@@ -238,6 +238,23 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
         !text.contains("No ledger database found"),
         "it must not claim the ledger is absent:\n{text}"
     );
+    // The success summary must name only what was checked. This command verifies
+    // Sigma-debit == Sigma-credit and nothing else about the ledger, so a plural
+    // "ledger invariants" claim would cover validations it never runs.
+    assert!(
+        !text.contains("ledger invariants"),
+        "success must not claim ledger invariants in general; only the \
+         double-entry invariant is checked:\n{text}"
+    );
+    assert!(
+        !text.contains("This backup can be safely restored"),
+        "even under --verify-ledger this command does not check hashes, \
+         signatures or provenance, so it must not certify safe restoration:\n{text}"
+    );
+    assert!(
+        text.contains("were NOT performed") || text.contains("NOT performed"),
+        "success must state which ledger validations it did not perform:\n{text}"
+    );
 }
 
 /// Requesting ledger verification on an archive with no ledger must not be
@@ -320,6 +337,105 @@ fn a_tampered_ledger_whose_rows_cannot_be_read_is_not_reported_as_verified() {
     assert!(
         !text.contains("BACKUP VERIFICATION PASSED"),
         "a tampered ledger must not print the success banner:\n{text}"
+    );
+}
+
+/// A row that is valid JSON but not a valid journal entry must not be skipped.
+///
+/// `serde_json::Value` parses `{}` happily, so a structurally invalid row used to
+/// contribute nothing to the per-currency sums and leave them empty — a wholly
+/// corrupt ledger then reported "no currencies" and passed. Parsing is not
+/// interpreting.
+#[test]
+fn schema_invalid_ledger_rows_are_not_silently_skipped() {
+    for (label, body) in [
+        ("no accounts array", br#"{}"#.to_vec()),
+        (
+            "account without a string currency",
+            br#"{"accounts":[{"debit":100}]}"#.to_vec(),
+        ),
+        (
+            "non-integer debit",
+            br#"{"accounts":[{"currency":"hours","debit":"lots"}]}"#.to_vec(),
+        ),
+    ] {
+        let dir = TempDir::new().unwrap();
+        let data_dir = dir.path().join("data");
+        let archive = dir.path().join("backup.tar");
+
+        init_identity(&data_dir);
+        let path = ledger_dir(&data_dir);
+        std::fs::create_dir_all(&path).unwrap();
+        let store = SledStore::open(&path).expect("fixture: could not open ledger store");
+        store
+            .put(
+                b"ledger:journal:0000000000000000000000000000000000000000000000000000000000000001",
+                &body,
+            )
+            .expect("fixture: could not write row");
+        store.db().flush().unwrap();
+        drop(store);
+        make_backup(&data_dir, &archive);
+
+        let out = verify(&archive, true);
+        let text = combined(&out);
+
+        assert!(
+            !out.status.success(),
+            "[{label}] a row that is not a valid journal entry must fail \
+             --verify-ledger:\n{text}"
+        );
+        assert!(
+            text.contains("not valid journal entries"),
+            "[{label}] the failure must say the row was not interpretable:\n{text}"
+        );
+        assert!(
+            !text.contains("BACKUP VERIFICATION PASSED"),
+            "[{label}] it must not print the success banner:\n{text}"
+        );
+    }
+}
+
+/// A ledger *directory* with no database inside must not be "opened".
+///
+/// `SledStore::open` calls `sled::open`, which CREATES when nothing is there. An
+/// archive carrying an empty `store/ledger` (icnd creates the directory before
+/// opening it, so a crash in between leaves exactly that) would otherwise have a
+/// fresh empty database created at verify time and reported as verified — this
+/// command certifying a database the backup does not contain.
+#[test]
+fn an_empty_ledger_directory_is_refused_rather_than_created() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+    // The directory exists and is archived, but holds no sled database.
+    let path = ledger_dir(&data_dir);
+    std::fs::create_dir_all(&path).unwrap();
+    std::fs::write(path.join("placeholder"), b"not a database").unwrap();
+    make_backup(&data_dir, &archive);
+
+    assert!(
+        archive_contains_ledger(&archive),
+        "fixture: the archive must carry the ledger directory itself"
+    );
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "an empty ledger directory must be refused, not opened into a new \
+         database:\n{text}"
+    );
+    assert!(
+        text.contains("holds no ledger database"),
+        "the failure must say the directory held no database:\n{text}"
+    );
+    assert!(
+        !text.contains("BACKUP VERIFICATION PASSED"),
+        "it must not print the success banner:\n{text}"
     );
 }
 

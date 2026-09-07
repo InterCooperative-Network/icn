@@ -1316,11 +1316,14 @@ every §11 disposition are untouched, and no readiness classification moves.
   typed gated-handle capability — evaluated and deliberately not built here.
 - **`verify-backup` gates only under `--verify-ledger`.** That is still true: plain
   `icnctl verify-backup` does not audit the restored tree. What changed is the *claim* — icn#2717
-  narrowed the bare command's message so it no longer prints "This backup can be safely restored",
-  and instead states that ledger contents and the N2-A audit were **not** verified and that
-  `--verify-ledger` is how to check them. The bare command's checks are unchanged; only the
-  overclaim was removed. Widening what it actually verifies would change what the command means and
-  is still not done here.
+  removed the "This backup can be safely restored" claim from **both** branches, because the
+  command never establishes it: bare `verify-backup` now states that ledger contents and the N2-A
+  audit were **not** verified and that `--verify-ledger` is how to check them, and the
+  `--verify-ledger` branch names the three things it did verify (archive integrity, the
+  double-entry invariant, the N2-A audit of the restored tree) and the ledger validations it did
+  not (amount signs, hashes, signatures, provenance, parent existence). No check changed in either
+  branch; only the claims did. Widening what the bare command actually verifies would change what
+  it means and is still not done here.
 - **A pre-existing `verify-backup` path bug, found while placing that gate. FIXED by icn#2717.**
   `verify_ledger_in_backup` looked for `<restore_dir>/ledger`, but `backup` archives the data
   directory whole, so the ledger lands at `<restore_dir>/store/ledger`. The ledger check was

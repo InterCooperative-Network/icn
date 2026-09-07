@@ -6805,8 +6805,16 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     // it never established (#2717). The bare command's *checks* are unchanged;
     // only the claim is narrowed to them.
     if verify_ledger {
-        println!("Integrity, ledger invariants and the N2-A principal audit all passed.");
-        println!("This backup can be safely restored.");
+        // Name the ONE invariant that was checked. `verify_ledger_in_backup`
+        // verifies Σdebit == Σcredit per currency and nothing else — not positive
+        // amounts, content hashes, signatures, provenance or parent existence — so
+        // "ledger invariants" in the plural claimed a validation this command does
+        // not perform. Narrowing the sentence is the same correction this PR makes
+        // to the bare command, applied to the line it added.
+        println!("Verified: archive integrity, the double-entry invariant, and the");
+        println!("N2-A principal audit of the restored tree.");
+        println!("Other ledger validations (amount signs, hashes, signatures,");
+        println!("provenance, parent existence) were NOT performed.");
     } else {
         println!("Verified: archive integrity, checksum, and required files.");
         println!("NOT verified: ledger contents and the N2-A principal audit.");
@@ -6846,6 +6854,25 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
         );
     }
 
+    // `SledStore::open` calls `sled::open`, which CREATES a database when none is
+    // there. A directory that exists but holds no database — `icnd` creates
+    // `store/ledger` before opening it, so a crash in between leaves exactly that,
+    // and the archive checksum ignores directories — would therefore be "opened"
+    // as a brand-new empty database, scanned for zero rows, and reported as a
+    // verified ledger. That is this command verifying a database the backup does
+    // not contain. `conf` is sled's own marker, written beside `db` and `blobs`.
+    if !ledger_db_path.join("conf").exists() {
+        bail!(
+            "FAILED: {} exists but holds no ledger database, so nothing from this \
+             backup could be verified. Ledger verification was NOT performed.\n\
+             \n\
+             A data directory can carry an empty ledger directory if the node was \
+             interrupted while creating it. Opening it here would have created a \
+             new empty database and verified that instead of the backup's.",
+            ledger_db_path.display()
+        );
+    }
+
     // Open the ledger store in read-only mode
     let store = SledStore::open(&ledger_db_path).context("Failed to open ledger store")?;
 
@@ -6860,39 +6887,80 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     let mut currency_sums: std::collections::HashMap<String, i128> =
         std::collections::HashMap::new();
     let mut parse_errors = 0usize;
+    // A row can be valid JSON and still not be a journal entry. Those used to be
+    // skipped in silence: `{}`, or an account whose `currency` is absent or not a
+    // string, contributed nothing to `currency_sums`, so a wholly corrupt ledger
+    // summed to "no currencies" and the command reported success. Structural
+    // rejects are collected rather than skipped, because the invariant cannot be
+    // evaluated over a row the verifier could not interpret.
+    let mut schema_errors: Vec<String> = Vec::new();
 
-    for (_key, value) in entries {
-        // Try to deserialize entry and extract account deltas
-        match serde_json::from_slice::<serde_json::Value>(&value) {
-            Ok(entry) => {
-                if let Some(accounts) = entry.get("accounts").and_then(|a| a.as_array()) {
-                    for account in accounts {
-                        if let Some(currency) = account.get("currency").and_then(|c| c.as_str()) {
-                            // AccountDelta uses separate debit and credit fields (both Option<i64>)
-                            let debit = account.get("debit").and_then(|d| d.as_i64()).unwrap_or(0);
-                            let credit =
-                                account.get("credit").and_then(|c| c.as_i64()).unwrap_or(0);
+    for (key, value) in entries {
+        let row = String::from_utf8_lossy(&key).into_owned();
 
-                            // Use checked arithmetic to prevent overflow
-                            let net =
-                                (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
-                                    anyhow::anyhow!(
-                                        "Arithmetic overflow computing net for currency {currency}"
-                                    )
-                                })?;
-
-                            let sum = currency_sums.entry(currency.to_string()).or_insert(0);
-                            *sum = sum.checked_add(net).ok_or_else(|| {
-                                anyhow::anyhow!("Arithmetic overflow summing currency {currency}")
-                            })?;
-                        }
-                    }
-                }
-            }
+        let entry = match serde_json::from_slice::<serde_json::Value>(&value) {
+            Ok(entry) => entry,
             Err(_) => {
                 parse_errors += 1;
+                continue;
             }
+        };
+
+        // `JournalEntry::accounts` is a plain `Vec<AccountDelta>` with no rename
+        // and no skip, so every legitimately written row carries this array.
+        let accounts = match entry.get("accounts").and_then(|a| a.as_array()) {
+            Some(accounts) => accounts,
+            None => {
+                schema_errors.push(format!("{row}: no `accounts` array"));
+                continue;
+            }
+        };
+
+        for account in accounts {
+            let Some(currency) = account.get("currency").and_then(|c| c.as_str()) else {
+                schema_errors.push(format!("{row}: account without a string `currency`"));
+                continue;
+            };
+
+            // `debit` and `credit` are `Option<i64>`: absent or null is legal and
+            // means zero. A field that is PRESENT but not an integer is not.
+            let mut amount = |field: &str| -> Option<i64> {
+                match account.get(field) {
+                    None | Some(serde_json::Value::Null) => Some(0),
+                    Some(v) => match v.as_i64() {
+                        Some(n) => Some(n),
+                        None => {
+                            schema_errors
+                                .push(format!("{row}: `{field}` is present but not an integer"));
+                            None
+                        }
+                    },
+                }
+            };
+            let (Some(debit), Some(credit)) = (amount("debit"), amount("credit")) else {
+                continue;
+            };
+
+            // Use checked arithmetic to prevent overflow
+            let net = (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
+                anyhow::anyhow!("Arithmetic overflow computing net for currency {currency}")
+            })?;
+
+            let sum = currency_sums.entry(currency.to_string()).or_insert(0);
+            *sum = sum.checked_add(net).ok_or_else(|| {
+                anyhow::anyhow!("Arithmetic overflow summing currency {currency}")
+            })?;
         }
+    }
+
+    if !schema_errors.is_empty() {
+        bail!(
+            "FAILED: {} of {} ledger row(s) are not valid journal entries, so the \
+             double-entry invariant could NOT be verified over this ledger. First: {}",
+            schema_errors.len(),
+            entry_count,
+            schema_errors[0]
+        );
     }
 
     // Fail closed on rows that could not be read. `icn-ledger` writes every
