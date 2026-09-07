@@ -6814,31 +6814,36 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     // it never established (#2717). The bare command's *checks* are unchanged;
     // only the claim is narrowed to them.
     if verify_ledger {
-        // Name the ONE invariant that was checked. `verify_ledger_in_backup`
-        // verifies Σdebit == Σcredit per currency and nothing else — not positive
-        // amounts, content hashes, signatures, provenance or parent existence — so
-        // "ledger invariants" in the plural claimed a validation this command does
-        // not perform. Narrowing the sentence is the same correction this PR makes
-        // to the bare command, applied to the line it added.
-        // Name only what was actually computed. A journal whose entries carry
-        // no currency deltas satisfies the per-currency invariant vacuously, so
-        // claiming "the double-entry invariant" there would contradict the
-        // detail line printed three lines above it.
-        let balanced = ledger_check
+        // Name exactly what was established, and widen it only as far as the
+        // checks actually widened. Entry validity is now decided by
+        // `icn_ledger::entry_validation` — the owner `Ledger::validate_entry`
+        // consults on append — so "empty-entry rejection" moves out of the
+        // NOT-performed list and into the claim. Nothing else does (icn#2736).
+        let entries = ledger_check.as_ref().map(|c| c.entries).unwrap_or(0);
+        let currencies = ledger_check
             .as_ref()
-            .map(|c| c.currencies_balanced > 0)
-            .unwrap_or(false);
-        if balanced {
-            println!("Verified: archive integrity, the double-entry invariant, and the");
-            println!("N2-A principal audit of the restored tree.");
+            .map(|c| c.currencies_balanced)
+            .unwrap_or(0);
+        if entries > 0 {
+            println!("Verified: archive integrity; that all {entries} ledger entries are valid");
+            println!("under icn-ledger's own entry validation (at least one account delta,");
+            println!("and the double-entry invariant per entry under checked i64, across");
+            println!(
+                "{currencies} currencies); and the N2-A principal audit of the restored tree."
+            );
         } else {
-            let entries = ledger_check.as_ref().map(|c| c.entries).unwrap_or(0);
+            // Reachable only for a journal with no entries at all. Every
+            // `AccountDelta` carries a currency and an entry with none is now
+            // refused, so a non-empty journal always yields a computed balance.
             println!("Verified: archive integrity and the N2-A principal audit of the");
-            println!("restored tree. {entries} ledger entries carried no currency delta,");
-            println!("so no double-entry balance was computed.");
+            println!("restored tree. The ledger contains no entries, so no entry was");
+            println!("validated and no double-entry balance was computed.");
         }
-        println!("Other ledger validations (amount signs, hashes, signatures,");
-        println!("provenance, parent existence, empty-entry rejection) were NOT performed.");
+        println!("NOT verified: content hashes, signatures, provenance, parent");
+        println!("existence. Freeze state, credit limits and progressive limits are");
+        println!("append-time policy — evaluated against live ledger state and the");
+        println!("current clock — so they are not properties of a backup at rest and");
+        println!("are deliberately not checked here.");
     } else {
         println!("Verified: archive integrity, checksum, and required files.");
         println!("NOT verified: ledger contents and the N2-A principal audit.");
@@ -6961,11 +6966,11 @@ fn sanitize_diagnostic(line: &str) -> String {
 
 /// What `verify_ledger_in_backup` actually established.
 ///
-/// Returned rather than inferred so the operator-facing summary cannot claim a
-/// balance that was never computed: a journal whose entries carry no currency
-/// deltas satisfies the per-currency invariant vacuously, and saying "the
-/// double-entry invariant" was verified there would be the same overclaim this
-/// command exists to stop making.
+/// Returned rather than inferred so the operator-facing summary reports coverage
+/// from evidence and never from the absence of an error. `currencies_balanced`
+/// counts only currencies `icn_ledger::entry_validation` summed to zero, so the
+/// summary can name the breadth of the double-entry claim instead of asserting
+/// it flatly.
 struct LedgerCheck {
     entries: usize,
     currencies_balanced: usize,
@@ -7014,14 +7019,10 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
     let entry_count = entries.len();
     println!("  Found {entry_count} ledger entries");
 
-    // Verify the double-entry invariant: within EACH entry, Σ debits == Σ credits
-    // per currency — the same scope `Ledger::validate_entry` enforces on append.
-    let mut unbalanced_rows: Vec<String> = Vec::new();
-    // Detail lines are per CURRENCY; a row imbalanced in two currencies
-    // contributes two. Counting rows separately stops the report claiming
-    // "2 of 1 ledger row(s) do not balance" — an impossible statement
-    // about the operator's own data.
-    let mut unbalanced_row_count = 0usize;
+    // Decide each row's validity by asking icn-ledger, not by re-deriving its
+    // rules here. See the call site below for why that owner exists (icn#2736).
+    let mut invalid_rows: Vec<String> = Vec::new();
+    let mut invalid_row_count = 0usize;
     let mut currencies_seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     // Deserialize each row into the PERSISTED LEDGER TYPE, not an untyped
     // `serde_json::Value`.
@@ -7054,73 +7055,40 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
             }
         };
 
-        // Balance is checked PER ROW, matching what the ledger enforces.
-        // `Ledger::validate_entry` (icn-ledger/src/ledger.rs) scopes its
-        // `currency_sums` to a single entry — `for delta in &entry.accounts` — and
-        // requires every currency to sum to zero for THAT entry. Accumulating
-        // across the whole journal is a strictly weaker check: two rows at +60 and
-        // −60 `hours` cancel ledger-wide and would have been reported as verified,
-        // while the ledger would have rejected both on append. Per-row balance
-        // implies the ledger-wide total, so this subsumes the old check rather
-        // than adding to it.
-        // i64 with checked arithmetic, using the ledger's own `net_change()` —
-        // NOT a widened i128. `validate_entry` accumulates in `HashMap<String, i64>`
-        // and rejects overflow as `ArithmeticOverflow`, so a row whose running
-        // per-currency total exceeds i64 and later cancels (debits of i64::MAX and
-        // 1, then matching credits) is rejected there. Computing the same sum in
-        // i128 cannot overflow, so it reaches zero and would report the row
-        // verified — accepting exactly what the ledger refuses. Same words, weaker
-        // check, which is the shape this whole command kept failing in.
-        let mut row_sums: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
-        let mut row_overflowed = false;
-
-        for account in &entry.accounts {
-            let currency = &account.currency;
-
-            let net = match account.net_change() {
-                Ok(net) => net,
-                Err(e) => {
-                    unbalanced_rows.push(sanitize_diagnostic(&format!("{row}: {e}")));
-                    row_overflowed = true;
-                    break;
-                }
-            };
-
-            let sum = row_sums.entry(currency.clone()).or_insert(0);
-            match sum.checked_add(net) {
-                Some(next) => *sum = next,
-                None => {
-                    unbalanced_rows.push(sanitize_diagnostic(&format!(
-                        "{row}: arithmetic overflow accumulating currency {currency}"
-                    )));
-                    row_overflowed = true;
-                    break;
-                }
+        // Ask icn-ledger whether this entry is valid. Do not re-derive the rule.
+        //
+        // `icn_ledger::entry_validation::inspect_entry` is the SAME owner
+        // `Ledger::validate_entry` consults on append, so the two cannot answer
+        // differently — which they twice did while this command kept its own copy
+        // (icn#2717): it summed balances across the whole journal where the ledger
+        // sums per entry, and it accumulated in a widened `i128` where the ledger
+        // uses checked `i64`, so a row the ledger rejects as an overflow reached
+        // zero here and was certified. A third divergence was already latent and is
+        // closed by the same move: an entry with an empty `accounts` array balances
+        // vacuously under a balance-only check, and the mirrored code passed it over
+        // while `validate_entry` rejects it on its first line (icn#2736).
+        //
+        // The owner is a free function over `&JournalEntry`: it opens nothing, locks
+        // nothing and reads no clock, so consulting it costs this command none of the
+        // read-only posture icn#2717 established. Deliberately NOT delegated to is
+        // the rest of `validate_entry` — freeze state, credit limits, progressive
+        // limits — which is evaluated against live ledger state and `SystemTime::now()`.
+        // Those are append-time policy, not properties of an archived journal;
+        // re-running them offline would reject entries that were valid when appended.
+        let intrinsics = icn_ledger::entry_validation::inspect_entry(&entry);
+        if intrinsics.is_valid() {
+            // Only currencies the owner actually summed to zero. Coverage is
+            // reported from evidence, never inferred from the absence of an error.
+            currencies_seen.extend(intrinsics.currencies_balanced().iter().cloned());
+        } else {
+            // Detail lines are per DEFECT; a row invalid in two currencies
+            // contributes two. Counting rows separately stops the report claiming
+            // "2 of 1 ledger row(s)" — an impossible statement about the
+            // operator's own data.
+            for defect in intrinsics.defects() {
+                invalid_rows.push(sanitize_diagnostic(&format!("{row}: {defect}")));
             }
-        }
-
-        if row_overflowed {
-            // The row is already recorded as failing; do not also fold its partial
-            // sums into the balance verdict. It still counts as ONE failing row —
-            // omitting it here would under-report the corruption scope by exactly
-            // the rows that failed hardest.
-            unbalanced_row_count += 1;
-            continue;
-        }
-
-        let mut row_unbalanced = false;
-        for (currency, sum) in row_sums {
-            if sum != 0 {
-                unbalanced_rows.push(sanitize_diagnostic(&format!(
-                    "{row}: currency {currency} sums to {sum}"
-                )));
-                row_unbalanced = true;
-            }
-            // Record the currency so the report can say how many were covered.
-            currencies_seen.insert(currency);
-        }
-        if row_unbalanced {
-            unbalanced_row_count += 1;
+            invalid_row_count += 1;
         }
     }
 
@@ -7138,32 +7106,42 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
         );
     }
 
-    if !unbalanced_rows.is_empty() {
-        for row in unbalanced_rows.iter().take(5) {
+    if !invalid_rows.is_empty() {
+        for row in invalid_rows.iter().take(5) {
             println!("  ✗ {row}");
         }
+        // "do not balance" was accurate while balance was the only rule checked.
+        // The owner also rejects an entry carrying no account deltas, which does
+        // not "fail to balance" — it has nothing to balance — so the sentence has
+        // to name the actual verdict rather than the rule it used to be about.
         bail!(
-            "FAILED: {} of {} ledger row(s) do not balance. The ledger enforces \
-             double entry per entry, so these rows would be rejected on append; \
-             a journal containing them is not a valid ledger even if the totals \
-             happen to cancel across rows.",
-            unbalanced_row_count,
+            "FAILED: {} of {} ledger row(s) are not valid journal entries. Each \
+             was rejected by icn-ledger's own entry validation — the same owner \
+             `Ledger::validate_entry` consults on append — so these rows would \
+             not have been accepted into a ledger, and a journal containing them \
+             is not a valid ledger even if the totals happen to cancel across rows.",
+            invalid_row_count,
             entry_count
         );
     }
 
-    if currencies_seen.is_empty() {
-        if entry_count == 0 {
-            println!("  ✓ Ledger empty (no entries)");
-        } else {
-            println!(
-                "  ✓ {entry_count} entries read; none carried a currency delta, \
-                 so no balance was computed"
-            );
-        }
+    if entry_count == 0 {
+        println!("  ✓ Ledger empty (no entries)");
     } else {
+        // Every surviving entry passed the owner, and the owner rejects an entry
+        // with no account deltas — so a non-empty journal that reaches here has
+        // at least one `AccountDelta`, and every `AccountDelta` carries a
+        // currency. `currencies_seen` therefore cannot be empty at this point.
+        // Before icn#2736 it could, and the summary needed a third arm for
+        // "entries read, nothing summed"; delegation removed that state rather
+        // than the wording papering over it.
+        debug_assert!(
+            !currencies_seen.is_empty(),
+            "a validated non-empty journal always yields at least one currency"
+        );
         println!(
-            "  ✓ Double-entry invariant verified per entry across {} entries and {} currencies",
+            "  ✓ {} entries valid under icn-ledger's entry validation; \
+             double-entry invariant holds per entry across {} currencies",
             entry_count,
             currencies_seen.len()
         );

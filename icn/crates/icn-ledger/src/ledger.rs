@@ -2887,20 +2887,48 @@ impl Ledger {
     /// Get archived entries for a specific rollback timestamp
     /// Validate a journal entry before accepting it
     ///
-    /// This validates:
-    /// - Entry has at least one account delta
+    /// **Entry-intrinsic** rules — at least one account delta, and
+    /// Σ debits == Σ credits per currency under checked `i64` — are owned by
+    /// [`crate::entry_validation`] and delegated to below. They depend on the
+    /// entry value alone, so a backup verifier can and does apply the same
+    /// owner to a restored journal (icn#2736).
+    ///
+    /// **Ledger-state** rules stay here, because they are not properties of an
+    /// entry at all:
     /// - Author and affected accounts are not frozen (Issue #25)
-    /// - Double-entry invariants (Σ debits == Σ credits per currency)
     /// - Credit limits are respected
+    /// - Progressive POPLevel balance and velocity limits (Issue #336)
+    ///
+    /// These read mutable ledger state and `SystemTime::now()`, so they answer
+    /// "may this entry be appended to *this* ledger, *now*?" — a question that
+    /// has no meaning for an archived journal, and one an offline verifier
+    /// would answer wrongly, rejecting entries that were valid when appended.
     ///
     /// Note: Parent validation (Merkle-DAG links) is done separately in
     /// `append_entry_internal` with different behavior for local vs sync operations
     /// (Issue #499: hybrid causal ordering).
     fn validate_entry(&mut self, entry: &JournalEntry) -> Result<()> {
-        // Check that entry has at least one account delta
-        if entry.accounts.is_empty() {
-            anyhow::bail!("Entry has no account deltas");
-        }
+        // Entry-intrinsic validity — at least one account delta, and the
+        // per-currency double-entry invariant under checked `i64` — is owned by
+        // `crate::entry_validation`, not by this method.
+        //
+        // It lives there because this method cannot be the owner: it is
+        // `&mut self` and the checks below it read live ledger state and the
+        // wall clock, so nothing outside an initialised `Ledger` can call it.
+        // `icnctl verify-backup --verify-ledger` needs exactly the entry-intrinsic
+        // half against a journal restored from a backup, and with no seam to call
+        // it re-derived the rule instead. That copy diverged twice before anyone
+        // noticed (icn#2717) and was already missing this method's very first
+        // check. Both callers now consult one owner (icn#2736).
+        //
+        // ORDER NOTE: the double-entry check now runs before the freeze check
+        // rather than after it. The set of entries this method ACCEPTS is
+        // unchanged — both are rejection gates and neither is skipped — but an
+        // entry that is both imbalanced and authored by a frozen DID now reports
+        // the imbalance rather than the freeze.
+        crate::entry_validation::inspect_entry(entry)
+            .into_result()
+            .map_err(LedgerError::from)?;
 
         // Check for frozen members (Issue #25)
         // Both the author and all affected accounts must not be frozen
@@ -2917,26 +2945,6 @@ impl Ledger {
                     "Account {} is frozen and cannot participate in transactions",
                     delta.account_id
                 );
-            }
-        }
-
-        // Check double-entry invariant per currency
-        let mut currency_sums: HashMap<String, i64> = HashMap::new();
-        for delta in &entry.accounts {
-            let sum = currency_sums.entry(delta.currency.clone()).or_insert(0);
-            let change = delta.net_change()?;
-            *sum = sum.checked_add(change).ok_or_else(|| {
-                LedgerError::ArithmeticOverflow(format!(
-                    "overflow in double-entry check: {sum} + {change} for currency {}",
-                    delta.currency
-                ))
-            })?;
-        }
-
-        // All currencies must sum to zero (double-entry)
-        for (currency, sum) in currency_sums {
-            if sum != 0 {
-                anyhow::bail!("Currency {currency} does not balance (sum = {sum})");
             }
         }
 

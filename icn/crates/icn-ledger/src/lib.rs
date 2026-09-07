@@ -58,6 +58,7 @@ pub mod credit_policy;
 pub mod dispute;
 pub mod dynamic_limits;
 pub mod entry;
+pub mod entry_validation;
 #[allow(missing_docs)]
 pub mod error;
 pub mod events;
@@ -93,6 +94,7 @@ pub use dynamic_limits::{
     AccountLimitState, DynamicCreditLimitManager, DynamicLimitConfig, LimitChangeEvent,
     LimitChangeReason,
 };
+pub use entry_validation::{inspect_entry, EntryDefect, EntryIntrinsics};
 pub use error::{LedgerError, Result};
 pub use fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,

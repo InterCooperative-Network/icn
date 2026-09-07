@@ -1320,14 +1320,20 @@ every §11 disposition are untouched, and no readiness classification moves.
   command never establishes it: bare `verify-backup` now states that ledger contents and the N2-A
   audit were **not** verified and that `--verify-ledger` is how to check them, and the
   `--verify-ledger` branch names only what it computed — archive integrity, the N2-A audit of the
-  restored tree, and the double-entry invariant **when a balance was actually computed**; a journal
-  whose entries carry no currency deltas satisfies that invariant vacuously, so there the summary
-  says so instead of claiming it — together with the ledger validations it did not perform (amount
-  signs, hashes, signatures, provenance, parent existence, empty-entry rejection). **The bare branch's checks
-  are unchanged — only its claim narrowed.** The `--verify-ledger` branch did change what it
-  checks, and the bullet below records how: it resolves the canonical ledger path, refuses an
-  absent or partial database before the gate can create one, decodes rows as `JournalEntry`, and
-  balances per entry. Widening what the *bare* command verifies would change what it means and is
+  restored tree, and — since icn#2736 — that every ledger entry is valid under
+  `icn_ledger::entry_validation`, the owner `Ledger::validate_entry` itself consults, together with
+  the ledger validations it did not perform (hashes, signatures, provenance, parent existence).
+  Before icn#2736 the invariant was claimed only **when a balance was actually computed**, because a
+  journal whose entries carried no currency deltas satisfied it vacuously and the summary said so
+  instead of claiming it; delegating to the owner made that state unreachable — an entry with no
+  account deltas is now **refused** rather than passed over — so the remaining no-balance terminal is
+  an empty journal. Freeze state, credit limits and progressive limits stay outside the claim by
+  construction: they are append-time policy evaluated against live ledger state and the current
+  clock, so an offline verifier applying them would reject entries that were valid when appended.
+  **The bare branch's checks are unchanged — only its claim narrowed.** The `--verify-ledger` branch
+  did change what it checks, and the bullet below records how: it resolves the canonical ledger path,
+  refuses an absent or partial database before the gate can create one, decodes rows as
+  `JournalEntry`, and asks the ledger's own validator whether each one is valid. Widening what the *bare* command verifies would change what it means and is
   still not done here.
 - **A pre-existing `verify-backup` path bug, found while placing that gate. FIXED by icn#2717.**
   `verify_ledger_in_backup` looked for `<restore_dir>/ledger`, but `backup` archives the data
