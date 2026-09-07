@@ -21,6 +21,7 @@ on:
       - 'scripts/tests/test_merge_policy_schema.py'
       - 'scripts/tests/test_what_matters_now_json.py'
       - 'scripts/tests/test_what_matters_now_drift.py'
+      - 'scripts/tests/test_what_matters_now_sprint_path.py'
       # icn#2651 stage B: the executable that owns ordinary-merge semantics, and its controls.
       - 'tools/icn-merge-pr/**'
       - 'scripts/tests/test_icn_merge_pr.py'
@@ -172,6 +173,13 @@ jobs:
       # This asserts the report is actually reached and that findings aggregate.
       - name: what-matters-now --drift reports what it found (Refs icn#2723)
         run: python3 scripts/tests/test_what_matters_now_drift.py
+
+      # icn#2722: the sprint/policy lookups spliced the checkout path into Python
+      # source, so a path containing a legal `'` silently misreported (and could
+      # execute code). This drives the script from such a path and forbids the
+      # class structurally, so it cannot return on a new site.
+      - name: what-matters-now survives a quoted checkout path (Refs icn#2722)
+        run: python3 scripts/tests/test_what_matters_now_sprint_path.py
 
       - name: what-matters-now human mode still renders
         run: bash ops/scripts/what-matters-now.sh > /dev/null
