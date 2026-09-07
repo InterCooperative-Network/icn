@@ -6836,7 +6836,12 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
         // distinguishable from "the verifier looked in the wrong place".
         bail!(
             "FAILED: --verify-ledger was requested but no ledger database exists \
-             in this backup at {}. Ledger verification was NOT performed.",
+             in this backup at {}. Ledger verification was NOT performed.\n\
+             \n\
+             A node that has never started has no ledger yet — `icnd` creates it, \
+             not `icnctl id init`. If this is a pre-first-start backup, verify it \
+             without --verify-ledger; there is deliberately no flag to make \
+             --verify-ledger pass without reading a ledger.",
             ledger_db_path.display()
         );
     }
@@ -6915,7 +6920,20 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
 
     if all_balanced {
         if currency_sums.is_empty() {
-            println!("  ✓ Ledger empty (no currencies)");
+            // Distinguish "there was nothing to check" from "there were rows and
+            // none of them carried a currency delta". Printing "Ledger empty"
+            // straight after "Found N ledger entries" contradicted itself, and
+            // the summary below would then assert an invariant over rows nothing
+            // was summed from — the same shape as the defects this command just
+            // stopped committing, one level in.
+            if entry_count == 0 {
+                println!("  ✓ Ledger empty (no entries)");
+            } else {
+                println!(
+                    "  ✓ {entry_count} entries read; none carried a currency delta, \
+                     so no balance was computed"
+                );
+            }
         } else {
             println!(
                 "  ✓ Double-entry invariant verified for {} currencies",

@@ -226,10 +226,13 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
         "success must state that the invariant was actually checked, not merely \
          that the command finished:\n{text}"
     );
+    // The exact count, not a disjunction that its own second operand subsumes:
+    // `contains("Found 1 ...") || contains("ledger entries")` can never fail on
+    // the count, so a verifier that read the wrong number of rows would pass it.
     assert!(
-        text.contains("Found 1 ledger entries") || text.contains("ledger entries"),
-        "it must report the rows it inspected, so success is evidence about what \
-         was read:\n{text}"
+        text.contains("Found 1 ledger entries"),
+        "it must report the exact number of rows it inspected, so success is \
+         evidence about what was read:\n{text}"
     );
     assert!(
         !text.contains("No ledger database found"),
@@ -348,7 +351,13 @@ fn verify_backup_verify_ledger_refuses_a_restored_tree_the_n2a_gate_refuses() {
     assert_ne!(a.as_str(), b.as_str(), "under TWO spellings");
     let peer = icn_identity::KeyPair::generate().unwrap().did().clone();
 
-    let store = SledStore::open(data_dir.join("store")).unwrap();
+    // The canonical trust path (`{data_dir}/store/trust`), not `{data_dir}/store`.
+    // The gate would discover either, since `find_sled_roots` recurses — but this
+    // PR is about store-layout ownership, and a fixture modelling the exact
+    // layout icn#2718 fixed would be a poor thing to leave behind in it.
+    let trust_dir = data_dir.join("store").join("trust");
+    std::fs::create_dir_all(&trust_dir).unwrap();
+    let store = SledStore::open(&trust_dir).unwrap();
     for src in [&a, &b] {
         let key = format!("trust/edges/{}:{}", src.as_str(), peer.as_str());
         store.put(key.as_bytes(), b"{}").unwrap();
@@ -395,6 +404,14 @@ fn bare_verify_backup_does_not_claim_a_ledger_verification_it_did_not_do() {
     let out = verify(&archive, false);
     let text = combined(&out);
 
+    // The headline claim itself. Without this, re-adding "This backup can be
+    // safely restored" to the bare branch would leave every other assertion here
+    // green — the change would be unpinned by the very test named for it.
+    assert!(
+        !text.contains("This backup can be safely restored"),
+        "bare verify-backup checked neither the ledger nor the N2-A audit, so it \
+         must not claim the backup can be safely restored:\n{text}"
+    );
     // The bare command does not inspect the ledger, so it must not speak about it.
     assert!(
         !text.contains("Double-entry invariant verified"),
