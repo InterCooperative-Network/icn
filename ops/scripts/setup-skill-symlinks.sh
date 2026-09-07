@@ -24,11 +24,15 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 SKILLS_DIR="${REPO_ROOT}/../.claude/skills"
 CANONICAL_DIR="${REPO_ROOT}/ops/automation/skills"
 
+# Registry path via sys.argv, never spliced into the Python source: REPO_ROOT is
+# the checkout path and a single quote is a legal POSIX path component, so
+# splicing it closed the string literal and parsed the rest as Python
+# (icn#2722 sweep).
 mapfile -t SKILLS < <(python3 -c "
 import json,sys
-d=json.load(open('${REPO_ROOT}/ops/state/truth/skills.json'))
+d=json.load(open(sys.argv[1]))
 print('\n'.join(e['name'] for e in d['skills']['ops_automation_canonical']))
-")
+" "${REPO_ROOT}/ops/state/truth/skills.json")
 if [[ "${#SKILLS[@]}" -eq 0 ]]; then
   echo "ERROR: no ops-automation skills registered in ops/state/truth/skills.json" >&2
   exit 1
