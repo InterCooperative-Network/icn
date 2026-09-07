@@ -6897,7 +6897,6 @@ fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Verify ledger integrity in a restored backup directory
 /// What `verify_ledger_in_backup` actually established.
 ///
 /// Returned rather than inferred so the operator-facing summary cannot claim a
@@ -6910,6 +6909,7 @@ struct LedgerCheck {
     currencies_balanced: usize,
 }
 
+/// Verify ledger integrity in a restored backup directory.
 fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
     use icn_store::{SledStore, Store};
 

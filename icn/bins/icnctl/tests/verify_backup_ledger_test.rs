@@ -316,6 +316,15 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
         !text.contains("No ledger database found"),
         "it must not claim the ledger is absent:\n{text}"
     );
+    // Pin the POSITIVE summary. `success_without_a_computed_balance_…` asserts the
+    // absence of this exact sentence; without something asserting its presence
+    // here, rewording it would make that negative unfalsifiable and leave the
+    // balanced branch's headline claim pinned by nothing.
+    assert!(
+        text.contains("Verified: archive integrity, the double-entry invariant"),
+        "a balanced ledger must state that the double-entry invariant was among \
+         the things verified:\n{text}"
+    );
     // The success summary must name only what was checked. This command verifies
     // Sigma-debit == Sigma-credit and nothing else about the ledger, so a plural
     // "ledger invariants" claim would cover validations it never runs.
@@ -425,7 +434,10 @@ fn success_without_a_computed_balance_does_not_claim_the_invariant_was_verified(
         (
             "entries with no currency delta",
             true,
-            "carried no currency delta",
+            // Must be unique to the DETAIL line. "carried no currency delta"
+            // alone also appears in the summary that BOTH arms print, so arm 2
+            // would pass without its terminal ever executing.
+            "1 entries read; none carried a currency delta",
         ),
     ];
 
