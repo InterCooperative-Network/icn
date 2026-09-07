@@ -24,14 +24,19 @@ ok()   { [[ "${VERBOSE}" == "--verbose" ]] && echo "OK:   $*" || true; }
 # trees are canonical and which are provider-facing; adding a tree or a skill must never require
 # editing a shell array here (icn#2633).
 REGISTRY="${REPO_ROOT}/ops/state/truth/skills.json"
+# Registry path via sys.argv, never spliced into the Python source: ${REGISTRY}
+# is derived from REPO_ROOT (the checkout path), and a single quote is a legal
+# POSIX path component, so splicing it closed the string literal and parsed the
+# rest as Python -- the class icn#2638/#2688 removed from the --json payload and
+# icn#2722 removed from what-matters-now.sh (icn#2722 sweep).
 mapfile -t SKILL_TREES < <(python3 -c "
 import json,sys
-try: d=json.load(open('${REGISTRY}'))
+try: d=json.load(open(sys.argv[1]))
 except Exception: sys.exit(0)
 s=d.get('enforcement',{}).get('scan_scope',{})
 for t in s.get('canonical_trees',[])+s.get('provider_trees',[]):
     if t.strip(): print(t.strip())
-" 2>/dev/null || true)
+" "${REGISTRY}" 2>/dev/null || true)
 if [[ "${#SKILL_TREES[@]}" -eq 0 ]]; then
   fail "could not derive skill scan scope from ops/state/truth/skills.json#enforcement.scan_scope"
   SKILL_TREES=(".agents/skills" ".claude/skills" "ops/automation/skills")
@@ -86,12 +91,13 @@ PROJECT_SKILLS="${REPO_ROOT}/../.claude/skills"
 CANONICAL_SKILLS="${REPO_ROOT}/ops/automation/skills"
 
 if [[ -d "${PROJECT_SKILLS}" ]]; then
+  # Registry path via sys.argv, not source (icn#2722 sweep).
   mapfile -t SYMLINK_SKILLS < <(python3 -c "
 import json,sys
-try: d=json.load(open('${REGISTRY}'))
+try: d=json.load(open(sys.argv[1]))
 except Exception: sys.exit(0)
 print('\n'.join(e['name'] for e in d['skills'].get('ops_automation_canonical', [])))
-" 2>/dev/null || true)
+" "${REGISTRY}" 2>/dev/null || true)
 
   for skill in "${SYMLINK_SKILLS[@]}"; do
     link="${PROJECT_SKILLS}/${skill}"
@@ -257,15 +263,16 @@ done
 
 POLICY_FILE="${REPO_ROOT}/ops/state/truth/policy.json"
 if [[ -f "${POLICY_FILE}" ]]; then
+  # Policy path via sys.argv, not source (icn#2722 sweep).
   REQUIRED_CHECK_COUNT=$(python3 -c "
 import json, sys
 try:
-    d = json.load(open('${POLICY_FILE}'))
+    d = json.load(open(sys.argv[1]))
     checks = d['merge']['required_checks']
     print(len(checks))
 except Exception as e:
     print(0)
-" 2>/dev/null || echo "0")
+" "${POLICY_FILE}" 2>/dev/null || echo "0")
 
   if [[ "${REQUIRED_CHECK_COUNT}" -ge 11 ]]; then
     ok "policy.json has ${REQUIRED_CHECK_COUNT} required checks"
@@ -280,12 +287,13 @@ AGENTS_FILE="${REPO_ROOT}/ops/state/truth/agents.json"
 AGENTS_DIR="${REPO_ROOT}/.claude/agents"
 
 if [[ -f "${AGENTS_FILE}" ]] && [[ -d "${AGENTS_DIR}" ]]; then
+  # Agents-registry path via sys.argv, not source (icn#2722 sweep).
   registered=$(python3 -c "
-import json
-d = json.load(open('${AGENTS_FILE}'))
+import json, sys
+d = json.load(open(sys.argv[1]))
 names = {a['name'] for a in d['agents']}
 print('\n'.join(sorted(names)))
-" 2>/dev/null || echo "")
+" "${AGENTS_FILE}" 2>/dev/null || echo "")
 
   for agent_file in "${AGENTS_DIR}"/*.md; do
     agent_name=$(basename "${agent_file}" .md)

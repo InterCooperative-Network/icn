@@ -150,27 +150,33 @@ WORKTREES=$(git -C "${REPO_ROOT}" worktree list 2>/dev/null | awk '{print $1, $3
 # on now" — that is a live issue/PR query (Refs icn#2634). A dormant cadence is a
 # truthful answer and must be reported as such, not as a stale sprint number.
 SPRINT_FILE="${REPO_ROOT}/ops/state/sprint/current.json"
+# The sprint file path is passed as sys.argv, never spliced into the Python
+# source. A checkout path can legally contain a single quote; splicing it into a
+# string literal closed the literal and parsed the rest as Python, so the lookup
+# silently fell back and misreported a readable file as unreadable -- the same
+# class icn#2638/#2688 removed from the --json payload, on this path (icn#2722).
+# This mirrors the canonical safe form in ops/scripts/drift-check.sh.
 SPRINT_SUMMARY=$(python3 -c "
-import json
-d = json.load(open('${SPRINT_FILE}'))
+import json, sys
+d = json.load(open(sys.argv[1]))
 if d.get('cadence') == 'dormant' or d.get('active_sprint') is None:
     print('no active sprint (cadence dormant)')
 else:
     print('Sprint %s (%s)' % (d.get('active_sprint'), d.get('status','?')))
-" 2>/dev/null || echo "unresolved (sprint owner unreadable)")
+" "${SPRINT_FILE}" 2>/dev/null || echo "unresolved (sprint owner unreadable)")
 # Emitted as JSON, not as Python source. The --json payload consumes this with json.loads;
 # repr() was only ever correct because the payload used to be built by splicing shell values
 # into Python source, which is the defect icn#2638 names.
-SPRINT_ACTIVE_JSON=$(python3 -c "import json; d=json.load(open('${SPRINT_FILE}')); v=d.get('active_sprint'); print(json.dumps(v if isinstance(v,(int,type(None))) else str(v)))" 2>/dev/null || echo "null")
-SPRINT_STATUS=$(python3 -c "import json; d=json.load(open('${SPRINT_FILE}')); print(d.get('status','?'))" 2>/dev/null || echo "?")
+SPRINT_ACTIVE_JSON=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); v=d.get('active_sprint'); print(json.dumps(v if isinstance(v,(int,type(None))) else str(v)))" "${SPRINT_FILE}" 2>/dev/null || echo "null")
+SPRINT_STATUS=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('status','?'))" "${SPRINT_FILE}" 2>/dev/null || echo "?")
 SPRINT_TASKS=$(python3 -c "
-import json
-d = json.load(open('${SPRINT_FILE}'))
+import json, sys
+d = json.load(open(sys.argv[1]))
 tasks = d.get('tasks', [])
 from collections import Counter
 counts = Counter(t.get('status','unknown') for t in tasks)
 print(', '.join(f'{v} {k}' for k,v in sorted(counts.items())) or 'none')
-" 2>/dev/null || echo "unavailable")
+" "${SPRINT_FILE}" 2>/dev/null || echo "unavailable")
 
 # ─── Phase 6: open PRs (if gh available) ────────────────────────────────────
 
@@ -187,12 +193,15 @@ fi
 
 # ─── Phase 7: canonical paths ────────────────────────────────────────────────
 
+# Path via sys.argv, not spliced into the source -- same reason as the sprint
+# lookups above (icn#2722). ${REPO_ROOT} is the checkout path and can contain a
+# single quote.
 POLICY_CHECKS=$(python3 -c "
-import json
-d = json.load(open('${REPO_ROOT}/ops/state/truth/policy.json'))
+import json, sys
+d = json.load(open(sys.argv[1]))
 checks = d['merge']['required_checks']
 print(str(len(checks)) + ' required checks')
-" 2>/dev/null || echo "?")
+" "${REPO_ROOT}/ops/state/truth/policy.json" 2>/dev/null || echo "?")
 
 # ─── Output ──────────────────────────────────────────────────────────────────
 
