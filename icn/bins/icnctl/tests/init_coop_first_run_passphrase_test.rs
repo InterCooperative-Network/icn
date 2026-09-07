@@ -347,14 +347,22 @@ fn without_a_passphrase_in_the_environment_first_run_still_requires_interactive_
         "the wizard must actually ask for a passphrase; if this prompt is \
          absent the interactive path was skipped rather than attempted:\n{text}"
     );
-    // ENXIO — "No such device or address" — is `rpassword` failing to open
-    // `/dev/tty` because `init_coop_command` put the child in its own session.
-    // Kept alongside the prompt assertion because it pins *where* the failure
-    // came from, but it is deliberately the weaker of the two: it renders
-    // through `strerror`, so it is the half that could in principle move under
-    // a different libc or a sandbox with no `/dev/tty` node.
+    // ENXIO is `rpassword` failing to open `/dev/tty`, because
+    // `init_coop_command` put the child in its own session. Kept alongside the
+    // prompt assertion because it pins *where* the failure came from: it is the
+    // assertion that fails if the `setsid` call is ever dropped, which the
+    // prompt check alone would not catch.
+    //
+    // Both spellings are listed because this renders through `strerror`, which
+    // is platform-specific: glibc gives "No such device or address" and Darwin
+    // gives "Device not configured" for the same errno. No CI job runs this
+    // test on macOS today — `release.yml` only builds there — but
+    // `cargo test -p icnctl` on a macOS workstation would otherwise fail on
+    // message text alone, which is a property of the assertion rather than of
+    // the code under test.
+    const ENXIO_MESSAGES: [&str; 2] = ["No such device or address", "Device not configured"];
     assert!(
-        text.contains("No such device or address"),
+        ENXIO_MESSAGES.iter().any(|m| text.contains(m)),
         "the wizard must fail because it had no terminal to prompt on; any \
          other failure means this test is no longer observing the interactive \
          path:\n{text}"
