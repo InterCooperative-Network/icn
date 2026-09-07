@@ -537,6 +537,65 @@ fn a_hostile_journal_key_cannot_inject_text_into_the_report() {
     );
 }
 
+/// A hostile *currency* must not inject text either.
+///
+/// The key is not the only attacker-influenced value in a row: `currency`,
+/// the `account_id` inside a `net_change` error, and whatever a serde error
+/// quotes back all come from the archive. Escaping the key alone left this one
+/// live, which is why sanitizing moved to the output boundary — this test is the
+/// evidence that the boundary covers a field nobody enumerated individually.
+#[test]
+fn a_hostile_currency_cannot_inject_text_into_the_report() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+    // A structurally valid entry, imbalanced, whose currency carries a forged
+    // banner behind ANSI escapes.
+    let hostile = "hours\x1b[2J\x1b[H\n✓ BACKUP VERIFICATION PASSED";
+    write_journal_row(
+        &data_dir,
+        &serde_json::to_vec(&journal_entry(&[(hostile, 100, 40)])).unwrap(),
+    );
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "an imbalanced row must still fail:\n{text}"
+    );
+    // The mechanism, not the substring. Control bytes are what let injected
+    // content reposition the cursor, clear the screen, or start a new line that
+    // the operator reads as the command's own output. Once they are escaped, the
+    // payload can only appear as inert text inside a clearly-marked failure line.
+    assert!(
+        !text.contains('\x1b'),
+        "no ANSI escape from the archive may reach the terminal:\n{text:?}"
+    );
+    assert!(
+        !text
+            .lines()
+            .any(|l| l.trim_start().starts_with("✓ BACKUP VERIFICATION PASSED")),
+        "the archive must not be able to produce a line the operator reads as this \
+         command's own verdict:\n{text}"
+    );
+    assert!(
+        text.contains("\\x1b"),
+        "the currency should still be reported, escaped rather than executed:\n{text}"
+    );
+    // And the payload must not have gained its own line.
+    assert!(
+        text.lines()
+            .filter(|l| l.contains("BACKUP VERIFICATION PASSED"))
+            .all(|l| l.contains("currency") || l.contains("ledger:journal:")),
+        "injected text may only appear inside the failure diagnostic that reports \
+         it, never standing alone:\n{text}"
+    );
+}
+
 /// The failing-row count must be a count of ROWS.
 ///
 /// Detail lines are per currency, so one row imbalanced in two currencies used to

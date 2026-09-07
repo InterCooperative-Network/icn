@@ -6897,8 +6897,8 @@ fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Render a journal key for operator output: bounded, with every non-printable
-/// byte escaped.
+/// Render an untrusted journal key: bounded, with every non-printable byte
+/// escaped.
 ///
 /// The key comes out of the archive being verified, which is untrusted input by
 /// definition — that is what this command exists to judge. Printing it verbatim
@@ -6917,6 +6917,34 @@ fn render_row_key(key: &[u8]) -> String {
     }
     if key.len() > MAX {
         out.push_str(&format!("…(+{} more bytes)", key.len() - MAX));
+    }
+    out
+}
+
+/// Sanitize a composed diagnostic line before it reaches the operator.
+///
+/// Applied at the OUTPUT BOUNDARY rather than per field, on purpose. A journal
+/// row carries several attacker-influenced values — the key, every
+/// `AccountDelta::currency`, the `account_id` embedded in a `net_change` error,
+/// and whatever a serde error quotes back — and escaping them one at a time
+/// requires enumerating all of them correctly, forever. icn#2717 escaped the key
+/// and left the currency, which is exactly that failure. One boundary is one
+/// place to get right.
+///
+/// Already-escaped input passes through unchanged, so this composes with
+/// [`render_row_key`] without double-escaping.
+fn sanitize_diagnostic(line: &str) -> String {
+    const MAX: usize = 240;
+    let mut out = String::with_capacity(line.len().min(MAX));
+    for ch in line.chars().take(MAX) {
+        if ch.is_control() {
+            out.push_str(&format!("\\x{:02x}", ch as u32 & 0xff));
+        } else {
+            out.push(ch);
+        }
+    }
+    if line.chars().count() > MAX {
+        out.push('…');
     }
     out
 }
@@ -7011,7 +7039,7 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
         let entry = match serde_json::from_slice::<icn_ledger::JournalEntry>(&value) {
             Ok(entry) => entry,
             Err(e) => {
-                undecodable.push(format!("{row}: {e}"));
+                undecodable.push(sanitize_diagnostic(&format!("{row}: {e}")));
                 continue;
             }
         };
@@ -7042,7 +7070,7 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
             let net = match account.net_change() {
                 Ok(net) => net,
                 Err(e) => {
-                    unbalanced_rows.push(format!("{row}: {e}"));
+                    unbalanced_rows.push(sanitize_diagnostic(&format!("{row}: {e}")));
                     row_overflowed = true;
                     break;
                 }
@@ -7052,9 +7080,9 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
             match sum.checked_add(net) {
                 Some(next) => *sum = next,
                 None => {
-                    unbalanced_rows.push(format!(
+                    unbalanced_rows.push(sanitize_diagnostic(&format!(
                         "{row}: arithmetic overflow accumulating currency {currency}"
-                    ));
+                    )));
                     row_overflowed = true;
                     break;
                 }
@@ -7073,7 +7101,9 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
         let mut row_unbalanced = false;
         for (currency, sum) in row_sums {
             if sum != 0 {
-                unbalanced_rows.push(format!("{row}: currency {currency} sums to {sum}"));
+                unbalanced_rows.push(sanitize_diagnostic(&format!(
+                    "{row}: currency {currency} sums to {sum}"
+                )));
                 row_unbalanced = true;
             }
             // Record the currency so the report can say how many were covered.
