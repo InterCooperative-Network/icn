@@ -1182,9 +1182,12 @@ fn is_known_verification_side_effect(path: &str) -> bool {
 ///    property an operator actually relies on and it holds exactly.
 /// 2. **The restored tree's mutation surface is bounded and known.** The archive
 ///    is extracted here and driven through the *same* sequence the handler drives
-///    — `n2a_startup_gate::enforce`, then `SledStore::open` and a journal scan —
-///    with a full content identity taken either side. Every difference must be on
-///    the permitlist above, and nothing may disappear.
+///    — the pre-gate recovery open (#2732), then `n2a_startup_gate::enforce`,
+///    then `SledStore::open` and a journal scan — with a full content identity
+///    taken either side. Every difference must be on the permitlist above, and
+///    nothing may disappear. The recovery open is part of the sequence precisely
+///    because it must come first; replicating the handler in the wrong order
+///    would make this test's claim about a run the handler never performs.
 /// 3. **The journal's contents survive.** The rows read back are exactly the row
 ///    the fixture wrote, and reading them a second time returns the same bytes.
 ///    So the side effects above are confined to sled's container: the evidence
@@ -1243,6 +1246,18 @@ fn verification_touches_nothing_outside_its_known_side_effect_surface() {
     );
 
     let before = tree_identity(&restore);
+
+    // The handler's FIRST open: the #2732 recovery check. It adds no new path to
+    // the permitlist because it opens the same sled root the scan below opens —
+    // but it does open it, and this test exists to notice if that ever stops
+    // being true.
+    {
+        let store = SledStore::open(&restored_ledger).expect("could not open restored ledger");
+        assert!(
+            store.db().was_recovered(),
+            "a healthy restored ledger must report as recovered, or the handler              would refuse this archive"
+        );
+    }
 
     icn_store::n2a_startup_gate::enforce(&restore, std::time::SystemTime::now())
         .expect("the N2-A gate must accept this tree");
@@ -1312,5 +1327,263 @@ fn verification_touches_nothing_outside_its_known_side_effect_surface() {
     assert!(
         icn_ledger::entry_validation::inspect_entry(&entry).is_valid(),
         "and it must still be valid under the ledger's own entry validation"
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// icn#2732 — a ledger that could not be read as written must not be reported as
+// an empty one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Copy a tree so the fixture's contents can be PROVED without perturbing the
+/// artifact under test.
+///
+/// This helper exists because of a trap that produced a false CLEAR while these
+/// tests were being written. `SledStore::open` writes a snapshot, and with a
+/// snapshot present sled *errors* on a damaged `db` instead of silently
+/// recovering from it. So a fixture that proved its own row count by opening the
+/// database it was about to damage changed which sled code path the damage took,
+/// and the run came back fail-closed — the defect masked by the act of
+/// establishing the precondition. Count on a copy; damage the original.
+fn copy_tree(src: &Path, dst: &Path) {
+    std::fs::create_dir_all(dst).expect("fixture: could not create copy target");
+    for entry in std::fs::read_dir(src).expect("fixture: could not read source tree") {
+        let entry = entry.expect("fixture: could not read directory entry");
+        let to = dst.join(entry.file_name());
+        if entry
+            .file_type()
+            .expect("fixture: could not stat entry")
+            .is_dir()
+        {
+            copy_tree(&entry.path(), &to);
+        } else {
+            std::fs::copy(entry.path(), &to).expect("fixture: could not copy file");
+        }
+    }
+}
+
+/// Prove, without touching `data_dir`, that its ledger really holds `expected`
+/// journal rows.
+fn assert_ledger_holds_rows_without_touching_it(dir: &TempDir, data_dir: &Path, expected: usize) {
+    let witness = dir.path().join(format!(
+        "witness-{}",
+        data_dir.file_name().unwrap().to_string_lossy()
+    ));
+    copy_tree(data_dir, &witness);
+    let store = SledStore::open(ledger_dir(&witness)).expect("fixture: could not open the witness");
+    let rows = store
+        .scan(b"ledger:journal:")
+        .expect("fixture: could not scan the witness");
+    assert_eq!(
+        rows.len(),
+        expected,
+        "fixture: the ledger must really hold {expected} row(s) before it is \
+         damaged, or the assertions below are about an already-empty ledger and \
+         discriminate nothing"
+    );
+}
+
+/// The shared shape of both damage cases.
+///
+/// A backup taken from a data directory whose ledger database was ALREADY
+/// damaged. The checksum in `backup_metadata.json` is computed over the data
+/// directory at backup time, so the damage is inside the checksummed bytes and
+/// the archive verifies as intact — which is exactly why the checksum cannot
+/// stand in for reading the ledger.
+fn a_backup_whose_ledger_was_damaged_before_it_was_taken(
+    dir: &TempDir,
+    name: &str,
+    damage: impl Fn(&Path),
+) -> PathBuf {
+    let data_dir = dir.path().join(name);
+    let archive = dir.path().join(format!("{name}.tar"));
+
+    init_identity(&data_dir);
+    seed_ledger(&data_dir, &[("hours", 60, 0), ("hours", 0, 60)]);
+    assert_ledger_holds_rows_without_touching_it(dir, &data_dir, 1);
+
+    damage(&ledger_dir(&data_dir));
+
+    // The presence proof #2717 established still passes: this is not a missing
+    // ledger, it is an unreadable one. Both markers are still files.
+    assert!(
+        ledger_dir(&data_dir).join("conf").is_file() && ledger_dir(&data_dir).join("db").is_file(),
+        "fixture: the damage must leave a directory that still LOOKS like a sled \
+         database, or this exercises #2717's presence check instead of #2732"
+    );
+
+    make_backup(&data_dir, &archive);
+    assert!(
+        archive_contains_ledger(&archive),
+        "fixture: the archive must carry the ledger directory"
+    );
+    archive
+}
+
+/// The assertions both damage cases share.
+fn assert_not_certified_as_empty(text: &str, status_ok: bool) {
+    let flat = flattened(text);
+    assert!(
+        !status_ok,
+        "a ledger that could not be read as written must not verify:\n{text}"
+    );
+    // THE defect, stated exactly: this pairing is the operator-visible false
+    // conclusion #2732 exists to stop.
+    assert!(
+        !flat.contains("Ledger empty"),
+        "an unreadable ledger must never be reported as an empty one:\n{text}"
+    );
+    assert!(
+        !flat.contains("BACKUP VERIFICATION PASSED"),
+        "and the run must not end in a success banner:\n{text}"
+    );
+    assert!(
+        flat.contains("could not be read as written"),
+        "the failure must name what actually happened — the database was replaced, \
+         not read:\n{text}"
+    );
+    assert!(
+        flat.contains("Ledger verification was NOT performed"),
+        "and must say the requested verification did not happen, rather than \
+         reporting a result it never obtained:\n{text}"
+    );
+    // Say only what the evidence supports. Nothing in the archive records how
+    // many rows the ledger held, so the message must not imply a count.
+    assert!(
+        flat.contains("not recoverable from this archive"),
+        "the message must not imply the original contents are known:\n{text}"
+    );
+}
+
+/// A ledger `db` truncated in transfer must not be certified as an empty ledger.
+///
+/// This is the mechanism icn#2732 names. `sled::open` has no read-only mode and
+/// no fail-closed mode: given a `db` it cannot parse it allocates a fresh meta
+/// page and hands back an EMPTY database. The journal scan then honestly finds
+/// zero rows, and the verifier — faithfully reporting what the layer below gave
+/// it — printed `✓ Ledger empty (no entries)` and `✓ BACKUP VERIFICATION PASSED`
+/// for a backup that in fact held journal rows nobody could read.
+///
+/// Against `main` before the fix this test fails on the `Ledger empty` assertion
+/// with exit status 0, which is the discrimination it is here to make.
+#[test]
+fn a_truncated_ledger_database_is_not_reported_as_an_empty_one() {
+    let dir = TempDir::new().unwrap();
+    let archive = a_backup_whose_ledger_was_damaged_before_it_was_taken(&dir, "truncated", |lp| {
+        // An interrupted copy: the file is still there, and holds nothing.
+        std::fs::write(lp.join("db"), b"").expect("fixture: could not truncate db");
+    });
+
+    let out = verify(&archive, true);
+    assert_not_certified_as_empty(&combined(&out), out.status.success());
+}
+
+/// The same conclusion must not survive same-length damage either.
+///
+/// Truncation is one shape of a partial write; a `db` overwritten in place with
+/// zeroes is another, and it defeats any check that reasons about file SIZE
+/// rather than about whether the database was recovered. Both must fail, and for
+/// the same stated reason.
+#[test]
+fn a_ledger_database_overwritten_in_place_is_not_reported_as_an_empty_one() {
+    let dir = TempDir::new().unwrap();
+    let archive = a_backup_whose_ledger_was_damaged_before_it_was_taken(&dir, "zeroed", |lp| {
+        let len = std::fs::metadata(lp.join("db"))
+            .expect("fixture: could not stat db")
+            .len() as usize;
+        std::fs::write(lp.join("db"), vec![0u8; len]).expect("fixture: could not zero db");
+    });
+
+    let out = verify(&archive, true);
+    assert_not_certified_as_empty(&combined(&out), out.status.success());
+}
+
+/// The signal exists only at the FIRST open, and that is why the check is placed
+/// where it is.
+///
+/// `Db::was_recovered()` is false when sled had to allocate the meta page rather
+/// than recover it — but the allocation is persisted, so the next open of the
+/// same damaged directory legitimately recovers what the previous one created.
+/// `enforce_n2a_gate` opens every sled root it finds. A recovery check placed
+/// after the gate would therefore read `true` on a corrupt ledger and certify it,
+/// which is the same class of ordering bug #2717 fixed for the presence check.
+///
+/// This test pins the property the ordering depends on, so that if a future sled
+/// upgrade makes the signal survive (or stop being produced at all) this fails
+/// rather than the ordering silently becoming decorative.
+#[test]
+fn sleds_recovery_signal_is_destroyed_by_the_first_open() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    init_identity(&data_dir);
+    seed_ledger(&data_dir, &[("hours", 60, 0), ("hours", 0, 60)]);
+    let lp = ledger_dir(&data_dir);
+    std::fs::write(lp.join("db"), b"").expect("fixture: could not truncate db");
+
+    let signal = |p: &Path| {
+        let store = SledStore::open(p).expect("could not open ledger");
+        let recovered = store.db().was_recovered();
+        let rows = store
+            .scan(b"ledger:journal:")
+            .expect("could not scan")
+            .len();
+        (recovered, rows)
+    };
+
+    let (first, rows_first) = signal(&lp);
+    let (second, _) = signal(&lp);
+
+    assert!(
+        !first,
+        "sled must report a damaged database as NOT recovered on the first open, \
+         or there is no mechanism to place before the gate"
+    );
+    assert_eq!(
+        rows_first, 0,
+        "and the fresh database it substituted must scan as empty — that is the \
+         false conclusion being prevented"
+    );
+    assert!(
+        second,
+        "the second open must report `recovered`, because the first open \
+         PERSISTED the meta page it allocated. This is why the check cannot run \
+         after `enforce_n2a_gate`, which opens every sled root it discovers"
+    );
+}
+
+/// A readable ledger that is genuinely empty must keep its meaning.
+///
+/// The whole point of icn#2732 is to separate two facts, not to collapse them in
+/// the other direction. A database sled really did recover, which really has no
+/// journal rows, must still report `✓ Ledger empty` and still pass — otherwise
+/// the fix has simply moved the false conclusion.
+///
+/// Complements `an_empty_ledger_does_not_claim_the_invariant_was_verified`, which
+/// pins the same case's summary wording; this one pins that the new recovery
+/// check does not reject it.
+#[test]
+fn a_genuinely_empty_readable_ledger_still_verifies() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+    let path = ledger_dir(&data_dir);
+    std::fs::create_dir_all(&path).unwrap();
+    let store = SledStore::open(&path).unwrap();
+    store.db().flush().unwrap();
+    drop(store);
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+    assert!(
+        out.status.success(),
+        "an honestly empty ledger must still verify — the recovery check must not \
+         reject a database sled actually recovered:\n{text}"
+    );
+    assert!(
+        flattened(&text).contains("Ledger empty (no entries)"),
+        "and it must still be reported as empty:\n{text}"
     );
 }

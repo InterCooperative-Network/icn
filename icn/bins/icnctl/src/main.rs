@@ -6797,6 +6797,13 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         // database, and a presence check running afterwards would find one and
         // certify it. The evidence has to be taken from the extracted tree first.
         assert_backup_carried_a_ledger(restore_dir)?;
+        // Then prove the database can be READ AS WRITTEN, still before the gate.
+        // `sled::open` recovers a damaged `db` into a fresh empty database rather
+        // than failing, and its own `was_recovered()` signal is only false on the
+        // FIRST open — the gate's open would persist the repair and turn the
+        // signal true, leaving a corrupt ledger to be certified as `✓ Ledger
+        // empty` (#2732).
+        assert_ledger_recovered_as_written(restore_dir)?;
         enforce_n2a_gate(restore_dir, "backup verification")?;
         ledger_check = Some(verify_ledger_in_backup(restore_dir)?);
     }
@@ -6870,9 +6877,11 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
 ///
 /// A live sled database directory holds `conf`, `db` and `blobs`; requiring `db`
 /// as well as `conf` is what distinguishes a restored database from an
-/// interrupted initialisation. This cannot detect a `db` that is present but
-/// unreadable — sled recovers such a directory into an empty database with only a
-/// warning, which needs a different mechanism and is owned by icn#2732.
+/// interrupted initialisation. This deliberately stays a pure filesystem check
+/// and opens nothing. It therefore cannot detect a `db` that is present but
+/// unreadable — sled recovers such a directory into an empty database — which is
+/// why [`assert_ledger_recovered_as_written`] runs immediately after it and
+/// before the gate (icn#2732).
 fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
     let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
 
@@ -6904,6 +6913,94 @@ fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
                 marker
             );
         }
+    }
+
+    Ok(())
+}
+
+/// Prove the archive's ledger database was read AS WRITTEN, not silently replaced.
+///
+/// Ordering is load-bearing in BOTH directions, and neither neighbour is
+/// interchangeable with this one.
+///
+/// **After [`assert_backup_carried_a_ledger`]**, because this opens the database
+/// and that check must stay a pure filesystem check: a directory holding `conf`
+/// but no `db` has to bail before anything performs a creating open, or the open
+/// manufactures the database the caller was about to certify (icn#2717).
+///
+/// **Before `enforce_n2a_gate`**, because the evidence is destroyed by being
+/// observed. `sled::open` is a CREATING open with no read-only mode: handed a
+/// `db` it cannot parse it does not fail, it allocates a fresh meta page and
+/// returns an empty database, and the journal scan then honestly reports zero
+/// rows. `Db::was_recovered()` is `false` for exactly that case — sled clears it
+/// when it has to allocate `META_PID` or `COUNTER_PID` instead of recovering
+/// them. But that allocation is PERSISTED, so the *second* open of the same
+/// damaged directory legitimately recovers what the first one created and
+/// reports `true`. Measured on a backup whose ledger `db` was truncated: open 1
+/// `false`, open 2 `true`, open 3 `true`. `enforce_n2a_gate` opens every sled
+/// root it discovers, so a check placed after it reads `true` and certifies the
+/// corruption. This must be the FIRST open of the extracted tree.
+///
+/// A genuinely empty but readable ledger reports `true` — it has a meta page to
+/// recover — so the signal separates "this backup holds an honestly empty
+/// ledger" from "this backup's ledger could not be inspected as written", which
+/// is the distinction icn#2732 exists to restore. Those are very different facts
+/// for an operator holding a backup they may need to restore.
+///
+/// This is a mechanism, not a reading of sled's log output. The warning sled
+/// prints on a damaged configuration is human-oriented text with no stability
+/// guarantee; `was_recovered()` is the library's own answer to the question
+/// being asked.
+///
+/// The checksum in `backup_metadata.json` cannot substitute for this: it is
+/// computed over the data directory at backup time, so a ledger already damaged
+/// when the backup was taken checksums consistently and passes.
+///
+/// The store is dropped before returning — sled holds an exclusive flock and the
+/// gate's own open comes next.
+fn assert_ledger_recovered_as_written(restore_dir: &Path) -> Result<()> {
+    use icn_store::SledStore;
+
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
+
+    // An open that fails outright is also "could not be inspected as written",
+    // and saying so here names the check the operator asked for. Without this the
+    // same damage surfaced as an N2-A startup-gate refusal, which is true but
+    // sends the reader looking for a principal-collision problem they do not have.
+    let store = SledStore::open(&ledger_db_path).with_context(|| {
+        format!(
+            "FAILED: the ledger database in this backup at {} could not be opened, \
+             so nothing in it could be verified. Ledger verification was NOT \
+             performed.\n\
+             \n\
+             The archive carries a ledger directory, so this is damage to the \
+             database itself — a truncated or partially written copy, a failed \
+             transfer, or tampering — not a node that never had a ledger.",
+            ledger_db_path.display()
+        )
+    })?;
+    let recovered = store.db().was_recovered();
+    drop(store);
+
+    if !recovered {
+        bail!(
+            "FAILED: the ledger database in this backup could not be read as \
+             written. sled did not recover the database at {}; it initialised a \
+             new, empty one in its place, so a scan of it would report this \
+             backup's ledger as empty no matter what the backup actually \
+             contained. Ledger verification was NOT performed.\n\
+             \n\
+             Both `conf` and `db` are present in the archive, so this is damage to \
+             the database itself — a truncated or partially written copy, a failed \
+             transfer, or tampering — not a node that never had a ledger. The \
+             backup's own checksum cannot catch this: it is computed over the data \
+             directory at backup time, so a ledger that was already damaged when \
+             the backup was taken checksums consistently and passes.\n\
+             \n\
+             How many entries the ledger held is not recoverable from this \
+             archive; treat the backup as unrestorable rather than as empty.",
+            ledger_db_path.display()
+        );
     }
 
     Ok(())
