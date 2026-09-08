@@ -170,6 +170,13 @@ fn read_receipt_json(data_dir: &Path) -> (Output, String) {
         (Some(a), Some(b)) if b > a => raw[a..=b].to_string(),
         _ => raw,
     };
+    // `show --json` wraps the receipt in an envelope carrying the evidence
+    // level; callers here want the receipt itself.
+    let text = serde_json::from_str::<serde_json::Value>(&text)
+        .ok()
+        .and_then(|v| v.get("receipt").cloned())
+        .map(|r| r.to_string())
+        .unwrap_or(text);
     (out, text)
 }
 
@@ -267,7 +274,6 @@ fn institutional_genesis_creates_an_institution_distinct_from_the_node() {
     //     graph. Read through a handle the ceremony never held.
     let trust_root = receipt["trust_root_did"].as_str().unwrap().to_string();
     {
-        use icn_store::Store;
         let store = SledStore::open(daemon_coop_store_path(data_dir)).unwrap();
         let bound = store
             .scan(b"coop:")
@@ -659,8 +665,6 @@ async fn author_score_after_removing_edge(
     remove: Option<(&str, &str)>,
     author: &str,
 ) -> f64 {
-    use icn_store::Store;
-
     if let Some((source, target)) = remove {
         let store = SledStore::open(daemon_trust_store_path(data_dir)).unwrap();
         let key = format!("trust/edges/{source}:{target}");
@@ -764,8 +768,6 @@ async fn removing_the_nodes_recognition_also_drops_the_treasury_below_the_gate()
 /// between step 11 and step 12 would leave.
 #[test]
 fn partial_genesis_is_reported_incomplete_and_never_silently_completed() {
-    use icn_store::Store;
-
     let dir = TempDir::new().unwrap();
     let data_dir = dir.path();
     assert!(init_identity(data_dir).status.success());
@@ -911,7 +913,6 @@ fn assert_partial_state_is_never_complete(dir: &Path, label: &str) {
 }
 
 fn drop_receipt(dir: &Path) {
-    use icn_store::Store;
     let store = SledStore::open(daemon_coop_store_path(dir)).unwrap();
     for (k, _) in store.scan(b"genesis:receipt:").unwrap() {
         store.delete(&k).unwrap();
@@ -1030,12 +1031,98 @@ fn a_config_naming_a_different_treasury_is_detected_on_readback() {
     );
     std::fs::write(&cfg, tampered).unwrap();
 
+    // `show` must report the disagreement itself. Asserting only that a rerun
+    // refuses is not enough: a rerun refuses on "already undergone genesis"
+    // whether or not the treasury comparison exists, so deleting that check
+    // would leave this test green.
+    let (show, _) = read_receipt_json(dir.path());
+    let text = combined(&show);
+    assert!(
+        !show.status.success(),
+        "a config naming a different treasury must not read as COMPLETE:\n{text}"
+    );
+    assert!(
+        text.contains("INCONSISTENT") && text.contains("resolves treasury"),
+        "the report must name the treasury disagreement, not merely fail:\n{text}"
+    );
+
     // A rerun must not accept this state as a clean slate either.
     let rerun = run_genesis(dir.path(), "Rerun Over Mismatch");
     assert!(
         !rerun.status.success(),
         "a rerun over a tampered configuration must refuse: {}",
         combined(&rerun)
+    );
+}
+
+/// The cooperative record naming a different treasury than the receipt must be
+/// detected. Same shape as the config case, different stored fact.
+#[test]
+fn a_cooperative_record_naming_a_different_treasury_is_detected_on_readback() {
+    let dir = genesis_dir("Record Mismatch Coop");
+    let (_, json) = read_receipt_json(dir.path());
+    let receipt: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let coop_id = receipt["cooperative_id"].as_str().unwrap().to_string();
+
+    // Rewrite the stored cooperative to name a different treasury.
+    {
+        let sled =
+            std::sync::Arc::new(SledStore::open(daemon_coop_store_path(dir.path())).unwrap());
+        let store = icn_coop::CoopStore::new(std::sync::Arc::new(sled.db().clone()));
+        let mut coop = store.get_cooperative(&coop_id).unwrap();
+        coop.treasury_did = Some(
+            icn_identity::KeyPair::generate()
+                .unwrap()
+                .did()
+                .as_str()
+                .to_string(),
+        );
+        store.save_cooperative(&coop).unwrap();
+        sled.flush().unwrap();
+    }
+
+    let (show, _) = read_receipt_json(dir.path());
+    let text = combined(&show);
+    assert!(
+        !show.status.success(),
+        "a cooperative naming a different treasury must not read as COMPLETE:\n{text}"
+    );
+    assert!(
+        text.contains("INCONSISTENT"),
+        "the report must name the disagreement:\n{text}"
+    );
+}
+
+/// The trust-root binding disagreeing with the receipt must be detected.
+#[test]
+fn a_cooperative_record_binding_a_different_trust_root_is_detected_on_readback() {
+    let dir = genesis_dir("Binding Mismatch Coop");
+    let (_, json) = read_receipt_json(dir.path());
+    let receipt: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let coop_id = receipt["cooperative_id"].as_str().unwrap().to_string();
+
+    {
+        let sled =
+            std::sync::Arc::new(SledStore::open(daemon_coop_store_path(dir.path())).unwrap());
+        let store = icn_coop::CoopStore::new(std::sync::Arc::new(sled.db().clone()));
+        let mut coop = store.get_cooperative(&coop_id).unwrap();
+        coop.metadata.insert(
+            "genesis.trust_root_did".to_string(),
+            icn_identity::KeyPair::generate()
+                .unwrap()
+                .did()
+                .as_str()
+                .to_string(),
+        );
+        store.save_cooperative(&coop).unwrap();
+        sled.flush().unwrap();
+    }
+
+    let (show, _) = read_receipt_json(dir.path());
+    let text = combined(&show);
+    assert!(
+        !show.status.success() && text.contains("INCONSISTENT"),
+        "a rebound trust root must be detected:\n{text}"
     );
 }
 
@@ -1415,4 +1502,82 @@ fn show_says_that_it_did_not_re_verify_key_provenance() {
         shown.contains("NOT re-verified") && shown.contains("key provenance"),
         "`show` must disclaim the provenance check it did not perform:\n{shown}"
     );
+}
+
+/// The exact boundary of the G4 claim, pinned so the PR cannot overstate it.
+///
+/// `a_governance_authored_append_crosses_the_real_gate_without_dev_self_trust`
+/// opens a fresh `TrustGraph` and scores immediately, which is what a
+/// just-started `icnd` does — and it passes. But `TrustGraph`'s reachability
+/// bloom filter starts empty, is populated only by in-process `add_edge`, and
+/// is never built from storage (`rebuild_reachability_filter` has no production
+/// caller). So from the first runtime edge onward, a principal reachable only
+/// through *persisted* edges short-circuits to `0.0`.
+///
+/// That is icn#2750: pre-existing, affecting every out-of-process trust write
+/// including `init-coop`'s own bootstrap edges, and NOT introduced here. This
+/// test exists so the limit is a measured fact rather than a footnote, and so
+/// that the day icn#2750 is fixed this test fails and the claim can be widened
+/// deliberately.
+///
+/// Note the inversion worth remembering: `icnd`'s `ICN_DEV_SELF_TRUST` seed is
+/// itself a runtime `add_edge`, so enabling the dev flag would *cause* this
+/// failure rather than paper over it.
+#[test]
+fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() {
+    let dir = TempDir::new().unwrap();
+    let node = icn_identity::KeyPair::generate().unwrap().did().clone();
+    let trust_root = icn_identity::KeyPair::generate().unwrap().did().clone();
+    let treasury = icn_identity::KeyPair::generate().unwrap().did().clone();
+    let full = icn_trust::TrustScore::new(1.0).unwrap();
+    let path = dir.path().join("trust");
+
+    // The genesis shape: two edges written, then the writer goes away.
+    {
+        let store: std::sync::Arc<dyn icn_store::Store> =
+            std::sync::Arc::new(SledStore::open(&path).unwrap());
+        let mut g = icn_trust::TrustGraph::new(store, node.clone());
+        g.add_edge(icn_trust::TrustEdge::new(
+            node.clone(),
+            trust_root.clone(),
+            full,
+        ))
+        .unwrap();
+        g.add_edge(icn_trust::TrustEdge::new(
+            trust_root,
+            treasury.clone(),
+            full,
+        ))
+        .unwrap();
+    }
+
+    // A freshly started daemon that has added nothing of its own: correct.
+    {
+        let store: std::sync::Arc<dyn icn_store::Store> =
+            std::sync::Arc::new(SledStore::open(&path).unwrap());
+        let g = icn_trust::TrustGraph::new(store, node.clone());
+        assert!(
+            g.compute_trust_score(&treasury).unwrap() >= 0.1,
+            "a daemon that has added no edge of its own must see the genesis facts"
+        );
+    }
+
+    // The same daemon after one unrelated runtime edge, scored for the first
+    // time (no cache entry to mask it).
+    {
+        let store: std::sync::Arc<dyn icn_store::Store> =
+            std::sync::Arc::new(SledStore::open(&path).unwrap());
+        let mut g = icn_trust::TrustGraph::new(store, node.clone());
+        let stranger = icn_identity::KeyPair::generate().unwrap().did().clone();
+        g.add_edge(icn_trust::TrustEdge::new(node, stranger, full))
+            .unwrap();
+
+        let score = g.compute_trust_score(&treasury).unwrap();
+        assert_eq!(
+            score, 0.0,
+            "icn#2750: persisted edges are expected to be zeroed here today. If \
+             this now scores {score}, icn#2750 has been fixed — delete this test \
+             and widen the G4 claim in the PR body accordingly."
+        );
+    }
 }

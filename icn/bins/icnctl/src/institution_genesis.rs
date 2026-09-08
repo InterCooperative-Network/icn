@@ -159,6 +159,17 @@ pub struct GenesisReceipt {
     pub created_at: String,
 }
 
+/// The cooperative sled database, in one place.
+///
+/// `icn_core::config` owns `store_path`, `trust_store_path` and
+/// `ledger_store_path` but not this one, so the `join("cooperative")` was
+/// repeated at every call site. A path spelled independently in several places
+/// is what produced #2717/#2718; the tests spell it literally on purpose, so
+/// that a wrong helper cannot make them agree with the code by construction.
+fn coop_db_path(data_dir: &Path) -> PathBuf {
+    icn_core::config::store_path(data_dir).join("cooperative")
+}
+
 /// Storage key of the cooperative's genesis trust root on its own record.
 ///
 /// The binding lives in the durable `Cooperative` record — the object the
@@ -339,6 +350,16 @@ impl GenesisComponents {
     /// state", and refuse to found on it. They are still *reported* — they are
     /// what an operator needs to see when a ceremony did break — but they do
     /// not by themselves make a directory look mid-ceremony.
+    ///
+    /// **The residual, stated rather than hidden.** The trade-off runs one way:
+    /// a ceremony interrupted before the configuration was published, whose two
+    /// `.age` files are then removed but whose cooperative record, treasury
+    /// registration and edges are left, classifies `NotStarted` and a rerun
+    /// mints a second treasury over the orphans. That requires someone to
+    /// delete exactly the exclusive markers and keep the shared ones — a
+    /// key-excluding restore, or an operator following the refusal message
+    /// half-way. Post-publish partials are still caught by the existing
+    /// `[cooperative]` section, and completed ones by the receipt.
     pub fn is_untouched(&self) -> bool {
         !self.trust_root_key && !self.treasury_key && !self.receipt
     }
@@ -409,7 +430,7 @@ pub fn genesis_components(data_dir: &Path) -> Result<GenesisComponents> {
         }
     };
 
-    let coop_db = icn_core::config::store_path(data_dir).join("cooperative");
+    let coop_db = coop_db_path(data_dir);
     let config_linkage = {
         let path = data_dir.join("icn.toml");
         std::fs::read_to_string(&path)
@@ -436,7 +457,15 @@ pub fn genesis_components(data_dir: &Path) -> Result<GenesisComponents> {
     })
 }
 
-/// Inspect the data directory without writing to it.
+/// Classify the data directory's genesis state.
+///
+/// **Not side-effect free.** When a receipt exists this runs
+/// `verify_durable_state`, which opens the ledger and trust stores
+/// unconditionally — and `SledStore::open` is a *creating* open that will
+/// `create_dir_all` the path and take an exclusive lock. Inspecting a data
+/// directory whose trust store was deleted therefore recreates it empty before
+/// reporting INCONSISTENT. It writes no domain row, but it is not read-only,
+/// and it needs the daemon stopped.
 pub fn genesis_state(data_dir: &Path) -> Result<GenesisState> {
     if let Some(receipt) = load_receipt(data_dir)? {
         // Re-verify rather than trusting the row. This is what makes the
@@ -540,7 +569,7 @@ fn mint_principal(path: &Path, passphrase: &[u8], what: &str) -> Result<Did> {
 
 /// Read the genesis receipt back out of the cooperative store.
 pub fn load_receipt(data_dir: &Path) -> Result<Option<GenesisReceipt>> {
-    let coop_db = icn_core::config::store_path(data_dir).join("cooperative");
+    let coop_db = coop_db_path(data_dir);
     if !coop_db.exists() {
         return Ok(None);
     }
@@ -757,12 +786,12 @@ fn run_genesis_inner(
     let coop_id = format!("coop:{}", uuid::Uuid::new_v4());
 
     // (7) Durable cooperative record, in the database the daemon opens.
-    let coop_db_path = icn_core::config::store_path(data_dir).join("cooperative");
-    let coop_sled = Arc::new(icn_store::SledStore::open(&coop_db_path).with_context(|| {
+    let coop_db = coop_db_path(data_dir);
+    let coop_sled = Arc::new(icn_store::SledStore::open(&coop_db).with_context(|| {
         format!(
             "Failed to open the cooperative store at {} (stop the daemon first; \
              it holds an exclusive lock)",
-            coop_db_path.display()
+            coop_db.display()
         )
     })?);
     let db = Arc::new(coop_sled.db().clone());
@@ -928,8 +957,8 @@ fn run_genesis_inner(
     // (12) The completion marker, written last and only over verified state.
     {
         use icn_store::Store;
-        let coop_db_path = icn_core::config::store_path(data_dir).join("cooperative");
-        let coop_sled = icn_store::SledStore::open(&coop_db_path)
+        let coop_db = coop_db_path(data_dir);
+        let coop_sled = icn_store::SledStore::open(&coop_db)
             .context("Failed to reopen the cooperative store to record the receipt")?;
         let key = format!("{RECEIPT_KEY_PREFIX}{coop_id}");
         let value = serde_json::to_vec(&receipt).context("Failed to encode the genesis receipt")?;
@@ -960,9 +989,9 @@ fn verify_durable_state(
     passphrase: Option<&[u8]>,
 ) -> Result<()> {
     // The cooperative record, and its link to the treasury.
-    let coop_db_path = icn_core::config::store_path(data_dir).join("cooperative");
+    let coop_db = coop_db_path(data_dir);
     let coop_sled = Arc::new(
-        icn_store::SledStore::open(&coop_db_path)
+        icn_store::SledStore::open(&coop_db)
             .context("Verification: failed to reopen the cooperative store")?,
     );
     let coop_store = icn_coop::CoopStore::new(Arc::new(coop_sled.db().clone()));
@@ -1428,7 +1457,24 @@ pub fn handle_institution_genesis_command(
         InstitutionGenesisCommands::Show { json } => match genesis_state(data_dir)? {
             GenesisState::Complete(receipt) => {
                 if json {
-                    println!("{}", serde_json::to_string_pretty(&receipt)?);
+                    // Wrap rather than print the receipt bare: a script
+                    // consuming this must be able to see which evidence level
+                    // produced it, and the human surface already says so. The
+                    // receipt keeps its own shape under `receipt`.
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({
+                            "state": "COMPLETE",
+                            "verified": {
+                                "durable_state": true,
+                                "config_linkage": true,
+                                "key_presence": true,
+                                "key_provenance": false,
+                            },
+                            "note": "key provenance is not re-verified by `show`;                                      it does not prompt for a passphrase. The ceremony                                      verifies it before writing the receipt.",
+                            "receipt": receipt,
+                        }))?
+                    );
                 } else {
                     print_receipt(&receipt, false);
                 }
