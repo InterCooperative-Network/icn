@@ -849,25 +849,23 @@ fn partial_genesis_is_reported_incomplete_and_never_silently_completed() {
 }
 
 // ---------------------------------------------------------------------------
-// Fault injection across every mutation boundary
+// Post-hoc removal and tampering
 // ---------------------------------------------------------------------------
 //
-// No claim of transactionality is made: these are three separate sled databases
-// plus two keystore files plus a config file, and there is no cross-store
-// transaction. What is claimed, and tested here, is *controlled partial-state
-// semantics*: at every boundary, an interrupted ceremony is observable as
-// incomplete and is never reported COMPLETE.
+// **These are consistency tests, not crash-boundary tests.** Each takes a
+// COMPLETED genesis and removes or alters a component afterwards. That proves
+// the inspector detects a state that has stopped being true — a real property,
+// since a receipt must not outlive what it claims — but it says nothing about
+// what the ceremony writes, or in what order.
 //
-// The boundaries, in ceremony order:
-//   A. after keys, before the cooperative record
-//   B. after the cooperative record, before treasury registration
-//   C. after treasury registration, before the trust facts
-//   D. after the trust facts, before the config linkage
-//   E. after the config linkage, before the commit marker
+// Crash-boundary evidence lives in the `failpoint_tests` module inside
+// `institution_genesis.rs`, where the real `run_genesis_inner` is driven to
+// each mutation boundary and the resulting component report is asserted
+// exactly. Those pin the ordering; these pin the detection. Reordering two
+// writes fails the former and not the latter, which is why both exist.
 //
-// A-D are simulated by removing the state written *after* that point from a
-// completed genesis; E is the receipt-removal case covered above. In every case
-// the question is the same: does anything report this as a genesis?
+// No claim of transactionality is made either way: three sled databases, two
+// keystore files and a config file, with no cross-store transaction.
 
 fn genesis_dir(name: &str) -> TempDir {
     let dir = TempDir::new().unwrap();
@@ -921,18 +919,18 @@ fn drop_receipt(dir: &Path) {
     store.flush().unwrap();
 }
 
-/// Boundary A — key material exists, nothing else does.
+/// The cooperative store is removed after a completed genesis.
 #[test]
-fn fault_after_keys_before_cooperative_is_not_complete() {
+fn removing_the_cooperative_store_after_genesis_is_detected() {
     let dir = genesis_dir("Boundary A Coop");
     drop_receipt(dir.path());
     std::fs::remove_dir_all(daemon_coop_store_path(dir.path())).unwrap();
-    assert_partial_state_is_never_complete(dir.path(), "boundary A");
+    assert_partial_state_is_never_complete(dir.path(), "cooperative store removed");
 }
 
-/// Boundary B — cooperative recorded, treasury not registered.
+/// The treasury registration is removed after a completed genesis.
 #[test]
-fn fault_after_cooperative_before_treasury_is_not_complete() {
+fn removing_the_treasury_registration_after_genesis_is_detected() {
     let dir = genesis_dir("Boundary B Coop");
     // The receipt is KEPT so that verification's treasury readback is exercised
     // in the failing direction. Dropping it first would short-circuit
@@ -949,12 +947,12 @@ fn fault_after_cooperative_before_treasury_is_not_complete() {
         "the missing treasury registration must be detected on readback:\n{text}"
     );
     drop_receipt(dir.path());
-    assert_partial_state_is_never_complete(dir.path(), "boundary B");
+    assert_partial_state_is_never_complete(dir.path(), "treasury registration removed");
 }
 
-/// Boundary C — treasury registered, trust facts absent.
+/// The trust facts are removed after a completed genesis.
 #[test]
-fn fault_after_treasury_before_trust_is_not_complete() {
+fn removing_the_trust_facts_after_genesis_is_detected() {
     let dir = genesis_dir("Boundary C Coop");
     // Receipt KEPT, as in boundary B, so the trust-edge readback is exercised.
     std::fs::remove_dir_all(daemon_trust_store_path(dir.path())).unwrap();
@@ -969,7 +967,7 @@ fn fault_after_treasury_before_trust_is_not_complete() {
         "the missing trust facts must be detected on readback:\n{text}"
     );
     drop_receipt(dir.path());
-    assert_partial_state_is_never_complete(dir.path(), "boundary C");
+    assert_partial_state_is_never_complete(dir.path(), "trust facts removed");
 }
 
 /// Boundary D — everything stored, configuration never linked.
@@ -978,7 +976,7 @@ fn fault_after_treasury_before_trust_is_not_complete() {
 /// write. If the receipt were still written before the linkage, this state
 /// would report COMPLETE while the daemon still fell back to the node DID.
 #[test]
-fn fault_after_trust_before_config_is_not_complete() {
+fn removing_the_config_linkage_after_genesis_is_detected() {
     let dir = genesis_dir("Boundary D Coop");
     // NOTE: the receipt is deliberately NOT removed here. This is the case that
     // discriminates the commit ordering: if the completion marker were written
@@ -1002,15 +1000,15 @@ fn fault_after_trust_before_config_is_not_complete() {
     let text = combined(&show);
     assert!(
         !show.status.success(),
-        "boundary D: a receipt must not certify a genesis whose configuration \
+        "config linkage removed: a receipt must not certify a genesis whose configuration \
          linkage is absent — the daemon would fall back to the node DID:\n{text}"
     );
     assert!(
         text.contains("INCONSISTENT"),
-        "boundary D: the state must be reported as inconsistent, naming the \
+        "config linkage removed: the state must be reported as inconsistent, naming the \
          disagreement, not merely as a missing receipt:\n{text}"
     );
-    assert_partial_state_is_never_complete(dir.path(), "boundary D");
+    assert_partial_state_is_never_complete(dir.path(), "config linkage removed");
 }
 
 /// A committed receipt must never coexist with a configuration naming a
@@ -1056,8 +1054,12 @@ fn a_hostile_cooperative_name_cannot_inject_configuration() {
     assert!(run_init_coop(data_dir).status.success());
 
     let attacker = icn_identity::KeyPair::generate().unwrap().did().clone();
+    // Every TOML-significant shape at once: a closing quote and a forged key
+    // (the injection proper), a newline, a backslash, a comment marker, a table
+    // header, and non-ASCII text.
     let hostile = format!(
-        "Evil\"\ntreasury_did = \"{}\"\nname = \"pwned",
+        "Evil\"\ntreasury_did = \"{}\"\n# comment\n[injected]\nx = 1\nback\\slash \
+         Ünïcodé ☭ 你好 name = \"pwned",
         attacker.as_str()
     );
 
@@ -1259,4 +1261,44 @@ fn a_receipt_cannot_survive_the_key_material_it_names() {
         text.contains("key material is missing"),
         "the failure must name the missing key material:\n{text}"
     );
+}
+
+/// The cooperative record must carry its genesis trust root through the
+/// production read path, not merely somewhere in the receipt.
+///
+/// The witness above checks the trust root appears in the stored bytes; this
+/// reads the field back the way the daemon's cooperative store does, after the
+/// writing process exited, and asserts the exact key. Without this, the trust
+/// root could exist only because the receipt asserts it — the thing the design
+/// explicitly refuses to do.
+#[test]
+fn the_cooperative_record_binds_its_trust_root_through_the_production_read_path() {
+    let dir = genesis_dir("Binding Readback Cooperative");
+    let (_, json) = read_receipt_json(dir.path());
+    let receipt: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let trust_root = receipt["trust_root_did"].as_str().unwrap();
+    let treasury = receipt["treasury_did"].as_str().unwrap();
+    let coop_id = receipt["cooperative_id"].as_str().unwrap();
+
+    // Opened fresh, after the ceremony's process exited.
+    let sled = std::sync::Arc::new(SledStore::open(daemon_coop_store_path(dir.path())).unwrap());
+    let store = icn_coop::CoopStore::new(std::sync::Arc::new(sled.db().clone()));
+    let coop = store
+        .get_cooperative(coop_id)
+        .expect("the cooperative must be readable through CoopStore");
+
+    assert_eq!(
+        coop.metadata
+            .get("genesis.trust_root_did")
+            .map(String::as_str),
+        Some(trust_root),
+        "the cooperative record must bind its genesis trust root under the \
+         namespaced key, readable through the production store"
+    );
+    assert_eq!(
+        coop.treasury_did.as_deref(),
+        Some(treasury),
+        "and must name the same treasury the receipt does"
+    );
+    assert_eq!(coop.id, coop_id);
 }

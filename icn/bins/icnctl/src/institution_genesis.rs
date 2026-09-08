@@ -274,9 +274,10 @@ fn resolve_storage_root(data_dir: &Path) -> Result<()> {
 pub enum GenesisState {
     /// Nothing has been written.
     NotStarted,
-    /// Artefacts exist but no completion receipt does — a ceremony that did
-    /// not finish. Carries the artefacts found, so the refusal can name them.
-    Incomplete { artefacts: Vec<String> },
+    /// Components exist but no completion receipt does — a ceremony that did
+    /// not finish. Carries a component-level report, so a refusal can say what
+    /// is actually on disk rather than only that "something" is.
+    Incomplete { components: GenesisComponents },
     /// A completion receipt whose claims still hold against durable state.
     Complete(Box<GenesisReceipt>),
     /// A completion receipt exists, but durable state no longer agrees with it.
@@ -287,6 +288,129 @@ pub enum GenesisState {
         receipt: Box<GenesisReceipt>,
         problem: String,
     },
+}
+
+/// Which durable components of a genesis exist, determined from the components
+/// themselves rather than from the receipt.
+///
+/// Every field here is observable **without secrets** — no keystore is
+/// unlocked and no passphrase is prompted for — so `show` can report an
+/// interrupted ceremony without asking the operator for anything. That is also
+/// why the trust facts are reported as a count rather than attributed to
+/// specific principals: naming them would require unlocking the keystores to
+/// learn the DIDs, and a receipt is exactly what an incomplete ceremony lacks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GenesisComponents {
+    pub trust_root_key: bool,
+    pub treasury_key: bool,
+    pub cooperative_record: bool,
+    pub treasury_registration: bool,
+    pub trust_edges: usize,
+    pub config_linkage: bool,
+    pub receipt: bool,
+}
+
+impl GenesisComponents {
+    /// True when nothing this ceremony writes is present.
+    ///
+    /// Trust edges are deliberately excluded: `init-coop` writes its own
+    /// `my_did -> member` edges, so their presence does not imply a genesis was
+    /// attempted and must not make a fresh data directory look touched.
+    pub fn is_untouched(&self) -> bool {
+        !self.trust_root_key
+            && !self.treasury_key
+            && !self.cooperative_record
+            && !self.treasury_registration
+            && !self.config_linkage
+            && !self.receipt
+    }
+
+    fn describe(&self) -> String {
+        fn mark(present: bool) -> &'static str {
+            if present {
+                "present:"
+            } else {
+                "absent: "
+            }
+        }
+        [
+            format!(
+                "{} genesis trust-root key material",
+                mark(self.trust_root_key)
+            ),
+            format!("{} treasury key material", mark(self.treasury_key)),
+            format!("{} cooperative record", mark(self.cooperative_record)),
+            format!("{} treasury registration", mark(self.treasury_registration)),
+            format!(
+                "{} trust facts ({} edge(s) in the trust store)",
+                mark(self.trust_edges > 0),
+                self.trust_edges
+            ),
+            format!("{} configuration linkage", mark(self.config_linkage)),
+            format!("{} completion receipt", mark(self.receipt)),
+        ]
+        .join("\n  ")
+    }
+}
+
+/// Read the component report from durable state.
+pub fn genesis_components(data_dir: &Path) -> Result<GenesisComponents> {
+    use icn_store::Store;
+
+    let exists = |p: PathBuf| std::fs::symlink_metadata(&p).is_ok();
+
+    let scan_any = |db: PathBuf, prefix: &[u8]| -> bool {
+        if !db.exists() {
+            return false;
+        }
+        match icn_store::SledStore::open(&db) {
+            Ok(store) => {
+                let found = store.scan(prefix).map(|r| !r.is_empty()).unwrap_or(false);
+                drop(store);
+                found
+            }
+            Err(_) => false,
+        }
+    };
+    let scan_count = |db: PathBuf, prefix: &[u8]| -> usize {
+        if !db.exists() {
+            return 0;
+        }
+        match icn_store::SledStore::open(&db) {
+            Ok(store) => {
+                let n = store.scan(prefix).map(|r| r.len()).unwrap_or(0);
+                drop(store);
+                n
+            }
+            Err(_) => 0,
+        }
+    };
+
+    let coop_db = icn_core::config::store_path(data_dir).join("cooperative");
+    let config_linkage = {
+        let path = data_dir.join("icn.toml");
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|t| toml::from_str::<toml::Value>(&t).ok())
+            .map(|v| v.get("cooperative").is_some())
+            .unwrap_or(false)
+    };
+
+    Ok(GenesisComponents {
+        trust_root_key: exists(trust_root_keystore_path(data_dir)),
+        treasury_key: exists(treasury_keystore_path(data_dir)),
+        cooperative_record: scan_any(coop_db.clone(), b"coop:"),
+        treasury_registration: scan_any(
+            icn_core::config::ledger_store_path(data_dir),
+            b"ledger:treasury:",
+        ),
+        trust_edges: scan_count(
+            icn_core::config::trust_store_path(data_dir),
+            b"trust/edges/",
+        ),
+        config_linkage,
+        receipt: scan_any(coop_db, RECEIPT_KEY_PREFIX.as_bytes()),
+    })
 }
 
 /// Inspect the data directory without writing to it.
@@ -306,28 +430,16 @@ pub fn genesis_state(data_dir: &Path) -> Result<GenesisState> {
             },
         });
     }
-    let mut artefacts = Vec::new();
-    for (path, what) in [
-        (
-            trust_root_keystore_path(data_dir),
-            "genesis trust-root key material",
-        ),
-        (treasury_keystore_path(data_dir), "treasury key material"),
-    ] {
-        // `symlink_metadata`, not `exists()`. `exists()` follows symlinks and so
-        // reports `false` for a DANGLING one — which would let the ceremony
-        // proceed and then create the keystore *through* that link, writing
-        // private key material to a path outside this data directory.
-        // `symlink_metadata` stats the link itself, so anything sitting at
-        // these paths at all is treated as an artefact and refused.
-        if std::fs::symlink_metadata(&path).is_ok() {
-            artefacts.push(format!("{what} at {}", path.display()));
-        }
-    }
-    if artefacts.is_empty() {
+    // No receipt: report which components a partial ceremony left behind.
+    //
+    // Keystore presence is probed with `symlink_metadata`, not `exists()`:
+    // `exists()` follows symlinks and so reports `false` for a DANGLING one,
+    // which would let a rerun create key material *through* that link.
+    let components = genesis_components(data_dir)?;
+    if components.is_untouched() {
         Ok(GenesisState::NotStarted)
     } else {
-        Ok(GenesisState::Incomplete { artefacts })
+        Ok(GenesisState::Incomplete { components })
     }
 }
 
@@ -362,15 +474,15 @@ fn refuse_if_already_started(data_dir: &Path) -> Result<()> {
             receipt.cooperative_id,
             receipt.treasury_did
         ),
-        GenesisState::Incomplete { artefacts } => bail!(
+        GenesisState::Incomplete { components } => bail!(
             "Refusing institutional genesis: this data directory holds \
-             INCOMPLETE genesis state — artefacts from a ceremony that did not \
-             finish, with no completion receipt:\n  {}\n\
+             INCOMPLETE genesis state — a ceremony that did not finish, with no \
+             completion receipt:\n  {}\n\
              Genesis never overwrites key material, and it cannot resume: \
              re-running would mint a second set of principals and leave the \
              first orphaned. Inspect this state and remove it deliberately \
              before founding again.",
-            artefacts.join("\n  ")
+            components.describe()
         ),
     }
 }
@@ -435,6 +547,46 @@ pub fn load_receipt(data_dir: &Path) -> Result<Option<GenesisReceipt>> {
     Ok(Some(receipt))
 }
 
+/// Deterministic fault-injection points, compiled only for tests.
+///
+/// These exist so that partial-genesis tests exercise the **ceremony's own
+/// ordering** rather than a partial state assembled by hand. Constructing the
+/// state manually proves the inspector; forcing the real `run_genesis` to stop
+/// at a boundary proves what the implementation actually writes, and in what
+/// order. A test that deletes rows from a completed genesis cannot tell you
+/// whether the cooperative record is written before or after the treasury
+/// registration; this can.
+///
+/// Nothing here is reachable from the CLI: the enum, the parameter and every
+/// check are `#[cfg(test)]`, so the shipped binary contains no failpoint and
+/// no environment variable can trigger one.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// The shared `After` prefix is the point: each variant names the write it
+// follows, so the enum reads as the ceremony's own ordering.
+#[allow(clippy::enum_variant_names)]
+pub(crate) enum GenesisFailpoint {
+    AfterTrustRootKey,
+    AfterTreasuryKey,
+    AfterCooperativeSave,
+    AfterTreasuryRegistration,
+    AfterAuthorityEdge,
+    AfterTreasuryAuthorityEdge,
+    AfterConfigPublish,
+}
+
+/// Stop the ceremony at `point` when the test asked for it.
+macro_rules! failpoint {
+    ($injected:expr, $point:expr) => {
+        #[cfg(test)]
+        {
+            if $injected == Some($point) {
+                anyhow::bail!("injected genesis fault at {:?}", $point);
+            }
+        }
+    };
+}
+
 /// Perform the ceremony.
 ///
 /// # Ceremony ordering and partial failure
@@ -471,6 +623,21 @@ pub fn load_receipt(data_dir: &Path) -> Result<Option<GenesisReceipt>> {
 /// what to do with half-written institutional state is an operator's
 /// judgement, and a recovery mechanism is out of scope for #2744.
 fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisReceipt> {
+    run_genesis_inner(
+        data_dir,
+        name,
+        currency,
+        #[cfg(test)]
+        None,
+    )
+}
+
+fn run_genesis_inner(
+    data_dir: &Path,
+    name: &str,
+    currency: &str,
+    #[cfg(test)] injected: Option<GenesisFailpoint>,
+) -> Result<GenesisReceipt> {
     // (1) Never write authoritative state where the daemon will not read it.
     resolve_storage_root(data_dir)?;
 
@@ -547,7 +714,9 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
         &passphrase,
         "genesis trust-root",
     )?;
+    failpoint!(injected, GenesisFailpoint::AfterTrustRootKey);
     let treasury_did = mint_principal(&treasury_keystore_path(data_dir), &passphrase, "treasury")?;
+    failpoint!(injected, GenesisFailpoint::AfterTreasuryKey);
 
     // The invariant this whole issue exists to establish. Asserted rather than
     // assumed: these come from independent `KeyPair::generate()` calls, so an
@@ -594,6 +763,7 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
     coop_store
         .save_cooperative(&coop)
         .map_err(|e| anyhow::anyhow!("Failed to persist the cooperative record: {e}"))?;
+    failpoint!(injected, GenesisFailpoint::AfterCooperativeSave);
 
     // (8) Register the treasury durably. `with_store` is required: the plain
     // `TreasuryManager::new()` keeps its maps in memory only, and a treasury
@@ -619,6 +789,7 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
             Some(format!("Genesis treasury for {name}")),
         )
         .context("Failed to register the treasury")?;
+    failpoint!(injected, GenesisFailpoint::AfterTreasuryRegistration);
 
     // (9) The two trust facts, and precisely what they do and do not mean.
     //
@@ -683,6 +854,7 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
             graph_type,
         ))
         .map_err(|e| anyhow::anyhow!("Failed to record the node's recognition edge: {e}"))?;
+    failpoint!(injected, GenesisFailpoint::AfterAuthorityEdge);
     trust_graph
         .add_edge(icn_trust::TrustEdge::new_typed(
             trust_root_did.clone(),
@@ -691,6 +863,7 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
             graph_type,
         ))
         .map_err(|e| anyhow::anyhow!("Failed to record the trust root's authority edge: {e}"))?;
+    failpoint!(injected, GenesisFailpoint::AfterTreasuryAuthorityEdge);
 
     // Close every store handle before verification. sled takes an exclusive
     // directory lock, so the fresh handles in (11) cannot open these databases
@@ -709,6 +882,7 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
     // completion marker: a receipt written before this point would claim a
     // genesis the daemon would not act on.
     publish_cooperative_config(data_dir, name, &treasury_did)?;
+    failpoint!(injected, GenesisFailpoint::AfterConfigPublish);
 
     let receipt = GenesisReceipt {
         schema_version: GENESIS_RECEIPT_SCHEMA_VERSION,
@@ -1177,13 +1351,13 @@ pub fn handle_institution_genesis_command(
             // Reported separately from "not started" on purpose: an operator
             // whose ceremony died half-way needs to be told that, not told
             // nothing happened.
-            GenesisState::Incomplete { artefacts } => bail!(
-                "INCOMPLETE genesis under {}: artefacts exist but no completion \
-                 receipt does, so no institution came into existence here.\n  {}\n\
+            GenesisState::Incomplete { components } => bail!(
+                "INCOMPLETE genesis under {}: components exist but no completion \
+                 receipt does, so no cooperative came into existence here.\n  {}\n\
                  This state cannot be resumed; remove it deliberately before \
                  founding again.",
                 data_dir.display(),
-                artefacts.join("\n  ")
+                components.describe()
             ),
             GenesisState::NotStarted => bail!(
                 "No genesis receipt under {}. This data directory has not \
@@ -1193,4 +1367,262 @@ pub fn handle_institution_genesis_command(
         },
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod failpoint_tests {
+    //! Crash-boundary evidence produced by the ceremony itself.
+    //!
+    //! Each test runs the real `run_genesis_inner` and forces it to stop at one
+    //! mutation boundary, then asserts the component report matches exactly
+    //! what the implementation had written by that point. That is the
+    //! difference between proving the inspector and proving the ordering: a
+    //! test that deletes rows from a completed genesis cannot tell you whether
+    //! the cooperative record lands before or after the treasury registration.
+    //!
+    //! It also means the ordering is pinned by construction. Reordering two
+    //! writes in `run_genesis_inner` changes which components exist at a
+    //! boundary and fails the corresponding assertion here.
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+    use icn_identity::AgeKeyStore;
+
+    const PASSPHRASE: &str = "failpoint-fixture-passphrase";
+
+    /// A data directory provisioned to the point genesis expects: a node
+    /// keystore, and a configuration the daemon could actually load.
+    fn provisioned() -> tempfile::TempDir {
+        // `read_passphrase` sources this; every test in this module uses the
+        // same value, so the shared process environment is not a race.
+        std::env::set_var("ICN_KEYSTORE_PASSPHRASE", PASSPHRASE);
+
+        let dir = tempfile::TempDir::new().unwrap();
+        AgeKeyStore::init(get_keystore_path(dir.path()), PASSPHRASE.as_bytes()).unwrap();
+
+        // Serialized from the production `Config` rather than hand-written, so
+        // the fixture cannot drift out of loadability as the schema grows — and
+        // so it exercises genesis against a configuration the daemon really
+        // would accept. (`init-coop`'s hand-built template is not one; that is
+        // icn#2747.)
+        let config = icn_core::Config {
+            data_dir: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        // `Config` always serializes a `[cooperative]` table, even with every
+        // field `None`. Genesis refuses to publish over an existing one, so a
+        // fixture that left it in place would exercise that refusal rather than
+        // the ceremony. Strip it to represent a node that has not been
+        // through genesis.
+        let mut doc: toml::Value =
+            toml::from_str(&toml::to_string(&config).expect("Config must serialize"))
+                .expect("Config must round-trip");
+        if let Some(table) = doc.as_table_mut() {
+            table.remove("cooperative");
+        }
+        std::fs::write(
+            dir.path().join("icn.toml"),
+            toml::to_string(&doc).expect("fixture config must serialize"),
+        )
+        .unwrap();
+        dir
+    }
+
+    fn run_to(dir: &Path, point: GenesisFailpoint) -> anyhow::Error {
+        let err = run_genesis_inner(dir, "Failpoint Cooperative", "HOURS", Some(point))
+            .expect_err("the injected fault must stop the ceremony");
+        let msg = format!("{err:#}");
+        // The ceremony must have stopped at the INJECTED point, not refused
+        // during preflight — otherwise the component assertions below would be
+        // asserting an untouched directory and proving nothing.
+        assert!(
+            msg.contains("injected genesis fault"),
+            "the ceremony stopped for a reason other than the injected fault, \
+             so this test proves nothing about ordering: {msg}"
+        );
+        err
+    }
+
+    /// Assert the exact component set the ceremony had written at a boundary.
+    #[allow(clippy::too_many_arguments)]
+    fn assert_components(
+        dir: &Path,
+        label: &str,
+        trust_root_key: bool,
+        treasury_key: bool,
+        cooperative_record: bool,
+        treasury_registration: bool,
+        edges: usize,
+        config_linkage: bool,
+    ) {
+        let got = genesis_components(dir).unwrap();
+        let want = GenesisComponents {
+            trust_root_key,
+            treasury_key,
+            cooperative_record,
+            treasury_registration,
+            trust_edges: edges,
+            config_linkage,
+            // No boundary here is after the receipt: it is the commit point.
+            receipt: false,
+        };
+        assert_eq!(
+            got, want,
+            "{label}: component report must match what the ceremony wrote"
+        );
+        assert!(
+            !got.is_untouched(),
+            "{label}: must not look like an untouched directory"
+        );
+
+        // And the state machine must call it INCOMPLETE — never untouched,
+        // never complete.
+        match genesis_state(dir).unwrap() {
+            GenesisState::Incomplete { .. } => {}
+            other => panic!("{label}: expected Incomplete, got {other:?}"),
+        }
+    }
+
+    /// A rerun over any partial state must refuse without minting anything.
+    fn assert_rerun_refuses_without_minting(dir: &Path, label: &str) {
+        let before: Vec<Option<Vec<u8>>> =
+            [trust_root_keystore_path(dir), treasury_keystore_path(dir)]
+                .iter()
+                .map(|p| std::fs::read(p).ok())
+                .collect();
+        let coops_before = genesis_components(dir).unwrap();
+
+        let err = run_genesis_inner(dir, "Rerun Attempt", "HOURS", None)
+            .expect_err("a rerun over partial state must refuse");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("INCOMPLETE"),
+            "{label}: the refusal must name the partial state: {msg}"
+        );
+
+        let after: Vec<Option<Vec<u8>>> =
+            [trust_root_keystore_path(dir), treasury_keystore_path(dir)]
+                .iter()
+                .map(|p| std::fs::read(p).ok())
+                .collect();
+        assert_eq!(
+            before, after,
+            "{label}: a refused rerun must not mint or replace key material"
+        );
+        assert_eq!(
+            coops_before,
+            genesis_components(dir).unwrap(),
+            "{label}: a refused rerun must not change durable state at all"
+        );
+    }
+
+    #[test]
+    fn boundary_a_after_trust_root_key() {
+        let dir = provisioned();
+        run_to(dir.path(), GenesisFailpoint::AfterTrustRootKey);
+        assert_components(dir.path(), "A", true, false, false, false, 0, false);
+        assert_rerun_refuses_without_minting(dir.path(), "A");
+    }
+
+    #[test]
+    fn boundary_b_after_treasury_key() {
+        let dir = provisioned();
+        run_to(dir.path(), GenesisFailpoint::AfterTreasuryKey);
+        assert_components(dir.path(), "B", true, true, false, false, 0, false);
+        assert_rerun_refuses_without_minting(dir.path(), "B");
+    }
+
+    #[test]
+    fn boundary_c_after_cooperative_save() {
+        let dir = provisioned();
+        run_to(dir.path(), GenesisFailpoint::AfterCooperativeSave);
+        assert_components(dir.path(), "C", true, true, true, false, 0, false);
+        assert_rerun_refuses_without_minting(dir.path(), "C");
+    }
+
+    #[test]
+    fn boundary_d_after_treasury_registration() {
+        let dir = provisioned();
+        run_to(dir.path(), GenesisFailpoint::AfterTreasuryRegistration);
+        assert_components(dir.path(), "D", true, true, true, true, 0, false);
+        assert_rerun_refuses_without_minting(dir.path(), "D");
+    }
+
+    #[test]
+    fn boundary_e_after_authority_edge() {
+        let dir = provisioned();
+        run_to(dir.path(), GenesisFailpoint::AfterAuthorityEdge);
+        assert_components(dir.path(), "E", true, true, true, true, 1, false);
+        assert_rerun_refuses_without_minting(dir.path(), "E");
+    }
+
+    #[test]
+    fn boundary_e2_after_treasury_authority_edge() {
+        let dir = provisioned();
+        run_to(dir.path(), GenesisFailpoint::AfterTreasuryAuthorityEdge);
+        assert_components(dir.path(), "E2", true, true, true, true, 2, false);
+        assert_rerun_refuses_without_minting(dir.path(), "E2");
+    }
+
+    /// The boundary that matters most.
+    ///
+    /// The configuration already points at the new treasury, so the daemon
+    /// would consume it — and yet no genesis has been committed. This state must
+    /// be reported INCOMPLETE, and must be confusable with neither an untouched
+    /// node nor a completed institution.
+    #[test]
+    fn boundary_f_after_config_publish_before_commit() {
+        let dir = provisioned();
+        run_to(dir.path(), GenesisFailpoint::AfterConfigPublish);
+        assert_components(dir.path(), "F", true, true, true, true, 2, true);
+
+        // The config genuinely names a treasury...
+        let text = std::fs::read_to_string(dir.path().join("icn.toml")).unwrap();
+        let cfg: icn_core::Config = toml::from_str(&text).unwrap();
+        assert!(
+            cfg.cooperative.treasury_did.is_some(),
+            "F: the configuration must already name the treasury at this boundary"
+        );
+        // ...and genesis still reports INCOMPLETE, not COMPLETE.
+        assert!(
+            matches!(
+                genesis_state(dir.path()).unwrap(),
+                GenesisState::Incomplete { .. }
+            ),
+            "F: a published configuration is not a committed genesis"
+        );
+        assert_rerun_refuses_without_minting(dir.path(), "F");
+    }
+
+    /// Without a failpoint the same code path commits, and the state machine
+    /// says so. Without this, every assertion above could be satisfied by a
+    /// ceremony that never completes at all.
+    #[test]
+    fn the_uninjected_ceremony_commits() {
+        let dir = provisioned();
+        let receipt =
+            run_genesis_inner(dir.path(), "Committed Cooperative", "HOURS", None).unwrap();
+        let components = genesis_components(dir.path()).unwrap();
+        assert_eq!(
+            components,
+            GenesisComponents {
+                trust_root_key: true,
+                treasury_key: true,
+                cooperative_record: true,
+                treasury_registration: true,
+                trust_edges: 2,
+                config_linkage: true,
+                receipt: true,
+            }
+        );
+        match genesis_state(dir.path()).unwrap() {
+            GenesisState::Complete(r) => {
+                assert_eq!(r.treasury_did, receipt.treasury_did);
+                assert_ne!(r.treasury_did, r.node_did);
+                assert_ne!(r.trust_root_did, r.node_did);
+                assert_ne!(r.trust_root_did, r.treasury_did);
+            }
+            other => panic!("expected Complete, got {other:?}"),
+        }
+    }
 }
