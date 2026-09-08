@@ -66,6 +66,13 @@ icn-entity.workspace = true
 utoipa = { version = "5.4.0", features = ["yaml"] }
 
 [dev-dependencies]
+# Test-only: the acceptance witness for #2744 drives the *production*
+# `TrustServiceImplTokio` and a real `Ledger` over the stores the genesis
+# ceremony wrote, so that the author-trust gate it crosses is the real one
+# rather than a stand-in. Neither crate is linked into the shipped binary.
+icn-trust-app = { path = "../../apps/trust-app" }
+icn-kernel-api = { path = "../../crates/icn-kernel-api" }
+
 tempfile = "3.24"
 # `init_coop_first_run_passphrase_test` needs `setsid(2)` to detach the child's
 # controlling terminal. Without it, `rpassword` opens `/dev/tty` — which is

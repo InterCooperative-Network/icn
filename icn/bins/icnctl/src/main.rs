@@ -2,6 +2,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 mod institution_bootstrap;
+mod institution_genesis;
 
 use anyhow::{bail, Context, Result};
 use rust_i18n::t;

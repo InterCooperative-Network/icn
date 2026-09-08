@@ -19,6 +19,17 @@ pub enum InstitutionCommands {
         #[command(subcommand)]
         command: InstitutionBootstrapCommands,
     },
+
+    /// Institutional genesis: bring a cooperative into existence as an
+    /// institution with its own treasury principal and trust root (#2744).
+    ///
+    /// Unlike `bootstrap`, which drives a *running* node's gateway and
+    /// therefore needs the institution to already exist in order to
+    /// authenticate, this is a local ceremony run with the daemon stopped.
+    Genesis {
+        #[command(subcommand)]
+        command: crate::institution_genesis::InstitutionGenesisCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -203,6 +214,9 @@ pub async fn handle_institution_command(cmd: InstitutionCommands, data_dir: &Pat
                 }
             }
         },
+        InstitutionCommands::Genesis { command } => {
+            crate::institution_genesis::handle_institution_genesis_command(command, data_dir)?
+        }
     }
 
     Ok(())
