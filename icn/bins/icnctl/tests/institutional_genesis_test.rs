@@ -1047,3 +1047,96 @@ fn a_hostile_cooperative_name_cannot_inject_configuration() {
         "the hostile name must round-trip as a single string value"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Path containment
+// ---------------------------------------------------------------------------
+//
+// A privileged ceremony that writes key material must not be redirectable by
+// what it finds on disk.
+//
+// **What actually protects this, established by mutation.** The N2-A startup
+// gate — which the ceremony crosses before it opens or writes anything —
+// already refuses a data directory containing a symlink, because sled
+// discovery "cannot decide whether it names a database inside or outside this
+// data directory". Reverting the ceremony's own `symlink_metadata` check to a
+// plain `exists()` did NOT make these tests fail: the gate refuses first.
+//
+// So these assert the gate's refusal, which is the real boundary. The
+// ceremony's own checks remain as defence in depth for the case the gate does
+// not cover — `exists()` follows symlinks and returns `false` for a DANGLING
+// one, so an existence check written that way would permit a
+// create-through-symlink if it were ever reached first. Attributing the
+// protection to the wrong layer is how a later refactor moves a write past the
+// thing that was actually guarding it.
+
+/// A dangling `treasury.age` symlink must not let genesis write key material
+/// outside the data directory.
+#[test]
+fn a_dangling_treasury_keystore_symlink_cannot_redirect_key_material() {
+    let dir = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let target = outside.path().join("stolen-treasury.age");
+    assert!(!target.exists(), "fixture: the link must dangle");
+    std::os::unix::fs::symlink(&target, data_dir.join("treasury.age")).unwrap();
+    // The trap, stated as an assertion so the fixture cannot silently stop
+    // exercising it: a plain existence check sees nothing here.
+    assert!(
+        !data_dir.join("treasury.age").exists(),
+        "fixture: a dangling symlink must be invisible to `exists()`"
+    );
+
+    let out = run_genesis(data_dir, "Symlink Coop");
+    let text = combined(&out);
+    assert!(
+        !out.status.success(),
+        "genesis must refuse over a symlinked treasury keystore path:\n{text}"
+    );
+    assert!(
+        text.contains("N2-A startup gate") && text.contains("symlink"),
+        "the refusal must come from the containment boundary that actually \
+         guards this — the N2-A gate, before any write — and must name the \
+         symlink:\n{text}"
+    );
+    assert!(
+        !target.exists(),
+        "no key material may be written through the symlink to {}",
+        target.display()
+    );
+}
+
+/// A symlink at the temporary config path must not redirect the configuration
+/// write.
+#[test]
+fn a_symlink_at_the_temp_config_path_cannot_redirect_the_write() {
+    let dir = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let target = outside.path().join("clobbered.toml");
+    std::fs::write(&target, "# untouched\n").unwrap();
+    std::os::unix::fs::symlink(&target, data_dir.join("icn.toml.genesis-tmp")).unwrap();
+
+    let out = run_genesis(data_dir, "Temp Symlink Coop");
+    let text = combined(&out);
+    assert!(
+        !out.status.success(),
+        "genesis must refuse rather than publish through a symlinked temp \
+         path:\n{text}"
+    );
+    assert!(
+        text.contains("N2-A startup gate") && text.contains("symlink"),
+        "as above, the refusal is the gate's and must name the symlink:\n{text}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&target).unwrap(),
+        "# untouched\n",
+        "the file behind the symlink must not have been written"
+    );
+}

@@ -308,7 +308,13 @@ pub fn genesis_state(data_dir: &Path) -> Result<GenesisState> {
         ),
         (treasury_keystore_path(data_dir), "treasury key material"),
     ] {
-        if path.exists() {
+        // `symlink_metadata`, not `exists()`. `exists()` follows symlinks and so
+        // reports `false` for a DANGLING one — which would let the ceremony
+        // proceed and then create the keystore *through* that link, writing
+        // private key material to a path outside this data directory.
+        // `symlink_metadata` stats the link itself, so anything sitting at
+        // these paths at all is treated as an artefact and refused.
+        if std::fs::symlink_metadata(&path).is_ok() {
             artefacts.push(format!("{what} at {}", path.display()));
         }
     }
@@ -467,6 +473,17 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
     // is the more fundamental question, and a data directory missing both
     // should say so rather than reporting the shallower problem.
     let node_keystore_path = get_keystore_path(data_dir);
+    if std::fs::symlink_metadata(&node_keystore_path)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+    {
+        bail!(
+            "Refusing institutional genesis: the node keystore at {} is a \
+             symlink. Founding authority must be proven against real key \
+             material in this data directory, not through a redirection.",
+            node_keystore_path.display()
+        );
+    }
     if !node_keystore_path.exists() {
         bail!(
             "Refusing institutional genesis: no node identity at {}.\n\
@@ -963,8 +980,32 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
     )?;
 
     let tmp_path = config_path.with_extension("toml.genesis-tmp");
+
+    // Never write through whatever happens to sit at the temporary path.
+    // `File::create` follows symlinks, so a pre-placed link here would redirect
+    // the configuration write to an arbitrary file. Refuse anything that is not
+    // a plain regular file, clear a stale regular file left by an interrupted
+    // run, and then create with `create_new`, which fails rather than following
+    // or truncating.
+    match std::fs::symlink_metadata(&tmp_path) {
+        Ok(meta) if meta.file_type().is_symlink() || !meta.is_file() => bail!(
+            "Refusing to publish the configuration: {} exists and is not a \
+             regular file. Genesis will not write through it.",
+            tmp_path.display()
+        ),
+        Ok(_) => std::fs::remove_file(&tmp_path).with_context(|| {
+            format!(
+                "Failed to clear the stale temporary file {}",
+                tmp_path.display()
+            )
+        })?,
+        Err(_) => {}
+    }
     {
-        let mut f = std::fs::File::create(&tmp_path)
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp_path)
             .with_context(|| format!("Failed to create {}", tmp_path.display()))?;
         f.write_all(out.as_bytes())
             .with_context(|| format!("Failed to write {}", tmp_path.display()))?;
