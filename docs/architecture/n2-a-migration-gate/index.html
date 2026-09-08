@@ -1955,8 +1955,14 @@ construction: they are append-time policy evaluated against live ledger state an
 clock, so an offline verifier applying them would reject entries that were valid when appended.
 <strong>The bare branch&#39;s checks are unchanged — only its claim narrowed.</strong> The <code>--verify-ledger</code> branch
 did change what it checks, and the bullet below records how: it resolves the canonical ledger path,
-refuses an absent or partial database before the gate can create one, decodes rows as
-<code>JournalEntry</code>, and asks the ledger&#39;s own validator whether each one is valid. Widening what the <em>bare</em> command verifies would change what it means and is
+refuses an absent or partial database before the gate can create one, refuses a database sled REPLACED rather than
+recovered (icn#2732 — a bounded claim: it is not a whole-database integrity check, and does not
+establish that every row a backup once held is still readable), decodes rows as <code>JournalEntry</code>, and asks the ledger&#39;s own
+validator whether each one is valid. The recovery refusal has to run before the gate for the same
+reason the presence refusal does, one layer down: <code>sled::open</code> replaces a database it cannot parse
+with a fresh empty one, and its <code>was_recovered()</code> signal is false only on the FIRST open — the
+gate&#39;s own open would persist the repair and leave the corruption to be certified as
+<code>✓ Ledger empty</code>. Widening what the <em>bare</em> command verifies would change what it means and is
 still not done here.</li>
 <li><strong>A pre-existing <code>verify-backup</code> path bug, found while placing that gate. FIXED by icn#2717.</strong>
 <code>verify_ledger_in_backup</code> looked for <code>&lt;restore_dir&gt;/ledger</code>, but <code>backup</code> archives the data
