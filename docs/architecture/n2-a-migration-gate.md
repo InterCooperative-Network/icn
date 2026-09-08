@@ -1335,8 +1335,9 @@ every §11 disposition are untouched, and no readiness classification moves.
   clock, so an offline verifier applying them would reject entries that were valid when appended.
   **The bare branch's checks are unchanged — only its claim narrowed.** The `--verify-ledger` branch
   did change what it checks, and the bullet below records how: it resolves the canonical ledger path,
-  refuses an absent or partial database before the gate can create one, refuses a database sled
-  could not recover as written (icn#2732), decodes rows as `JournalEntry`, and asks the ledger's own
+  refuses an absent or partial database before the gate can create one, refuses a database sled REPLACED rather than
+  recovered (icn#2732 — a bounded claim: it is not a whole-database integrity check, and does not
+  establish that every row a backup once held is still readable), decodes rows as `JournalEntry`, and asks the ledger's own
   validator whether each one is valid. The recovery refusal has to run before the gate for the same
   reason the presence refusal does, one layer down: `sled::open` replaces a database it cannot parse
   with a fresh empty one, and its `was_recovered()` signal is false only on the FIRST open — the

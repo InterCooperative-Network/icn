@@ -1714,3 +1714,126 @@ fn a_restarted_nodes_ledger_damaged_the_same_way_is_also_refused() {
     // name a cause even less than the recovery branch may.
     assert_names_no_cause(&flat, &text);
 }
+
+/// A crafted archive must not make verification write outside what it extracted.
+///
+/// The archive is untrusted input, so a `store/ledger` that is a *symlink* to a
+/// sled database elsewhere on the machine has to be refused before anything
+/// follows it. Every gate in front of the ledger open follows symlinks or ignores
+/// them:
+///
+/// - `calculate_dir_checksum` walks with `follow_links(false)` and hashes only
+///   `is_file()` entries, so a symlink is skipped and the checksum still matches;
+/// - `Path::exists` and `Path::is_file` in the presence check follow it, and find
+///   a complete `conf`/`db` pair;
+/// - `sled::open` follows it too, and **writes** — it grows the backing file, may
+///   write a snapshot, and rewrites the configuration.
+///
+/// `enforce_n2a_gate` does refuse symlinks (`find_sled_roots` uses `file_type()`,
+/// which does not follow, and errors rather than skipping). That was sufficient
+/// while the gate held the first open of the extracted tree. icn#2732 moved an
+/// open in front of the gate — it has to, or sled's recovery signal is already
+/// gone — and that reordering stepped the new open past the gate's guard.
+///
+/// Measured with the guard removed: the external database's `db` was rewritten
+/// and a `snap.*` was created, from nothing but an operator running
+/// `verify-backup` on a hostile file. The refusal must therefore come before the
+/// open, not from the gate after it.
+///
+/// The assertion is on the VICTIM, not on the exit status. The command already
+/// failed in the end either way — the gate caught it — so a status assertion
+/// passes whether or not the escape happened. What distinguishes the two is
+/// whether bytes outside the extraction root changed.
+#[test]
+fn a_symlinked_ledger_cannot_make_verification_write_outside_the_archive() {
+    let dir = TempDir::new().unwrap();
+
+    // A real sled database that has nothing to do with any backup.
+    let victim = dir.path().join("victim-ledger");
+    std::fs::create_dir_all(&victim).unwrap();
+    {
+        let store = SledStore::open(&victim).expect("fixture: could not create the victim");
+        store
+            .put(b"ledger:journal:victim", b"{}")
+            .expect("fixture: could not write to the victim");
+        store
+            .db()
+            .flush()
+            .expect("fixture: could not flush the victim");
+    }
+    let victim_before = tree_identity(&victim);
+    assert!(
+        !victim_before.is_empty(),
+        "fixture: the victim must hold files, or 'unchanged' proves nothing"
+    );
+
+    // A legitimate ledger-less backup, so `backup_metadata.json` carries a real
+    // checksum that the crafted tree below genuinely satisfies.
+    let data_dir = dir.path().join("data");
+    init_identity(&data_dir);
+    let honest = dir.path().join("honest.tar");
+    make_backup(&data_dir, &honest);
+
+    let stage = dir.path().join("stage");
+    std::fs::create_dir_all(&stage).unwrap();
+    tar::Archive::new(std::fs::File::open(&honest).unwrap())
+        .unpack(&stage)
+        .expect("fixture: could not extract the honest archive");
+
+    // The craft: the same payload, plus a symlink where the ledger belongs.
+    let crafted = dir.path().join("crafted.tar");
+    {
+        let mut builder = tar::Builder::new(std::fs::File::create(&crafted).unwrap());
+        builder.follow_symlinks(false);
+        for entry in walkdir::WalkDir::new(&stage)
+            .follow_links(false)
+            .sort_by_file_name()
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.file_type().is_file() {
+                let rel = entry.path().strip_prefix(&stage).unwrap();
+                builder
+                    .append_path_with_name(entry.path(), rel)
+                    .expect("fixture: could not append file");
+            }
+        }
+        let mut header = tar::Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Symlink);
+        header.set_size(0);
+        header.set_mode(0o777);
+        header.set_cksum();
+        builder
+            .append_link(&mut header, "store/ledger", &victim)
+            .expect("fixture: could not append the symlink");
+        builder
+            .finish()
+            .expect("fixture: could not finish the archive");
+    }
+
+    let out = verify(&crafted, true);
+    let text = combined(&out);
+
+    // The property. Everything else here is scaffolding for it.
+    assert_eq!(
+        tree_identity(&victim),
+        victim_before,
+        "verifying a crafted archive must not touch a database outside it:\n{text}"
+    );
+
+    assert!(
+        !out.status.success(),
+        "and the crafted archive must not verify:\n{text}"
+    );
+    let flat = flattened(&text);
+    assert!(
+        flat.contains("symbolic link"),
+        "the refusal must name what was actually wrong with the archive, so an \
+         operator is not sent looking for a principal collision:\n{text}"
+    );
+    assert!(
+        flat.contains("nothing was opened"),
+        "and must say that no database was opened, which is the property that \
+         distinguishes this refusal from the gate catching it afterwards:\n{text}"
+    );
+}

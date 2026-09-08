@@ -6867,6 +6867,69 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     Ok(())
 }
 
+/// Refuse a ledger path that leaves the extracted tree, before anything follows it.
+///
+/// The archive is untrusted input — judging it is this command's entire job — and
+/// `Path::exists`, `Path::is_file` and `sled::open` all FOLLOW symlinks. A
+/// crafted archive carrying `store/ledger` as a symlink to a sled database
+/// elsewhere on the machine therefore reads as a present, complete ledger:
+/// `calculate_dir_checksum` walks with `follow_links(false)` and hashes only
+/// `is_file()` entries, so the symlink is skipped and the checksum matches; the
+/// marker checks below follow it and find `conf` and `db`; and the recovery open
+/// then opens the external database. `sled::open` writes — it grows the backing
+/// file, may write a snapshot, and rewrites the configuration — so verification
+/// would mutate a database outside the directory it extracted, on nothing more
+/// than an operator running `verify-backup` on a hostile file.
+///
+/// Reproduced before this check existed: the victim database's `db` was rewritten
+/// and a `snap.*` appeared, on an archive whose only payload was the symlink.
+///
+/// `enforce_n2a_gate` already refuses symlinks — `find_sled_roots` uses
+/// `file_type()`, which does not follow them, and errors rather than skipping
+/// (`icn/crates/icn-store/src/did_collision_scan.rs:1463`). That refusal was
+/// enough while the gate held the FIRST open of the extracted tree. icn#2732 had
+/// to move an open in front of the gate to catch sled's recovery signal before
+/// the gate's own open destroys it, and that reordering stepped the new open past
+/// this guard. Moving a check earlier also moves it past whatever used to protect
+/// it, so the guard has to move with it.
+///
+/// Every component from the extraction root down is checked with
+/// `symlink_metadata`, which does not follow, because a link anywhere along the
+/// path escapes just as effectively as one at the leaf. A component that does not
+/// exist is not this function's business — absence is the presence check's
+/// verdict to give, and giving it here would produce two different messages for
+/// one condition.
+fn assert_ledger_path_is_contained(restore_dir: &Path, ledger_db_path: &Path) -> Result<()> {
+    let relative = ledger_db_path
+        .strip_prefix(restore_dir)
+        .context("ledger path is not under the extraction root")?;
+
+    let mut walked = restore_dir.to_path_buf();
+    for component in relative.components() {
+        walked.push(component);
+        let metadata = match std::fs::symlink_metadata(&walked) {
+            Ok(metadata) => metadata,
+            // Absent: let `assert_backup_carried_a_ledger` say so.
+            Err(_) => return Ok(()),
+        };
+        if metadata.file_type().is_symlink() {
+            bail!(
+                "FAILED: this backup places a symbolic link at {}, inside the path \
+                 its ledger database must occupy. Ledger verification was NOT \
+                 performed, and nothing was opened.\n\
+                 \n\
+                 A link there would make verification read — and, because \
+                 `sled::open` writes, MODIFY — a database outside the archive being \
+                 verified, while reporting the result as though it came from the \
+                 backup. A backup written by `icnctl backup` never contains one.",
+                walked.display()
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Prove the ARCHIVE carried a ledger database, before anything opens the tree.
 ///
 /// Must be called before `enforce_n2a_gate`. The gate discovers sled roots by the
@@ -6884,6 +6947,9 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
 /// before the gate (icn#2732).
 fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
     let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
+
+    // Containment FIRST, because every check below this line follows symlinks.
+    assert_ledger_path_is_contained(restore_dir, &ledger_db_path)?;
 
     if !ledger_db_path.exists() {
         bail!(
@@ -6946,6 +7012,15 @@ fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
 /// ledger" from "this backup's ledger could not be inspected as written", which
 /// is the distinction icn#2732 exists to restore. Those are very different facts
 /// for an operator holding a backup they may need to restore.
+///
+/// What the signal establishes is bounded, and the bound is worth stating.
+/// `was_recovered()` answers whether sled RECOVERED the database or REPLACED it.
+/// It is not a whole-database integrity check and this refusal does not claim to
+/// be one: it cannot establish that every row a backup once held is still
+/// readable. Deciding that needs a count or manifest recorded when the backup was
+/// taken and cross-checked here, which is a backup-format change icn#2732
+/// deliberately does not make. What is closed here is the specific false
+/// conclusion that a replaced database is an empty one.
 ///
 /// What the signal does NOT establish is the CAUSE. A truncated copy, a failed
 /// transfer, tampering, and a ledger whose first writes were never durably
