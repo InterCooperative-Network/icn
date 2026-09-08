@@ -6973,15 +6973,34 @@ fn assert_ledger_recovered_as_written(restore_dir: &Path) -> Result<()> {
     // and saying so here names the check the operator asked for. Without this the
     // same damage surfaced as an N2-A startup-gate refusal, which is true but
     // sends the reader looking for a principal-collision problem they do not have.
+    //
+    // This branch is the REALISTIC one, not the exotic one. A ledger that has
+    // been opened more than once carries a `snap.*`, and with a snapshot present
+    // sled reports damage as `Corruption` instead of recovering into an empty
+    // database — so any node that has ever restarted arrives here rather than at
+    // the `was_recovered()` refusal below.
+    //
+    // It therefore names a cause even less than that refusal may.
+    // `SledStore::open` is a bare `sled::open`, so this context attaches to every
+    // `sled::Error` — a permission failure, ENOSPC, a descriptor limit or another
+    // process holding the flock reach it exactly as damaged bytes do. Telling an
+    // operator their backup may have been tampered with because the file was not
+    // readable would be a fabricated conclusion. Say what happened, and let
+    // sled's own error say why through the cause chain below.
     let store = SledStore::open(&ledger_db_path).with_context(|| {
         format!(
             "FAILED: the ledger database in this backup at {} could not be opened, \
              so nothing in it could be verified. Ledger verification was NOT \
              performed.\n\
              \n\
-             The archive carries a ledger directory, so this is damage to the \
-             database itself — a truncated or partially written copy, a failed \
-             transfer, or tampering — not a node that never had a ledger.",
+             The archive carried both `conf` and `db`, so this is not the \
+             missing-ledger case. What stopped the open is not narrowed here: \
+             sled's own error is reported below, and the possibilities include \
+             damaged contents as well as conditions that say nothing about the \
+             archive at all, such as a permission problem or another process \
+             holding the database lock.\n\
+             \n\
+             Do not rely on this backup as an empty ledger.",
             ledger_db_path.display()
         )
     })?;
@@ -6996,8 +7015,8 @@ fn assert_ledger_recovered_as_written(restore_dir: &Path) -> Result<()> {
              backup's ledger as empty no matter what the backup actually \
              contained. Ledger verification was NOT performed.\n\
              \n\
-             Both `conf` and `db` are present, so this is not a backup that never \
-             carried a ledger. What it is cannot be narrowed further from the \
+             The archive carried both `conf` and `db`, so this is not the \
+             missing-ledger case. What it IS cannot be narrowed further from the \
              archive alone: a truncated or partially written copy, a failed \
              transfer, tampering, and a ledger whose first writes were never \
              durably flushed all leave bytes sled reports the same way. The \

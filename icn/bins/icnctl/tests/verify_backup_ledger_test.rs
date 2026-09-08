@@ -1420,6 +1420,39 @@ fn a_backup_whose_ledger_was_damaged_before_it_was_taken(
     archive
 }
 
+/// A refusal may not tell the operator WHY, because nothing here establishes why.
+///
+/// A presence check on the hedge is not enough on its own: a future edit that
+/// re-added `— a truncated or partially written copy, a failed transfer, or
+/// tampering —` *alongside* "cannot be narrowed further" would satisfy the hedge
+/// assertion and still deliver the fabricated conclusion. The regression to guard
+/// is the reappearance of a cause, so this asserts its ABSENCE.
+///
+/// `was_recovered() == false` is equally consistent with a truncated copy, a
+/// failed transfer, tampering, and a ledger whose first writes were never durably
+/// flushed; sled cannot tell those apart, so neither may the message. The
+/// open-failed branch is looser still — it attaches to every `sled::Error`,
+/// including a permission problem or flock contention that says nothing about the
+/// archive.
+///
+/// NAMING the possibilities is allowed; ASSERTING one is not. A message that
+/// lists what it cannot distinguish is telling the operator something true and
+/// useful, and the current wording does exactly that. So the forbidden strings
+/// are the assertive constructions only — the flat claim, and the disjunction
+/// that closed the original overclaim — rather than the individual causes, which
+/// legitimately appear in the "cannot be narrowed further" enumeration. A
+/// forbidden-word list over the causes themselves was tried first and failed the
+/// honest wording, which is the distinction this comment exists to keep.
+fn assert_names_no_cause(flat: &str, text: &str) {
+    for forbidden in ["or tampering", "damage to the database itself"] {
+        assert!(
+            !flat.contains(forbidden),
+            "the refusal must not assert a cause it cannot establish, but it \
+             contains {forbidden:?}:\n{text}"
+        );
+    }
+}
+
 /// The assertions both damage cases share.
 fn assert_not_certified_as_empty(text: &str, status_ok: bool) {
     let flat = flattened(text);
@@ -1460,15 +1493,12 @@ fn assert_not_certified_as_empty(text: &str, status_ok: bool) {
         "and it must give the operator the one instruction the evidence does \
          support:\n{text}"
     );
-    // Nor may it assert a CAUSE. `was_recovered() == false` is equally consistent
-    // with a truncated copy, a failed transfer, tampering, and a ledger whose
-    // first writes were never durably flushed — sled cannot tell them apart, so
-    // neither may this message. An earlier draft asserted damage or tampering
-    // outright, which is the same overclaiming this whole change exists to stop.
+    // Nor may it assert a CAUSE.
     assert!(
         flat.contains("cannot be narrowed further"),
         "the message must say plainly that the cause is not established:\n{text}"
     );
+    assert_names_no_cause(&flat, text);
 }
 
 /// A ledger `db` truncated in transfer must not be certified as an empty ledger.
@@ -1680,4 +1710,7 @@ fn a_restarted_nodes_ledger_damaged_the_same_way_is_also_refused() {
         "a snapshot-bearing ledger fails at OPEN, so the message must be the \
          open-failed one rather than the recovery one:\n{text}"
     );
+    // This branch attaches to every `sled::Error`, not only corruption, so it may
+    // name a cause even less than the recovery branch may.
+    assert_names_no_cause(&flat, &text);
 }
