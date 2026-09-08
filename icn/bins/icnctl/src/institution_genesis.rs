@@ -82,7 +82,7 @@ pub enum InstitutionGenesisCommands {
     /// Perform institutional genesis for a new cooperative.
     ///
     /// Creates durable cooperative state, a treasury principal with its own key
-    /// material, the institution-rooted trust facts a governance-authored
+    /// material, the trust facts a governance-authored
     /// ledger entry needs, and a versioned genesis receipt.
     ///
     /// Opens the local stores directly, so run it with the daemon stopped (the
@@ -101,7 +101,12 @@ pub enum InstitutionGenesisCommands {
         yes: bool,
     },
 
-    /// Read back the genesis receipt.
+    /// Read back the genesis receipt, re-verified against durable state.
+    ///
+    /// This is not a plain file read: it re-checks the cooperative record, the
+    /// treasury registration, both trust facts and the configuration linkage,
+    /// so that a receipt cannot outlive what it claims. That means it opens the
+    /// same sled databases the daemon does — run it with the daemon stopped.
     Show {
         /// Emit machine-readable JSON.
         #[arg(long)]
@@ -374,6 +379,17 @@ fn refuse_if_already_started(data_dir: &Path) -> Result<()> {
 /// The DID comes from the generated public key (`Did::from_public_key`), so it
 /// is backed by a key this node holds and survives the daemon's own config
 /// parse. Nothing here fabricates a DID string.
+/// # Control, as distinct from identity
+///
+/// Both minted keystores are encrypted with the **node keystore passphrase**.
+/// The treasury is therefore a distinct *principal* but not separately
+/// *controlled*: whoever can unlock `identity.age` can unlock `treasury.age`.
+///
+/// That is honest for this slice — the treasury key signs nothing yet, so the
+/// shared passphrase grants no capability that is currently exercised — but it
+/// is a real limit on what "distinct principal" means here, and separating
+/// custody is a prerequisite for any later claim that the institution controls
+/// its treasury independently of the operator.
 fn mint_principal(path: &Path, passphrase: &[u8], what: &str) -> Result<Did> {
     let keystore = AgeKeyStore::init(path, passphrase)
         .with_context(|| format!("Failed to create {what} keystore at {}", path.display()))?;
@@ -436,7 +452,7 @@ pub fn load_receipt(data_dir: &Path) -> Result<Option<GenesisReceipt>> {
 /// 6. mint institution and treasury key material;
 /// 7. write the cooperative record;
 /// 8. register the treasury durably;
-/// 9. write the institution-rooted trust facts;
+/// 9. write the trust facts;
 /// 10. write the receipt — **the commit point**;
 /// 11. link the configuration.
 ///
@@ -539,7 +555,7 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
         bail!(
             "Refusing institutional genesis: a generated institutional \
              principal collided with the node DID ({node_did}). Genesis fails \
-             rather than letting the machine stand in for the institution."
+             rather than letting the machine stand in for the cooperative."
         );
     }
 
@@ -606,17 +622,17 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
     //
     // The ledger's author-trust gate scores an author through
     // `TrustGraph::compute_trust_score`, which is ego-centric from the node's
-    // own DID. An `institution -> treasury` edge *alone* is unreachable from
+    // own DID. A `trust root -> treasury` edge *alone* is unreachable from
     // that origin and scores 0.0, so both edges are required:
     //
-    //   node -> institution      the operator's local recognition of the
-    //                            institution founded here. Not a self-edge.
-    //   institution -> treasury  a trust fact whose SOURCE is the institution.
+    //   node -> trust root       the operator's local recognition of the
+    //                            cooperative founded here. Not a self-edge.
+    //   trust root -> treasury   a trust fact whose SOURCE is the trust root.
     //
     // Together they score 1.0*1.0 * 0.3 (the transitive weight) = 0.30, above
     // the 0.1 the ledger requires.
     //
-    // What the second edge is NOT: it is not signed by the institution's key,
+    // What the second edge is NOT: it is not signed by the trust root's key,
     // and `TrustEdge` carries no signature or provenance field, so the store
     // records no evidence of who established it. It is written through
     // `TrustGraph::add_edge` — the storage primitive, and the only API that
@@ -626,9 +642,9 @@ fn run_genesis(data_dir: &Path, name: &str, currency: &str) -> Result<GenesisRec
     //
     // So the honest description is an *institution-attributed* trust fact
     // established under the founding Principal's privileged local ceremony.
-    // It is NOT a cryptographic authorisation by the institution, and this
-    // slice does not claim the institution holds authority independent of the
-    // node: removing `node -> institution` also drops the author to 0.0. Both
+    // It is NOT a cryptographic authorisation by the cooperative, and this
+    // slice does not claim the cooperative holds authority independent of the
+    // node: removing `node -> trust root` also drops the author to 0.0. Both
     // of those are covered by tests, so the claim cannot drift.
     //
     // Genesis never writes the `node -> node` self-edge that ICN_DEV_SELF_TRUST
@@ -807,18 +823,18 @@ fn verify_durable_state(data_dir: &Path, receipt: &GenesisReceipt) -> Result<()>
     let trust_root_did: Did = receipt
         .trust_root_did
         .parse()
-        .context("Verification: the institution DID in the receipt is not a usable DID")?;
+        .context("Verification: the trust root DID in the receipt is not a usable DID")?;
     let graph = icn_trust::TrustGraph::new(trust_store, node_did.clone());
     for (source, target, what) in [
         (
             &node_did,
             &trust_root_did,
-            "the node's recognition of the institution",
+            "the node's recognition of the genesis trust root",
         ),
         (
             &trust_root_did,
             &treasury_did,
-            "the institution's authority over its treasury",
+            "the trust root's authority over the treasury",
         ),
     ] {
         let present = graph
@@ -836,21 +852,34 @@ fn verify_durable_state(data_dir: &Path, receipt: &GenesisReceipt) -> Result<()>
     let config_path = data_dir.join("icn.toml");
     let text = std::fs::read_to_string(&config_path)
         .with_context(|| format!("Verification: failed to read {}", config_path.display()))?;
-    let cooperative = read_cooperative_section(&text)
-        .with_context(|| {
-            format!(
-                "Verification: failed to parse the [cooperative] section of {}",
-                config_path.display()
-            )
-        })?
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Verification: {} has no [cooperative] section, so the daemon would fall back \
-                 to the node DID.",
-                config_path.display()
-            )
-        })?;
-    let resolved = cooperative
+    // The key material itself. Without this, deleting `treasury.age` after a
+    // completed ceremony would still report COMPLETE, and the claim that every
+    // component is re-read would be narrower than stated.
+    for (path, what) in [
+        (trust_root_keystore_path(data_dir), "genesis trust-root"),
+        (treasury_keystore_path(data_dir), "treasury"),
+    ] {
+        if !path.is_file() {
+            bail!(
+                "Verification: {what} key material is missing from {}. The \
+                 principal named by the receipt has no key behind it.",
+                path.display()
+            );
+        }
+    }
+
+    // Through the daemon's own loader, not a sub-table read: a receipt that
+    // certifies "the daemon will consume this treasury" must be backed by the
+    // same parse the daemon performs.
+    let config: icn_core::Config = toml::from_str(&text).with_context(|| {
+        format!(
+            "Verification: {} is not loadable by the daemon, so a genesis linked into it \
+             would never be consumed (see icn#2747)",
+            config_path.display()
+        )
+    })?;
+    let resolved = config
+        .cooperative
         .resolve_treasury_did(&node_did)
         .context("Verification: the published configuration does not resolve a treasury")?;
     if !resolved.is_institutional() || resolved.did().as_str() != receipt.treasury_did {
@@ -895,6 +924,32 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
     // parses a bare value rather than a document, so a normal config file with
     // a leading comment fails there. This is the parser the rest of the
     // repository uses.
+    // The daemon loads this file with `Config::from_file`, a plain
+    // `toml::from_str::<Config>` with no defaulting layer. Checking only that
+    // it is valid TOML would let this ceremony write an entire institution and
+    // then certify it against a configuration `icnd` cannot load — and
+    // `icnd --data-dir`, its only other form, takes `Config::default()`, whose
+    // `cooperative.treasury_did` is `None`, so the node would author as itself.
+    // That is exactly the collapse this work exists to prevent, so it is
+    // checked HERE, before the first write, rather than discovered at
+    // publication time with half an institution already on disk.
+    //
+    // Today this refuses the `icn.toml` that `init-coop` itself generates: that
+    // template omits `[network] bootstrap_peers`, which has no serde default.
+    // That is icn#2747, a pre-existing defect this ceremony does not fix —
+    // refusing loudly is the honest outcome.
+    if let Err(e) = toml::from_str::<icn_core::Config>(&text) {
+        bail!(
+            "Refusing institutional genesis: {} is not loadable by the daemon \
+             ({e}).\n\
+             `icnd --config` parses this file with `Config::from_file`, so a \
+             genesis linked into it would never be consumed. If this names a \
+             missing `[network] bootstrap_peers`, that is icn#2747 — the \
+             configuration `init-coop` generates cannot be loaded by the daemon \
+             it tells you to run. Fix the configuration and re-run.",
+            config_path.display()
+        );
+    }
     let parsed: toml::Value = toml::from_str(&text)
         .with_context(|| format!("Failed to parse {}", config_path.display()))?;
     if parsed.get("cooperative").is_some() {
@@ -975,9 +1030,16 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
     // `[network] bootstrap_peers`, which has no serde default, so
     // `Config::from_file` rejects it. That is a separate pre-existing defect
     // and is not this ceremony's to fix or to be blocked by.
-    let _ = read_cooperative_section(&out).context(
-        "Refusing to publish a configuration whose [cooperative] section does not parse",
-    )?;
+    // Validate the candidate the way the daemon will load it, before the
+    // rename, so a failure leaves the original file in place.
+    let candidate: icn_core::Config = toml::from_str(&out)
+        .context("Refusing to publish a configuration the daemon could not load")?;
+    if candidate.cooperative.treasury_did.as_deref() != Some(treasury_did.as_str()) {
+        bail!(
+            "Refusing to publish: the appended [cooperative] section does not \
+             resolve the treasury this ceremony created"
+        );
+    }
 
     let tmp_path = config_path.with_extension("toml.genesis-tmp");
 
@@ -1012,6 +1074,21 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
         f.sync_all()
             .with_context(|| format!("Failed to flush {}", tmp_path.display()))?;
     }
+    // Carry the original file's permissions onto the replacement. `icnd --init`
+    // writes `gateway.jwt_secret` into this file in plaintext, so a deployment
+    // that hardened it to 0600 must not silently get 0644 back from the
+    // process umask.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        if let Ok(meta) = std::fs::metadata(&config_path) {
+            let mode = meta.permissions().mode();
+            std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(mode))
+                .with_context(|| {
+                    format!("Failed to carry permissions onto {}", tmp_path.display())
+                })?;
+        }
+    }
     std::fs::rename(&tmp_path, &config_path).with_context(|| {
         format!(
             "Failed to publish {} over {}",
@@ -1022,29 +1099,12 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
     Ok(())
 }
 
-/// Read just the `[cooperative]` table, through the type that owns it.
-///
-/// Scoped deliberately: this ceremony writes one section and should validate
-/// exactly that section. See the note in [`publish_cooperative_config`] for why
-/// deserializing the whole file is not an option today.
-fn read_cooperative_section(text: &str) -> Result<Option<icn_core::config::CooperativeConfig>> {
-    let doc: toml::Value = toml::from_str(text).context("configuration is not valid TOML")?;
-    match doc.get("cooperative") {
-        None => Ok(None),
-        Some(section) => {
-            Ok(Some(section.clone().try_into().context(
-                "[cooperative] section is not a valid CooperativeConfig",
-            )?))
-        }
-    }
-}
-
 fn print_receipt(receipt: &GenesisReceipt) {
     println!("Institutional Genesis");
     println!("=====================\n");
     println!("Cooperative:        {}", receipt.cooperative_name);
     println!("  id:               {}", receipt.cooperative_id);
-    println!("Institution DID:    {}", receipt.trust_root_did);
+    println!("Genesis trust root: {}", receipt.trust_root_did);
     println!("Treasury DID:       {}", receipt.treasury_did);
     println!("Founding authority: {}", receipt.genesis_authority_did);
     println!("Node DID:           {}", receipt.node_did);

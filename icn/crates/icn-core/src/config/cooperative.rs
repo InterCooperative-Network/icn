@@ -39,6 +39,19 @@ impl CooperativeConfig {
     /// operator asked for an institutional treasury and got the machine, logged
     /// as "No treasury_did configured", which was false.
     ///
+    /// # Scope of the refusal
+    ///
+    /// A configured-but-unusable value now refuses at startup where it
+    /// previously started on the node DID. That is deliberate and is scoped by
+    /// construction rather than by a genesis marker: nothing in this repository
+    /// ever generated a `[cooperative]` section before `icnctl institution
+    /// genesis` existed, so the only way to reach this arm on an existing
+    /// deployment is a hand-edited configuration that names a treasury the
+    /// daemon cannot parse. Starting such a node on its own DID is the silent
+    /// substitution #2744 exists to remove, so refusing is the intended
+    /// behaviour rather than a migration hazard. Deployments with no
+    /// `[cooperative]` section — every pre-genesis node — are untouched.
+    ///
     /// It is not a hypothetical. `Did` parsing requires the bytes after
     /// `did:icn:` to decode to exactly 32 bytes *and* form a valid Ed25519
     /// point, and both treasury spellings this repository already produces fail

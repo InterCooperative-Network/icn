@@ -116,10 +116,36 @@ fn node_did(data_dir: &Path) -> String {
 /// `init-coop` writes `data_dir = <the CLI --data-dir>`, so the configuration
 /// and the command line agree and genesis proceeds.
 fn run_init_coop(data_dir: &Path) -> Output {
-    icnctl(data_dir)
+    let out = icnctl(data_dir)
         .args(["init-coop", "--name", "Fixture Node", "--yes", "--no-start"])
         .output()
-        .unwrap()
+        .unwrap();
+    if out.status.success() {
+        make_config_daemon_loadable(data_dir);
+    }
+    out
+}
+
+/// Repair the one field that stops `init-coop`'s generated `icn.toml` from
+/// loading, so the fixture provisions a node a daemon could actually run.
+///
+/// This is **not** cosmetic. `init-coop` emits `[network]` without
+/// `bootstrap_peers`, which has no serde default, so `Config::from_file` — the
+/// loader `icnd --config` uses — rejects the very file `init-coop` tells the
+/// operator to run. That is icn#2747: pre-existing, out of scope for #2744, and
+/// genesis now refuses such a configuration rather than certifying a genesis
+/// the daemon could never consume. The fixture therefore has to hand genesis a
+/// loadable config; without this, every positive test below would exercise that
+/// refusal instead of the ceremony.
+fn make_config_daemon_loadable(data_dir: &Path) {
+    let path = data_dir.join("icn.toml");
+    let text = std::fs::read_to_string(&path).unwrap();
+    if text.contains("bootstrap_peers") {
+        return;
+    }
+    let patched = text.replace("[network]\n", "[network]\nbootstrap_peers = []\n");
+    assert_ne!(patched, text, "fixture: [network] section must be present");
+    std::fs::write(&path, patched).unwrap();
 }
 
 fn run_genesis(data_dir: &Path, name: &str) -> Output {
@@ -292,25 +318,28 @@ fn institutional_genesis_creates_an_institution_distinct_from_the_node() {
     );
 
     // 7. G4 — institution-rooted trust, not a node self-edge.
+    // Edge keys are `trust/edges/{source}:{target}` and a DID CONTAINS colons,
+    // so these must be compared against a constructed key. Splitting on the
+    // first ':' yields "did" for every key ever written, which would make both
+    // assertions below structurally incapable of failing.
     let edges = rows_with_prefix(&daemon_trust_store_path(data_dir), b"trust/edges/");
+    let self_edge = format!("trust/edges/{node}:{node}");
     assert!(
-        !edges.iter().any(|k| {
-            k.strip_prefix("trust/edges/")
-                .and_then(|rest| rest.split_once(':').map(|(s, t)| s == node && t == node))
-                .unwrap_or(false)
-        }),
+        !edges.contains(&self_edge),
         "G4/G5: genesis must never write the node self-edge that \
-         ICN_DEV_SELF_TRUST writes. Found {edges:?}"
+         ICN_DEV_SELF_TRUST writes ({self_edge}). Found {edges:?}"
+    );
+    let node_source_prefix = format!("trust/edges/{node}:");
+    assert!(
+        edges.iter().any(|k| !k.starts_with(&node_source_prefix)),
+        "G4: some stored trust edge must be rooted in an authority that is not \
+         the node itself, or the treasury's authority is the machine's. \
+         Found {edges:?}"
     );
     assert!(
-        edges.iter().any(|k| {
-            k.strip_prefix("trust/edges/")
-                .and_then(|rest| rest.split_once(':').map(|(s, _)| s != node))
-                .unwrap_or(false)
-        }),
-        "G4: some stored trust edge must be rooted in an authority that is not \
-         the node itself, or the institution has no authority of its own. \
-         Found {edges:?}"
+        edges.contains(&format!("trust/edges/{trust_root}:{treasury}")),
+        "G4: the trust root's authority edge over the treasury must be present \
+         verbatim. Found {edges:?}"
     );
 
     // 8. The founding authority is named.
@@ -599,15 +628,17 @@ fn genesis_neither_needs_nor_consults_icn_dev_self_trust() {
     assert!(out.status.success(), "genesis: {}", combined(&out));
 
     let node = node_did(data_dir);
+    // Constructed key, not a split — see the note in the main witness.
     let edges = rows_with_prefix(&daemon_trust_store_path(data_dir), b"trust/edges/");
+    let self_edge = format!("trust/edges/{node}:{node}");
     assert!(
-        !edges.iter().any(|k| {
-            k.strip_prefix("trust/edges/")
-                .and_then(|rest| rest.split_once(':').map(|(s, t)| s == node && t == node))
-                .unwrap_or(false)
-        }),
-        "genesis must not write a node self-edge even when the dev flag is \
-         set — it does not read it. Found {edges:?}"
+        !edges.contains(&self_edge),
+        "genesis must not write a node self-edge ({self_edge}) even when the \
+         dev flag is set — it does not read it. Found {edges:?}"
+    );
+    assert!(
+        !edges.is_empty(),
+        "fixture: genesis must have written edges"
     );
 }
 
@@ -903,8 +934,21 @@ fn fault_after_keys_before_cooperative_is_not_complete() {
 #[test]
 fn fault_after_cooperative_before_treasury_is_not_complete() {
     let dir = genesis_dir("Boundary B Coop");
-    drop_receipt(dir.path());
+    // The receipt is KEPT so that verification's treasury readback is exercised
+    // in the failing direction. Dropping it first would short-circuit
+    // `genesis_state` on the artefact scan and leave that check uncovered.
     std::fs::remove_dir_all(daemon_ledger_store_path(dir.path())).unwrap();
+    let (show, _) = read_receipt_json(dir.path());
+    let text = combined(&show);
+    assert!(
+        !show.status.success(),
+        "boundary B must not be complete:\n{text}"
+    );
+    assert!(
+        text.contains("INCONSISTENT"),
+        "the missing treasury registration must be detected on readback:\n{text}"
+    );
+    drop_receipt(dir.path());
     assert_partial_state_is_never_complete(dir.path(), "boundary B");
 }
 
@@ -912,8 +956,19 @@ fn fault_after_cooperative_before_treasury_is_not_complete() {
 #[test]
 fn fault_after_treasury_before_trust_is_not_complete() {
     let dir = genesis_dir("Boundary C Coop");
-    drop_receipt(dir.path());
+    // Receipt KEPT, as in boundary B, so the trust-edge readback is exercised.
     std::fs::remove_dir_all(daemon_trust_store_path(dir.path())).unwrap();
+    let (show, _) = read_receipt_json(dir.path());
+    let text = combined(&show);
+    assert!(
+        !show.status.success(),
+        "boundary C must not be complete:\n{text}"
+    );
+    assert!(
+        text.contains("INCONSISTENT"),
+        "the missing trust facts must be detected on readback:\n{text}"
+    );
+    drop_receipt(dir.path());
     assert_partial_state_is_never_complete(dir.path(), "boundary C");
 }
 
@@ -1138,5 +1193,70 @@ fn a_symlink_at_the_temp_config_path_cannot_redirect_the_write() {
         std::fs::read_to_string(&target).unwrap(),
         "# untouched\n",
         "the file behind the symlink must not have been written"
+    );
+}
+
+/// Genesis must refuse a configuration the daemon cannot load, rather than
+/// certifying a genesis that would never be consumed.
+///
+/// This is the case that made a COMPLETE receipt dishonest: `icnd --config`
+/// parses the whole file with `Config::from_file`, and `icnd --data-dir` — its
+/// only other form — takes `Config::default()`, whose `treasury_did` is `None`,
+/// so the node authors as itself. Certifying either as a completed genesis
+/// would assert exactly the collapse this work exists to prevent.
+///
+/// The unloadable config here is the one `init-coop` really generates
+/// (icn#2747), reproduced by removing the field the fixture adds.
+#[test]
+fn genesis_refuses_a_configuration_the_daemon_cannot_load() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    // Put the config back into the state `init-coop` actually leaves it in.
+    let path = data_dir.join("icn.toml");
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(&path, text.replace("bootstrap_peers = []\n", "")).unwrap();
+
+    let out = run_genesis(data_dir, "Unloadable Config Coop");
+    let msg = combined(&out);
+    assert!(
+        !out.status.success(),
+        "genesis must refuse a configuration the daemon cannot load:\n{msg}"
+    );
+    assert!(
+        msg.contains("not loadable by the daemon") && msg.contains("2747"),
+        "the refusal must say the daemon could not load it and name the \
+         pre-existing defect:\n{msg}"
+    );
+    // Refused before anything was written.
+    assert!(
+        !data_dir.join("treasury.age").exists()
+            && !data_dir.join("genesis-trust-root.age").exists(),
+        "no key material may be minted when the configuration is unusable"
+    );
+}
+
+/// A principal named by the receipt must still have key material behind it.
+///
+/// Without this check, deleting `treasury.age` after a completed ceremony left
+/// the receipt reporting COMPLETE for a treasury nothing could ever act as.
+#[test]
+fn a_receipt_cannot_survive_the_key_material_it_names() {
+    let dir = genesis_dir("Key Material Coop");
+    assert!(read_receipt_json(dir.path()).0.status.success());
+
+    std::fs::remove_file(dir.path().join("treasury.age")).unwrap();
+
+    let (show, _) = read_receipt_json(dir.path());
+    let text = combined(&show);
+    assert!(
+        !show.status.success(),
+        "a receipt must not certify a treasury whose key is gone:\n{text}"
+    );
+    assert!(
+        text.contains("key material is missing"),
+        "the failure must name the missing key material:\n{text}"
     );
 }
