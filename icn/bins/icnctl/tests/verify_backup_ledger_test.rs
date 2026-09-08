@@ -1255,7 +1255,7 @@ fn verification_touches_nothing_outside_its_known_side_effect_surface() {
         let store = SledStore::open(&restored_ledger).expect("could not open restored ledger");
         assert!(
             store.db().was_recovered(),
-            "a healthy restored ledger must report as recovered, or the handler              would refuse this archive"
+            "a healthy restored ledger must report as recovered, or the handler would refuse this archive"
         );
     }
 
@@ -1447,11 +1447,27 @@ fn assert_not_certified_as_empty(text: &str, status_ok: bool) {
         "and must say the requested verification did not happen, rather than \
          reporting a result it never obtained:\n{text}"
     );
-    // Say only what the evidence supports. Nothing in the archive records how
-    // many rows the ledger held, so the message must not imply a count.
+    // Say only what the evidence supports, in two directions.
+    //
+    // Nothing in the archive records how many rows the ledger held, so the
+    // message must not imply a count.
     assert!(
-        flat.contains("not recoverable from this archive"),
+        flat.contains("not established by this archive"),
         "the message must not imply the original contents are known:\n{text}"
+    );
+    assert!(
+        flat.contains("Do not rely on it as an empty ledger"),
+        "and it must give the operator the one instruction the evidence does \
+         support:\n{text}"
+    );
+    // Nor may it assert a CAUSE. `was_recovered() == false` is equally consistent
+    // with a truncated copy, a failed transfer, tampering, and a ledger whose
+    // first writes were never durably flushed — sled cannot tell them apart, so
+    // neither may this message. An earlier draft asserted damage or tampering
+    // outright, which is the same overclaiming this whole change exists to stop.
+    assert!(
+        flat.contains("cannot be narrowed further"),
+        "the message must say plainly that the cause is not established:\n{text}"
     );
 }
 
@@ -1585,5 +1601,83 @@ fn a_genuinely_empty_readable_ledger_still_verifies() {
     assert!(
         flattened(&text).contains("Ledger empty (no entries)"),
         "and it must still be reported as empty:\n{text}"
+    );
+}
+
+/// A restarted node's ledger takes the OTHER refusal branch, and must also refuse.
+///
+/// The two damage tests above build a ledger that has been opened exactly once —
+/// `seed_ledger` opens a fresh directory, writes, flushes and drops. sled writes
+/// a `snap.*` only when a later open advances the stable LSN, so a first-ever
+/// open leaves `conf`, `db` and `blobs` and no snapshot. That is the shape of a
+/// node that has never restarted.
+///
+/// A real node's ledger carries a `snap.*` after its second start, and with a
+/// snapshot present the same truncation makes `sled::open` return `Corruption`
+/// instead of silently recovering — so production damage reaches
+/// `assert_ledger_recovered_as_written`'s OPEN-FAILED branch, not its
+/// `was_recovered()` branch. Both are refusals, but only one of them was covered,
+/// and "a corrupt ledger is never reported as empty" is a claim about both.
+///
+/// This test reopens the seeded ledger once before damaging it, which is the
+/// cheapest faithful stand-in for a restart.
+#[test]
+fn a_restarted_nodes_ledger_damaged_the_same_way_is_also_refused() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("restarted.tar");
+
+    init_identity(&data_dir);
+    seed_ledger(&data_dir, &[("hours", 60, 0), ("hours", 0, 60)]);
+
+    // The "restart": a second open, which is what writes the snapshot.
+    {
+        let store = SledStore::open(ledger_dir(&data_dir)).expect("fixture: could not reopen");
+        store.db().flush().expect("fixture: could not flush");
+    }
+    let snapshots: Vec<_> = std::fs::read_dir(ledger_dir(&data_dir))
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.starts_with("snap."))
+        .collect();
+    assert!(
+        !snapshots.is_empty(),
+        "fixture: a restarted ledger must carry a snapshot, or this test builds \
+         the same shape as the two above and covers nothing new"
+    );
+
+    std::fs::write(ledger_dir(&data_dir).join("db"), b"").expect("fixture: could not truncate db");
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+    let flat = flattened(&text);
+
+    assert!(
+        !out.status.success(),
+        "a restarted node's damaged ledger must not verify:\n{text}"
+    );
+    // The claim under test is the same one, on the branch the other tests miss.
+    assert!(
+        !flat.contains("Ledger empty"),
+        "an unreadable ledger must never be reported as an empty one, on either \
+         refusal branch:\n{text}"
+    );
+    assert!(
+        !flat.contains("BACKUP VERIFICATION PASSED"),
+        "and the run must not end in a success banner:\n{text}"
+    );
+    assert!(
+        flat.contains("Ledger verification was NOT performed"),
+        "and it must say the requested verification did not happen:\n{text}"
+    );
+    // This shape reaches the open-failed branch, whose wording differs from the
+    // recovery branch. Asserting the distinct wording is what proves the two are
+    // actually different code paths rather than one path reached twice.
+    assert!(
+        flat.contains("could not be opened"),
+        "a snapshot-bearing ledger fails at OPEN, so the message must be the \
+         open-failed one rather than the recovery one:\n{text}"
     );
 }

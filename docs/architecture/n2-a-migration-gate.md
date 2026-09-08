@@ -1335,8 +1335,13 @@ every §11 disposition are untouched, and no readiness classification moves.
   clock, so an offline verifier applying them would reject entries that were valid when appended.
   **The bare branch's checks are unchanged — only its claim narrowed.** The `--verify-ledger` branch
   did change what it checks, and the bullet below records how: it resolves the canonical ledger path,
-  refuses an absent or partial database before the gate can create one, decodes rows as
-  `JournalEntry`, and asks the ledger's own validator whether each one is valid. Widening what the *bare* command verifies would change what it means and is
+  refuses an absent or partial database before the gate can create one, refuses a database sled
+  could not recover as written (icn#2732), decodes rows as `JournalEntry`, and asks the ledger's own
+  validator whether each one is valid. The recovery refusal has to run before the gate for the same
+  reason the presence refusal does, one layer down: `sled::open` replaces a database it cannot parse
+  with a fresh empty one, and its `was_recovered()` signal is false only on the FIRST open — the
+  gate's own open would persist the repair and leave the corruption to be certified as
+  `✓ Ledger empty`. Widening what the *bare* command verifies would change what it means and is
   still not done here.
 - **A pre-existing `verify-backup` path bug, found while placing that gate. FIXED by icn#2717.**
   `verify_ledger_in_backup` looked for `<restore_dir>/ledger`, but `backup` archives the data

@@ -6947,6 +6947,12 @@ fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
 /// is the distinction icn#2732 exists to restore. Those are very different facts
 /// for an operator holding a backup they may need to restore.
 ///
+/// What the signal does NOT establish is the CAUSE. A truncated copy, a failed
+/// transfer, tampering, and a ledger whose first writes were never durably
+/// flushed are byte-indistinguishable here, and the message must not pick one of
+/// them. It reports what was established — the database was replaced rather than
+/// recovered — and declines to name why.
+///
 /// This is a mechanism, not a reading of sled's log output. The warning sled
 /// prints on a damaged configuration is human-oriented text with no stability
 /// guarantee; `was_recovered()` is the library's own answer to the question
@@ -6990,15 +6996,18 @@ fn assert_ledger_recovered_as_written(restore_dir: &Path) -> Result<()> {
              backup's ledger as empty no matter what the backup actually \
              contained. Ledger verification was NOT performed.\n\
              \n\
-             Both `conf` and `db` are present in the archive, so this is damage to \
-             the database itself — a truncated or partially written copy, a failed \
-             transfer, or tampering — not a node that never had a ledger. The \
-             backup's own checksum cannot catch this: it is computed over the data \
-             directory at backup time, so a ledger that was already damaged when \
-             the backup was taken checksums consistently and passes.\n\
+             Both `conf` and `db` are present, so this is not a backup that never \
+             carried a ledger. What it is cannot be narrowed further from the \
+             archive alone: a truncated or partially written copy, a failed \
+             transfer, tampering, and a ledger whose first writes were never \
+             durably flushed all leave bytes sled reports the same way. The \
+             backup's own checksum cannot distinguish them either — it is computed \
+             over the data directory at backup time, so a ledger already damaged \
+             when the backup was taken checksums consistently and passes.\n\
              \n\
-             How many entries the ledger held is not recoverable from this \
-             archive; treat the backup as unrestorable rather than as empty.",
+             What this backup's ledger held is therefore not established by this \
+             archive. It may have held nothing; it may have held entries that \
+             cannot be recovered. Do not rely on it as an empty ledger.",
             ledger_db_path.display()
         );
     }
