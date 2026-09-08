@@ -103,9 +103,10 @@ pub enum InstitutionGenesisCommands {
 
     /// Read back the genesis receipt, re-verified against durable state.
     ///
-    /// This is not a plain file read: it re-checks the cooperative record, the
-    /// treasury registration, both trust facts and the configuration linkage,
-    /// so that a receipt cannot outlive what it claims. That means it opens the
+    /// This is not a plain file read: it re-checks the cooperative record and
+    /// its trust-root binding, the treasury registration, both trust facts, the
+    /// minted key material, and the configuration linkage, so that a receipt
+    /// cannot outlive what it claims. That means it opens the
     /// same sled databases the daemon does — run it with the daemon stopped.
     Show {
         /// Emit machine-readable JSON.
@@ -453,8 +454,9 @@ pub fn load_receipt(data_dir: &Path) -> Result<Option<GenesisReceipt>> {
 /// 7. write the cooperative record;
 /// 8. register the treasury durably;
 /// 9. write the trust facts;
-/// 10. write the receipt — **the commit point**;
-/// 11. link the configuration.
+/// 10. publish the configuration linkage;
+/// 11. verify every component through freshly opened handles;
+/// 12. write the receipt — **the commit point** — last.
 ///
 /// The receipt is written last and is what `show` consults, so a ceremony
 /// interrupted at any earlier point leaves no receipt and is reported as
@@ -1020,18 +1022,11 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
     );
     out.push_str(&body);
 
-    // Parse before publishing, so a malformed append fails with the original
-    // file still in place.
-    //
-    // Only the section this ceremony owns is validated. Deserializing the whole
-    // file as `icn_core::Config` would couple genesis to the entire config
-    // schema — and would fail today for a reason that has nothing to do with
-    // genesis: `init-coop`'s generated `icn.toml` omits
-    // `[network] bootstrap_peers`, which has no serde default, so
-    // `Config::from_file` rejects it. That is a separate pre-existing defect
-    // and is not this ceremony's to fix or to be blocked by.
-    // Validate the candidate the way the daemon will load it, before the
-    // rename, so a failure leaves the original file in place.
+    // Validate the candidate the way the daemon loads it — a whole-`Config`
+    // parse, not just the `[cooperative]` table — before the rename, so a
+    // failure leaves the original file in place. An earlier draft validated
+    // only the section this ceremony writes, which let a COMPLETE receipt
+    // certify a configuration `icnd` could not load.
     let candidate: icn_core::Config = toml::from_str(&out)
         .context("Refusing to publish a configuration the daemon could not load")?;
     if candidate.cooperative.treasury_did.as_deref() != Some(treasury_did.as_str()) {
@@ -1064,9 +1059,18 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
         Err(_) => {}
     }
     {
-        let mut f = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
+        // Created 0600, then widened to the original file's mode after the
+        // content is written. The published `icn.toml` may hold a plaintext
+        // `jwt_secret`, and creating the temp file at the process umask would
+        // expose it world-readable for the duration of the write.
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            opts.mode(0o600);
+        }
+        let mut f = opts
             .open(&tmp_path)
             .with_context(|| format!("Failed to create {}", tmp_path.display()))?;
         f.write_all(out.as_bytes())
@@ -1074,10 +1078,11 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
         f.sync_all()
             .with_context(|| format!("Failed to flush {}", tmp_path.display()))?;
     }
-    // Carry the original file's permissions onto the replacement. `icnd --init`
-    // writes `gateway.jwt_secret` into this file in plaintext, so a deployment
-    // that hardened it to 0600 must not silently get 0644 back from the
-    // process umask.
+    // Carry the original file's permissions onto the replacement. `init-coop`'s
+    // template invites a plaintext secret into this very file
+    // (`# jwt_secret = "CHANGE_ME"  # Set this before starting!`), so a
+    // deployment that hardened it to 0600 must not silently get 0644 back from
+    // the process umask.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;
