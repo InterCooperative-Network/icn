@@ -279,6 +279,14 @@ pub enum GenesisState {
     /// is actually on disk rather than only that "something" is.
     Incomplete { components: GenesisComponents },
     /// A completion receipt whose claims still hold against durable state.
+    ///
+    /// "Still hold" means every non-secret relationship: the cooperative record
+    /// and its trust-root binding, the treasury registration, both trust facts,
+    /// the presence of both keystores, and the configuration linkage. It does
+    /// **not** include key provenance — `genesis_state` runs verification
+    /// without a passphrase, so a keystore substituted after the ceremony still
+    /// classifies as `Complete`. The ceremony itself verifies provenance before
+    /// writing the marker; nothing re-verifies it afterwards.
     Complete(Box<GenesisReceipt>),
     /// A completion receipt exists, but durable state no longer agrees with it.
     ///
@@ -305,24 +313,34 @@ pub struct GenesisComponents {
     pub treasury_key: bool,
     pub cooperative_record: bool,
     pub treasury_registration: bool,
-    pub trust_edges: usize,
+    pub trust_store_edges: usize,
     pub config_linkage: bool,
     pub receipt: bool,
 }
 
 impl GenesisComponents {
-    /// True when nothing this ceremony writes is present.
+    /// True when no **genesis-exclusive** marker is present.
     ///
-    /// Trust edges are deliberately excluded: `init-coop` writes its own
-    /// `my_did -> member` edges, so their presence does not imply a genesis was
-    /// attempted and must not make a fresh data directory look touched.
+    /// Only three components are written exclusively by this ceremony, and only
+    /// those may be read as evidence that a genesis was attempted here:
+    ///
+    /// | Component | Exclusive to genesis? |
+    /// |---|---|
+    /// | `genesis-trust-root.age` | **yes** |
+    /// | `treasury.age` | **yes** |
+    /// | `genesis:receipt:` rows | **yes** |
+    /// | cooperative record | no — the gateway's `CoopManager` creates cooperatives |
+    /// | treasury registration | no — reachable from the activation path |
+    /// | trust store edges | no — `init-coop` writes `my_did -> member` edges |
+    /// | `[cooperative]` config | ambiguous — an operator can hand-write it |
+    ///
+    /// Counting the shared ones would tell a node that had merely created a
+    /// cooperative through the gateway that it holds "incomplete genesis
+    /// state", and refuse to found on it. They are still *reported* — they are
+    /// what an operator needs to see when a ceremony did break — but they do
+    /// not by themselves make a directory look mid-ceremony.
     pub fn is_untouched(&self) -> bool {
-        !self.trust_root_key
-            && !self.treasury_key
-            && !self.cooperative_record
-            && !self.treasury_registration
-            && !self.config_linkage
-            && !self.receipt
+        !self.trust_root_key && !self.treasury_key && !self.receipt
     }
 
     fn describe(&self) -> String {
@@ -341,10 +359,15 @@ impl GenesisComponents {
             format!("{} treasury key material", mark(self.treasury_key)),
             format!("{} cooperative record", mark(self.cooperative_record)),
             format!("{} treasury registration", mark(self.treasury_registration)),
+            // Deliberately NOT called "genesis trust facts": attributing edges
+            // to this ceremony needs the trust-root and treasury DIDs, which
+            // live in the keystores and the receipt — and a receipt is exactly
+            // what an incomplete ceremony lacks. Unlocking keystores to make
+            // this line prettier is not worth prompting for a passphrase during
+            // a read-only inspection.
             format!(
-                "{} trust facts ({} edge(s) in the trust store)",
-                mark(self.trust_edges > 0),
-                self.trust_edges
+                "         {} edge(s) in the trust store (total; attribution to this ceremony needs the receipt)",
+                self.trust_store_edges
             ),
             format!("{} configuration linkage", mark(self.config_linkage)),
             format!("{} completion receipt", mark(self.receipt)),
@@ -404,7 +427,7 @@ pub fn genesis_components(data_dir: &Path) -> Result<GenesisComponents> {
             icn_core::config::ledger_store_path(data_dir),
             b"ledger:treasury:",
         ),
-        trust_edges: scan_count(
+        trust_store_edges: scan_count(
             icn_core::config::trust_store_path(data_dir),
             b"trust/edges/",
         ),
@@ -422,7 +445,8 @@ pub fn genesis_state(data_dir: &Path) -> Result<GenesisState> {
         // that make its claims true. It is also what keeps the commit ordering
         // honest — a receipt written before the configuration was published
         // would surface here as inconsistent, not as a genesis.
-        return Ok(match verify_durable_state(data_dir, &receipt) {
+        // `None`: a read-only inspection must not prompt for a passphrase.
+        return Ok(match verify_durable_state(data_dir, &receipt, None) {
             Ok(()) => GenesisState::Complete(Box::new(receipt)),
             Err(problem) => GenesisState::Inconsistent {
                 receipt: Box::new(receipt),
@@ -899,7 +923,7 @@ fn run_genesis_inner(
     // (11) Verify every claim the receipt is about to make, through handles
     // opened after the writers were dropped. A COMPLETE receipt must not be
     // producible for durable state that disagrees with it.
-    verify_durable_state(data_dir, &receipt)?;
+    verify_durable_state(data_dir, &receipt, Some(&passphrase))?;
 
     // (12) The completion marker, written last and only over verified state.
     {
@@ -930,7 +954,11 @@ fn run_genesis_inner(
 /// actually performs: the daemon resolves its treasury from the configuration,
 /// `TreasuryManager::with_store` rehydrates from the ledger rows, and the
 /// cooperative record is read straight out of sled.
-fn verify_durable_state(data_dir: &Path, receipt: &GenesisReceipt) -> Result<()> {
+fn verify_durable_state(
+    data_dir: &Path,
+    receipt: &GenesisReceipt,
+    passphrase: Option<&[u8]>,
+) -> Result<()> {
     // The cooperative record, and its link to the treasury.
     let coop_db_path = icn_core::config::store_path(data_dir).join("cooperative");
     let coop_sled = Arc::new(
@@ -1031,9 +1059,32 @@ fn verify_durable_state(data_dir: &Path, receipt: &GenesisReceipt) -> Result<()>
     // The key material itself. Without this, deleting `treasury.age` after a
     // completed ceremony would still report COMPLETE, and the claim that every
     // component is re-read would be narrower than stated.
-    for (path, what) in [
-        (trust_root_keystore_path(data_dir), "genesis trust-root"),
-        (treasury_keystore_path(data_dir), "treasury"),
+    //
+    // Presence is checked always; **provenance** — that the key actually
+    // derives the DID the receipt names — only when a passphrase is available.
+    // The ceremony has one and checks it, so a receipt is never written over
+    // key material that does not back its principals. `show` deliberately does
+    // not: it is a read-only inspection and must not prompt for a passphrase,
+    // so it reports presence only.
+    //
+    // A keystore substituted AFTER a completed genesis is therefore not
+    // detected by any current command. A rerun of `create` does refuse, but it
+    // refuses because a genesis already exists — not because the key stopped
+    // backing the receipt; `a_rerun_over_a_substituted_keystore_refuses_on_prior_genesis_not_provenance`
+    // pins that distinction so this comment cannot drift back into claiming
+    // detection it does not perform. Post-hoc cryptographic verification is
+    // recorded as a limitation, not implemented here.
+    for (path, what, expected) in [
+        (
+            trust_root_keystore_path(data_dir),
+            "genesis trust-root",
+            &receipt.trust_root_did,
+        ),
+        (
+            treasury_keystore_path(data_dir),
+            "treasury",
+            &receipt.treasury_did,
+        ),
     ] {
         if !path.is_file() {
             bail!(
@@ -1041,6 +1092,27 @@ fn verify_durable_state(data_dir: &Path, receipt: &GenesisReceipt) -> Result<()>
                  principal named by the receipt has no key behind it.",
                 path.display()
             );
+        }
+        if let Some(passphrase) = passphrase {
+            let mut keystore = AgeKeyStore::open(&path)
+                .with_context(|| format!("Verification: failed to open {}", path.display()))?;
+            keystore
+                .unlock(passphrase)
+                .with_context(|| format!("Verification: failed to unlock {}", path.display()))?;
+            let actual = keystore
+                .get_keypair()
+                .with_context(|| format!("Verification: failed to read the {what} keypair"))?
+                .did()
+                .clone();
+            if actual.as_str() != expected {
+                bail!(
+                    "Verification: {} holds key material for {}, but the receipt names {}. \
+                     Refusing to certify a principal whose key does not back it.",
+                    path.display(),
+                    actual.as_str(),
+                    expected
+                );
+            }
         }
     }
 
@@ -1278,18 +1350,41 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
     Ok(())
 }
 
-fn print_receipt(receipt: &GenesisReceipt) {
+/// Print the receipt with an explicit statement of what was actually verified.
+///
+/// `provenance_verified` separates two genuinely different evidence levels, so
+/// the output cannot claim more than the path that produced it checked:
+///
+/// * the ceremony unlocks both keystores and confirms they derive the recorded
+///   DIDs before writing its commit marker;
+/// * `show` re-checks every non-secret durable relationship but does not
+///   prompt for a passphrase, so it cannot speak to key provenance.
+fn print_receipt(receipt: &GenesisReceipt, provenance_verified: bool) {
     println!("Institutional Genesis");
     println!("=====================\n");
     println!("Cooperative:        {}", receipt.cooperative_name);
     println!("  id:               {}", receipt.cooperative_id);
     println!("Genesis trust root: {}", receipt.trust_root_did);
     println!("Treasury DID:       {}", receipt.treasury_did);
-    println!("Founding authority: {}", receipt.genesis_authority_did);
+    println!("Genesis authority:  {}", receipt.genesis_authority_did);
     println!("Node DID:           {}", receipt.node_did);
     println!("Currency:           {}", receipt.currency);
     println!("Created at:         {}", receipt.created_at);
     println!("Schema version:     {}", receipt.schema_version);
+    println!();
+    if provenance_verified {
+        println!(
+            "Verified: durable state, configuration linkage, and key provenance\n\
+             (both keystores were unlocked and derive the DIDs above)."
+        );
+    } else {
+        println!(
+            "Verified: durable state and configuration linkage.\n\
+             NOT re-verified: key provenance. This command does not prompt for a\n\
+             passphrase, so it cannot confirm the keystores still derive the DIDs\n\
+             above — only that they are present."
+        );
+    }
     println!(
         "\nThe treasury is a principal of its own; it is not the node.\n\
          This is Principal-generation runtime genesis. It does not implement\n\
@@ -1328,14 +1423,14 @@ pub fn handle_institution_genesis_command(
                 }
             }
             let receipt = run_genesis(data_dir, &name, &currency)?;
-            print_receipt(&receipt);
+            print_receipt(&receipt, true);
         }
         InstitutionGenesisCommands::Show { json } => match genesis_state(data_dir)? {
             GenesisState::Complete(receipt) => {
                 if json {
                     println!("{}", serde_json::to_string_pretty(&receipt)?);
                 } else {
-                    print_receipt(&receipt);
+                    print_receipt(&receipt, false);
                 }
             }
             GenesisState::Inconsistent { receipt, problem } => bail!(
@@ -1461,7 +1556,7 @@ mod failpoint_tests {
             treasury_key,
             cooperative_record,
             treasury_registration,
-            trust_edges: edges,
+            trust_store_edges: edges,
             config_linkage,
             // No boundary here is after the receipt: it is the commit point.
             receipt: false,
@@ -1594,6 +1689,144 @@ mod failpoint_tests {
         assert_rerun_refuses_without_minting(dir.path(), "F");
     }
 
+    /// A cooperative that already exists — created through the gateway, say —
+    /// must not make a data directory look mid-ceremony.
+    ///
+    /// The gateway's `CoopManager` creates cooperatives, and `init-coop` writes
+    /// its own trust edges, so those components are shared rather than
+    /// genesis-exclusive. Counting them as evidence of an interrupted ceremony
+    /// would refuse genesis on a perfectly ordinary node.
+    #[test]
+    fn shared_components_do_not_make_a_directory_look_mid_ceremony() {
+        let dir = provisioned();
+
+        // A cooperative record and a trust edge, written by something that is
+        // not this ceremony.
+        let coop_db = icn_core::config::store_path(dir.path()).join("cooperative");
+        {
+            let sled = std::sync::Arc::new(icn_store::SledStore::open(&coop_db).unwrap());
+            let store = icn_coop::CoopStore::new(std::sync::Arc::new(sled.db().clone()));
+            let coop = icn_coop::Cooperative::new_with_domain(
+                "coop:pre-existing".to_string(),
+                "Pre-existing Coop".to_string(),
+                icn_coop::CoopType::Worker,
+                "coop:pre-existing".to_string(),
+                1,
+            );
+            store.save_cooperative(&coop).unwrap();
+        }
+        {
+            let store: std::sync::Arc<dyn icn_store::Store> = std::sync::Arc::new(
+                icn_store::SledStore::open(icn_core::config::trust_store_path(dir.path())).unwrap(),
+            );
+            let a = icn_identity::KeyPair::generate().unwrap().did().clone();
+            let b = icn_identity::KeyPair::generate().unwrap().did().clone();
+            let mut g = icn_trust::TrustGraph::new(store, a.clone());
+            g.add_edge(icn_trust::TrustEdge::new(
+                a,
+                b,
+                icn_trust::TrustScore::new(0.5).unwrap(),
+            ))
+            .unwrap();
+        }
+
+        let components = genesis_components(dir.path()).unwrap();
+        assert!(
+            components.cooperative_record,
+            "fixture: the record must exist"
+        );
+        assert!(
+            components.trust_store_edges > 0,
+            "fixture: the edge must exist"
+        );
+        assert!(
+            components.is_untouched(),
+            "shared components must not read as an attempted genesis: {components:?}"
+        );
+        assert!(
+            matches!(genesis_state(dir.path()).unwrap(), GenesisState::NotStarted),
+            "a node with pre-existing cooperatives must still be foundable"
+        );
+
+        // And genesis must actually proceed on such a node.
+        run_genesis_inner(dir.path(), "Founded Anyway", "HOURS", None)
+            .expect("genesis must not be refused because a cooperative already existed");
+    }
+
+    /// A keystore that does not derive the DID the receipt names must be
+    /// refused, not certified.
+    ///
+    /// This is the provenance half of "the treasury is a real principal": file
+    /// presence alone would let a substituted keystore pass.
+    #[test]
+    fn a_keystore_that_does_not_back_its_recorded_did_is_refused() {
+        let dir = provisioned();
+        let receipt =
+            run_genesis_inner(dir.path(), "Provenance Cooperative", "HOURS", None).unwrap();
+
+        // Swap the treasury keystore for one belonging to a different principal.
+        let path = treasury_keystore_path(dir.path());
+        std::fs::remove_file(&path).unwrap();
+        let impostor = AgeKeyStore::init(&path, PASSPHRASE.as_bytes()).unwrap();
+        let impostor_did = icn_identity::KeyStore::get_keypair(&impostor)
+            .unwrap()
+            .did()
+            .clone();
+        assert_ne!(impostor_did.as_str(), receipt.treasury_did);
+
+        let err = verify_durable_state(dir.path(), &receipt, Some(PASSPHRASE.as_bytes()))
+            .expect_err("a substituted keystore must be refused");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("does not back it"),
+            "the refusal must name the provenance mismatch: {msg}"
+        );
+
+        // And presence-only verification (what `show` does) still passes, which
+        // is the documented limitation rather than an accident.
+        verify_durable_state(dir.path(), &receipt, None)
+            .expect("presence-only verification cannot detect a substitution");
+    }
+
+    /// What a rerun over a substituted keystore ACTUALLY refuses on.
+    ///
+    /// An earlier comment claimed a post-genesis keystore substitution was
+    /// "detectable by `genesis create` refusing a rerun". This test exists to
+    /// check that sentence rather than to preserve it, because it conflates two
+    /// different refusals: "a genesis already exists here" and "the key on disk
+    /// no longer backs the DID the receipt names". Only the second is
+    /// provenance detection.
+    #[test]
+    fn a_rerun_over_a_substituted_keystore_refuses_on_prior_genesis_not_provenance() {
+        let dir = provisioned();
+        let receipt = run_genesis_inner(dir.path(), "Substitution Coop", "HOURS", None).unwrap();
+
+        let path = treasury_keystore_path(dir.path());
+        std::fs::remove_file(&path).unwrap();
+        AgeKeyStore::init(&path, PASSPHRASE.as_bytes()).unwrap();
+
+        let err =
+            run_genesis_inner(dir.path(), "Rerun", "HOURS", None).expect_err("a rerun must refuse");
+        let msg = format!("{err:#}");
+
+        // The refusal is about a prior ceremony, NOT about provenance.
+        assert!(
+            msg.contains("already undergone genesis"),
+            "expected the prior-ceremony refusal, got: {msg}"
+        );
+        assert!(
+            !msg.contains("does not back it"),
+            "the rerun path does not perform passphrase-backed provenance \
+             verification, so it must not be documented as if it did: {msg}"
+        );
+
+        // And the mismatch is real — passphrase-backed verification does catch
+        // it, which is what the ceremony runs before writing its own marker.
+        let provenance = verify_durable_state(dir.path(), &receipt, Some(PASSPHRASE.as_bytes()))
+            .expect_err("passphrase-backed verification must catch the substitution");
+        assert!(format!("{provenance:#}").contains("does not back it"));
+    }
+
     /// Without a failpoint the same code path commits, and the state machine
     /// says so. Without this, every assertion above could be satisfied by a
     /// ceremony that never completes at all.
@@ -1610,7 +1843,7 @@ mod failpoint_tests {
                 treasury_key: true,
                 cooperative_record: true,
                 treasury_registration: true,
-                trust_edges: 2,
+                trust_store_edges: 2,
                 config_linkage: true,
                 receipt: true,
             }

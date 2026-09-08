@@ -1302,3 +1302,117 @@ fn the_cooperative_record_binds_its_trust_root_through_the_production_read_path(
     );
     assert_eq!(coop.id, coop_id);
 }
+
+// ---------------------------------------------------------------------------
+// What TrustGraphType actually does to the ledger's author-trust query
+// ---------------------------------------------------------------------------
+
+/// The ledger's author-trust query does not filter on `TrustGraphType`.
+///
+/// Established by execution rather than inferred from API names. The storage
+/// key is `trust/edges/{source}:{target}` with no type component, so one edge
+/// exists per ordered pair regardless of type; `computation.rs` never mentions
+/// `graph_type`; and the score cache keys on the DID alone. The type is
+/// serialized into the edge value and then never consulted by this path.
+///
+/// All four combinations of `Social` / `EconomicReliability` across the two
+/// genesis edges therefore reach the same score. This is a **guard, not an
+/// endorsement**: it exists so that introducing a typed query — which would be
+/// a reasonable thing to want — cannot silently stop genesis-written facts from
+/// reaching the gate. If this test starts failing, the trust model gained type
+/// filtering and genesis must declare the graph the ledger actually consumes.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_ledger_author_trust_query_does_not_filter_on_graph_type() {
+    use icn_trust::{TrustEdge, TrustGraph, TrustGraphType, TrustScore};
+
+    let social = TrustGraphType::Social;
+    let economic = TrustGraphType::EconomicReliability;
+
+    for (recognition, authority, label) in [
+        (social, social, "A: Social / Social"),
+        (economic, economic, "B: Economic / Economic"),
+        (social, economic, "C: Social / Economic"),
+        (economic, social, "D: Economic / Social"),
+    ] {
+        let dir = TempDir::new().unwrap();
+        let node_kp = icn_identity::KeyPair::generate().unwrap();
+        let node = node_kp.did().clone();
+        let trust_root = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let treasury = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let full = TrustScore::new(1.0).unwrap();
+
+        // Write, then DROP the writer, then reopen — so the score below is
+        // computed from persisted state and not from the writer's own caches.
+        {
+            let store: std::sync::Arc<dyn icn_store::Store> =
+                std::sync::Arc::new(SledStore::open(dir.path().join("trust")).unwrap());
+            let mut graph = TrustGraph::new(store, node.clone());
+            graph
+                .add_edge(TrustEdge::new_typed(
+                    node.clone(),
+                    trust_root.clone(),
+                    full,
+                    recognition,
+                ))
+                .unwrap();
+            graph
+                .add_edge(TrustEdge::new_typed(
+                    trust_root.clone(),
+                    treasury.clone(),
+                    full,
+                    authority,
+                ))
+                .unwrap();
+        }
+
+        let store: std::sync::Arc<dyn icn_store::Store> =
+            std::sync::Arc::new(SledStore::open(dir.path().join("trust")).unwrap());
+        let graph = std::sync::Arc::new(tokio::sync::RwLock::new(TrustGraph::new(
+            store.clone(),
+            node.clone(),
+        )));
+        let svc = icn_trust_app::create_service_tokio(graph, node_kp, store);
+        let score = svc.trust_score(&treasury.as_str().parse().unwrap());
+
+        assert!(
+            score >= 0.1,
+            "{label}: the ledger's author-trust threshold must be reached \
+             regardless of graph type; scored {score}"
+        );
+    }
+}
+
+/// `show` must state which evidence level it actually reached.
+///
+/// The two paths verify different things — the ceremony unlocks both keystores
+/// and confirms they derive the recorded DIDs; `show` cannot, because it must
+/// not prompt for a passphrase. Printing the same confident receipt from both
+/// would claim stronger evidence than the read-only path establishes.
+#[test]
+fn show_says_that_it_did_not_re_verify_key_provenance() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let created = combined(&run_genesis(data_dir, "Evidence Level Cooperative"));
+    assert!(
+        created.contains("key provenance"),
+        "the ceremony must say it verified key provenance:\n{created}"
+    );
+    assert!(
+        !created.contains("NOT re-verified"),
+        "the ceremony DID verify provenance, so it must not disclaim it:\n{created}"
+    );
+
+    let shown = combined(
+        &icnctl(data_dir)
+            .args(["institution", "genesis", "show"])
+            .output()
+            .unwrap(),
+    );
+    assert!(
+        shown.contains("NOT re-verified") && shown.contains("key provenance"),
+        "`show` must disclaim the provenance check it did not perform:\n{shown}"
+    );
+}
