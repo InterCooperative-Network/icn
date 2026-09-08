@@ -6797,6 +6797,13 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         // database, and a presence check running afterwards would find one and
         // certify it. The evidence has to be taken from the extracted tree first.
         assert_backup_carried_a_ledger(restore_dir)?;
+        // Then prove the database can be READ AS WRITTEN, still before the gate.
+        // `sled::open` recovers a damaged `db` into a fresh empty database rather
+        // than failing, and its own `was_recovered()` signal is only false on the
+        // FIRST open — the gate's open would persist the repair and turn the
+        // signal true, leaving a corrupt ledger to be certified as `✓ Ledger
+        // empty` (#2732).
+        assert_ledger_recovered_as_written(restore_dir)?;
         enforce_n2a_gate(restore_dir, "backup verification")?;
         ledger_check = Some(verify_ledger_in_backup(restore_dir)?);
     }
@@ -6860,6 +6867,100 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     Ok(())
 }
 
+/// Refuse a ledger path that leaves the extracted tree, before anything follows it.
+///
+/// The archive is untrusted input — judging it is this command's entire job — and
+/// `Path::exists`, `Path::is_file` and `sled::open` all FOLLOW symlinks. A
+/// crafted archive carrying `store/ledger` as a symlink to a sled database
+/// elsewhere on the machine therefore reads as a present, complete ledger:
+/// `calculate_dir_checksum` walks with `follow_links(false)` and hashes only
+/// `is_file()` entries, so the symlink is skipped and the checksum matches; the
+/// marker checks below follow it and find `conf` and `db`; and the recovery open
+/// then opens the external database. `sled::open` writes — it grows the backing
+/// file, may write a snapshot, and rewrites the configuration — so verification
+/// would mutate a database outside the directory it extracted, on nothing more
+/// than an operator running `verify-backup` on a hostile file.
+///
+/// Reproduced before this check existed: the victim database's `db` was rewritten
+/// and a `snap.*` appeared, on an archive whose only payload was the symlink.
+///
+/// `enforce_n2a_gate` already refuses symlinks — `find_sled_roots` uses
+/// `file_type()`, which does not follow them, and errors rather than skipping
+/// (`icn/crates/icn-store/src/did_collision_scan.rs:1463`). That refusal was
+/// enough while the gate held the FIRST open of the extracted tree. icn#2732 had
+/// to move an open in front of the gate to catch sled's recovery signal before
+/// the gate's own open destroys it, and that reordering stepped the new open past
+/// this guard. Moving a check earlier also moves it past whatever used to protect
+/// it, so the guard has to move with it.
+///
+/// Every component from the extraction root down is checked with
+/// `symlink_metadata`, which does not follow, because a link anywhere along the
+/// path escapes just as effectively as one at the leaf. A component that does not
+/// exist is not this function's business — absence is the presence check's
+/// verdict to give, and giving it here would produce two different messages for
+/// one condition.
+///
+/// The path alone is NOT enough, and a first version of this check that stopped
+/// there was still escapable. An archive can keep `store/ledger` a real directory
+/// and make its CHILDREN links: `conf`, `db`, or anything under `blobs/`. The
+/// marker checks follow those with `is_file()`, and `sled::open` opens exactly
+/// those paths — reproduced, with the external database's `db` rewritten through
+/// a symlinked child while the directory itself was genuinely local. So the whole
+/// subtree is walked, no-follow, and any link anywhere in it is refused. sled
+/// decides for itself which files under this directory to open; the safe
+/// assumption is all of them.
+fn assert_ledger_path_is_contained(restore_dir: &Path, ledger_db_path: &Path) -> Result<()> {
+    let relative = ledger_db_path
+        .strip_prefix(restore_dir)
+        .context("ledger path is not under the extraction root")?;
+
+    let mut walked = restore_dir.to_path_buf();
+    for component in relative.components() {
+        walked.push(component);
+        let metadata = match std::fs::symlink_metadata(&walked) {
+            Ok(metadata) => metadata,
+            // Absent: let `assert_backup_carried_a_ledger` say so.
+            Err(_) => return Ok(()),
+        };
+        if metadata.file_type().is_symlink() {
+            bail!(
+                "FAILED: this backup places a symbolic link at {}, inside the path \
+                 its ledger database must occupy. Ledger verification was NOT \
+                 performed, and nothing was opened.\n\
+                 \n\
+                 A link there would make verification read — and, because \
+                 `sled::open` writes, MODIFY — a database outside the archive being \
+                 verified, while reporting the result as though it came from the \
+                 backup. A backup written by `icnctl backup` never contains one.",
+                walked.display()
+            );
+        }
+    }
+
+    // The directory is local. Everything sled may open UNDER it must be too.
+    for entry in walkdir::WalkDir::new(ledger_db_path)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+    {
+        if entry.file_type().is_symlink() {
+            bail!(
+                "FAILED: this backup places a symbolic link at {}, inside its \
+                 ledger database directory. Ledger verification was NOT performed, \
+                 and nothing was opened.\n\
+                 \n\
+                 The directory itself is local, but sled opens the files inside it \
+                 — and writes to them — so a link there reaches outside the archive \
+                 exactly as a linked directory would. A backup written by \
+                 `icnctl backup` never contains one.",
+                entry.path().display()
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Prove the ARCHIVE carried a ledger database, before anything opens the tree.
 ///
 /// Must be called before `enforce_n2a_gate`. The gate discovers sled roots by the
@@ -6870,11 +6971,16 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
 ///
 /// A live sled database directory holds `conf`, `db` and `blobs`; requiring `db`
 /// as well as `conf` is what distinguishes a restored database from an
-/// interrupted initialisation. This cannot detect a `db` that is present but
-/// unreadable — sled recovers such a directory into an empty database with only a
-/// warning, which needs a different mechanism and is owned by icn#2732.
+/// interrupted initialisation. This deliberately stays a pure filesystem check
+/// and opens nothing. It therefore cannot detect a `db` that is present but
+/// unreadable — sled recovers such a directory into an empty database — which is
+/// why [`assert_ledger_recovered_as_written`] runs immediately after it and
+/// before the gate (icn#2732).
 fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
     let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
+
+    // Containment FIRST, because every check below this line follows symlinks.
+    assert_ledger_path_is_contained(restore_dir, &ledger_db_path)?;
 
     if !ledger_db_path.exists() {
         bail!(
@@ -6904,6 +7010,131 @@ fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
                 marker
             );
         }
+    }
+
+    Ok(())
+}
+
+/// Prove the archive's ledger database was read AS WRITTEN, not silently replaced.
+///
+/// Ordering is load-bearing in BOTH directions, and neither neighbour is
+/// interchangeable with this one.
+///
+/// **After [`assert_backup_carried_a_ledger`]**, because this opens the database
+/// and that check must stay a pure filesystem check: a directory holding `conf`
+/// but no `db` has to bail before anything performs a creating open, or the open
+/// manufactures the database the caller was about to certify (icn#2717).
+///
+/// **Before `enforce_n2a_gate`**, because the evidence is destroyed by being
+/// observed. `sled::open` is a CREATING open with no read-only mode: handed a
+/// `db` it cannot parse it does not fail, it allocates a fresh meta page and
+/// returns an empty database, and the journal scan then honestly reports zero
+/// rows. `Db::was_recovered()` is `false` for exactly that case — sled clears it
+/// when it has to allocate `META_PID` or `COUNTER_PID` instead of recovering
+/// them. But that allocation is PERSISTED, so the *second* open of the same
+/// damaged directory legitimately recovers what the first one created and
+/// reports `true`. Measured on a backup whose ledger `db` was truncated: open 1
+/// `false`, open 2 `true`, open 3 `true`. `enforce_n2a_gate` opens every sled
+/// root it discovers, so a check placed after it reads `true` and certifies the
+/// corruption. This must be the FIRST open of the extracted tree.
+///
+/// A genuinely empty but readable ledger reports `true` — it has a meta page to
+/// recover — so the signal separates "this backup holds an honestly empty
+/// ledger" from "this backup's ledger could not be inspected as written", which
+/// is the distinction icn#2732 exists to restore. Those are very different facts
+/// for an operator holding a backup they may need to restore.
+///
+/// What the signal establishes is bounded, and the bound is worth stating.
+/// `was_recovered()` answers whether sled RECOVERED the database or REPLACED it.
+/// It is not a whole-database integrity check and this refusal does not claim to
+/// be one: it cannot establish that every row a backup once held is still
+/// readable. Deciding that needs a count or manifest recorded when the backup was
+/// taken and cross-checked here, which is a backup-format change icn#2732
+/// deliberately does not make. What is closed here is the specific false
+/// conclusion that a replaced database is an empty one.
+///
+/// What the signal does NOT establish is the CAUSE. A truncated copy, a failed
+/// transfer, tampering, and a ledger whose first writes were never durably
+/// flushed are byte-indistinguishable here, and the message must not pick one of
+/// them. It reports what was established — the database was replaced rather than
+/// recovered — and declines to name why.
+///
+/// This is a mechanism, not a reading of sled's log output. The warning sled
+/// prints on a damaged configuration is human-oriented text with no stability
+/// guarantee; `was_recovered()` is the library's own answer to the question
+/// being asked.
+///
+/// The checksum in `backup_metadata.json` cannot substitute for this: it is
+/// computed over the data directory at backup time, so a ledger already damaged
+/// when the backup was taken checksums consistently and passes.
+///
+/// The store is dropped before returning — sled holds an exclusive flock and the
+/// gate's own open comes next.
+fn assert_ledger_recovered_as_written(restore_dir: &Path) -> Result<()> {
+    use icn_store::SledStore;
+
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
+
+    // An open that fails outright is also "could not be inspected as written",
+    // and saying so here names the check the operator asked for. Without this the
+    // same damage surfaced as an N2-A startup-gate refusal, which is true but
+    // sends the reader looking for a principal-collision problem they do not have.
+    //
+    // This branch is the REALISTIC one, not the exotic one. A ledger that has
+    // been opened more than once carries a `snap.*`, and with a snapshot present
+    // sled reports damage as `Corruption` instead of recovering into an empty
+    // database — so any node that has ever restarted arrives here rather than at
+    // the `was_recovered()` refusal below.
+    //
+    // It therefore names a cause even less than that refusal may.
+    // `SledStore::open` is a bare `sled::open`, so this context attaches to every
+    // `sled::Error` — a permission failure, ENOSPC, a descriptor limit or another
+    // process holding the flock reach it exactly as damaged bytes do. Telling an
+    // operator their backup may have been tampered with because the file was not
+    // readable would be a fabricated conclusion. Say what happened, and let
+    // sled's own error say why through the cause chain below.
+    let store = SledStore::open(&ledger_db_path).with_context(|| {
+        format!(
+            "FAILED: the ledger database in this backup at {} could not be opened, \
+             so nothing in it could be verified. Ledger verification was NOT \
+             performed.\n\
+             \n\
+             The archive carried both `conf` and `db`, so this is not the \
+             missing-ledger case. What stopped the open is not narrowed here: \
+             sled's own error is reported below, and the possibilities include \
+             damaged contents as well as conditions that say nothing about the \
+             archive at all, such as a permission problem or another process \
+             holding the database lock.\n\
+             \n\
+             Do not rely on this backup as an empty ledger.",
+            ledger_db_path.display()
+        )
+    })?;
+    let recovered = store.db().was_recovered();
+    drop(store);
+
+    if !recovered {
+        bail!(
+            "FAILED: the ledger database in this backup could not be read as \
+             written. sled did not recover the database at {}; it initialised a \
+             new, empty one in its place, so a scan of it would report this \
+             backup's ledger as empty no matter what the backup actually \
+             contained. Ledger verification was NOT performed.\n\
+             \n\
+             The archive carried both `conf` and `db`, so this is not the \
+             missing-ledger case. What it IS cannot be narrowed further from the \
+             archive alone: a truncated or partially written copy, a failed \
+             transfer, tampering, and a ledger whose first writes were never \
+             durably flushed all leave bytes sled reports the same way. The \
+             backup's own checksum cannot distinguish them either — it is computed \
+             over the data directory at backup time, so a ledger already damaged \
+             when the backup was taken checksums consistently and passes.\n\
+             \n\
+             What this backup's ledger held is therefore not established by this \
+             archive. It may have held nothing; it may have held entries that \
+             cannot be recovered. Do not rely on it as an empty ledger.",
+            ledger_db_path.display()
+        );
     }
 
     Ok(())
