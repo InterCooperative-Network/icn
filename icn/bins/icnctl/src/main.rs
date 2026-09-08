@@ -8453,22 +8453,29 @@ async fn handle_init_coop_command(
         println!("Step 1: Creating new identity");
         std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
-        print!("Choose a passphrase: ");
-        io::stdout().flush()?;
-        let passphrase1 = rpassword::read_password()?;
-
-        print!("Confirm passphrase: ");
-        io::stdout().flush()?;
-        let passphrase2 = rpassword::read_password()?;
-
-        if passphrase1 != passphrase2 {
-            bail!("Passphrases do not match");
-        }
-        if passphrase1.len() < 8 {
+        // Sourced through the shared helper, so `ICN_KEYSTORE_PASSPHRASE` and
+        // the legacy `ICN_PASSPHRASE` work here exactly as they already do on
+        // the existing-identity branch above and in `id init` (#2727). This
+        // branch used to call `rpassword` directly, which made the one command
+        // intended for first-run setup the one command that could not be run
+        // without a terminal.
+        //
+        // On the environment arm the helper returns the configured value
+        // without asking for a second entry, so its "passphrases do not match"
+        // check is vacuous there *by construction* — confirming a variable
+        // against itself would prove nothing. A human at a terminal is still
+        // prompted twice and still rejected on a mismatch.
+        //
+        // The minimum length is enforced HERE rather than inside the helper on
+        // purpose. `id init` shares that helper and has deliberately never
+        // imposed a minimum, so moving this rule down would quietly change an
+        // unrelated command's contract. Checking the returned value — instead
+        // of the prompt's input — is what keeps the rule binding on the
+        // environment arm as well as the interactive one.
+        let passphrase = Zeroizing::new(confirm_passphrase()?);
+        if passphrase.len() < 8 {
             bail!("Passphrase must be at least 8 characters");
         }
-
-        let passphrase = Zeroizing::new(passphrase1.into_bytes());
 
         // Initialize keystore (generates keypair internally)
         let keystore = AgeKeyStore::init(&keystore_path, &passphrase)?;

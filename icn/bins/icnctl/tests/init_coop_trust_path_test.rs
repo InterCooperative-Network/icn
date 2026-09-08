@@ -54,12 +54,11 @@ const PASSPHRASE: &str = "m4d-2718-fixture-passphrase";
 /// Create the keystore first, so `init-coop` takes its *existing identity*
 /// branch.
 ///
-/// The wizard's new-identity branch calls `rpassword` directly instead of the
-/// crate's `read_passphrase`/`confirm_passphrase` helpers, so it ignores
-/// `ICN_KEYSTORE_PASSPHRASE` and cannot run unattended. That is a separate
-/// defect from the one under test here and is recorded rather than fixed; this
-/// fixture sidesteps it by provisioning the identity through `id init`, which
-/// does honour the variable.
+/// That branch is the one these tests are about, so the identity is still
+/// provisioned up front rather than left to the wizard. It is no longer a
+/// workaround: the new-identity branch ignored `ICN_KEYSTORE_PASSPHRASE` and
+/// could not run unattended when this fixture was written, and that defect is
+/// fixed (#2727) and covered by `init_coop_first_run_passphrase_test`.
 fn init_identity(data_dir: &Path) -> Output {
     Command::new(icnctl_bin())
         .env("ICN_KEYSTORE_PASSPHRASE", PASSPHRASE)

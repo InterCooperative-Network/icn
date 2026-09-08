@@ -4004,6 +4004,7 @@ dependencies = [
  "icn-store",
  "icn-trust",
  "image",
+ "libc",
  "qrcode",
  "rand 0.9.4",
  "rand_core 0.6.4",
