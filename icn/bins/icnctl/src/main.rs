@@ -6899,6 +6899,16 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
 /// exist is not this function's business — absence is the presence check's
 /// verdict to give, and giving it here would produce two different messages for
 /// one condition.
+///
+/// The path alone is NOT enough, and a first version of this check that stopped
+/// there was still escapable. An archive can keep `store/ledger` a real directory
+/// and make its CHILDREN links: `conf`, `db`, or anything under `blobs/`. The
+/// marker checks follow those with `is_file()`, and `sled::open` opens exactly
+/// those paths — reproduced, with the external database's `db` rewritten through
+/// a symlinked child while the directory itself was genuinely local. So the whole
+/// subtree is walked, no-follow, and any link anywhere in it is refused. sled
+/// decides for itself which files under this directory to open; the safe
+/// assumption is all of them.
 fn assert_ledger_path_is_contained(restore_dir: &Path, ledger_db_path: &Path) -> Result<()> {
     let relative = ledger_db_path
         .strip_prefix(restore_dir)
@@ -6923,6 +6933,27 @@ fn assert_ledger_path_is_contained(restore_dir: &Path, ledger_db_path: &Path) ->
                  verified, while reporting the result as though it came from the \
                  backup. A backup written by `icnctl backup` never contains one.",
                 walked.display()
+            );
+        }
+    }
+
+    // The directory is local. Everything sled may open UNDER it must be too.
+    for entry in walkdir::WalkDir::new(ledger_db_path)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+    {
+        if entry.file_type().is_symlink() {
+            bail!(
+                "FAILED: this backup places a symbolic link at {}, inside its \
+                 ledger database directory. Ledger verification was NOT performed, \
+                 and nothing was opened.\n\
+                 \n\
+                 The directory itself is local, but sled opens the files inside it \
+                 — and writes to them — so a link there reaches outside the archive \
+                 exactly as a linked directory would. A backup written by \
+                 `icnctl backup` never contains one.",
+                entry.path().display()
             );
         }
     }

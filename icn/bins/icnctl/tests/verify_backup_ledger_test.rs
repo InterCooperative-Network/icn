@@ -1746,6 +1746,35 @@ fn a_restarted_nodes_ledger_damaged_the_same_way_is_also_refused() {
 /// whether bytes outside the extraction root changed.
 #[test]
 fn a_symlinked_ledger_cannot_make_verification_write_outside_the_archive() {
+    crafted_symlink_archive_must_not_touch_the_victim(SymlinkShape::WholeDirectory);
+}
+
+/// The same escape one level down, which the first containment fix did not close.
+///
+/// An archive can keep `store/ledger` a genuinely local directory and make its
+/// CHILDREN links instead. A path-only containment check walks to the directory
+/// and stops, so it sees nothing wrong — but the presence check then follows
+/// `conf` and `db` with `is_file()`, and `sled::open` opens exactly those paths
+/// and writes to them.
+///
+/// Reproduced against the path-only check: the victim's `db` was rewritten
+/// through a symlinked child while the ledger directory itself was local. sled
+/// decides which files under its directory to open, so containment walks the
+/// whole subtree rather than guessing at a list of names.
+#[test]
+fn a_symlinked_ledger_child_cannot_make_verification_write_outside_the_archive() {
+    crafted_symlink_archive_must_not_touch_the_victim(SymlinkShape::ChildrenOnly);
+}
+
+/// Where the crafted archive puts its link.
+enum SymlinkShape {
+    /// `store/ledger` is itself a link to the victim directory.
+    WholeDirectory,
+    /// `store/ledger` is a real directory whose `conf`/`db` link to the victim's.
+    ChildrenOnly,
+}
+
+fn crafted_symlink_archive_must_not_touch_the_victim(shape: SymlinkShape) {
     let dir = TempDir::new().unwrap();
 
     // A real sled database that has nothing to do with any backup.
@@ -1798,14 +1827,42 @@ fn a_symlinked_ledger_cannot_make_verification_write_outside_the_archive() {
                     .expect("fixture: could not append file");
             }
         }
-        let mut header = tar::Header::new_gnu();
-        header.set_entry_type(tar::EntryType::Symlink);
-        header.set_size(0);
-        header.set_mode(0o777);
-        header.set_cksum();
-        builder
-            .append_link(&mut header, "store/ledger", &victim)
-            .expect("fixture: could not append the symlink");
+        match shape {
+            SymlinkShape::WholeDirectory => {
+                let mut header = tar::Header::new_gnu();
+                header.set_entry_type(tar::EntryType::Symlink);
+                header.set_size(0);
+                header.set_mode(0o777);
+                header.set_cksum();
+                builder
+                    .append_link(&mut header, "store/ledger", &victim)
+                    .expect("fixture: could not append the symlink");
+            }
+            SymlinkShape::ChildrenOnly => {
+                let mut dir_header = tar::Header::new_gnu();
+                dir_header.set_entry_type(tar::EntryType::Directory);
+                dir_header.set_size(0);
+                dir_header.set_mode(0o755);
+                dir_header.set_cksum();
+                builder
+                    .append_data(&mut dir_header, "store/ledger/", std::io::empty())
+                    .expect("fixture: could not append the ledger directory");
+                for marker in ["conf", "db"] {
+                    let mut header = tar::Header::new_gnu();
+                    header.set_entry_type(tar::EntryType::Symlink);
+                    header.set_size(0);
+                    header.set_mode(0o777);
+                    header.set_cksum();
+                    builder
+                        .append_link(
+                            &mut header,
+                            format!("store/ledger/{marker}"),
+                            victim.join(marker),
+                        )
+                        .expect("fixture: could not append the child symlink");
+                }
+            }
+        }
         builder
             .finish()
             .expect("fixture: could not finish the archive");
