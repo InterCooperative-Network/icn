@@ -1471,13 +1471,55 @@ pub fn handle_institution_genesis_command(
                                 "key_presence": true,
                                 "key_provenance": false,
                             },
-                            "note": "key provenance is not re-verified by `show`;                                      it does not prompt for a passphrase. The ceremony                                      verifies it before writing the receipt.",
+                            "note": "key provenance is not re-verified by `show`; it does not prompt for a passphrase. The ceremony verifies it before writing the receipt.",
                             "receipt": receipt,
                         }))?
                     );
                 } else {
                     print_receipt(&receipt, false);
                 }
+            }
+            GenesisState::Inconsistent { receipt, problem } if json => {
+                // A script asking for JSON must get JSON on every arm, not only
+                // on success — otherwise the envelope's whole purpose (letting a
+                // consumer see which evidence level produced a result) fails in
+                // exactly the cases it matters most.
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "state": "INCONSISTENT",
+                        "problem": problem,
+                        "receipt": receipt,
+                    }))?
+                );
+                bail!("INCONSISTENT genesis under {}", data_dir.display());
+            }
+            GenesisState::Incomplete { components } if json => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "state": "INCOMPLETE",
+                        "components": {
+                            "trust_root_key": components.trust_root_key,
+                            "treasury_key": components.treasury_key,
+                            "cooperative_record": components.cooperative_record,
+                            "treasury_registration": components.treasury_registration,
+                            "trust_store_edges": components.trust_store_edges,
+                            "config_linkage": components.config_linkage,
+                            "receipt": components.receipt,
+                        },
+                    }))?
+                );
+                bail!("INCOMPLETE genesis under {}", data_dir.display());
+            }
+            GenesisState::NotStarted if json => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "state": "NOT_STARTED",
+                    }))?
+                );
+                bail!("No genesis under {}", data_dir.display());
             }
             GenesisState::Inconsistent { receipt, problem } => bail!(
                 "INCONSISTENT genesis under {}: a receipt exists for cooperative \

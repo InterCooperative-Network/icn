@@ -180,12 +180,40 @@ fn read_receipt_json(data_dir: &Path) -> (Output, String) {
     (out, text)
 }
 
+/// Open a sled database, retrying briefly on the exclusive-lock error.
+///
+/// sled takes a flock and releases it when the last handle drops — but the
+/// release can lag a just-dropped handle or a just-exited child process, and
+/// this suite opens the same databases repeatedly from both. Failing on the
+/// first `WouldBlock` makes tests flaky under parallel load for a reason that
+/// has nothing to do with what they assert.
+///
+/// This retries the *lock* specifically and still fails on any other error, so
+/// a genuinely missing or corrupt database is not papered over.
+fn open_store(path: impl AsRef<Path>) -> SledStore {
+    let path = path.as_ref();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    loop {
+        match SledStore::open(path) {
+            Ok(store) => return store,
+            Err(e) => {
+                let msg = e.to_string();
+                let is_lock = msg.contains("could not acquire lock") || msg.contains("WouldBlock");
+                if !is_lock || std::time::Instant::now() >= deadline {
+                    panic!("failed to open {}: {e}", path.display());
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    }
+}
+
 /// Scan a sled database opened *after* the writing process exited.
 fn rows_with_prefix(path: &Path, prefix: &[u8]) -> Vec<String> {
     if !path.exists() {
         return Vec::new();
     }
-    let store = SledStore::open(path).unwrap();
+    let store = open_store(path);
     let rows = store
         .scan(prefix)
         .unwrap()
@@ -274,7 +302,7 @@ fn institutional_genesis_creates_an_institution_distinct_from_the_node() {
     //     graph. Read through a handle the ceremony never held.
     let trust_root = receipt["trust_root_did"].as_str().unwrap().to_string();
     {
-        let store = SledStore::open(daemon_coop_store_path(data_dir)).unwrap();
+        let store = open_store(daemon_coop_store_path(data_dir));
         let bound = store
             .scan(b"coop:")
             .unwrap()
@@ -409,7 +437,7 @@ async fn a_governance_authored_append_crosses_the_real_gate_without_dev_self_tru
         icn_identity::KeyStore::get_keypair(&ks).unwrap()
     };
     let trust_store: std::sync::Arc<dyn icn_store::Store> =
-        std::sync::Arc::new(SledStore::open(daemon_trust_store_path(data_dir)).unwrap());
+        std::sync::Arc::new(open_store(daemon_trust_store_path(data_dir)));
     let node_did_typed: icn_identity::Did = node.parse().unwrap();
     let graph = std::sync::Arc::new(tokio::sync::RwLock::new(icn_trust::TrustGraph::new(
         trust_store.clone(),
@@ -428,7 +456,7 @@ async fn a_governance_authored_append_crosses_the_real_gate_without_dev_self_tru
     );
 
     let ledger_store: std::sync::Arc<dyn icn_store::Store> =
-        std::sync::Arc::new(SledStore::open(daemon_ledger_store_path(data_dir)).unwrap());
+        std::sync::Arc::new(open_store(daemon_ledger_store_path(data_dir)));
     let mut ledger = Ledger::new(ledger_store).unwrap();
     ledger.set_trust_service(trust_service);
     // Deliberately NOT calling `set_min_trust_for_entry`: the production
@@ -666,7 +694,7 @@ async fn author_score_after_removing_edge(
     author: &str,
 ) -> f64 {
     if let Some((source, target)) = remove {
-        let store = SledStore::open(daemon_trust_store_path(data_dir)).unwrap();
+        let store = open_store(daemon_trust_store_path(data_dir));
         let key = format!("trust/edges/{source}:{target}");
         store.delete(key.as_bytes()).unwrap();
         // Confirm the mutation actually landed. A mutant that silently failed
@@ -685,7 +713,7 @@ async fn author_score_after_removing_edge(
         icn_identity::KeyStore::get_keypair(&ks).unwrap()
     };
     let trust_store: std::sync::Arc<dyn icn_store::Store> =
-        std::sync::Arc::new(SledStore::open(daemon_trust_store_path(data_dir)).unwrap());
+        std::sync::Arc::new(open_store(daemon_trust_store_path(data_dir)));
     let graph = std::sync::Arc::new(tokio::sync::RwLock::new(icn_trust::TrustGraph::new(
         trust_store.clone(),
         node.parse::<icn_identity::Did>().unwrap(),
@@ -786,7 +814,7 @@ fn partial_genesis_is_reported_incomplete_and_never_silently_completed() {
 
     // Simulate the crash: drop the commit point, keep everything else.
     {
-        let store = SledStore::open(daemon_coop_store_path(data_dir)).unwrap();
+        let store = open_store(daemon_coop_store_path(data_dir));
         let keys: Vec<_> = store
             .scan(b"genesis:receipt:")
             .unwrap()
@@ -913,7 +941,7 @@ fn assert_partial_state_is_never_complete(dir: &Path, label: &str) {
 }
 
 fn drop_receipt(dir: &Path) {
-    let store = SledStore::open(daemon_coop_store_path(dir)).unwrap();
+    let store = open_store(daemon_coop_store_path(dir));
     for (k, _) in store.scan(b"genesis:receipt:").unwrap() {
         store.delete(&k).unwrap();
     }
@@ -1066,8 +1094,7 @@ fn a_cooperative_record_naming_a_different_treasury_is_detected_on_readback() {
 
     // Rewrite the stored cooperative to name a different treasury.
     {
-        let sled =
-            std::sync::Arc::new(SledStore::open(daemon_coop_store_path(dir.path())).unwrap());
+        let sled = std::sync::Arc::new(open_store(daemon_coop_store_path(dir.path())));
         let store = icn_coop::CoopStore::new(std::sync::Arc::new(sled.db().clone()));
         let mut coop = store.get_cooperative(&coop_id).unwrap();
         coop.treasury_did = Some(
@@ -1087,9 +1114,13 @@ fn a_cooperative_record_naming_a_different_treasury_is_detected_on_readback() {
         !show.status.success(),
         "a cooperative naming a different treasury must not read as COMPLETE:\n{text}"
     );
+    // The distinctive substring, not just "INCONSISTENT": asserting only the
+    // state word would let a refusal from a *different* guard satisfy this
+    // test, which is the exact failure mode two earlier mutants exposed.
     assert!(
-        text.contains("INCONSISTENT"),
-        "the report must name the disagreement:\n{text}"
+        text.contains("names treasury"),
+        "the report must name the stored-cooperative treasury disagreement \
+         specifically:\n{text}"
     );
 }
 
@@ -1102,8 +1133,7 @@ fn a_cooperative_record_binding_a_different_trust_root_is_detected_on_readback()
     let coop_id = receipt["cooperative_id"].as_str().unwrap().to_string();
 
     {
-        let sled =
-            std::sync::Arc::new(SledStore::open(daemon_coop_store_path(dir.path())).unwrap());
+        let sled = std::sync::Arc::new(open_store(daemon_coop_store_path(dir.path())));
         let store = icn_coop::CoopStore::new(std::sync::Arc::new(sled.db().clone()));
         let mut coop = store.get_cooperative(&coop_id).unwrap();
         coop.metadata.insert(
@@ -1121,8 +1151,13 @@ fn a_cooperative_record_binding_a_different_trust_root_is_detected_on_readback()
     let (show, _) = read_receipt_json(dir.path());
     let text = combined(&show);
     assert!(
-        !show.status.success() && text.contains("INCONSISTENT"),
+        !show.status.success(),
         "a rebound trust root must be detected:\n{text}"
+    );
+    assert!(
+        text.contains("binds trust root"),
+        "the report must name the trust-root binding disagreement \
+         specifically, not merely report some inconsistency:\n{text}"
     );
 }
 
@@ -1368,7 +1403,7 @@ fn the_cooperative_record_binds_its_trust_root_through_the_production_read_path(
     let coop_id = receipt["cooperative_id"].as_str().unwrap();
 
     // Opened fresh, after the ceremony's process exited.
-    let sled = std::sync::Arc::new(SledStore::open(daemon_coop_store_path(dir.path())).unwrap());
+    let sled = std::sync::Arc::new(open_store(daemon_coop_store_path(dir.path())));
     let store = icn_coop::CoopStore::new(std::sync::Arc::new(sled.db().clone()));
     let coop = store
         .get_cooperative(coop_id)
@@ -1432,7 +1467,7 @@ async fn the_ledger_author_trust_query_does_not_filter_on_graph_type() {
         // computed from persisted state and not from the writer's own caches.
         {
             let store: std::sync::Arc<dyn icn_store::Store> =
-                std::sync::Arc::new(SledStore::open(dir.path().join("trust")).unwrap());
+                std::sync::Arc::new(open_store(dir.path().join("trust")));
             let mut graph = TrustGraph::new(store, node.clone());
             graph
                 .add_edge(TrustEdge::new_typed(
@@ -1453,7 +1488,7 @@ async fn the_ledger_author_trust_query_does_not_filter_on_graph_type() {
         }
 
         let store: std::sync::Arc<dyn icn_store::Store> =
-            std::sync::Arc::new(SledStore::open(dir.path().join("trust")).unwrap());
+            std::sync::Arc::new(open_store(dir.path().join("trust")));
         let graph = std::sync::Arc::new(tokio::sync::RwLock::new(TrustGraph::new(
             store.clone(),
             node.clone(),
@@ -1534,8 +1569,7 @@ fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() 
 
     // The genesis shape: two edges written, then the writer goes away.
     {
-        let store: std::sync::Arc<dyn icn_store::Store> =
-            std::sync::Arc::new(SledStore::open(&path).unwrap());
+        let store: std::sync::Arc<dyn icn_store::Store> = std::sync::Arc::new(open_store(&path));
         let mut g = icn_trust::TrustGraph::new(store, node.clone());
         g.add_edge(icn_trust::TrustEdge::new(
             node.clone(),
@@ -1553,8 +1587,7 @@ fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() 
 
     // A freshly started daemon that has added nothing of its own: correct.
     {
-        let store: std::sync::Arc<dyn icn_store::Store> =
-            std::sync::Arc::new(SledStore::open(&path).unwrap());
+        let store: std::sync::Arc<dyn icn_store::Store> = std::sync::Arc::new(open_store(&path));
         let g = icn_trust::TrustGraph::new(store, node.clone());
         assert!(
             g.compute_trust_score(&treasury).unwrap() >= 0.1,
@@ -1565,8 +1598,7 @@ fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() 
     // The same daemon after one unrelated runtime edge, scored for the first
     // time (no cache entry to mask it).
     {
-        let store: std::sync::Arc<dyn icn_store::Store> =
-            std::sync::Arc::new(SledStore::open(&path).unwrap());
+        let store: std::sync::Arc<dyn icn_store::Store> = std::sync::Arc::new(open_store(&path));
         let mut g = icn_trust::TrustGraph::new(store, node.clone());
         let stranger = icn_identity::KeyPair::generate().unwrap().did().clone();
         g.add_edge(icn_trust::TrustEdge::new(node, stranger, full))
@@ -1580,4 +1612,112 @@ fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() 
              and widen the G4 claim in the PR body accordingly."
         );
     }
+}
+
+/// `show --json` must carry the evidence level on every arm, not only success.
+///
+/// Without this, reverting the envelope to a bare receipt left the whole suite
+/// green — the fixture's unwrapper falls through to the raw text when there is
+/// no `receipt` key, so every downstream field read still resolved. A machine
+/// surface nothing asserts on is a machine surface that can silently regress.
+#[test]
+fn show_json_reports_the_evidence_level_on_every_arm() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+
+    let json_show = |d: &Path| -> (bool, serde_json::Value) {
+        let out = icnctl(d)
+            .args(["institution", "genesis", "show", "--json"])
+            .output()
+            .unwrap();
+        let raw = String::from_utf8_lossy(&out.stdout).into_owned();
+        let slice = match (raw.find('{'), raw.rfind('}')) {
+            (Some(a), Some(b)) if b > a => raw[a..=b].to_string(),
+            _ => raw,
+        };
+        (
+            out.status.success(),
+            serde_json::from_str(&slice).unwrap_or_else(|e| {
+                panic!("`show --json` must emit JSON on every arm: {e}\n{slice}")
+            }),
+        )
+    };
+
+    // Nothing has happened here yet.
+    assert!(init_identity(data_dir).status.success());
+    let (ok, v) = json_show(data_dir);
+    assert!(!ok);
+    assert_eq!(v["state"], "NOT_STARTED");
+
+    // A completed ceremony: the envelope must state what was and was not checked.
+    assert!(run_init_coop(data_dir).status.success());
+    assert!(run_genesis(data_dir, "Envelope Cooperative")
+        .status
+        .success());
+    let (ok, v) = json_show(data_dir);
+    assert!(ok, "a completed genesis must succeed");
+    assert_eq!(v["state"], "COMPLETE");
+    assert_eq!(
+        v["verified"]["key_provenance"], false,
+        "`show` does not prompt for a passphrase, so it must report that key \
+         provenance was NOT re-verified"
+    );
+    assert_eq!(v["verified"]["durable_state"], true);
+    assert_eq!(v["verified"]["config_linkage"], true);
+    assert!(
+        v["receipt"]["treasury_did"].as_str().is_some(),
+        "the receipt must remain available under `receipt`"
+    );
+
+    // And a state that stopped being true reports as such, in JSON.
+    let cfg = data_dir.join("icn.toml");
+    let text = std::fs::read_to_string(&cfg).unwrap();
+    std::fs::write(&cfg, text.split("\n[cooperative]\n").next().unwrap()).unwrap();
+    let (ok, v) = json_show(data_dir);
+    assert!(!ok);
+    assert_eq!(v["state"], "INCONSISTENT");
+    // INCOMPLETE, via the same commit-marker removal the tampering tests use.
+    // The failpoint module remains the evidence for *ordering*; this only pins
+    // that the envelope reports the state and carries the component report.
+    {
+        let d2 = TempDir::new().unwrap();
+        assert!(init_identity(d2.path()).status.success());
+        assert!(run_init_coop(d2.path()).status.success());
+        assert!(run_genesis(d2.path(), "Incomplete Envelope Coop")
+            .status
+            .success());
+        drop_receipt(d2.path());
+
+        let (ok, v) = json_show(d2.path());
+        assert!(!ok);
+        assert_eq!(v["state"], "INCOMPLETE");
+        assert_eq!(
+            v["components"]["receipt"], false,
+            "the component report must show the missing commit marker"
+        );
+        assert_eq!(
+            v["components"]["treasury_key"], true,
+            "and must show the key material that is still there"
+        );
+        assert!(
+            v["components"]["trust_store_edges"].as_u64().is_some(),
+            "the edge count must be present: {v}"
+        );
+    }
+
+    // Removing the linkage makes resolution fall back to the node DID, so the
+    // diagnosis is the treasury-resolution one — and it correctly names the node
+    // as the treasury the daemon would have used. Assert that specific guard,
+    // not merely that something went wrong.
+    let problem = v["problem"].as_str().unwrap_or_default().to_string();
+    assert!(
+        problem.contains("resolves treasury"),
+        "the JSON arm must carry the same diagnosis the human arm does: {v}"
+    );
+    let node = v["receipt"]["node_did"].as_str().unwrap();
+    assert!(
+        problem.contains(node),
+        "the diagnosis must name the node DID the daemon would have fallen back \
+         to, which is the collapse this work exists to prevent: {problem}"
+    );
 }
