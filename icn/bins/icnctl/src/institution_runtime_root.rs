@@ -1088,7 +1088,18 @@ fn provision_runtime_root_inner(
         );
     }
 
-    let coop_id = format!("coop:{}", uuid::Uuid::new_v4());
+    // `coop-<uuid>`, not `coop:<uuid>`. The gateway's `validate_coop_id`
+    // (`icn-gateway/src/validation.rs`) permits only alphanumerics, hyphens and
+    // underscores, so a colon-bearing ID is rejected by `/v1/auth/verify` before
+    // authentication — and the default (non-`--local-mint`) path of
+    // `institution bootstrap apply` could then never obtain a token for the
+    // cooperative this ceremony just founded.
+    //
+    // `Cooperative::new` still mints `coop:<uuid>`, so that inconsistency is
+    // pre-existing and affects every cooperative created through it; it is filed
+    // separately. This ceremony chooses its own identifier, so it chooses one
+    // the rest of the system can actually use.
+    let coop_id = format!("coop-{}", uuid::Uuid::new_v4());
 
     // (7) Durable cooperative record, in the database the daemon opens.
     let coop_db = coop_db_path(data_dir);
@@ -1585,6 +1596,16 @@ fn verify_durable_state(
         }
     }
 
+    // The configuration must still name THIS storage root. Without this,
+    // editing `icn.toml` to point elsewhere leaves `show --data-dir <old-root>`
+    // reporting READY while `icnd --config` would open the newly configured root
+    // and find none of the cooperative, treasury or trust state being certified.
+    // Same comparison the ceremony makes, so the two cannot disagree.
+    resolve_storage_root(data_dir).context(
+        "Verification: the configuration no longer names the storage root this runtime root \
+         was provisioned into",
+    )?;
+
     // Through the daemon's own loader, not a sub-table read: a receipt that
     // certifies "the daemon will consume this treasury" must be backed by the
     // same parse the daemon performs.
@@ -1655,9 +1676,29 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
     // template omits `[network] bootstrap_peers`, which has no serde default.
     // That is icn#2747, a pre-existing defect this ceremony does not fix —
     // refusing loudly is the honest outcome.
-    if let Err(e) = toml::from_str::<icn_core::Config>(&text) {
-        bail!(
-            "Refusing institutional genesis: {} is not loadable by the daemon \
+    match toml::from_str::<icn_core::Config>(&text) {
+        Ok(config) => {
+            // Parsing is necessary but not sufficient. `icnd` additionally runs
+            // `Config::validate` at startup and exits on a fatal constraint — an
+            // empty `network.listen_addr`, a trust threshold outside [0,1] — so a
+            // file that merely parses can still belong to a node that cannot
+            // start, and certifying it would report READY for exactly that.
+            // `validate` returns Ok(warnings) / Err(fatal errors), and `icnd`
+            // exits on the error arm. Warnings are the daemon's business, not
+            // this ceremony's; only the fatal arm is a reason to refuse.
+            if let Err(errors) = config.validate() {
+                bail!(
+                    "Refusing to provision: {} parses, but the daemon would refuse to start \
+                     with it:\n  {}\n\
+                     A receipt certifying a node that cannot start would claim more than this \
+                     ceremony can establish.",
+                    config_path.display(),
+                    errors.join("\n  ")
+                );
+            }
+        }
+        Err(e) => bail!(
+            "Refusing to provision: {} is not loadable by the daemon \
              ({e}).\n\
              `icnd --config` parses this file with `Config::from_file`, so a \
              genesis linked into it would never be consumed. If this names a \
@@ -1665,7 +1706,7 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
              configuration `init-coop` generates cannot be loaded by the daemon \
              it tells you to run. Fix the configuration and re-run.",
             config_path.display()
-        );
+        ),
     }
     let parsed: toml::Value = toml::from_str(&text)
         .with_context(|| format!("Failed to parse {}", config_path.display()))?;

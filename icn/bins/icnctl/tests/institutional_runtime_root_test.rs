@@ -139,13 +139,41 @@ fn run_init_coop(data_dir: &Path) -> Output {
 /// refusal instead of the ceremony.
 fn make_config_daemon_loadable(data_dir: &Path) {
     let path = data_dir.join("icn.toml");
-    let text = std::fs::read_to_string(&path).unwrap();
-    if text.contains("bootstrap_peers") {
-        return;
+    let mut text = std::fs::read_to_string(&path).unwrap();
+
+    // (1) `[network] bootstrap_peers` has no serde default, so the file does not
+    //     even parse as `Config`.
+    if !text.contains("bootstrap_peers") {
+        let patched = text.replace("[network]\n", "[network]\nbootstrap_peers = []\n");
+        assert_ne!(patched, text, "fixture: [network] section must be present");
+        text = patched;
     }
-    let patched = text.replace("[network]\n", "[network]\nbootstrap_peers = []\n");
-    assert_ne!(patched, text, "fixture: [network] section must be present");
-    std::fs::write(&path, patched).unwrap();
+
+    // (2) The template enables the gateway but leaves `jwt_secret` commented
+    //     out, so `Config::validate` fails and the daemon exits at startup. Both
+    //     are facets of icn#2747: the configuration `init-coop` generates cannot
+    //     run the daemon it tells the operator to start. The ceremony refuses
+    //     such a configuration rather than certify a node that cannot start, so
+    //     the fixture has to supply what the template omits.
+    // Guard on an UNCOMMENTED assignment: the template's own
+    // `# jwt_secret = "CHANGE_ME"` line contains the substring, so a naive
+    // `contains` check silently skips the patch.
+    if !text
+        .lines()
+        .any(|l| l.trim_start().starts_with("jwt_secret = \""))
+    {
+        let patched = text.replace(
+            "# jwt_secret = \"CHANGE_ME\"  # Set this before starting!",
+            "jwt_secret = \"fixture-jwt-secret-not-a-real-credential\"",
+        );
+        assert_ne!(
+            patched, text,
+            "fixture: the jwt_secret placeholder must be present"
+        );
+        text = patched;
+    }
+
+    std::fs::write(&path, text).unwrap();
 }
 
 fn provision_runtime_root(data_dir: &Path, name: &str) -> Output {
@@ -1891,5 +1919,57 @@ fn two_concurrent_ceremonies_cannot_both_own_a_data_directory() {
     assert!(
         primaries[0].contains(treasury),
         "and it must be the one the surviving receipt names"
+    );
+}
+
+/// The generated cooperative ID must be one the rest of the system accepts.
+///
+/// The gateway's `validate_coop_id` permits only alphanumerics, hyphens and
+/// underscores, so a colon-bearing ID is rejected by `/v1/auth/verify` before
+/// authentication — and the default path of `institution bootstrap apply` could
+/// then never obtain a token for the cooperative this ceremony just founded.
+#[test]
+fn the_generated_cooperative_id_is_accepted_by_the_gateway_validator() {
+    let dir = genesis_dir("Gateway Valid Id Coop");
+    let (_, json) = read_receipt_json(dir.path());
+    let receipt: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let coop_id = receipt["cooperative_id"].as_str().unwrap();
+
+    assert!(
+        coop_id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'),
+        "the cooperative ID must satisfy the gateway's character rule; got {coop_id:?}"
+    );
+    assert!(
+        !coop_id.contains(':'),
+        "a colon is exactly what the gateway rejects: {coop_id:?}"
+    );
+}
+
+/// A configuration edited to point at a different storage root must stop
+/// reading as READY, even though the treasury DID in it is unchanged.
+#[test]
+fn a_config_repointed_at_another_storage_root_is_detected_on_readback() {
+    let dir = genesis_dir("Repointed Root Coop");
+    let elsewhere = TempDir::new().unwrap();
+    let cfg = dir.path().join("icn.toml");
+    let text = std::fs::read_to_string(&cfg).unwrap();
+    let patched = text.replace(
+        &format!("data_dir = \"{}\"", dir.path().display()),
+        &format!("data_dir = \"{}\"", elsewhere.path().display()),
+    );
+    assert_ne!(patched, text, "fixture: the data_dir line must be present");
+    std::fs::write(&cfg, patched).unwrap();
+
+    let (show, _) = read_receipt_json(dir.path());
+    let text = combined(&show);
+    assert!(
+        !show.status.success(),
+        "a repointed storage root must not read as READY:\n{text}"
+    );
+    assert!(
+        text.contains("storage root"),
+        "the report must name the storage-root disagreement:\n{text}"
     );
 }
