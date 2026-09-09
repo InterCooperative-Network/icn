@@ -178,11 +178,17 @@ impl DataDirLock {
     /// * **the lock file exists** — contend for it, and fail closed on any
     ///   error. Contention does not need write permission: `try_lock_shared` is
     ///   `flock(2)`, which operates on the descriptor irrespective of open mode.
-    /// * **it does not exist and cannot be created** — report `Ok(None)`.
-    ///   Nothing holds a lock that does not exist, and a ceremony that cannot
-    ///   create a file here cannot publish a configuration here either. This is
-    ///   what keeps a daemon whose configuration lives in a packaged read-only
-    ///   directory — a Kubernetes ConfigMap mount, say — working unchanged.
+    /// * **it does not exist and the filesystem is read-only** — report
+    ///   `Ok(None)`. Nothing on that filesystem can be written by anybody, so
+    ///   no ICN process can publish a configuration there. This is what keeps a
+    ///   Kubernetes ConfigMap mount (`readOnly: true`) working unchanged.
+    /// * **it does not exist and this process may not create it** — refuse.
+    ///   This is *not* the same statement: it says only that this account lacks
+    ///   authority, and a more privileged one may still publish here. Note the
+    ///   consequence, which is deliberate: a daemon running as a service
+    ///   account over a configuration directory owned by root will not start
+    ///   until that directory is made writable by the daemon's account. The
+    ///   refusal says so.
     ///
     /// # Actor model, stated plainly
     ///
@@ -313,7 +319,19 @@ impl DataDirLock {
         }
         let file = match open.open(&path) {
             Ok(f) => f,
-            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            // Both errno values mean the same thing here — this process cannot
+            // open the file for *writing* — and `flock(2)` does not care: it
+            // locks the descriptor irrespective of open mode. Splitting them
+            // would refuse a daemon whose configuration directory is a
+            // read-only mount that already contains a lock file, which is what
+            // `docker-compose.test.yml`'s `./config:/config:ro` produces once
+            // the two-node demo has run on the host.
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+                ) =>
+            {
                 std::fs::File::open(&path).with_context(|| {
                     format!(
                         "Failed to open the lock {} even read-only.\n\
@@ -528,6 +546,50 @@ mod tests {
         // And both still exclude the ceremony's corresponding acquisition.
         assert!(DataDirLock::acquire(dir.path(), "a ceremony").is_err());
         assert!(DataDirLock::acquire_config(dir.path(), "a ceremony").is_err());
+    }
+
+    /// An existing lock file this process cannot open for writing is still
+    /// contended for, not treated as absent.
+    ///
+    /// `flock(2)` locks the descriptor irrespective of open mode, so a
+    /// read-only descriptor participates fully. This is the arm that keeps a
+    /// daemon working when its configuration directory is a read-only mount
+    /// that already contains a lock file — the shape
+    /// `docker-compose.test.yml`'s `./config:/config:ro` produces once the
+    /// two-node demo has run on the host. That mount reports
+    /// `ReadOnlyFilesystem` rather than `PermissionDenied`; both reach this
+    /// same fallback, and this test drives it through the errno an
+    /// unprivileged process can actually produce.
+    #[cfg(unix)]
+    #[test]
+    fn a_lock_file_that_cannot_be_opened_for_writing_is_still_contended_for() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::TempDir::new().unwrap();
+
+        // Create the lock file, then make it unwritable.
+        let path = DataDirLock::config_lock_path(dir.path());
+        std::fs::write(&path, b"").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o444)).unwrap();
+        let writable = std::fs::OpenOptions::new().write(true).open(&path).is_ok();
+        if writable {
+            eprintln!(
+                "SKIPPED a_lock_file_that_cannot_be_opened_for_writing_is_still_contended_for: \
+                 this process can write through a 0444 file (running as root?). Not evidence \
+                 in this environment."
+            );
+            return;
+        }
+
+        let reader = DataDirLock::acquire_config_shared_if_manageable(dir.path(), "the daemon")
+            .expect("an unwritable lock file must not be an error")
+            .expect("nor be reported as nothing to exclude");
+
+        // And it is a real lock, not a no-op: a publisher is still refused.
+        assert!(
+            DataDirLock::acquire_config(dir.path(), "a ceremony").is_err(),
+            "the read-only descriptor must hold a genuine shared lock"
+        );
+        drop(reader);
     }
 
     /// A directory this process cannot write to is not evidence that nobody can.

@@ -185,6 +185,14 @@
 //! nothing to exclude. None of this is a boundary against a privileged local
 //! adversary, who can remove the file or ignore advisory locking.
 //!
+//! One consequence is deliberate and worth stating rather than discovering: a
+//! daemon running as a service account over a configuration directory owned by
+//! a *more privileged* account will not start until that directory is made
+//! writable by the daemon's account. It cannot establish exclusion there, and
+//! the same-account model is what makes the coordination domain meaningful. A
+//! read-only filesystem is exempt, because nothing on it can be published by
+//! anyone.
+//!
 //! A symlinked `<data_dir>/icn.toml` is refused, twice and independently: the
 //! N2-A startup gate refuses a symlink under the data directory before any
 //! mutation, and publication refuses a non-regular destination. A ceremony that
@@ -278,7 +286,14 @@
 //! * the provisioning authority is cryptographically the same Principal as the
 //!   node today — the roles differ, the subjects do not;
 //! * the boundary crossed is the ledger **author-trust gate**; the `PolicyOracle`
-//!   beside it is `AllowAllOracle::wildcard()` (pre-existing, permissive).
+//!   beside it is `AllowAllOracle::wildcard()` (pre-existing, permissive);
+//! * **the cooperative record is left `Forming`.** This ceremony does not call
+//!   `activate_cooperative`, so the record keeps `status: Forming`,
+//!   `charter_ratified: false` and no founding signatures. That is deliberate —
+//!   ratification is a governance act, not a provisioning one — and no
+//!   production path gates on `CoopStatus::Active` today. Anything that starts
+//!   gating on it will need to decide what activates a runtime root, and this
+//!   receipt is not that decision.
 //!
 //! # Honest evidence limits
 //!
@@ -294,6 +309,16 @@
 //! * **daemon readability is not proven.** This process does not run under the
 //!   daemon's credentials, so a check it performs speaks only for its own. The
 //!   claim is that the original supported access metadata was preserved;
+//! * a **hard-linked** managed configuration is refused, not published. A
+//!   second directory entry for the same inode is a second configuration
+//!   identity in a different lock domain, so publication would leave a daemon
+//!   reading the old inode through the other name while this receipt said
+//!   READY. Refusing is the claim; preserving the link count is not offered;
+//! * a daemon whose configuration directory it cannot write **will not start**.
+//!   That is deliberate (it cannot establish exclusion over a configuration a
+//!   more privileged actor could republish), and it is a behaviour change: such
+//!   a daemon previously started with no configuration lock at all. A read-only
+//!   *filesystem* is exempt, because nothing on it can be published;
 //! * the cross-*user* ownership case is argued from the policy function but was
 //!   executed only cross-*group*: an unprivileged test cannot `chown` to another
 //!   uid.
@@ -679,31 +704,37 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
 
     let exists = |p: PathBuf| std::fs::symlink_metadata(&p).is_ok();
 
-    let scan_any = |db: PathBuf, prefix: &[u8]| -> bool {
+    // Fail closed, like every other inspection in this file. An earlier version
+    // answered `false` for any store that could not be opened or scanned — a
+    // stale sled lock, a mode change, a regular file where a database belongs —
+    // which reports *could not read* as *is not there*, in the very report an
+    // operator uses to decide what to delete by hand. That is the same defect
+    // `refuse_if_foreign_institutional_state` documents having removed.
+    let scan_any = |db: PathBuf, prefix: &[u8]| -> Result<bool> {
         if !db.exists() {
-            return false;
+            return Ok(false);
         }
-        match icn_store::SledStore::open(&db) {
-            Ok(store) => {
-                let found = store.scan(prefix).map(|r| !r.is_empty()).unwrap_or(false);
-                drop(store);
-                found
-            }
-            Err(_) => false,
-        }
+        let store = icn_store::SledStore::open(&db)
+            .with_context(|| format!("Could not open {} to inspect it", db.display()))?;
+        let found = store
+            .scan(prefix)
+            .map(|r| !r.is_empty())
+            .map_err(|e| anyhow::anyhow!("Could not scan {}: {e}", db.display()))?;
+        drop(store);
+        Ok(found)
     };
-    let scan_count = |db: PathBuf, prefix: &[u8]| -> usize {
+    let scan_count = |db: PathBuf, prefix: &[u8]| -> Result<usize> {
         if !db.exists() {
-            return 0;
+            return Ok(0);
         }
-        match icn_store::SledStore::open(&db) {
-            Ok(store) => {
-                let n = store.scan(prefix).map(|r| r.len()).unwrap_or(0);
-                drop(store);
-                n
-            }
-            Err(_) => 0,
-        }
+        let store = icn_store::SledStore::open(&db)
+            .with_context(|| format!("Could not open {} to inspect it", db.display()))?;
+        let n = store
+            .scan(prefix)
+            .map(|r| r.len())
+            .map_err(|e| anyhow::anyhow!("Could not scan {}: {e}", db.display()))?;
+        drop(store);
+        Ok(n)
     };
 
     let coop_db = coop_db_path(data_dir);
@@ -719,17 +750,17 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
     Ok(RuntimeRootComponents {
         trust_root_key: exists(trust_root_keystore_path(data_dir)),
         treasury_key: exists(treasury_keystore_path(data_dir)),
-        cooperative_record: scan_any(coop_db.clone(), b"coop:"),
+        cooperative_record: scan_any(coop_db.clone(), b"coop:")?,
         treasury_registration: scan_any(
             icn_core::config::ledger_store_path(data_dir),
             b"ledger:treasury:",
-        ),
+        )?,
         trust_store_edges: scan_count(
             icn_core::config::trust_store_path(data_dir),
             b"trust/edges/",
-        ),
+        )?,
         config_linkage,
-        receipt: scan_any(coop_db, RECEIPT_KEY_PREFIX.as_bytes()),
+        receipt: scan_any(coop_db, RECEIPT_KEY_PREFIX.as_bytes())?,
     })
 }
 
@@ -925,9 +956,9 @@ fn refuse_if_foreign_institutional_state(data_dir: &Path) -> Result<()> {
              institutional state that this ceremony did not create:\n  {}\n\
              The daemon publishes a single `[cooperative] treasury_did` and its \
              ledger service debits that one treasury for every treasury \
-             operation, so founding another institution here would make the \
-             existing cooperative's operations debit the new treasury. Found a \
-             new institution in a fresh data directory.",
+             operation, so provisioning a second runtime root here would make \
+             the existing cooperative's operations debit the new treasury. \
+             Provision a runtime root in a fresh data directory instead.",
             found.join("\n  ")
         );
     }
@@ -1286,18 +1317,22 @@ macro_rules! failpoint {
 /// pretending it is impossible:
 ///
 /// 1. refuse on a storage-root disagreement (nothing written);
-/// 2. cross the N2-A startup gate (before any store is opened);
-/// 3. refuse if key material already exists, if there is no node keystore to
-///    found under, or if the configuration cannot be linked (nothing written);
-/// 4. prove founding authority by unlocking the node keystore;
-/// 5. refuse if a receipt already exists;
-/// 6. mint institution and treasury key material;
-/// 7. write the cooperative record;
-/// 8. register the treasury durably;
-/// 9. write the trust facts;
-/// 10. publish the configuration linkage;
-/// 11. verify every component through freshly opened handles;
-/// 12. write the receipt — **the commit point** — last.
+/// 2. refuse if the configuration belongs to another account (nothing written,
+///    and before the coordination locks exist);
+/// 3. take the configuration and storage locks;
+/// 4. cross the N2-A startup gate (before any store is opened);
+/// 5. refuse if key material or a receipt already exists, if there is no node
+///    keystore to provision under, if this directory holds another
+///    institution's state, or if the configuration cannot be linked (nothing
+///    written);
+/// 6. prove provisioning authority by unlocking the node keystore;
+/// 7. mint the runtime trust-root and treasury key material;
+/// 8. write the cooperative record;
+/// 9. register the treasury durably;
+/// 10. write the trust facts;
+/// 11. publish the configuration linkage;
+/// 12. verify every component through freshly opened handles;
+/// 13. write the receipt — **the commit point** — last.
 ///
 /// The receipt is written last and is what `show` consults, so a ceremony
 /// interrupted at any earlier point leaves no receipt and is reported as
@@ -1339,6 +1374,7 @@ fn provision_runtime_root_inner(
     // a wrong-account run would otherwise leave behind for the daemon to trip
     // over. See `refuse_if_the_configuration_belongs_to_another_account`.
     refuse_if_the_configuration_belongs_to_another_account(data_dir)?;
+    refuse_if_the_configuration_is_hard_linked(data_dir)?;
 
     // (1b) Take exclusive ownership of the data root BEFORE any state-sensitive
     // observation. Everything from here to the receipt is a read that a
@@ -2117,6 +2153,73 @@ fn refuse_ownership_change(
     )
 }
 
+/// Refuse a managed configuration that has more than one directory entry.
+///
+/// Atomic publication replaces the inode: the new contents arrive at
+/// `<data_dir>/icn.toml`, and every *other* name for the old inode keeps
+/// serving the old bytes. That is not merely lost metadata — it is a second
+/// configuration identity outside this ceremony's exclusion domain.
+///
+/// The reachable shape:
+///
+/// ```text
+/// A/icn.toml ─────┐
+///                 ├── one inode
+/// B/config.toml ──┘
+/// ```
+///
+/// A daemon consuming `B/config.toml` takes `B/.icn-config.lock`; this ceremony
+/// takes `A/.icn-config.lock`. The two never contend, so the ceremony publishes
+/// a new inode into `A`, commits its receipt, and the daemon carries on reading
+/// the old one through `B` — the stale-configuration state the whole protocol
+/// exists to prevent, reached through inode aliasing rather than through a path
+/// alias, which canonicalization already handles.
+///
+/// Measured: after publication over a two-link configuration, `A/icn.toml` held
+/// the `[cooperative]` section at a new inode while `B/config.toml` still held
+/// the original inode without it.
+///
+/// So the alias is refused rather than documented. `symlink_metadata` is used
+/// for the same reason the rest of this file uses it: the question is about the
+/// entry itself, never about something it points at.
+#[cfg(unix)]
+fn refuse_if_the_configuration_is_hard_linked(data_dir: &Path) -> Result<()> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let config_path = data_dir.join("icn.toml");
+    let meta = match std::fs::symlink_metadata(&config_path) {
+        Ok(meta) => meta,
+        // Absent, or not a regular file: both are refused by other layers, with
+        // better messages than this one could give.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => {
+            return Err(e).with_context(|| format!("Failed to inspect {}", config_path.display()))
+        }
+    };
+    if meta.file_type().is_symlink() || !meta.is_file() {
+        return Ok(());
+    }
+    if meta.nlink() > 1 {
+        bail!(
+            "Refusing institutional runtime-root provisioning: {} has {} directory entries, not \
+             one.\n\
+             Publication replaces the file, so the other name(s) for it would keep serving the \
+             configuration as it is now while this data directory moved on — and a daemon reading \
+             through one of them coordinates on that directory's lock, not this one, so the two \
+             would never contend. Remove the additional link (or copy the file instead of linking \
+             it) and re-run.",
+            config_path.display(),
+            meta.nlink()
+        );
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn refuse_if_the_configuration_is_hard_linked(_data_dir: &Path) -> Result<()> {
+    Ok(())
+}
+
 /// Refuse when publication would hand the configuration to a different account.
 ///
 /// Called twice, and both call sites matter.
@@ -2177,8 +2280,9 @@ fn identity_new_files_receive(dir: &Path) -> Result<AccessIdentity> {
         ".icn-runtime-root-identity-probe.{}",
         std::process::id()
     ));
-    // A stale probe is not a reason to guess: `create_new` refuses rather than
-    // reusing whatever sits there, and an unreadable one is refused below.
+    // Cleared first, then created with `create_new` — which is `O_CREAT|O_EXCL`
+    // and so refuses to follow a symlink, dangling or not, if one is planted
+    // between the two.
     let _ = std::fs::remove_file(&probe);
     std::fs::OpenOptions::new()
         .write(true)
@@ -2218,9 +2322,9 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
              link the treasury into.\n\
              The daemon resolves its treasury from `[cooperative] \
              treasury_did`, so without this link it would fall back to the node \
-             DID — genesis would appear to succeed while the machine remained \
-             the treasury. Run `icnctl init-coop` (or create the configuration) \
-             and re-run genesis.",
+             DID — provisioning would appear to succeed while the machine \
+             remained the treasury. Run `icnctl init-coop` (or create the \
+             configuration) and re-run `institution runtime-root create`.",
             config_path.display()
         );
     }
@@ -2412,7 +2516,24 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
              rather than update it.",
             config_path.display()
         ),
-        Ok(meta) => Some(meta),
+        Ok(meta) => {
+            // Re-checked here, not only at preflight: the whole ceremony runs
+            // between the two, and a link created in that window would leave a
+            // second configuration identity outside this exclusion domain.
+            {
+                use std::os::unix::fs::MetadataExt as _;
+                if meta.nlink() > 1 {
+                    bail!(
+                        "Refusing to publish the configuration: {} has {} directory entries, not \
+                         one. Publication replaces the file, so the other name(s) would keep \
+                         serving it as it is now. Remove the additional link and re-run.",
+                        config_path.display(),
+                        meta.nlink()
+                    );
+                }
+            }
+            Some(meta)
+        }
         // Nothing to replace, and nothing to preserve. Preflight requires the
         // file to exist, so this is only reachable if it vanished mid-ceremony.
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
@@ -2645,18 +2766,25 @@ fn print_receipt(data_dir: &Path, receipt: &RuntimeRootReceipt, provenance_verif
     } else {
         println!(
             "Verified: durable state, configuration linkage, and that the trust\n\
-             facts still score the treasury above the ledger's author threshold.\n\
+             facts still score the treasury above the ledger's author threshold\n\
+             on a cold reopened graph.\n\
              NOT re-verified: key provenance, and whether the node identity still\n\
              matches the one recorded. This command does not prompt for a\n\
              passphrase, so it cannot open the keystores — only see that they are\n\
-             present."
+             present.\n\
+             NOTE (icn#2750): a running daemon scores this treasury 0.0 once any\n\
+             unrelated trust edge is added in-process, so the score above\n\
+             describes the persisted facts rather than the live daemon."
         );
     }
     println!(
         "\nThe treasury is a principal of its own; it is not the node.\n\
-         This provisions the institutional runtime root. It does not implement\n\
-         the GEN protocol (#2602), stable Subject-generation (#2694),\n\
-         federation, or the Technical Alpha as a whole."
+         This provisions the institutional runtime root. It is NOT canonical\n\
+         Institution genesis: no `EntityId` is allocated and no signed founding\n\
+         act is persisted, so this receipt is provisioning evidence rather than\n\
+         founding evidence. It does not implement the GEN protocol (#2602),\n\
+         stable Subject-generation (#2694), federation, or the Technical Alpha\n\
+         as a whole."
     );
     // Say how this becomes effective, because it does not become effective on
     // its own. A daemon started without `--config` builds `Config::default()`,
@@ -2734,7 +2862,7 @@ pub fn handle_institution_runtime_root_command(
                                 "treasury_key_provenance": "not_reverified",
                                 "node_identity": "not_reverified",
                             },
-                            "note": "key provenance is not re-verified by `show`; it does not prompt for a passphrase. The ceremony verifies it before writing the receipt.",
+                            "note": "key provenance is not re-verified by `show`; it does not prompt for a passphrase. The ceremony verifies it before writing the receipt. `trust_score_above_ledger_threshold` is measured on a cold reopened graph: under icn#2750 the running daemon scores this treasury 0.0 once any unrelated in-process edge exists, so this field describes the persisted facts, not the live daemon.",
                             "receipt": receipt,
                         }))?
                     );
@@ -3112,10 +3240,75 @@ mod failpoint_tests {
             "the probe must report the identity a real new file receives here"
         );
 
-        // And it must leave nothing behind.
+        // And it must leave nothing behind. The name is pid-suffixed, so this
+        // has to be matched by prefix — asserting the bare name would name a
+        // path the probe never creates and could never fail.
+        let leftovers: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.starts_with(".icn-runtime-root-identity-probe"))
+            .collect();
         assert!(
-            !dir.path().join(".icn-runtime-root-identity-probe").exists(),
-            "the probe file must be removed"
+            leftovers.is_empty(),
+            "the probe file must be removed; found {leftovers:?}"
+        );
+    }
+
+    /// The probe reads the inode rather than asking for the process's own gid,
+    /// and a setgid directory is the case where those two answers differ.
+    ///
+    /// Without this, `identity_new_files_receive` could be replaced by
+    /// `getegid()` and every other test would still pass.
+    #[cfg(unix)]
+    #[test]
+    fn the_identity_probe_follows_a_setgid_directory_rather_than_the_process() {
+        use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+
+        let Some(other_gid) = a_supplementary_group() else {
+            eprintln!(
+                "SKIPPED the_identity_probe_follows_a_setgid_directory_rather_than_the_process: \
+                 this account has no supplementary group, so a setgid directory whose group \
+                 differs from the process's cannot be built. Not evidence in this environment."
+            );
+            return;
+        };
+
+        let dir = tempfile::TempDir::new().unwrap();
+        chgrp(dir.path(), other_gid);
+        // setgid: new files below here inherit the DIRECTORY's group.
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o2755)).unwrap();
+        if std::fs::symlink_metadata(dir.path())
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o2000
+            == 0
+        {
+            eprintln!(
+                "SKIPPED the_identity_probe_follows_a_setgid_directory_rather_than_the_process: \
+                 this filesystem did not retain the setgid bit. Not evidence in this environment."
+            );
+            return;
+        }
+
+        let probed = identity_new_files_receive(dir.path()).unwrap();
+        let process_gid = unsafe { libc::getegid() };
+        assert_eq!(
+            probed.gid, other_gid,
+            "the probe must report the group a new file here actually receives"
+        );
+        assert_ne!(
+            probed.gid, process_gid,
+            "fixture: the directory's group must differ from the process's, or this proves nothing"
+        );
+
+        // And a real file agrees with the probe.
+        let witness = dir.path().join("witness");
+        std::fs::write(&witness, b"").unwrap();
+        assert_eq!(
+            std::fs::symlink_metadata(&witness).unwrap().gid(),
+            probed.gid
         );
     }
 
@@ -3220,6 +3413,35 @@ mod failpoint_tests {
         assert!(
             msg.contains("would change which account owns it"),
             "the refusal must come from the ownership check at publication: {msg}"
+        );
+    }
+
+    /// A stale temporary file from an interrupted run must not strand every
+    /// later publication.
+    ///
+    /// The symlink half of this guard is redundant — `create_new` is
+    /// `O_CREAT|O_EXCL` and cannot follow a link — but the `Ok(_) => remove_file`
+    /// half is not: delete it and a rerun fails permanently with `EEXIST`,
+    /// which no other test would catch.
+    #[cfg(unix)]
+    #[test]
+    fn a_stale_temporary_file_does_not_strand_publication() {
+        let dir = provisioned();
+        let stale = dir.path().join("icn.toml.genesis-tmp");
+        std::fs::write(&stale, b"left behind by an interrupted run\n").unwrap();
+
+        let treasury = icn_identity::KeyPair::generate().unwrap().did().clone();
+        publish_cooperative_config(dir.path(), "Stale Temp Coop", &treasury)
+            .expect("a stale regular temporary file must be cleared, not fatal");
+
+        assert!(
+            !stale.exists(),
+            "the temporary file must not survive a successful publication"
+        );
+        let published = std::fs::read_to_string(dir.path().join("icn.toml")).unwrap();
+        assert!(
+            published.contains(treasury.as_str()),
+            "and the configuration must actually name the treasury"
         );
     }
 
@@ -3472,19 +3694,22 @@ mod failpoint_tests {
         assert!(format!("{provenance:#}").contains("does not back it"));
     }
 
-    /// Inability to inspect existing state is a refusal, never an absence.
+    /// Inability to inspect existing state is a refusal, never an absence —
+    /// through the whole command.
     ///
-    /// Kills the `if let Ok(..)` swallowing an earlier draft used: with that
-    /// behaviour restored, an unopenable cooperative store reads as "no foreign
-    /// state" and the ceremony proceeds to found over it.
+    /// Attribution, because it moved: the ledger store is now read first by
+    /// `runtime_root_components` (reached from `refuse_if_already_provisioned`),
+    /// which became fail-closed in this branch, so *that* is the guard this
+    /// end-to-end fixture exercises. `refuse_if_foreign_institutional_state`
+    /// reads the same store a step later and has its own direct witness
+    /// below — without it, making the earlier guard fail closed would have
+    /// silently retired the discriminator for the later one.
     #[test]
     fn an_uninspectable_store_refuses_rather_than_reading_as_empty() {
         let dir = provisioned();
         // The LEDGER store specifically. The cooperative store is already opened
         // earlier by `load_receipt`, which fails closed on its own, so corrupting
-        // that one would prove nothing about this check. Only
-        // `refuse_if_foreign_institutional_state` reads the ledger store during
-        // preflight, which makes this a discriminator for *this* guard.
+        // that one would prove nothing about the inspection guards.
         let ledger_db = icn_core::config::ledger_store_path(dir.path());
         std::fs::create_dir_all(ledger_db.parent().unwrap()).unwrap();
         std::fs::write(&ledger_db, b"not a database").unwrap();
@@ -3493,16 +3718,56 @@ mod failpoint_tests {
             .expect_err("an uninspectable store must refuse");
         let msg = format!("{err:#}");
         assert!(
-            msg.contains("could not be opened") || msg.contains("could not be scanned"),
+            msg.contains("could not be opened")
+                || msg.contains("could not be scanned")
+                || msg.contains("Could not open")
+                || msg.contains("Could not scan"),
             "the refusal must name the inspection failure, not report absence: {msg}"
         );
         assert!(
             msg.contains(&ledger_db.display().to_string()),
             "and must name the store it could not inspect: {msg}"
         );
+        // Checked on the filesystem, not through `runtime_root_components`:
+        // that helper is now fail-closed and would itself refuse over the
+        // corrupted store, so calling it here would test the fixture rather
+        // than the invariant.
+        for artefact in [
+            trust_root_keystore_path(dir.path()),
+            treasury_keystore_path(dir.path()),
+        ] {
+            assert!(
+                !artefact.exists(),
+                "nothing may be minted when existing state cannot be inspected: {}",
+                artefact.display()
+            );
+        }
+    }
+
+    /// `refuse_if_foreign_institutional_state`'s own witness.
+    ///
+    /// Driven directly, because an earlier fail-closed inspection now reaches
+    /// the same store first through the command. Without this, restoring the
+    /// `if let Ok(..)` swallowing that this guard documents having removed
+    /// would be invisible: the ceremony would still refuse, just one step
+    /// sooner and for a different reason.
+    #[test]
+    fn foreign_state_inspection_refuses_an_unopenable_store_on_its_own() {
+        let dir = provisioned();
+        let ledger_db = icn_core::config::ledger_store_path(dir.path());
+        std::fs::create_dir_all(ledger_db.parent().unwrap()).unwrap();
+        std::fs::write(&ledger_db, b"not a database").unwrap();
+
+        let err = refuse_if_foreign_institutional_state(dir.path())
+            .expect_err("an unopenable store must refuse, not read as absent");
+        let msg = format!("{err:#}");
         assert!(
-            !runtime_root_components(dir.path()).unwrap().trust_root_key,
-            "nothing may be minted when existing state cannot be inspected"
+            msg.contains("could not be opened") || msg.contains("could not be scanned"),
+            "the refusal must name the inspection failure: {msg}"
+        );
+        assert!(
+            msg.contains(&ledger_db.display().to_string()),
+            "and must name the store it could not inspect: {msg}"
         );
     }
 

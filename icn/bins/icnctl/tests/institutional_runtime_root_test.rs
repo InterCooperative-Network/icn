@@ -1,4 +1,4 @@
-//! A cooperative must be able to come into existence as an institution (#2744).
+//! A cooperative must be able to acquire an institutional runtime root (#2744).
 //!
 //! Before this ceremony existed a cooperative could only come into existence as
 //! a *string*: `init-coop` wrote a keystore and an `icn.toml` with no
@@ -261,7 +261,7 @@ fn rows_with_prefix(path: &Path, prefix: &[u8]) -> Vec<String> {
 /// assertions are unreachable rather than independently observable, and this
 /// test does not pretend otherwise.
 #[test]
-fn institutional_genesis_creates_an_institution_distinct_from_the_node() {
+fn runtime_root_provisioning_creates_state_distinct_from_the_node() {
     let dir = TempDir::new().unwrap();
     let data_dir = dir.path();
 
@@ -1935,15 +1935,22 @@ fn the_generated_cooperative_id_is_accepted_by_the_gateway_validator() {
     let receipt: serde_json::Value = serde_json::from_str(&json).unwrap();
     let coop_id = receipt["cooperative_id"].as_str().unwrap();
 
-    assert!(
-        coop_id
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'),
-        "the cooperative ID must satisfy the gateway's character rule; got {coop_id:?}"
-    );
+    // Call the owner, do not restate it. The previous version of this test
+    // re-implemented the character rule and dropped `MAX_COOP_ID_LEN`
+    // altogether, so a generator that produced a 100-byte id would have kept it
+    // green while `icnctl auth token` refused that id permanently — a rerun is
+    // refused by design, so the value would be unfixable. Restating a limit is
+    // precisely the defect this PR fixed for the name and the currency.
+    icn_gateway::validation::validate_coop_id(coop_id).unwrap_or_else(|e| {
+        panic!("the generated cooperative ID must satisfy the gateway: {coop_id:?}: {e}")
+    });
+    // And the same id must survive the domain rule the cooperative record uses.
+    icn_gateway::validation::validate_domain_id(coop_id).unwrap_or_else(|e| {
+        panic!("the generated cooperative ID must satisfy the domain rule: {coop_id:?}: {e}")
+    });
     assert!(
         !coop_id.contains(':'),
-        "a colon is exactly what the gateway rejects: {coop_id:?}"
+        "a colon would break every delimiter-framed keyspace that stores this id: {coop_id:?}"
     );
 }
 
@@ -2584,5 +2591,93 @@ fn a_successful_ceremony_says_how_the_configuration_becomes_effective() {
     assert!(
         text.contains("2755"),
         "and must name the deployment issue, so the limitation is traceable:\n{text}"
+    );
+}
+
+/// A second directory entry for the managed configuration is a second
+/// configuration identity, in a different lock domain.
+///
+/// Reproduced before it was fixed, with the real binary:
+///
+/// ```text
+/// before: A/icn.toml inode=46071 nlink=2   B/config.toml inode=46071
+/// ceremony on A: SUCCEEDED
+/// after:  A/icn.toml inode=46114 (has [cooperative])
+///         B/config.toml inode=46071 (does NOT)
+/// ```
+///
+/// A daemon consuming `B/config.toml` coordinates on `B/.icn-config.lock` while
+/// this ceremony holds `A/.icn-config.lock`; the two never contend, so the
+/// daemon kept serving the pre-ceremony configuration while the receipt said
+/// READY. Canonicalization already handles *path* aliases — this is an *inode*
+/// alias, which it cannot see.
+///
+/// The answer is refusal, not preservation: nothing here tries to keep the link
+/// count across a replacement.
+#[cfg(unix)]
+#[test]
+fn a_hard_linked_configuration_is_refused_before_anything_is_provisioned() {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let cfg = data_dir.join("icn.toml");
+    let elsewhere = TempDir::new().unwrap();
+    let alias = elsewhere.path().join("config.toml");
+    std::fs::hard_link(&cfg, &alias).unwrap();
+
+    let before = std::fs::symlink_metadata(&cfg).unwrap();
+    assert_eq!(before.nlink(), 2, "fixture: the alias must share the inode");
+    let before_bytes = std::fs::read(&cfg).unwrap();
+
+    let refused = combined(&provision_runtime_root(data_dir, "Aliased Coop"));
+    assert!(
+        refused.contains("directory entries, not one"),
+        "an aliased configuration must be refused:\n{refused}"
+    );
+
+    // Refused before anything durable exists — including the coordination files,
+    // which are retained after release.
+    for artefact in [
+        "genesis-trust-root.age",
+        "treasury.age",
+        ".icn-config.lock",
+        ".icn-data-dir.lock",
+    ] {
+        assert!(
+            !data_dir.join(artefact).exists(),
+            "{artefact} must not exist after the refusal"
+        );
+    }
+
+    // Neither name was rewritten, and they are still one inode.
+    let after = std::fs::symlink_metadata(&cfg).unwrap();
+    assert_eq!(
+        before.ino(),
+        after.ino(),
+        "the configuration must be untouched"
+    );
+    assert_eq!(after.nlink(), 2, "and must still carry both entries");
+    assert_eq!(before_bytes, std::fs::read(&cfg).unwrap());
+    assert_eq!(before_bytes, std::fs::read(&alias).unwrap());
+
+    // A rerun keeps refusing while the alias is there.
+    let again = combined(&provision_runtime_root(data_dir, "Aliased Coop"));
+    assert!(
+        again.contains("directory entries, not one"),
+        "the refusal must persist while the alias does:\n{again}"
+    );
+
+    // And clears once it is gone — so the guard is specific to the alias and not
+    // a blanket refusal of this fixture.
+    std::fs::remove_file(&alias).unwrap();
+    let out = provision_runtime_root(data_dir, "Aliased Coop");
+    assert!(
+        out.status.success(),
+        "provisioning must proceed once the extra link is removed:\n{}",
+        combined(&out)
     );
 }
