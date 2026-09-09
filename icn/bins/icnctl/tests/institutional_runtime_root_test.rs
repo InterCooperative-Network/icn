@@ -1891,7 +1891,7 @@ fn two_concurrent_ceremonies_cannot_both_own_a_data_directory() {
         &texts[0]
     };
     assert!(
-        loser.contains("already owns"),
+        loser.contains("already holds"),
         "the loser must be refused because another ceremony owns the root, not \
          for some incidental later reason:\n{loser}"
     );
@@ -1971,5 +1971,109 @@ fn a_config_repointed_at_another_storage_root_is_detected_on_readback() {
     assert!(
         text.contains("storage root"),
         "the report must name the storage-root disagreement:\n{text}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Cross-process exclusion: real processes, real primitive
+// ---------------------------------------------------------------------------
+//
+// The child is this same test binary, re-invoked as a separate process and
+// holding the real `DataDirLock`. That makes these witnesses about the process
+// invariant — and about the exact primitive the daemon and the ceremony call —
+// rather than about Rust's `Drop` or about a foreign lock implementation.
+
+fn lock_file_for(data_dir: &Path) -> PathBuf {
+    icn_core::DataDirLock::lock_path(data_dir)
+}
+
+/// The child half of the process-death witness.
+///
+/// Re-invoked as a separate process by the test below. Without the environment
+/// variable it returns immediately, so an ordinary `cargo test` run is
+/// unaffected.
+///
+/// This deliberately uses the real `DataDirLock`, not `flock(1)`: the mechanism
+/// under test is the Rust primitive both the daemon and the ceremony call, and
+/// an earlier witness built on `flock FILE COMMAND` proved nothing because that
+/// tool *forks* the command, leaving a grandchild holding the inherited
+/// descriptor after the parent was killed.
+#[test]
+fn data_dir_lock_holder_child() {
+    let Ok(root) = std::env::var("ICN_TEST_LOCK_HOLDER_ROOT") else {
+        return;
+    };
+    let root = PathBuf::from(root);
+    let _guard = icn_core::DataDirLock::acquire(&root, "test child")
+        .expect("the child must acquire the lock");
+    std::fs::write(root.join(".holder-ready"), b"ready").unwrap();
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(60));
+    }
+}
+
+/// Spawn that child and wait until it has *established* ownership.
+fn spawn_lock_holder(data_dir: &Path) -> std::process::Child {
+    let ready = data_dir.join(".holder-ready");
+    let _ = std::fs::remove_file(&ready);
+
+    let child = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "data_dir_lock_holder_child", "--nocapture"])
+        .env("ICN_TEST_LOCK_HOLDER_ROOT", data_dir)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("the test binary must be re-invokable as a child");
+
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while !ready.exists() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the lock holder never signalled readiness"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    child
+}
+
+/// C4 — a *killed* process releases ownership; the kernel does it, not `Drop`.
+///
+/// This is the property that makes an advisory lock safe here and a
+/// `create_new` marker file or a PID file unsafe: nothing has to run on the
+/// dying side, and no operator has to delete anything afterwards.
+#[test]
+fn killing_the_lock_holder_releases_ownership_without_manual_cleanup() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let mut holder = spawn_lock_holder(data_dir);
+
+    // Contention is observable from a genuinely separate process.
+    let blocked = provision_runtime_root(data_dir, "Blocked While Held");
+    assert!(
+        !blocked.status.success(),
+        "the ceremony must refuse while another process owns the root"
+    );
+    assert!(
+        combined(&blocked).contains("already holds"),
+        "and must say so: {}",
+        combined(&blocked)
+    );
+
+    // Kill it — no cooperative cleanup, no Drop, no unlink.
+    holder.kill().unwrap();
+    holder.wait().unwrap();
+
+    assert!(
+        lock_file_for(data_dir).exists(),
+        "the lock file itself survives; only ownership is released"
+    );
+    let after = provision_runtime_root(data_dir, "Proceeds After Death");
+    assert!(
+        after.status.success(),
+        "a killed holder must not strand the data directory: {}",
+        combined(&after)
     );
 }

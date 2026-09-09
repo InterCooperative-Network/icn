@@ -540,88 +540,6 @@ pub fn runtime_root_state(data_dir: &Path) -> Result<RuntimeRootState> {
     }
 }
 
-/// Exclusive ownership of one data directory for the duration of a ceremony.
-///
-/// # Why this exists
-///
-/// Every state-sensitive preflight check — prior-provisioning, foreign
-/// institutional state, config linkability — is a read followed later by an
-/// irreversible write. Without one exclusion boundary spanning both, two
-/// concurrent ceremonies can each observe an untouched directory and then race
-/// through `AgeKeyStore::init`'s non-atomic existence-check/write, so one can
-/// overwrite key material the other generated and a receipt can be committed
-/// for keys no longer on disk.
-///
-/// The N2-A startup gate does **not** provide this. It takes sled locks while it
-/// audits and releases them when it returns, which is long before the ceremony's
-/// first write. It remains required for what it does own; it is not the ceremony
-/// lock.
-///
-/// # Mechanism
-///
-/// An advisory lock on a file inside the data root, via `std::fs::File::try_lock`
-/// — no new dependency, and the kernel releases the lock when the process dies,
-/// so a crash cannot strand the directory. That is the specific failure a
-/// `create_new` marker file would have: it survives the process and needs
-/// stale-lock heuristics that are easy to get wrong.
-///
-/// The lock file itself is never read and carries no content, so nothing secret
-/// reaches it. It is refused if it is not a regular file, so it cannot redirect
-/// a write outside the root.
-struct CeremonyLock {
-    _file: std::fs::File,
-    path: PathBuf,
-}
-
-impl CeremonyLock {
-    /// Take exclusive ownership, or explain who has it.
-    fn acquire(data_dir: &Path) -> Result<Self> {
-        let path = data_dir.join(".icn-runtime-root-ceremony.lock");
-
-        // Containment before creation: never open through a link.
-        if let Ok(meta) = std::fs::symlink_metadata(&path) {
-            if meta.file_type().is_symlink() || !meta.is_file() {
-                bail!(
-                    "Refusing to provision: the ceremony lock path {} exists and is not a \
-                     regular file.",
-                    path.display()
-                );
-            }
-        }
-
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(&path)
-            .with_context(|| format!("Failed to open the ceremony lock at {}", path.display()))?;
-
-        match file.try_lock() {
-            Ok(()) => Ok(Self { _file: file, path }),
-            Err(_) => bail!(
-                "Refusing to provision: another institutional runtime-root ceremony already \
-                 owns {}.\n\
-                 Only one ceremony may hold a data directory at a time — two would each see an \
-                 untouched directory and then race to mint key material over one another. If no \
-                 other ceremony is running, the lock is released automatically when that process \
-                 exits; nothing needs to be cleaned up by hand.",
-                data_dir.display()
-            ),
-        }
-    }
-}
-
-impl Drop for CeremonyLock {
-    fn drop(&mut self) {
-        // The advisory lock is released when the file handle closes, which Drop
-        // does for us — including on every error path, since the guard is held
-        // by the ceremony's stack frame. The empty file is deliberately left
-        // behind: removing it would race another process that has just opened it
-        // and is about to lock.
-        let _ = &self.path;
-    }
-}
-
 /// Reject operator-supplied values before the ceremony writes or prompts.
 ///
 /// Deliberately conservative rather than clever: this is a founding act, the
@@ -830,6 +748,35 @@ fn mint_principal(path: &Path, passphrase: &[u8], what: &str) -> Result<Did> {
         .with_context(|| format!("Failed to read the generated {what} keypair"))?
         .did()
         .clone();
+
+    // Make the key material durable before anything can certify it.
+    //
+    // `AgeKeyStore::init` writes through `std::fs::write`, which establishes
+    // visibility, not survival: after it returns the bytes may still be in the
+    // page cache. Everything downstream — relational verification, and then a
+    // completion receipt that IS flushed — would happily certify a principal
+    // whose private key had not reached the disk. A power cut in that window
+    // leaves the worst possible state: a receipt saying the root is READY,
+    // naming principals whose keys are gone, and a rerun that refuses precisely
+    // *because* that receipt exists.
+    //
+    // The file is opened read-only and its contents are never touched, so
+    // nothing secret is read into this process to sync it.
+    let file = std::fs::File::open(path)
+        .with_context(|| format!("Failed to reopen the {what} keystore to make it durable"))?;
+    file.sync_all()
+        .with_context(|| format!("Failed to sync the {what} keystore at {}", path.display()))?;
+    drop(file);
+
+    // The directory entry needs its own barrier, or the file can survive while
+    // the name that reaches it does not.
+    if let Some(parent) = path.parent() {
+        let dir = std::fs::File::open(parent)
+            .with_context(|| format!("Failed to open {} to sync", parent.display()))?;
+        dir.sync_all()
+            .with_context(|| format!("Failed to sync {}", parent.display()))?;
+    }
+
     Ok(did)
 }
 
@@ -910,13 +857,78 @@ pub(crate) enum RuntimeRootFailpoint {
     AfterConfigPublish,
 }
 
+/// Called at each failpoint boundary **while the ceremony guard is still
+/// alive**, so a test can observe lock lifetime rather than lock acquisition.
+///
+/// The previous attempt at this evidence checked contention *after* the
+/// ceremony returned, by which time the guard had unwound — proving only that a
+/// released lock can be re-acquired. This runs inside the ceremony's own stack
+/// frame.
+#[cfg(test)]
+type BoundaryObserver = fn(&Path, RuntimeRootFailpoint);
+
+/// A boundary observer, bound to the exact root it is watching.
+///
+/// Scoping matters: `cargo test` runs these in parallel, and every other
+/// runtime-root ceremony also owns a `DataDirLock`. An unscoped observer would
+/// happily fire on someone else's ceremony, see contention on *their* root, and
+/// report success without the ceremony under test ever reaching its boundary —
+/// another false green of exactly the kind this suite keeps finding.
+#[cfg(test)]
+struct ScopedObserver {
+    expected_root: PathBuf,
+    callback: BoundaryObserver,
+}
+
+#[cfg(test)]
+static LATE_BOUNDARY_OBSERVER: std::sync::Mutex<Option<ScopedObserver>> =
+    std::sync::Mutex::new(None);
+
+/// Install an observer for one root, removing it again on drop so a panicking
+/// test cannot leave it installed for whatever runs next.
+#[cfg(test)]
+struct ObserverGuard;
+
+#[cfg(test)]
+impl ObserverGuard {
+    fn install(root: &Path, callback: BoundaryObserver) -> Self {
+        if let Ok(mut slot) = LATE_BOUNDARY_OBSERVER.lock() {
+            *slot = Some(ScopedObserver {
+                expected_root: icn_core::DataDirLock::lock_path(root),
+                callback,
+            });
+        }
+        Self
+    }
+}
+
+#[cfg(test)]
+impl Drop for ObserverGuard {
+    fn drop(&mut self) {
+        if let Ok(mut slot) = LATE_BOUNDARY_OBSERVER.lock() {
+            *slot = None;
+        }
+    }
+}
+
 /// Stop the ceremony at `point` when the test asked for it.
 macro_rules! failpoint {
-    ($injected:expr, $point:expr) => {
+    ($injected:expr, $root:expr, $point:expr) => {
         #[cfg(test)]
         {
+            // Observation happens BEFORE the bail, so the ceremony guard is
+            // still held when a test looks.
+            if let Ok(observer) = LATE_BOUNDARY_OBSERVER.lock() {
+                if let Some(o) = observer.as_ref() {
+                    // Compare canonical lock identities, not path spellings, and
+                    // ignore ceremonies this observer was not installed for.
+                    if o.expected_root == icn_core::DataDirLock::lock_path($root) {
+                        (o.callback)($root, $point);
+                    }
+                }
+            }
             if $injected == Some($point) {
-                anyhow::bail!("injected genesis fault at {:?}", $point);
+                anyhow::bail!("injected runtime-root fault at {:?}", $point);
             }
         }
     };
@@ -985,7 +997,7 @@ fn provision_runtime_root_inner(
     // concurrent ceremony could invalidate, so the boundary has to span all of
     // it. Held until `_ceremony` drops at the end of this function — including
     // on every error path.
-    let _ceremony = CeremonyLock::acquire(data_dir)?;
+    let _ceremony = icn_core::DataDirLock::acquire(data_dir, "runtime-root provisioning")?;
 
     // (2) Before anything opens or writes a store. The gate takes exclusive
     // locks while it audits, so this also fails fast when the daemon is running
@@ -1072,9 +1084,9 @@ fn provision_runtime_root_inner(
         &passphrase,
         "genesis trust-root",
     )?;
-    failpoint!(injected, RuntimeRootFailpoint::AfterTrustRootKey);
+    failpoint!(injected, data_dir, RuntimeRootFailpoint::AfterTrustRootKey);
     let treasury_did = mint_principal(&treasury_keystore_path(data_dir), &passphrase, "treasury")?;
-    failpoint!(injected, RuntimeRootFailpoint::AfterTreasuryKey);
+    failpoint!(injected, data_dir, RuntimeRootFailpoint::AfterTreasuryKey);
 
     // The invariant this whole issue exists to establish. Asserted rather than
     // assumed: these come from independent `KeyPair::generate()` calls, so an
@@ -1132,7 +1144,11 @@ fn provision_runtime_root_inner(
     coop_store
         .save_cooperative(&coop)
         .map_err(|e| anyhow::anyhow!("Failed to persist the cooperative record: {e}"))?;
-    failpoint!(injected, RuntimeRootFailpoint::AfterCooperativeSave);
+    failpoint!(
+        injected,
+        data_dir,
+        RuntimeRootFailpoint::AfterCooperativeSave
+    );
 
     // (8) Register the treasury durably. `with_store` is required: the plain
     // `TreasuryManager::new()` keeps its maps in memory only, and a treasury
@@ -1159,7 +1175,11 @@ fn provision_runtime_root_inner(
             Some(format!("Genesis treasury for {name}")),
         )
         .context("Failed to register the treasury")?;
-    failpoint!(injected, RuntimeRootFailpoint::AfterTreasuryRegistration);
+    failpoint!(
+        injected,
+        data_dir,
+        RuntimeRootFailpoint::AfterTreasuryRegistration
+    );
 
     // (9) The two trust facts, and precisely what they do and do not mean.
     //
@@ -1224,7 +1244,7 @@ fn provision_runtime_root_inner(
             graph_type,
         ))
         .map_err(|e| anyhow::anyhow!("Failed to record the node's recognition edge: {e}"))?;
-    failpoint!(injected, RuntimeRootFailpoint::AfterAuthorityEdge);
+    failpoint!(injected, data_dir, RuntimeRootFailpoint::AfterAuthorityEdge);
     trust_graph
         .add_edge(icn_trust::TrustEdge::new_typed(
             trust_root_did.clone(),
@@ -1233,7 +1253,11 @@ fn provision_runtime_root_inner(
             graph_type,
         ))
         .map_err(|e| anyhow::anyhow!("Failed to record the trust root's authority edge: {e}"))?;
-    failpoint!(injected, RuntimeRootFailpoint::AfterTreasuryAuthorityEdge);
+    failpoint!(
+        injected,
+        data_dir,
+        RuntimeRootFailpoint::AfterTreasuryAuthorityEdge
+    );
 
     // Close every store handle before verification. sled takes an exclusive
     // directory lock, so the fresh handles in (11) cannot open these databases
@@ -1264,7 +1288,7 @@ fn provision_runtime_root_inner(
     // completion marker: a receipt written before this point would claim a
     // genesis the daemon would not act on.
     publish_cooperative_config(data_dir, name, &treasury_did)?;
-    failpoint!(injected, RuntimeRootFailpoint::AfterConfigPublish);
+    failpoint!(injected, data_dir, RuntimeRootFailpoint::AfterConfigPublish);
 
     let receipt = RuntimeRootReceipt {
         schema_version: RUNTIME_ROOT_RECEIPT_SCHEMA_VERSION,
@@ -2142,7 +2166,7 @@ mod failpoint_tests {
         // during preflight — otherwise the component assertions below would be
         // asserting an untouched directory and proving nothing.
         assert!(
-            msg.contains("injected genesis fault"),
+            msg.contains("injected runtime-root fault"),
             "the ceremony stopped for a reason other than the injected fault, \
              so this test proves nothing about ordering: {msg}"
         );
@@ -2686,8 +2710,89 @@ mod failpoint_tests {
         );
     }
 
+    /// C2 — a running daemon blocks the ceremony, before any mutation.
+    ///
+    /// The test holds the same lock `icnd` holds for its lifetime, which is
+    /// exactly the daemon's side of the protocol. The N2-A gate cannot provide
+    /// this: it takes sled locks and releases them when it returns.
+    #[test]
+    fn a_held_data_dir_lock_refuses_the_ceremony_before_any_mutation() {
+        let dir = provisioned();
+        let daemon_side = icn_core::DataDirLock::acquire(dir.path(), "the daemon").unwrap();
+
+        let err = provision_runtime_root_inner(dir.path(), "Blocked By Daemon", "HOURS", None)
+            .expect_err("a held data-directory lock must refuse the ceremony");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("already holds"),
+            "the refusal must name the conflicting holder: {msg}"
+        );
+        assert!(
+            runtime_root_components(dir.path()).unwrap().is_untouched(),
+            "nothing may be written while another process owns the root"
+        );
+
+        drop(daemon_side);
+        provision_runtime_root_inner(dir.path(), "Unblocked", "HOURS", None)
+            .expect("the ceremony must proceed once the holder releases");
+    }
+
+    /// The ceremony still owns the root at its LATEST boundary — after every
+    /// store handle has been dropped and the configuration published.
+    ///
+    /// That window is the one sled locks do not cover, and it is exactly where a
+    /// daemon could otherwise load stale configuration and enter service. An
+    /// earlier version of this witness checked contention after the ceremony
+    /// returned, which proves only that a released lock can be retaken; this
+    /// observes from inside the ceremony's own stack frame.
+    #[test]
+    fn the_ceremony_still_owns_the_root_at_its_last_boundary() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static OBSERVED: AtomicBool = AtomicBool::new(false);
+        static CONTENDED: AtomicBool = AtomicBool::new(false);
+
+        fn observe(data_dir: &Path, point: RuntimeRootFailpoint) {
+            if point != RuntimeRootFailpoint::AfterConfigPublish {
+                return;
+            }
+            OBSERVED.store(true, Ordering::SeqCst);
+            // A second acquisition, from this same process but a separate open
+            // file description — which `flock(2)` treats as a distinct owner.
+            let contended =
+                icn_core::DataDirLock::acquire(data_dir, "a daemon starting up").is_err();
+            CONTENDED.store(contended, Ordering::SeqCst);
+        }
+
+        let dir = provisioned();
+        OBSERVED.store(false, Ordering::SeqCst);
+        CONTENDED.store(false, Ordering::SeqCst);
+        let _observer = ObserverGuard::install(dir.path(), observe);
+        let outcome = provision_runtime_root_inner(
+            dir.path(),
+            "Late Boundary Coop",
+            "HOURS",
+            Some(RuntimeRootFailpoint::AfterConfigPublish),
+        );
+        drop(_observer);
+
+        assert!(
+            outcome.is_err(),
+            "the injected fault must stop the ceremony"
+        );
+        assert!(
+            OBSERVED.load(Ordering::SeqCst),
+            "the observer must have run at the late boundary, or this test \
+             proves nothing"
+        );
+        assert!(
+            CONTENDED.load(Ordering::SeqCst),
+            "the ceremony must STILL own the root after publishing the \
+             configuration — this is the window a daemon could otherwise use"
+        );
+    }
+
     /// Without a failpoint the same code path commits, and the state machine
-    /// says so. Without this, every assertion above could be satisfied by a
+    /// says so.""" Without this, every assertion above could be satisfied by a
     /// ceremony that never completes at all.
     #[test]
     fn the_uninjected_ceremony_commits() {

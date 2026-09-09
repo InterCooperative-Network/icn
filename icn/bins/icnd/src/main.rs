@@ -562,6 +562,53 @@ async fn main() -> Result<()> {
         .install_default()
         .map_err(|_| anyhow::anyhow!("Failed to install default crypto provider"))?;
 
+    // Exclusion BEFORE the mutable configuration is consumed.
+    //
+    // Taking it after `Config::from_file` would be too late for the race it
+    // exists to prevent: a daemon can read a configuration that a runtime-root
+    // ceremony is about to replace, and then keep running with the node-DID
+    // fallback that ceremony removes — durable state saying READY while the live
+    // process uses the treasury it superseded. Excluding only from the point
+    // *after* the read does not help; the stale value is already in hand.
+    //
+    // The identity both actors can know before that read is the directory
+    // holding the configuration file. Runtime-root provisioning publishes
+    // `<data_dir>/icn.toml` and refuses a configuration whose `data_dir` names a
+    // different root, so for any root it manages that directory *is* the data
+    // root — which is what makes one lock cover both actors.
+    //
+    // `acquire_if_manageable` returns `None` when the directory is not writable.
+    // A ceremony that cannot write there cannot provision there either, so there
+    // is nothing to exclude, and a packaged read-only configuration keeps
+    // working as before.
+    let pre_config_lock = match &args.config {
+        Some(config_path) => {
+            // Canonicalize the FILE first, then take its parent.
+            //
+            // Directory canonicalization inside `lock_path` does not help when
+            // the *file component* is the alias: `icnd --config
+            // /tmp/link.toml` pointing at `/data/icn.toml` would otherwise
+            // derive `/tmp` as the root and lock something a ceremony owning
+            // `/data` never contends with — while `Config::from_file` follows
+            // the link and consumes the ceremony-managed bytes anyway.
+            //
+            // Resolving the link makes both actors derive one identity from the
+            // same file. If it cannot be resolved the literal path is used; a
+            // path that does not resolve is not one a ceremony is managing.
+            let resolved =
+                std::fs::canonicalize(config_path).unwrap_or_else(|_| config_path.clone());
+            let root = resolved
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            icn_core::DataDirLock::acquire_if_manageable(&root, "the daemon")?
+        }
+        // With no `--config` there is no configuration file for a ceremony to
+        // replace, so there is nothing to exclude before the default is built.
+        None => None,
+    };
+
     // Load or create config (before tracing init so we can use tracing config)
     let mut config = if let Some(config_path) = &args.config {
         Config::from_file(config_path).context("Failed to load config file")?
@@ -713,6 +760,37 @@ async fn main() -> Result<()> {
     std::fs::create_dir_all(&config.data_dir)?;
 
     tracing::info!("Data directory: {:?}", config.data_dir);
+
+    // Take the data-directory lock for the daemon's lifetime, before the N2-A
+    // gate and before any store is opened.
+    //
+    // The gate alone does not exclude a concurrent maintenance ceremony: it
+    // takes sled locks and releases them when it returns, and a ceremony that
+    // closes its own handles mid-run leaves windows in which nothing is locked.
+    // Worse, the configuration above was already loaded — so without this a
+    // daemon could read a configuration a ceremony is about to replace, pass the
+    // gate in one of those windows, and then run with the node-DID fallback that
+    // ceremony exists to remove, while durable state said otherwise.
+    //
+    // Held until this guard drops at process exit; the kernel releases it if the
+    // process dies, so a crash cannot strand the directory.
+    //
+    // If the pre-config lock above already covers this root, keep it rather than
+    // taking a second one: `File::try_lock` is `flock(2)`, which is per
+    // open-file-description, so a second handle on the same path conflicts even
+    // inside one process.
+    let already_covers_data_dir = pre_config_lock
+        .as_ref()
+        .is_some_and(|held| held.path() == icn_core::DataDirLock::lock_path(&config.data_dir));
+    let _data_dir_lock = if already_covers_data_dir {
+        pre_config_lock
+    } else {
+        drop(pre_config_lock);
+        Some(icn_core::DataDirLock::acquire(
+            &config.data_dir,
+            "the daemon",
+        )?)
+    };
 
     // N2-A startup gate (#2627). `Did` equality now names the principal, not
     // the spelling (I7), so the first start of this binary over a store holding
