@@ -1944,14 +1944,11 @@ fn the_generated_cooperative_id_is_accepted_by_the_gateway_validator() {
     icn_gateway::validation::validate_coop_id(coop_id).unwrap_or_else(|e| {
         panic!("the generated cooperative ID must satisfy the gateway: {coop_id:?}: {e}")
     });
-    // And the same id must survive the domain rule the cooperative record uses.
-    icn_gateway::validation::validate_domain_id(coop_id).unwrap_or_else(|e| {
-        panic!("the generated cooperative ID must satisfy the domain rule: {coop_id:?}: {e}")
-    });
-    assert!(
-        !coop_id.contains(':'),
-        "a colon would break every delimiter-framed keyspace that stores this id: {coop_id:?}"
-    );
+    // Deliberately nothing further. `validate_domain_id` is strictly weaker
+    // (128 bytes, and its character set is a superset that also permits `:`),
+    // so asserting it after `validate_coop_id` could never fail — and it has no
+    // caller in the workspace, so it is not "the rule the record uses" either.
+    // A `contains(':')` assertion is subsumed for the same reason.
 }
 
 /// A configuration edited to point at a different storage root must stop

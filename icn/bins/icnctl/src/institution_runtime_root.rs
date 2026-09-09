@@ -290,10 +290,15 @@
 //! * **the cooperative record is left `Forming`.** This ceremony does not call
 //!   `activate_cooperative`, so the record keeps `status: Forming`,
 //!   `charter_ratified: false` and no founding signatures. That is deliberate —
-//!   ratification is a governance act, not a provisioning one — and no
-//!   production path gates on `CoopStatus::Active` today. Anything that starts
-//!   gating on it will need to decide what activates a runtime root, and this
-//!   receipt is not that decision.
+//!   ratification is a governance act, not a provisioning one. One production
+//!   path does gate on `CoopStatus::Active`:
+//!   `supervisor/init_notifications.rs`'s `handle_coop_update` binds
+//!   `coop_id -> EntityId` in the `coop_entity_map` only for activated
+//!   cooperatives, so a peer syncing this record by gossip records no binding.
+//!   That path logs "name binding only; grants no authority", so nothing this
+//!   ceremony establishes depends on it — but the gate exists, and anything
+//!   that starts gating on `Active` for something load-bearing will have to
+//!   decide what activates a runtime root. This receipt is not that decision.
 //!
 //! # Honest evidence limits
 //!
@@ -2520,6 +2525,7 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
             // Re-checked here, not only at preflight: the whole ceremony runs
             // between the two, and a link created in that window would leave a
             // second configuration identity outside this exclusion domain.
+            #[cfg(unix)]
             {
                 use std::os::unix::fs::MetadataExt as _;
                 if meta.nlink() > 1 {
@@ -2759,9 +2765,12 @@ fn print_receipt(data_dir: &Path, receipt: &RuntimeRootReceipt, provenance_verif
     if provenance_verified {
         println!(
             "Verified: durable state, configuration linkage, trust facts scoring\n\
-             above the ledger's author threshold, and key provenance — the node,\n\
-             trust-root and treasury keystores were each unlocked and derive the\n\
-             DIDs above."
+             above the ledger's author threshold on a cold reopened graph, and\n\
+             key provenance — the node, trust-root and treasury keystores were\n\
+             each unlocked and derive the DIDs above.\n\
+             NOTE (icn#2750): a running daemon scores this treasury 0.0 once any\n\
+             unrelated trust edge is added in-process, so the score above\n\
+             describes the persisted facts rather than the live daemon."
         );
     } else {
         println!(
@@ -3697,13 +3706,17 @@ mod failpoint_tests {
     /// Inability to inspect existing state is a refusal, never an absence —
     /// through the whole command.
     ///
-    /// Attribution, because it moved: the ledger store is now read first by
-    /// `runtime_root_components` (reached from `refuse_if_already_provisioned`),
-    /// which became fail-closed in this branch, so *that* is the guard this
-    /// end-to-end fixture exercises. `refuse_if_foreign_institutional_state`
-    /// reads the same store a step later and has its own direct witness
-    /// below — without it, making the earlier guard fail closed would have
-    /// silently retired the discriminator for the later one.
+    /// Attribution, stated honestly: **this fixture does not distinguish which
+    /// guard refuses.** Two of them read the ledger store —
+    /// `runtime_root_components` (reached from `refuse_if_already_provisioned`)
+    /// and `refuse_if_foreign_institutional_state` a step later — and either
+    /// alone produces a refusal that satisfies the assertions below. What this
+    /// covers is the end-to-end property: an uninspectable store never becomes
+    /// "nothing is there", and nothing is minted. Each guard's own
+    /// discriminator is separate: `foreign_state_inspection_refuses_an_
+    /// unopenable_store_on_its_own` below, and
+    /// `an_uninspectable_trust_store_refuses_rather_than_counting_zero_edges`
+    /// for the component scan, which is the only reader of the trust store.
     #[test]
     fn an_uninspectable_store_refuses_rather_than_reading_as_empty() {
         let dir = provisioned();
@@ -3742,6 +3755,33 @@ mod failpoint_tests {
                 artefact.display()
             );
         }
+    }
+
+    /// The component scan's own witness: the trust store.
+    ///
+    /// `runtime_root_components` is the **only** reader of the trust store
+    /// during inspection, so this is the one fixture that fails if its scan
+    /// goes back to `.unwrap_or(0)`. The ledger-store fixture cannot show that:
+    /// `refuse_if_foreign_institutional_state` reads the ledger store too and
+    /// was already fail-closed, so it would refuse either way.
+    #[test]
+    fn an_uninspectable_trust_store_refuses_rather_than_counting_zero_edges() {
+        let dir = provisioned();
+        let trust_db = icn_core::config::trust_store_path(dir.path());
+        std::fs::create_dir_all(trust_db.parent().unwrap()).unwrap();
+        std::fs::write(&trust_db, b"not a database").unwrap();
+
+        let err = runtime_root_components(dir.path())
+            .expect_err("an unopenable trust store must refuse, not count zero edges");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("Could not open") || msg.contains("Could not scan"),
+            "the refusal must name the inspection failure: {msg}"
+        );
+        assert!(
+            msg.contains(&trust_db.display().to_string()),
+            "and must name the store it could not inspect: {msg}"
+        );
     }
 
     /// `refuse_if_foreign_institutional_state`'s own witness.

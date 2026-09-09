@@ -585,10 +585,12 @@ async fn main() -> Result<()> {
     // see the storage lock below for why releasing it afterwards would put the
     // race straight back.
     //
-    // The `if_manageable` form returns `None` when the directory is not
-    // writable. A ceremony that cannot write there cannot publish there either,
-    // so there is nothing to exclude, and a packaged read-only configuration —
-    // a ConfigMap mount, say — keeps working as before.
+    // The `if_manageable` form returns `None` only when the *filesystem* is
+    // read-only — a ConfigMap mount, say — where nothing can be published by
+    // anybody. A directory this process merely may not write is a different
+    // statement and fails closed: see `DataDirLock` for why, and for the
+    // deliberate consequence that a daemon will not start over a configuration
+    // directory owned by a more privileged account.
     let pre_config_lock = match &args.config {
         Some(config_path) => {
             // Canonicalize the FILE first, then take its parent.
