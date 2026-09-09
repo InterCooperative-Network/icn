@@ -2907,111 +2907,131 @@ pub fn handle_institution_runtime_root_command(
             let receipt = provision_runtime_root(data_dir, &name, &currency)?;
             print_receipt(data_dir, &receipt, true);
         }
-        InstitutionRuntimeRootCommands::Show { json } => match classify_for_show(data_dir, json)? {
-            RuntimeRootState::Ready(receipt) => {
-                if json {
-                    // Wrap rather than print the receipt bare: a script
-                    // consuming this must be able to see which evidence level
-                    // produced it, and the human surface already says so. The
-                    // receipt keeps its own shape under `receipt`.
+        InstitutionRuntimeRootCommands::Show { json } => {
+            // `show` joins the exclusion protocol rather than racing it.
+            //
+            // Classification is not read-only: `runtime_root_state` opens the
+            // stores, and `SledStore::open` is a *creating* open that takes
+            // sled's own exclusive directory lock. The ceremony deliberately
+            // closes its handles before verifying through fresh ones, and a
+            // `show` that won a sled lock inside that window would make the
+            // ceremony's own re-open fail — after the keys, rows and
+            // configuration were written but before the receipt was committed.
+            // The result is an INCOMPLETE runtime root that every later `create`
+            // refuses, produced by a diagnostic command. Completion must not
+            // depend on process arrival order.
+            //
+            // Taking the storage lock turns that race into an honest refusal:
+            // non-blocking, so a `show` during a ceremony (or against a running
+            // daemon, which holds this lock and whose sled databases `show`
+            // could not open anyway) says so instead of interfering.
+            let _inspection = icn_core::DataDirLock::acquire(data_dir, "runtime-root inspection")?;
+            match classify_for_show(data_dir, json)? {
+                RuntimeRootState::Ready(receipt) => {
+                    if json {
+                        // Wrap rather than print the receipt bare: a script
+                        // consuming this must be able to see which evidence level
+                        // produced it, and the human surface already says so. The
+                        // receipt keeps its own shape under `receipt`.
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "state": "READY",
+                                "kind": "institutional_runtime_root",
+                                // Tri-state, not booleans. `false` would conflate
+                                // "checked and wrong" with "not checked" — and this
+                                // path deliberately does not prompt for a
+                                // passphrase, so it cannot open a keystore at all.
+                                "evidence": {
+                                    "durable_state": "verified",
+                                    "config_linkage": "verified",
+                                    "trust_score_above_ledger_threshold": "verified",
+                                    "key_presence": "verified",
+                                    "trust_root_key_provenance": "not_reverified",
+                                    "treasury_key_provenance": "not_reverified",
+                                    "node_identity": "not_reverified",
+                                },
+                                "note": "key provenance is not re-verified by `show`; it does not prompt for a passphrase. The ceremony verifies it before writing the receipt. `trust_score_above_ledger_threshold` is measured on a cold reopened graph: under icn#2750 the running daemon scores this treasury 0.0 once any unrelated in-process edge exists, so this field describes the persisted facts, not the live daemon.",
+                                "receipt": receipt,
+                            }))?
+                        );
+                    } else {
+                        print_receipt(data_dir, &receipt, false);
+                    }
+                }
+                RuntimeRootState::Inconsistent { receipt, problem } if json => {
+                    // A script asking for JSON must get JSON on every arm, not only
+                    // on success — otherwise the envelope's whole purpose (letting a
+                    // consumer see which evidence level produced a result) fails in
+                    // exactly the cases it matters most.
                     println!(
                         "{}",
                         serde_json::to_string_pretty(&serde_json::json!({
-                            "state": "READY",
+                            "state": "INCONSISTENT",
                             "kind": "institutional_runtime_root",
-                            // Tri-state, not booleans. `false` would conflate
-                            // "checked and wrong" with "not checked" — and this
-                            // path deliberately does not prompt for a
-                            // passphrase, so it cannot open a keystore at all.
-                            "evidence": {
-                                "durable_state": "verified",
-                                "config_linkage": "verified",
-                                "trust_score_above_ledger_threshold": "verified",
-                                "key_presence": "verified",
-                                "trust_root_key_provenance": "not_reverified",
-                                "treasury_key_provenance": "not_reverified",
-                                "node_identity": "not_reverified",
-                            },
-                            "note": "key provenance is not re-verified by `show`; it does not prompt for a passphrase. The ceremony verifies it before writing the receipt. `trust_score_above_ledger_threshold` is measured on a cold reopened graph: under icn#2750 the running daemon scores this treasury 0.0 once any unrelated in-process edge exists, so this field describes the persisted facts, not the live daemon.",
+                            "problem": problem,
                             "receipt": receipt,
                         }))?
                     );
-                } else {
-                    print_receipt(data_dir, &receipt, false);
+                    bail!("INCONSISTENT runtime root under {}", data_dir.display());
                 }
-            }
-            RuntimeRootState::Inconsistent { receipt, problem } if json => {
-                // A script asking for JSON must get JSON on every arm, not only
-                // on success — otherwise the envelope's whole purpose (letting a
-                // consumer see which evidence level produced a result) fails in
-                // exactly the cases it matters most.
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&serde_json::json!({
-                        "state": "INCONSISTENT",
-                        "kind": "institutional_runtime_root",
-                        "problem": problem,
-                        "receipt": receipt,
-                    }))?
-                );
-                bail!("INCONSISTENT runtime root under {}", data_dir.display());
-            }
-            RuntimeRootState::Incomplete { components } if json => {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&serde_json::json!({
-                        "state": "INCOMPLETE",
-                        "kind": "institutional_runtime_root",
-                        "components": {
-                            "trust_root_key": components.trust_root_key,
-                            "treasury_key": components.treasury_key,
-                            "cooperative_record": components.cooperative_record,
-                            "treasury_registration": components.treasury_registration,
-                            "trust_store_edges": components.trust_store_edges,
-                            "config_linkage": components.config_linkage,
-                            "receipt": components.receipt,
-                        },
-                    }))?
-                );
-                bail!("INCOMPLETE runtime root under {}", data_dir.display());
-            }
-            RuntimeRootState::NotStarted if json => {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&serde_json::json!({
-                        "state": "NOT_STARTED",
-                        "kind": "institutional_runtime_root",
-                    }))?
-                );
-                bail!("No runtime root under {}", data_dir.display());
-            }
-            RuntimeRootState::Inconsistent { receipt, problem } => bail!(
-                "INCONSISTENT runtime root under {}: a receipt exists for cooperative \
+                RuntimeRootState::Incomplete { components } if json => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({
+                            "state": "INCOMPLETE",
+                            "kind": "institutional_runtime_root",
+                            "components": {
+                                "trust_root_key": components.trust_root_key,
+                                "treasury_key": components.treasury_key,
+                                "cooperative_record": components.cooperative_record,
+                                "treasury_registration": components.treasury_registration,
+                                "trust_store_edges": components.trust_store_edges,
+                                "config_linkage": components.config_linkage,
+                                "receipt": components.receipt,
+                            },
+                        }))?
+                    );
+                    bail!("INCOMPLETE runtime root under {}", data_dir.display());
+                }
+                RuntimeRootState::NotStarted if json => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&serde_json::json!({
+                            "state": "NOT_STARTED",
+                            "kind": "institutional_runtime_root",
+                        }))?
+                    );
+                    bail!("No runtime root under {}", data_dir.display());
+                }
+                RuntimeRootState::Inconsistent { receipt, problem } => bail!(
+                    "INCONSISTENT runtime root under {}: a receipt exists for cooperative \
                  {} ({}), but the state it describes does not hold:\n  {}\n\
                  This is reported as a failure rather than as a genesis: a \
                  receipt is evidence only while what it claims is still true.",
-                data_dir.display(),
-                receipt.cooperative_name,
-                receipt.cooperative_id,
-                problem
-            ),
-            // Reported separately from "not started" on purpose: an operator
-            // whose ceremony died half-way needs to be told that, not told
-            // nothing happened.
-            RuntimeRootState::Incomplete { components } => bail!(
-                "INCOMPLETE runtime root under {}: components exist but no completion \
+                    data_dir.display(),
+                    receipt.cooperative_name,
+                    receipt.cooperative_id,
+                    problem
+                ),
+                // Reported separately from "not started" on purpose: an operator
+                // whose ceremony died half-way needs to be told that, not told
+                // nothing happened.
+                RuntimeRootState::Incomplete { components } => bail!(
+                    "INCOMPLETE runtime root under {}: components exist but no completion \
                  receipt does, so no cooperative came into existence here.\n  {}\n\
                  This state cannot be resumed; remove it deliberately before \
                  founding again.",
-                data_dir.display(),
-                components.describe()
-            ),
-            RuntimeRootState::NotStarted => bail!(
-                "No runtime-root receipt under {}. This data directory has not been \
+                    data_dir.display(),
+                    components.describe()
+                ),
+                RuntimeRootState::NotStarted => bail!(
+                    "No runtime-root receipt under {}. This data directory has not been \
                  provisioned with an institutional runtime root.",
-                data_dir.display()
-            ),
-        },
+                    data_dir.display()
+                ),
+            }
+        }
     }
     Ok(())
 }

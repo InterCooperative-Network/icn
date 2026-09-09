@@ -2954,3 +2954,48 @@ fn a_secret_only_the_daemons_environment_holds_does_not_read_as_inconsistent() {
         "an empty listen_addr is not environment-suppliable and must still refuse:\n{broken}"
     );
 }
+
+/// A diagnostic must not be able to strand a provisioning run.
+///
+/// `show` is not read-only: classification opens the stores, and
+/// `SledStore::open` is a creating open that takes sled's exclusive directory
+/// lock. The ceremony closes its handles before verifying through fresh ones,
+/// so a `show` that won a sled lock in that window made the ceremony's re-open
+/// fail — after keys, rows and configuration were written but before the
+/// receipt — leaving an INCOMPLETE root that every later `create` refuses.
+///
+/// `show` now joins the exclusion protocol, so the race becomes a refusal.
+#[test]
+fn show_refuses_rather_than_racing_a_holder_of_the_data_root() {
+    let dir = genesis_dir("Inspected Coop");
+
+    // Exactly what a ceremony (or a running daemon) holds.
+    let held = icn_core::DataDirLock::acquire(dir.path(), "runtime-root provisioning").unwrap();
+    let out = icnctl(dir.path())
+        .args(["institution", "runtime-root", "show"])
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    drop(held);
+
+    assert!(
+        !out.status.success(),
+        "`show` must not proceed into stores another process owns:\n{text}"
+    );
+    assert!(
+        text.contains("already holds"),
+        "and must say so, rather than failing somewhere inside sled:\n{text}"
+    );
+
+    // And with the root free it works, so the refusal is the exclusion and not
+    // an unrelated permanent failure.
+    let after = icnctl(dir.path())
+        .args(["institution", "runtime-root", "show"])
+        .output()
+        .unwrap();
+    assert!(
+        after.status.success(),
+        "with the root free `show` must report normally:\n{}",
+        combined(&after)
+    );
+}
