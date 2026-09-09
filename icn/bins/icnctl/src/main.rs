@@ -2,7 +2,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 mod institution_bootstrap;
-mod institution_genesis;
+mod institution_runtime_root;
 
 use anyhow::{bail, Context, Result};
 use rust_i18n::t;
@@ -3253,8 +3253,10 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| "en".to_string());
     rust_i18n::set_locale(&locale);
 
-    // Initialize simple logging
-    icn_obs::init()?;
+    // Diagnostics to stderr, not stdout. `icnctl`'s stdout is its result — and
+    // for `--json` subcommands it is a document a caller pipes into a parser —
+    // so tracing lines interleaved into it make that document unparseable.
+    icn_obs::init_to_stderr()?;
 
     let data_dir = get_data_dir(args.data_dir)?;
 

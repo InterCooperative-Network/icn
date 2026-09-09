@@ -148,35 +148,33 @@ fn make_config_daemon_loadable(data_dir: &Path) {
     std::fs::write(&path, patched).unwrap();
 }
 
-fn run_genesis(data_dir: &Path, name: &str) -> Output {
+fn provision_runtime_root(data_dir: &Path, name: &str) -> Output {
     icnctl(data_dir)
-        .args(["institution", "genesis", "create", "--name", name, "--yes"])
+        .args([
+            "institution",
+            "runtime-root",
+            "create",
+            "--name",
+            name,
+            "--yes",
+        ])
         .output()
         .unwrap()
 }
 
 fn read_receipt_json(data_dir: &Path) -> (Output, String) {
     let out = icnctl(data_dir)
-        .args(["institution", "genesis", "show", "--json"])
+        .args(["institution", "runtime-root", "show", "--json"])
         .output()
         .unwrap();
-    let raw = String::from_utf8_lossy(&out.stdout).into_owned();
-    // `show` now re-verifies the receipt against durable state, and opening the
-    // ledger store emits a tracing line on stdout ahead of the payload. That is
-    // pre-existing `icnctl` logging behaviour shared by every `--json`
-    // subcommand, not something this ceremony introduced, so the fixture slices
-    // out the JSON object rather than changing where the whole binary logs.
-    let text = match (raw.find('{'), raw.rfind('}')) {
-        (Some(a), Some(b)) if b > a => raw[a..=b].to_string(),
-        _ => raw,
-    };
-    // `show --json` wraps the receipt in an envelope carrying the evidence
-    // level; callers here want the receipt itself.
-    let text = serde_json::from_str::<serde_json::Value>(&text)
+    // Raw stdout, no substring extraction: `icnctl` writes diagnostics to
+    // stderr, so a `--json` document stands alone. Callers here want the
+    // receipt itself, which the envelope carries under `receipt`.
+    let text = serde_json::from_slice::<serde_json::Value>(&out.stdout)
         .ok()
         .and_then(|v| v.get("receipt").cloned())
         .map(|r| r.to_string())
-        .unwrap_or(text);
+        .unwrap_or_else(|| String::from_utf8_lossy(&out.stdout).into_owned());
     (out, text)
 }
 
@@ -250,7 +248,7 @@ fn institutional_genesis_creates_an_institution_distinct_from_the_node() {
     );
 
     // 1. The ceremony runs at all.
-    let out = run_genesis(data_dir, "Riverside Bakery Cooperative");
+    let out = provision_runtime_root(data_dir, "Riverside Bakery Cooperative");
     let text = combined(&out);
     assert!(
         out.status.success(),
@@ -413,7 +411,7 @@ async fn a_governance_authored_append_crosses_the_real_gate_without_dev_self_tru
     assert!(init_identity(data_dir).status.success());
     assert!(run_init_coop(data_dir).status.success());
     let node = node_did(data_dir);
-    let out = run_genesis(data_dir, "Author Gate Cooperative");
+    let out = provision_runtime_root(data_dir, "Author Gate Cooperative");
     assert!(out.status.success(), "genesis: {}", combined(&out));
 
     let (_show, receipt_json) = read_receipt_json(data_dir);
@@ -521,7 +519,7 @@ async fn a_governance_authored_append_crosses_the_real_gate_without_dev_self_tru
 #[test]
 fn genesis_refuses_when_no_genesis_authority_can_be_established() {
     let dir = TempDir::new().unwrap();
-    let out = run_genesis(dir.path(), "No Authority Coop");
+    let out = provision_runtime_root(dir.path(), "No Authority Coop");
     assert!(!out.status.success(), "genesis must refuse");
     let text = combined(&out);
     assert!(
@@ -542,13 +540,15 @@ fn genesis_refuses_a_second_ceremony_over_the_first() {
     let data_dir = dir.path();
     assert!(init_identity(data_dir).status.success());
     assert!(run_init_coop(data_dir).status.success());
-    assert!(run_genesis(data_dir, "First Cooperative").status.success());
+    assert!(provision_runtime_root(data_dir, "First Cooperative")
+        .status
+        .success());
 
     let (_, first) = read_receipt_json(data_dir);
     let first: serde_json::Value = serde_json::from_str(&first).unwrap();
     let first_treasury = first["treasury_did"].as_str().unwrap().to_string();
 
-    let out = run_genesis(data_dir, "Second Cooperative");
+    let out = provision_runtime_root(data_dir, "Second Cooperative");
     let text = combined(&out);
     assert!(
         !out.status.success(),
@@ -558,7 +558,7 @@ fn genesis_refuses_a_second_ceremony_over_the_first() {
     // the prior-ceremony check, and the config linkage check refusing a second
     // `[cooperative]` section — which is real defence in depth, but a test that
     // accepted either could not tell the intended guard from an accident. A
-    // mutation removing `refuse_if_already_started` survived until this
+    // mutation removing `refuse_if_already_provisioned` survived until this
     // assertion existed.
     assert!(
         text.contains("already undergone genesis"),
@@ -594,7 +594,7 @@ fn genesis_refuses_when_the_config_names_a_different_storage_root() {
     )
     .unwrap();
 
-    let out = run_genesis(data_dir, "Divergent Root Coop");
+    let out = provision_runtime_root(data_dir, "Divergent Root Coop");
     assert!(!out.status.success(), "genesis must refuse");
     let text = combined(&out);
     assert!(
@@ -618,7 +618,9 @@ fn a_receipt_cannot_outlive_the_cooperative_store_it_describes() {
     let data_dir = dir.path();
     assert!(init_identity(data_dir).status.success());
     assert!(run_init_coop(data_dir).status.success());
-    assert!(run_genesis(data_dir, "Ephemeral Coop").status.success());
+    assert!(provision_runtime_root(data_dir, "Ephemeral Coop")
+        .status
+        .success());
     assert!(read_receipt_json(data_dir).0.status.success());
 
     std::fs::remove_dir_all(daemon_coop_store_path(data_dir)).unwrap();
@@ -651,7 +653,7 @@ fn genesis_neither_needs_nor_consults_icn_dev_self_trust() {
         .arg(data_dir)
         .args([
             "institution",
-            "genesis",
+            "runtime-root",
             "create",
             "--name",
             "Flag Set Coop",
@@ -727,7 +729,7 @@ async fn genesis_fixture(name: &str) -> (TempDir, String, String, String) {
     let dir = TempDir::new().unwrap();
     assert!(init_identity(dir.path()).status.success());
     assert!(run_init_coop(dir.path()).status.success());
-    assert!(run_genesis(dir.path(), name).status.success());
+    assert!(provision_runtime_root(dir.path(), name).status.success());
     let (_, json) = read_receipt_json(dir.path());
     let r: serde_json::Value = serde_json::from_str(&json).unwrap();
     let node = r["node_did"].as_str().unwrap().to_string();
@@ -800,7 +802,7 @@ fn partial_genesis_is_reported_incomplete_and_never_silently_completed() {
     let data_dir = dir.path();
     assert!(init_identity(data_dir).status.success());
     assert!(run_init_coop(data_dir).status.success());
-    assert!(run_genesis(data_dir, "Interrupted Cooperative")
+    assert!(provision_runtime_root(data_dir, "Interrupted Cooperative")
         .status
         .success());
 
@@ -816,7 +818,7 @@ fn partial_genesis_is_reported_incomplete_and_never_silently_completed() {
     {
         let store = open_store(daemon_coop_store_path(data_dir));
         let keys: Vec<_> = store
-            .scan(b"genesis:receipt:")
+            .scan(b"runtimeroot:receipt:")
             .unwrap()
             .into_iter()
             .map(|(k, _)| k)
@@ -845,7 +847,7 @@ fn partial_genesis_is_reported_incomplete_and_never_silently_completed() {
     );
 
     // A rerun must refuse, and must not mint anything.
-    let rerun = run_genesis(data_dir, "Second Attempt");
+    let rerun = provision_runtime_root(data_dir, "Second Attempt");
     let rerun_text = combined(&rerun);
     assert!(!rerun.status.success(), "rerun must refuse: {rerun_text}");
     assert!(
@@ -889,7 +891,7 @@ fn partial_genesis_is_reported_incomplete_and_never_silently_completed() {
 // what the ceremony writes, or in what order.
 //
 // Crash-boundary evidence lives in the `failpoint_tests` module inside
-// `institution_genesis.rs`, where the real `run_genesis_inner` is driven to
+// `institution_runtime_root.rs`, where the real `provision_runtime_root_inner` is driven to
 // each mutation boundary and the resulting component report is asserted
 // exactly. Those pin the ordering; these pin the detection. Reordering two
 // writes fails the former and not the latter, which is why both exist.
@@ -901,7 +903,7 @@ fn genesis_dir(name: &str) -> TempDir {
     let dir = TempDir::new().unwrap();
     assert!(init_identity(dir.path()).status.success());
     assert!(run_init_coop(dir.path()).status.success());
-    assert!(run_genesis(dir.path(), name).status.success());
+    assert!(provision_runtime_root(dir.path(), name).status.success());
     dir
 }
 
@@ -922,7 +924,7 @@ fn assert_partial_state_is_never_complete(dir: &Path, label: &str) {
         combined(&show)
     );
 
-    let rerun = run_genesis(dir, "Rerun After Fault");
+    let rerun = provision_runtime_root(dir, "Rerun After Fault");
     let text = combined(&rerun);
     assert!(
         !rerun.status.success(),
@@ -942,7 +944,7 @@ fn assert_partial_state_is_never_complete(dir: &Path, label: &str) {
 
 fn drop_receipt(dir: &Path) {
     let store = open_store(daemon_coop_store_path(dir));
-    for (k, _) in store.scan(b"genesis:receipt:").unwrap() {
+    for (k, _) in store.scan(b"runtimeroot:receipt:").unwrap() {
         store.delete(&k).unwrap();
     }
     store.flush().unwrap();
@@ -1075,7 +1077,7 @@ fn a_config_naming_a_different_treasury_is_detected_on_readback() {
     );
 
     // A rerun must not accept this state as a clean slate either.
-    let rerun = run_genesis(dir.path(), "Rerun Over Mismatch");
+    let rerun = provision_runtime_root(dir.path(), "Rerun Over Mismatch");
     assert!(
         !rerun.status.success(),
         "a rerun over a tampered configuration must refuse: {}",
@@ -1181,7 +1183,7 @@ fn a_hostile_cooperative_name_cannot_inject_configuration() {
     // Assert that first, then prove the *remaining* TOML-significant characters
     // are escaped rather than merely absent.
     let with_newline = format!("Evil\"\ntreasury_did = \"{}\"", attacker.as_str());
-    let refused = combined(&run_genesis(data_dir, &with_newline));
+    let refused = combined(&provision_runtime_root(data_dir, &with_newline));
     assert!(
         refused.contains("control characters"),
         "a name containing a newline must be refused before it reaches the \
@@ -1197,7 +1199,7 @@ fn a_hostile_cooperative_name_cannot_inject_configuration() {
         attacker.as_str()
     );
 
-    let out = run_genesis(data_dir, &hostile);
+    let out = provision_runtime_root(data_dir, &hostile);
     assert!(
         out.status.success(),
         "a name with TOML metacharacters must be handled, not rejected \
@@ -1281,7 +1283,7 @@ fn a_dangling_treasury_keystore_symlink_cannot_redirect_key_material() {
         "fixture: a dangling symlink must be invisible to `exists()`"
     );
 
-    let out = run_genesis(data_dir, "Symlink Coop");
+    let out = provision_runtime_root(data_dir, "Symlink Coop");
     let text = combined(&out);
     assert!(
         !out.status.success(),
@@ -1314,7 +1316,7 @@ fn a_symlink_at_the_temp_config_path_cannot_redirect_the_write() {
     std::fs::write(&target, "# untouched\n").unwrap();
     std::os::unix::fs::symlink(&target, data_dir.join("icn.toml.genesis-tmp")).unwrap();
 
-    let out = run_genesis(data_dir, "Temp Symlink Coop");
+    let out = provision_runtime_root(data_dir, "Temp Symlink Coop");
     let text = combined(&out);
     assert!(
         !out.status.success(),
@@ -1355,7 +1357,7 @@ fn genesis_refuses_a_configuration_the_daemon_cannot_load() {
     let text = std::fs::read_to_string(&path).unwrap();
     std::fs::write(&path, text.replace("bootstrap_peers = []\n", "")).unwrap();
 
-    let out = run_genesis(data_dir, "Unloadable Config Coop");
+    let out = provision_runtime_root(data_dir, "Unloadable Config Coop");
     let msg = combined(&out);
     assert!(
         !out.status.success(),
@@ -1529,7 +1531,10 @@ fn show_says_that_it_did_not_re_verify_key_provenance() {
     assert!(init_identity(data_dir).status.success());
     assert!(run_init_coop(data_dir).status.success());
 
-    let created = combined(&run_genesis(data_dir, "Evidence Level Cooperative"));
+    let created = combined(&provision_runtime_root(
+        data_dir,
+        "Evidence Level Cooperative",
+    ));
     assert!(
         created.contains("key provenance"),
         "the ceremony must say it verified key provenance:\n{created}"
@@ -1541,7 +1546,7 @@ fn show_says_that_it_did_not_re_verify_key_provenance() {
 
     let shown = combined(
         &icnctl(data_dir)
-            .args(["institution", "genesis", "show"])
+            .args(["institution", "runtime-root", "show"])
             .output()
             .unwrap(),
     );
@@ -1637,22 +1642,23 @@ fn show_json_reports_the_evidence_level_on_every_arm() {
     let dir = TempDir::new().unwrap();
     let data_dir = dir.path();
 
+    // Parse RAW stdout. Slicing from the first `{` to the last `}` would prove
+    // only that JSON is *somewhere* in the output, which is not what a caller
+    // piping into a parser gets. `icnctl` now writes diagnostics to stderr, so
+    // stdout must be a document on its own.
     let json_show = |d: &Path| -> (bool, serde_json::Value) {
         let out = icnctl(d)
-            .args(["institution", "genesis", "show", "--json"])
+            .args(["institution", "runtime-root", "show", "--json"])
             .output()
             .unwrap();
-        let raw = String::from_utf8_lossy(&out.stdout).into_owned();
-        let slice = match (raw.find('{'), raw.rfind('}')) {
-            (Some(a), Some(b)) if b > a => raw[a..=b].to_string(),
-            _ => raw,
-        };
-        (
-            out.status.success(),
-            serde_json::from_str(&slice).unwrap_or_else(|e| {
-                panic!("`show --json` must emit JSON on every arm: {e}\n{slice}")
-            }),
-        )
+        let parsed = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+            panic!(
+                "`show --json` stdout must be parseable JSON with nothing else in it: {e}\n\
+                 stdout was: {:?}",
+                String::from_utf8_lossy(&out.stdout)
+            )
+        });
+        (out.status.success(), parsed)
     };
 
     // Nothing has happened here yet.
@@ -1663,19 +1669,28 @@ fn show_json_reports_the_evidence_level_on_every_arm() {
 
     // A completed ceremony: the envelope must state what was and was not checked.
     assert!(run_init_coop(data_dir).status.success());
-    assert!(run_genesis(data_dir, "Envelope Cooperative")
+    assert!(provision_runtime_root(data_dir, "Envelope Cooperative")
         .status
         .success());
     let (ok, v) = json_show(data_dir);
-    assert!(ok, "a completed genesis must succeed");
-    assert_eq!(v["state"], "COMPLETE");
+    assert!(ok, "a provisioned runtime root must succeed");
+    assert_eq!(v["state"], "READY");
+    assert_eq!(v["kind"], "institutional_runtime_root");
+    // Tri-state, not booleans: "not_reverified" is a different claim from
+    // "mismatch", and a boolean `false` would conflate them.
     assert_eq!(
-        v["verified"]["key_provenance"], false,
-        "`show` does not prompt for a passphrase, so it must report that key \
-         provenance was NOT re-verified"
+        v["evidence"]["trust_root_key_provenance"], "not_reverified",
+        "`show` does not prompt for a passphrase, so provenance is UNKNOWN here \
+         — not known-false"
     );
-    assert_eq!(v["verified"]["durable_state"], true);
-    assert_eq!(v["verified"]["config_linkage"], true);
+    assert_eq!(v["evidence"]["treasury_key_provenance"], "not_reverified");
+    assert_eq!(v["evidence"]["node_identity"], "not_reverified");
+    assert_eq!(v["evidence"]["durable_state"], "verified");
+    assert_eq!(v["evidence"]["config_linkage"], "verified");
+    assert_eq!(
+        v["evidence"]["trust_score_above_ledger_threshold"],
+        "verified"
+    );
     assert!(
         v["receipt"]["treasury_did"].as_str().is_some(),
         "the receipt must remain available under `receipt`"
@@ -1695,9 +1710,11 @@ fn show_json_reports_the_evidence_level_on_every_arm() {
         let d2 = TempDir::new().unwrap();
         assert!(init_identity(d2.path()).status.success());
         assert!(run_init_coop(d2.path()).status.success());
-        assert!(run_genesis(d2.path(), "Incomplete Envelope Coop")
-            .status
-            .success());
+        assert!(
+            provision_runtime_root(d2.path(), "Incomplete Envelope Coop")
+                .status
+                .success()
+        );
         drop_receipt(d2.path());
 
         let (ok, v) = json_show(d2.path());
@@ -1731,5 +1748,148 @@ fn show_json_reports_the_evidence_level_on_every_arm() {
         problem.contains(node),
         "the diagnosis must name the node DID the daemon would have fallen back \
          to, which is the collapse this work exists to prevent: {problem}"
+    );
+}
+
+/// Key material replaced by a symlink must be reported as inconsistent, even
+/// though `show` never unlocks anything.
+///
+/// Containment and provenance are different properties. Provenance needs the
+/// passphrase and `show` deliberately does not prompt — but "is this a regular
+/// file inside the data directory" needs no secret at all, and `is_file()`
+/// answers it wrongly because it follows links. `show` does not cross the N2-A
+/// gate that refuses symlinks for the create path, so nothing else catches this.
+#[test]
+fn a_symlinked_treasury_keystore_is_reported_inconsistent_by_show() {
+    let dir = genesis_dir("Symlink Presence Coop");
+    let outside = TempDir::new().unwrap();
+
+    // A *valid* keystore elsewhere, so this is not merely "the file is missing".
+    let elsewhere = outside.path().join("decoy.age");
+    std::fs::copy(dir.path().join("treasury.age"), &elsewhere).unwrap();
+    std::fs::remove_file(dir.path().join("treasury.age")).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, dir.path().join("treasury.age")).unwrap();
+    assert!(
+        dir.path().join("treasury.age").is_file(),
+        "fixture: `is_file()` must be fooled by the link — that is the defect"
+    );
+
+    let (show, _) = read_receipt_json(dir.path());
+    let text = combined(&show);
+    assert!(
+        !show.status.success(),
+        "a symlinked keystore must not read as READY:\n{text}"
+    );
+    assert!(
+        text.contains("is a symlink"),
+        "the report must name the containment violation specifically:\n{text}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Concurrency: one ceremony may own a data directory at a time
+// ---------------------------------------------------------------------------
+
+/// Two real `icnctl` processes racing on one fresh data root.
+///
+/// Deterministic because the lock is taken as the *first* state-sensitive step,
+/// before the passphrase is read and long before key minting — which takes
+/// seconds. Two processes started microseconds apart therefore always overlap at
+/// the lock, so exactly one acquires it and the other is refused immediately.
+///
+/// Without the lock, both would pass preflight against an untouched directory
+/// and then race through `AgeKeyStore::init`'s non-atomic existence-check/write,
+/// letting one overwrite key material the other generated — and a receipt could
+/// be committed for keys no longer on disk.
+#[test]
+fn two_concurrent_ceremonies_cannot_both_own_a_data_directory() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let spawn = |name: &str| {
+        icnctl(data_dir)
+            .args([
+                "institution",
+                "runtime-root",
+                "create",
+                "--name",
+                name,
+                "--yes",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap()
+    };
+
+    let a = spawn("Racer A");
+    // Start the second process *after* the first is certainly past the lock
+    // acquisition but still mid-ceremony. Minting two keystores takes seconds,
+    // so this margin is large.
+    //
+    // Starting them simultaneously would not discriminate: both would contend
+    // at the same instant, and a lock that was acquired and released
+    // immediately would still refuse one of them by luck. This ordering makes
+    // the test fail if the lock is not *held* across the ceremony, which is the
+    // property that matters.
+    std::thread::sleep(std::time::Duration::from_millis(600));
+    let b = spawn("Racer B");
+    let ra = a.wait_with_output().unwrap();
+    let rb = b.wait_with_output().unwrap();
+
+    let succeeded = [&ra, &rb].iter().filter(|o| o.status.success()).count();
+    let texts: Vec<String> = [&ra, &rb]
+        .iter()
+        .map(|o| {
+            format!(
+                "{}{}",
+                String::from_utf8_lossy(&o.stdout),
+                String::from_utf8_lossy(&o.stderr)
+            )
+        })
+        .collect();
+
+    assert_eq!(
+        succeeded, 1,
+        "exactly one ceremony may own the directory; got {succeeded} successes.\nA:\n{}\nB:\n{}",
+        texts[0], texts[1]
+    );
+
+    let loser = if ra.status.success() {
+        &texts[1]
+    } else {
+        &texts[0]
+    };
+    assert!(
+        loser.contains("already owns"),
+        "the loser must be refused because another ceremony owns the root, not \
+         for some incidental later reason:\n{loser}"
+    );
+
+    // Exactly one runtime root exists, and its key material backs its receipt —
+    // so the loser wrote nothing that could shadow the winner's principals.
+    let (show, json) = read_receipt_json(data_dir);
+    assert!(show.status.success(), "the winner's root must be READY");
+    let receipt: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let treasury = receipt["treasury_did"].as_str().unwrap();
+
+    let rows = rows_with_prefix(&daemon_coop_store_path(data_dir), b"runtimeroot:receipt:");
+    assert_eq!(rows.len(), 1, "exactly one receipt may exist: {rows:?}");
+
+    let ledger_rows = rows_with_prefix(&daemon_ledger_store_path(data_dir), b"ledger:treasury:");
+    let primaries: Vec<&String> = ledger_rows
+        .iter()
+        .filter(|k| !k.starts_with("ledger:treasury:idx:"))
+        .collect();
+    assert_eq!(
+        primaries.len(),
+        1,
+        "exactly one treasury may have been registered: {primaries:?}"
+    );
+    assert!(
+        primaries[0].contains(treasury),
+        "and it must be the one the surviving receipt names"
     );
 }

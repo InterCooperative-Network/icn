@@ -20,15 +20,23 @@ pub enum InstitutionCommands {
         command: InstitutionBootstrapCommands,
     },
 
-    /// Institutional genesis: bring a cooperative into existence as an
-    /// institution with its own treasury principal and trust root (#2744).
+    /// Provision the institutional runtime root: durable cooperative state, a
+    /// distinct genesis trust-root Principal, a distinct treasury Principal,
+    /// the trust relationships the ledger's author path needs, and the
+    /// configuration linkage that makes the daemon consume that treasury
+    /// (#2744).
+    ///
+    /// This is **not** canonical Institution genesis under
+    /// `docs/architecture/IDENTITY_SEMANTICS.md`: it creates no `EntityId` and
+    /// persists no signed founding act.
     ///
     /// Unlike `bootstrap`, which drives a *running* node's gateway and
     /// therefore needs the institution to already exist in order to
     /// authenticate, this is a local ceremony run with the daemon stopped.
-    Genesis {
+    #[command(name = "runtime-root")]
+    RuntimeRoot {
         #[command(subcommand)]
-        command: crate::institution_genesis::InstitutionGenesisCommands,
+        command: crate::institution_runtime_root::InstitutionRuntimeRootCommands,
     },
 }
 
@@ -214,8 +222,10 @@ pub async fn handle_institution_command(cmd: InstitutionCommands, data_dir: &Pat
                 }
             }
         },
-        InstitutionCommands::Genesis { command } => {
-            crate::institution_genesis::handle_institution_genesis_command(command, data_dir)?
+        InstitutionCommands::RuntimeRoot { command } => {
+            crate::institution_runtime_root::handle_institution_runtime_root_command(
+                command, data_dir,
+            )?
         }
     }
 
