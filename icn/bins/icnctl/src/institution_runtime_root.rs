@@ -286,7 +286,7 @@ fn resolve_storage_root(data_dir: &Path) -> Result<()> {
     // actually read. Refuse rather than certify a cwd-dependent equivalence.
     if std::path::Path::new(configured).is_relative() {
         bail!(
-            "Refusing institutional genesis: {} sets a relative `data_dir` \
+            "Refusing institutional runtime-root provisioning: {} sets a relative `data_dir` \
              ({configured:?}).\n\
              It would be resolved against whatever directory the daemon happens \
              to start in, so this ceremony cannot prove it names the same root \
@@ -304,7 +304,7 @@ fn resolve_storage_root(data_dir: &Path) -> Result<()> {
     let cfg = std::fs::canonicalize(&cfg_path).unwrap_or(cfg_path);
     if cli != cfg {
         bail!(
-            "Refusing institutional genesis: the storage root on the command \
+            "Refusing institutional runtime-root provisioning: the storage root on the command \
              line and the one this configuration will be read with disagree.\n  \
              --data-dir:            {}\n  \
              {} data_dir = {}\n\
@@ -320,7 +320,7 @@ fn resolve_storage_root(data_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// What a data directory currently shows about institutional genesis.
+/// What a data directory currently shows about runtime-root provisioning.
 ///
 /// Deliberately three states rather than two. "A receipt exists" and "some
 /// artefacts exist but no receipt does" are different operator situations and
@@ -390,8 +390,8 @@ impl RuntimeRootComponents {
     /// | `[cooperative]` config | ambiguous — an operator can hand-write it |
     ///
     /// Counting the shared ones would tell a node that had merely created a
-    /// cooperative through the gateway that it holds "incomplete genesis
-    /// state", and refuse to found on it. They are still *reported* — they are
+    /// cooperative through the gateway that it holds "incomplete provisioning
+    /// state", and refuse to provision on it. They are still *reported* — they are
     /// what an operator needs to see when a ceremony did break — but they do
     /// not by themselves make a directory look mid-ceremony.
     ///
@@ -501,7 +501,7 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
     })
 }
 
-/// Classify the data directory's genesis state.
+/// Classify the data directory's runtime-root provisioning state.
 ///
 /// **Not side-effect free.** When a receipt exists this runs
 /// `verify_durable_state`, which opens the ledger and trust stores
@@ -542,59 +542,81 @@ pub fn runtime_root_state(data_dir: &Path) -> Result<RuntimeRootState> {
 
 /// Reject operator-supplied values before the ceremony writes or prompts.
 ///
-/// Deliberately conservative rather than clever: this is a founding act, the
-/// name lands in a durable record and in the daemon's configuration, and the
-/// currency is recorded on the treasury. A value that is empty, whitespace-only
-/// or absurdly long is a mistake, and discovering it after key material exists
-/// means an operator has to clean up a half-founded institution by hand.
-fn validate_genesis_inputs(name: &str, currency: &str) -> Result<()> {
+/// Deliberately conservative rather than clever: this is durable runtime-root
+/// provisioning, the name lands in a durable record and in the daemon's
+/// configuration, and the currency is recorded on the treasury. A value that is
+/// empty, whitespace-only or absurdly long is a mistake, and a value discovered
+/// to be invalid after key material has been minted leaves partial provisioning
+/// state an operator has to clean up by hand.
+fn validate_runtime_root_inputs(name: &str, currency: &str) -> Result<()> {
     /// Long enough for any real cooperative name, short enough that a paste
-    /// accident cannot bloat the configuration.
+    /// accident cannot bloat the configuration. This is the ceremony's own
+    /// tighter rule; the gateway's is applied below, in addition.
     const MAX_NAME: usize = 200;
-    const MAX_CURRENCY: usize = 32;
 
     if name.trim().is_empty() {
-        bail!("Refusing institutional genesis: the cooperative name is empty or only whitespace.");
+        bail!("Refusing institutional runtime-root provisioning: the cooperative name is empty or only whitespace.");
     }
     if name.chars().count() > MAX_NAME {
         bail!(
-            "Refusing institutional genesis: the cooperative name is {} characters; the \
+            "Refusing institutional runtime-root provisioning: the cooperative name is {} characters; the \
              maximum is {MAX_NAME}.",
             name.chars().count()
         );
     }
     if name.chars().any(|c| c.is_control()) {
-        bail!("Refusing institutional genesis: the cooperative name contains control characters.");
+        bail!("Refusing institutional runtime-root provisioning: the cooperative name contains control characters.");
     }
     if currency.trim().is_empty() {
-        bail!("Refusing institutional genesis: the currency is empty or only whitespace.");
-    }
-    if currency.chars().count() > MAX_CURRENCY {
-        bail!(
-            "Refusing institutional genesis: the currency is {} characters; the maximum is \
-             {MAX_CURRENCY}.",
-            currency.chars().count()
-        );
+        bail!("Refusing institutional runtime-root provisioning: the currency is empty or only whitespace.");
     }
     if currency
         .chars()
         .any(|c| c.is_control() || c.is_whitespace())
     {
         bail!(
-            "Refusing institutional genesis: the currency contains whitespace or control \
+            "Refusing institutional runtime-root provisioning: the currency contains whitespace or control \
              characters."
         );
     }
+
+    // Then the gateway's rules, by calling the gateway's own validators rather
+    // than restating them.
+    //
+    // These values are written straight into durable state, bypassing the
+    // gateway entirely — but the gateway serves the same cooperative, and
+    // `validate_unit` gates every ledger entry submitted through it
+    // (`icn-gateway/src/api/ledger.rs`). A unit this ceremony accepts and the
+    // gateway rejects is one the cooperative can never use, permanently: a
+    // rerun over provisioned state is refused, by design.
+    //
+    // Restating the limits here is exactly what produced the defect this
+    // replaces. The gateway measures `str::len()` — BYTES — while the
+    // hand-written check counted Unicode scalars, so nine four-byte characters
+    // passed a "32 character" rule and failed the gateway's 32-byte one. The
+    // same gap existed for the name, whose 200 scalars can be 800 bytes against
+    // the gateway's 256. Calling the owner removes the drift instead of
+    // re-synchronising two copies of it.
+    icn_gateway::validation::validate_coop_name(name).map_err(|e| {
+        anyhow::anyhow!(
+            "Refusing institutional runtime-root provisioning: the gateway would reject this cooperative name: {e}"
+        )
+    })?;
+    icn_gateway::validation::validate_unit(currency).map_err(|e| {
+        anyhow::anyhow!(
+            "Refusing institutional runtime-root provisioning: the gateway would reject this currency: {e}"
+        )
+    })?;
     Ok(())
 }
 
 /// Refuse a data directory that already holds another institution's state.
 ///
 /// **This is a different question from [`RuntimeRootComponents::is_untouched`], and
-/// conflating them was a real defect.** That predicate answers "was a genesis
+/// conflating them was a real defect.** That predicate answers "was provisioning
 /// attempted here?", and deliberately ignores cooperative records because the
 /// gateway's `CoopManager` creates them — counting them there would refuse
-/// genesis on an ordinary node. This one answers "is it *safe* to found a new
+/// provisioning on an ordinary node. This one answers "is it *safe* to found a new
 /// institution here?", and the answer is no as soon as any other cooperative or
 /// treasury state exists.
 ///
@@ -630,7 +652,7 @@ fn refuse_if_foreign_institutional_state(data_dir: &Path) -> Result<()> {
         }
         let store = icn_store::SledStore::open(&db).with_context(|| {
             format!(
-                "Refusing institutional genesis: {} exists but could not be opened to check for \
+                "Refusing institutional runtime-root provisioning: {} exists but could not be opened to check for \
                  existing institutional state (if the daemon is running, stop it first). \
                  Genesis refuses rather than assume an unreadable store is empty",
                 db.display()
@@ -640,7 +662,7 @@ fn refuse_if_foreign_institutional_state(data_dir: &Path) -> Result<()> {
             use icn_store::Store;
             store.scan(prefix).with_context(|| {
                 format!(
-                    "Refusing institutional genesis: {} could not be scanned for existing \
+                    "Refusing institutional runtime-root provisioning: {} could not be scanned for existing \
                      institutional state. Genesis refuses rather than assume absence",
                     db.display()
                 )
@@ -667,7 +689,7 @@ fn refuse_if_foreign_institutional_state(data_dir: &Path) -> Result<()> {
 
     if !found.is_empty() {
         bail!(
-            "Refusing institutional genesis: this data directory already holds \
+            "Refusing institutional runtime-root provisioning: this data directory already holds \
              institutional state that this ceremony did not create:\n  {}\n\
              The daemon publishes a single `[cooperative] treasury_did` and its \
              ledger service debits that one treasury for every treasury \
@@ -694,28 +716,29 @@ fn refuse_if_already_provisioned(data_dir: &Path) -> Result<()> {
     match runtime_root_state(data_dir)? {
         RuntimeRootState::NotStarted => Ok(()),
         RuntimeRootState::Inconsistent { receipt, problem } => bail!(
-            "Refusing institutional genesis: this data directory holds a genesis \
-             receipt for cooperative {} ({}) whose claims no longer hold:\n  {}\n\
-             Founding again over inconsistent state would compound it. Inspect \
-             and resolve this deliberately.",
+            "Refusing institutional runtime-root provisioning: this data directory holds a \
+             runtime-root receipt for cooperative {} ({}) whose claims no longer \
+             hold:\n  {}\n\
+             Provisioning again over inconsistent state would compound it. \
+             Inspect and resolve this deliberately.",
             receipt.cooperative_name,
             receipt.cooperative_id,
             problem
         ),
         RuntimeRootState::Ready(receipt) => bail!(
-            "Refusing institutional genesis: this data directory has already \
-             undergone genesis.\n  cooperative: {} ({})\n  treasury:    {}\n\
-             Founding a second institution over the first would orphan its \
+            "Refusing institutional runtime-root provisioning: this data directory has already \
+             been provisioned.\n  cooperative: {} ({})\n  treasury:    {}\n\
+             Provisioning a second runtime root over the first would orphan its \
              treasury and trust facts.",
             receipt.cooperative_name,
             receipt.cooperative_id,
             receipt.treasury_did
         ),
         RuntimeRootState::Incomplete { components } => bail!(
-            "Refusing institutional genesis: this data directory holds \
-             INCOMPLETE genesis state — a ceremony that did not finish, with no \
-             completion receipt:\n  {}\n\
-             Genesis never overwrites key material, and it cannot resume: \
+            "Refusing institutional runtime-root provisioning: this data directory holds \
+             INCOMPLETE provisioning state — a ceremony that did not finish, with \
+             no completion receipt:\n  {}\n\
+             Provisioning never overwrites key material, and it cannot resume: \
              re-running would mint a second set of principals and leave the \
              first orphaned. Inspect this state and remove it deliberately \
              before founding again.",
@@ -843,8 +866,8 @@ pub fn load_receipt(data_dir: &Path) -> Result<Option<RuntimeRootReceipt>> {
             .map(|(k, _)| String::from_utf8_lossy(k).into_owned())
             .collect();
         bail!(
-            "Refusing to read genesis state: {} holds {} genesis receipts:\n  {}\n\
-             A data directory has exactly one genesis. More than one is \
+            "Refusing to read runtime-root state: {} holds {} runtime-root receipts:\n  {}\n\
+             A data directory has exactly one runtime root. More than one is \
              corruption or a manual edit, and picking one would make `show` and \
              the rerun guard report whichever happened to sort first. Resolve \
              this deliberately.",
@@ -856,11 +879,12 @@ pub fn load_receipt(data_dir: &Path) -> Result<Option<RuntimeRootReceipt>> {
     let Some((_, value)) = found.into_iter().next() else {
         return Ok(None);
     };
-    let receipt: RuntimeRootReceipt = serde_json::from_slice(&value)
-        .context("Genesis receipt is present but unreadable; refusing to guess what it said")?;
+    let receipt: RuntimeRootReceipt = serde_json::from_slice(&value).context(
+        "The runtime-root receipt is present but unreadable; refusing to guess what it said",
+    )?;
     if receipt.schema_version != RUNTIME_ROOT_RECEIPT_SCHEMA_VERSION {
         bail!(
-            "Genesis receipt schema version {} is not the {} this binary \
+            "Runtime-root receipt schema version {} is not the {} this binary \
              understands; refusing to interpret it.",
             receipt.schema_version,
             RUNTIME_ROOT_RECEIPT_SCHEMA_VERSION
@@ -1110,7 +1134,7 @@ fn provision_runtime_root_inner(
     // durable record and the configuration, and an oversized one would be
     // discovered only when the config was published — after the institution had
     // been minted.
-    validate_genesis_inputs(name, currency)?;
+    validate_runtime_root_inputs(name, currency)?;
 
     // (3a) And refuse a directory that already belongs to another institution.
     // Distinct question, distinct predicate — see the function's own docs.
@@ -1130,7 +1154,7 @@ fn provision_runtime_root_inner(
         .unwrap_or(false)
     {
         bail!(
-            "Refusing institutional genesis: the node keystore at {} is a \
+            "Refusing institutional runtime-root provisioning: the node keystore at {} is a \
              symlink. Founding authority must be proven against real key \
              material in this data directory, not through a redirection.",
             node_keystore_path.display()
@@ -1138,7 +1162,7 @@ fn provision_runtime_root_inner(
     }
     if !node_keystore_path.exists() {
         bail!(
-            "Refusing institutional genesis: no node identity at {}.\n\
+            "Refusing institutional runtime-root provisioning: no node identity at {}.\n\
              The founding authority is the principal that unlocks this \
              keystore; with no keystore there is no authority to found under. \
              Run `icnctl id init` first.",
@@ -1191,7 +1215,7 @@ fn provision_runtime_root_inner(
     // continuing would reintroduce exactly the collapse being fixed.
     if treasury_did == node_did || trust_root_did == node_did {
         bail!(
-            "Refusing institutional genesis: a generated institutional \
+            "Refusing institutional runtime-root provisioning: a generated institutional \
              principal collided with the node DID ({node_did}). Genesis fails \
              rather than letting the machine stand in for the cooperative."
         );
@@ -1269,7 +1293,7 @@ fn provision_runtime_root_inner(
             coop_id.clone(),
             currency.to_string(),
             genesis_authority_did.clone(),
-            Some(format!("Genesis treasury for {name}")),
+            Some(format!("Runtime-root treasury for {name}")),
         )
         .context("Failed to register the treasury")?;
     failpoint!(
@@ -1411,15 +1435,16 @@ fn provision_runtime_root_inner(
         let coop_sled = icn_store::SledStore::open(&coop_db)
             .context("Failed to reopen the cooperative store to record the receipt")?;
         let key = format!("{RECEIPT_KEY_PREFIX}{coop_id}");
-        let value = serde_json::to_vec(&receipt).context("Failed to encode the genesis receipt")?;
+        let value =
+            serde_json::to_vec(&receipt).context("Failed to encode the runtime-root receipt")?;
         // Written into the same sled database as the `coop:` rows, so the
         // receipt cannot outlive the cooperative it describes.
         coop_sled
             .put(key.as_bytes(), &value)
-            .context("Failed to persist the genesis receipt")?;
+            .context("Failed to persist the runtime-root receipt")?;
         coop_sled
             .flush()
-            .context("Failed to flush the genesis receipt")?;
+            .context("Failed to flush the runtime-root receipt")?;
     }
 
     Ok(receipt)
@@ -1732,7 +1757,7 @@ fn verify_durable_state(
     // same parse the daemon performs.
     let config: icn_core::Config = toml::from_str(&text).with_context(|| {
         format!(
-            "Verification: {} is not loadable by the daemon, so a genesis linked into it \
+            "Verification: {} is not loadable by the daemon, so a runtime root linked into it \
              would never be consumed (see icn#2747)",
             config_path.display()
         )
@@ -1767,7 +1792,7 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
     let config_path = data_dir.join("icn.toml");
     if !config_path.exists() {
         bail!(
-            "Refusing institutional genesis: there is no configuration at {} to \
+            "Refusing institutional runtime-root provisioning: there is no configuration at {} to \
              link the treasury into.\n\
              The daemon resolves its treasury from `[cooperative] \
              treasury_did`, so without this link it would fall back to the node \
@@ -1849,7 +1874,7 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
         .with_context(|| format!("Failed to parse {}", config_path.display()))?;
     if parsed.get("cooperative").is_some() {
         bail!(
-            "Refusing institutional genesis: {} already has a [cooperative] \
+            "Refusing institutional runtime-root provisioning: {} already has a [cooperative] \
              section. It may already name a different treasury; repointing an \
              institution's spend source is an explicit operator decision.",
             config_path.display()
@@ -1907,7 +1932,7 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
         .context("Failed to serialize the [cooperative] section")?;
 
     out.push_str(
-        "\n# Written by `icnctl institution genesis` (#2744).\n\
+        "\n# Written by `icnctl institution runtime-root create` (#2744).\n\
          # `treasury_did` is a keypair-backed DID whose key material lives in\n\
          # `treasury.age`. Without this section the daemon falls back to the\n\
          # node's own DID for governance-authored ledger entries.\n\
@@ -2048,7 +2073,7 @@ fn classify_for_show(data_dir: &Path, json: bool) -> Result<RuntimeRootState> {
 
 /// Map a classification failure onto a stable-ish machine category.
 fn classify_show_error(message: &str) -> (&'static str, &'static str) {
-    if message.contains("genesis receipts") || message.contains("receipts:") {
+    if message.contains("runtime-root receipts") || message.contains("receipts:") {
         (
             "multiple_receipts",
             "A data directory has exactly one runtime root. Inspect the extra receipts and \
@@ -2098,9 +2123,9 @@ fn print_receipt(receipt: &RuntimeRootReceipt, provenance_verified: bool) {
     println!("==========================\n");
     println!("Cooperative:        {}", receipt.cooperative_name);
     println!("  id:               {}", receipt.cooperative_id);
-    println!("Genesis trust root: {}", receipt.trust_root_did);
+    println!("Runtime trust root: {}", receipt.trust_root_did);
     println!("Treasury DID:       {}", receipt.treasury_did);
-    println!("Genesis authority:  {}", receipt.genesis_authority_did);
+    println!("Founding authority: {}", receipt.genesis_authority_did);
     println!("Node DID:           {}", receipt.node_did);
     println!("Currency:           {}", receipt.currency);
     println!("Created at:         {}", receipt.created_at);
@@ -2144,10 +2169,10 @@ pub fn handle_institution_runtime_root_command(
             if !yes {
                 use std::io::Write;
                 println!(
-                    "Institutional genesis creates durable cooperative state, a \
+                    "Runtime-root provisioning creates durable cooperative state, a \
                      treasury principal with its own key material, \
-                     institution-rooted trust facts, and a genesis receipt \
-                     under {}.",
+                     institution-rooted trust facts, and a runtime-root \
+                     receipt under {}.",
                     data_dir.display()
                 );
                 println!("Run the daemon *stopped*; it holds exclusive store locks.");
@@ -2210,7 +2235,7 @@ pub fn handle_institution_runtime_root_command(
                         "receipt": receipt,
                     }))?
                 );
-                bail!("INCONSISTENT genesis under {}", data_dir.display());
+                bail!("INCONSISTENT runtime root under {}", data_dir.display());
             }
             RuntimeRootState::Incomplete { components } if json => {
                 println!(
@@ -2229,7 +2254,7 @@ pub fn handle_institution_runtime_root_command(
                         },
                     }))?
                 );
-                bail!("INCOMPLETE genesis under {}", data_dir.display());
+                bail!("INCOMPLETE runtime root under {}", data_dir.display());
             }
             RuntimeRootState::NotStarted if json => {
                 println!(
@@ -2239,10 +2264,10 @@ pub fn handle_institution_runtime_root_command(
                         "kind": "institutional_runtime_root",
                     }))?
                 );
-                bail!("No genesis under {}", data_dir.display());
+                bail!("No runtime root under {}", data_dir.display());
             }
             RuntimeRootState::Inconsistent { receipt, problem } => bail!(
-                "INCONSISTENT genesis under {}: a receipt exists for cooperative \
+                "INCONSISTENT runtime root under {}: a receipt exists for cooperative \
                  {} ({}), but the state it describes does not hold:\n  {}\n\
                  This is reported as a failure rather than as a genesis: a \
                  receipt is evidence only while what it claims is still true.",
@@ -2255,7 +2280,7 @@ pub fn handle_institution_runtime_root_command(
             // whose ceremony died half-way needs to be told that, not told
             // nothing happened.
             RuntimeRootState::Incomplete { components } => bail!(
-                "INCOMPLETE genesis under {}: components exist but no completion \
+                "INCOMPLETE runtime root under {}: components exist but no completion \
                  receipt does, so no cooperative came into existence here.\n  {}\n\
                  This state cannot be resumed; remove it deliberately before \
                  founding again.",
@@ -2263,8 +2288,8 @@ pub fn handle_institution_runtime_root_command(
                 components.describe()
             ),
             RuntimeRootState::NotStarted => bail!(
-                "No genesis receipt under {}. This data directory has not \
-                 undergone institutional genesis.",
+                "No runtime-root receipt under {}. This data directory has not been \
+                 provisioned with an institutional runtime root.",
                 data_dir.display()
             ),
         },
@@ -2505,18 +2530,81 @@ mod failpoint_tests {
                 runtime_root_state(dir.path()).unwrap(),
                 RuntimeRootState::Incomplete { .. }
             ),
-            "F: a published configuration is not a committed genesis"
+            "F: a published configuration is not a committed runtime root"
         );
         assert_rerun_refuses_without_minting(dir.path(), "F");
     }
 
+    /// Every input this ceremony accepts must be one the gateway accepts.
+    ///
+    /// The ceremony writes straight into durable state, so nothing re-checks
+    /// these values later — and a rerun over provisioned state is refused. An
+    /// input this function waves through and the gateway rejects is therefore
+    /// permanent.
+    ///
+    /// The specific trap: the gateway measures `str::len()`, which is BYTES. A
+    /// hand-written "32 characters" rule counted Unicode scalars, so nine
+    /// four-byte characters passed here and failed there.
+    #[test]
+    fn every_input_this_ceremony_accepts_is_one_the_gateway_would_accept() {
+        // Nine scalars, thirty-six bytes: inside a 32-scalar rule, outside the
+        // gateway's 32-byte one.
+        let multibyte_currency = "\u{1F600}".repeat(9);
+        assert_eq!(multibyte_currency.chars().count(), 9);
+        assert_eq!(multibyte_currency.len(), 36);
+        // Two hundred scalars, six hundred bytes, against the gateway's 256.
+        let multibyte_name = "\u{540D}".repeat(200);
+        assert_eq!(multibyte_name.chars().count(), 200);
+        assert_eq!(multibyte_name.len(), 600);
+
+        // Not a vacuous guard: the two known-bad inputs must actually refuse,
+        // and ordinary input must still be accepted.
+        assert!(
+            validate_runtime_root_inputs("Fixture Coop", &multibyte_currency).is_err(),
+            "a currency of 36 bytes must be refused, as the gateway refuses it"
+        );
+        assert!(
+            validate_runtime_root_inputs(&multibyte_name, "SEED").is_err(),
+            "a name of 600 bytes must be refused, as the gateway refuses it"
+        );
+        validate_runtime_root_inputs("Fixture Coop", "SEED")
+            .expect("ordinary input must still be accepted");
+
+        // And the general rule, differentially against the owner of the limits.
+        let cases: Vec<(String, String)> = vec![
+            ("Fixture Coop".into(), multibyte_currency.clone()),
+            (multibyte_name.clone(), "SEED".into()),
+            ("Fixture Coop".into(), "SEED".into()),
+            ("Fixture Coop".into(), "A".repeat(32)),
+            ("Fixture Coop".into(), "A".repeat(33)),
+            ("N".repeat(200), "SEED".into()),
+            ("\u{540D}".repeat(85), "SEED".into()),
+            ("Fixture Coop".into(), "\u{1F600}".repeat(8)),
+        ];
+        for (name, currency) in cases {
+            if validate_runtime_root_inputs(&name, &currency).is_ok() {
+                icn_gateway::validation::validate_coop_name(&name).unwrap_or_else(|e| {
+                    panic!(
+                        "accepted a name the gateway rejects ({} bytes): {e}",
+                        name.len()
+                    )
+                });
+                icn_gateway::validation::validate_unit(&currency).unwrap_or_else(|e| {
+                    panic!(
+                        "accepted a currency the gateway rejects ({} bytes): {e}",
+                        currency.len()
+                    )
+                });
+            }
+        }
+    }
     /// A cooperative that already exists — created through the gateway, say —
     /// must not make a data directory look mid-ceremony.
     ///
     /// The gateway's `CoopManager` creates cooperatives, and `init-coop` writes
     /// its own trust edges, so those components are shared rather than
-    /// genesis-exclusive. Counting them as evidence of an interrupted ceremony
-    /// would refuse genesis on a perfectly ordinary node.
+    /// provisioning-exclusive. Counting them as evidence of an interrupted
+    /// ceremony would refuse provisioning on a perfectly ordinary node.
     #[test]
     fn shared_components_do_not_make_a_directory_look_mid_ceremony() {
         let dir = provisioned();
@@ -2562,7 +2650,7 @@ mod failpoint_tests {
         );
         assert!(
             components.is_untouched(),
-            "shared components must not read as an attempted genesis: {components:?}"
+            "shared components must not read as attempted provisioning: {components:?}"
         );
         assert!(
             matches!(
@@ -2579,7 +2667,7 @@ mod failpoint_tests {
         // one. Conflating these two questions is what made an earlier draft
         // wrong in both directions at once.
         let err = provision_runtime_root_inner(dir.path(), "Founded Anyway", "HOURS", None)
-            .expect_err("genesis must refuse a directory that already holds a cooperative");
+            .expect_err("provisioning must refuse a directory that already holds a cooperative");
         let msg = format!("{err:#}");
         assert!(
             msg.contains("already holds institutional state"),
@@ -2591,7 +2679,7 @@ mod failpoint_tests {
         let after = runtime_root_components(dir.path()).unwrap();
         assert!(
             !after.trust_root_key && !after.treasury_key && !after.receipt,
-            "no genesis-exclusive artefact may exist after a preflight refusal: {after:?}"
+            "no provisioning-exclusive artefact may exist after a preflight refusal: {after:?}"
         );
     }
 
@@ -2609,7 +2697,7 @@ mod failpoint_tests {
             let err = provision_runtime_root_inner(dir.path(), name, currency, None)
                 .unwrap_err_or_else_msg(why);
             assert!(
-                err.contains("Refusing institutional genesis"),
+                err.contains("Refusing institutional runtime-root provisioning"),
                 "{why}: expected a refusal, got: {err}"
             );
             let c = runtime_root_components(dir.path()).unwrap();
@@ -2659,9 +2747,9 @@ mod failpoint_tests {
     /// What a rerun over a substituted keystore ACTUALLY refuses on.
     ///
     /// An earlier comment claimed a post-genesis keystore substitution was
-    /// "detectable by `genesis create` refusing a rerun". This test exists to
+    /// "detectable by `runtime-root create` refusing a rerun". This test exists to
     /// check that sentence rather than to preserve it, because it conflates two
-    /// different refusals: "a genesis already exists here" and "the key on disk
+    /// different refusals: "a runtime root already exists here" and "the key on disk
     /// no longer backs the DID the receipt names". Only the second is
     /// provenance detection.
     #[test]
@@ -2680,7 +2768,7 @@ mod failpoint_tests {
 
         // The refusal is about a prior ceremony, NOT about provenance.
         assert!(
-            msg.contains("already undergone genesis"),
+            msg.contains("has already been provisioned"),
             "expected the prior-ceremony refusal, got: {msg}"
         );
         assert!(
@@ -2821,7 +2909,7 @@ mod failpoint_tests {
         let err = load_receipt(dir.path()).expect_err("two receipts must refuse");
         let msg = format!("{err:#}");
         assert!(
-            msg.contains("2 genesis receipts"),
+            msg.contains("2 runtime-root receipts"),
             "the refusal must name the multiplicity rather than parsing one: {msg}"
         );
     }

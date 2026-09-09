@@ -589,7 +589,7 @@ fn genesis_refuses_a_second_ceremony_over_the_first() {
     // mutation removing `refuse_if_already_provisioned` survived until this
     // assertion existed.
     assert!(
-        text.contains("already undergone genesis"),
+        text.contains("has already been provisioned"),
         "the refusal must come from the prior-ceremony check, naming the \
          existing institution, rather than incidentally from a later step:\n{text}"
     );
