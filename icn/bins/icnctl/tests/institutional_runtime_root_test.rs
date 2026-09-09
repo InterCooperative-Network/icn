@@ -2077,3 +2077,155 @@ fn killing_the_lock_holder_releases_ownership_without_manual_cleanup() {
         combined(&after)
     );
 }
+
+/// `show --json` must emit exactly one JSON document for EVERY outcome —
+/// including the failures automation most needs to distinguish.
+///
+/// Classification itself can fail before any output arm is reached: a receipt
+/// schema this binary does not understand, several receipts where there may be
+/// one, a store it cannot read. Returning prose there means the machine surface
+/// is missing precisely when it matters.
+///
+/// Every assertion parses the complete stdout bytes. No brace hunting, no
+/// tracing-prefix tolerance — `icnctl` writes diagnostics to stderr, so stdout
+/// is a document or the contract is broken.
+#[test]
+fn show_json_emits_one_document_for_every_outcome_including_load_failures() {
+    use icn_store::Store;
+
+    let parse = |out: &Output| -> serde_json::Value {
+        serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+            panic!(
+                "stdout must be exactly one JSON document: {e}\nstdout was: {:?}",
+                String::from_utf8_lossy(&out.stdout)
+            )
+        })
+    };
+    let show = |d: &Path| -> Output {
+        icnctl(d)
+            .args(["institution", "runtime-root", "show", "--json"])
+            .output()
+            .unwrap()
+    };
+
+    // --- multiple receipts -------------------------------------------------
+    {
+        let dir = genesis_dir("Two Receipts Coop");
+        let (_, json) = read_receipt_json(dir.path());
+        let receipt: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let store = open_store(daemon_coop_store_path(dir.path()));
+        let mut second = receipt.clone();
+        second["cooperative_id"] = serde_json::Value::String("coop-second".into());
+        store
+            .put(
+                b"runtimeroot:receipt:coop-second",
+                &serde_json::to_vec(&second).unwrap(),
+            )
+            .unwrap();
+        store.flush().unwrap();
+        drop(store);
+
+        let out = show(dir.path());
+        let v = parse(&out);
+        assert!(!out.status.success());
+        assert_eq!(v["state"], "ERROR");
+        assert_eq!(v["kind"], "institutional_runtime_root");
+        assert_eq!(v["error"]["code"], "multiple_receipts");
+    }
+
+    // --- unsupported receipt schema ----------------------------------------
+    {
+        let dir = genesis_dir("Future Schema Coop");
+        let store = open_store(daemon_coop_store_path(dir.path()));
+        let (key, raw) = store
+            .scan(b"runtimeroot:receipt:")
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        let mut receipt: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+        receipt["schema_version"] = serde_json::Value::from(999u64);
+        store
+            .put(&key, &serde_json::to_vec(&receipt).unwrap())
+            .unwrap();
+        store.flush().unwrap();
+        drop(store);
+
+        let out = show(dir.path());
+        let v = parse(&out);
+        assert!(!out.status.success());
+        assert_eq!(v["error"]["code"], "receipt_schema_unsupported");
+    }
+
+    // --- malformed receipt payload -----------------------------------------
+    {
+        let dir = genesis_dir("Malformed Receipt Coop");
+        let store = open_store(daemon_coop_store_path(dir.path()));
+        let (key, _) = store
+            .scan(b"runtimeroot:receipt:")
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        store.put(&key, b"{not json").unwrap();
+        store.flush().unwrap();
+        drop(store);
+
+        let out = show(dir.path());
+        let v = parse(&out);
+        assert!(!out.status.success());
+        assert_eq!(v["error"]["code"], "receipt_unreadable");
+    }
+
+    // --- the ordinary states still hold ------------------------------------
+    {
+        let dir = TempDir::new().unwrap();
+        assert!(init_identity(dir.path()).status.success());
+        let v = parse(&show(dir.path()));
+        assert_eq!(v["state"], "NOT_STARTED");
+        assert_eq!(v["kind"], "institutional_runtime_root");
+    }
+    {
+        let dir = genesis_dir("Ready Envelope Coop");
+        let out = show(dir.path());
+        let v = parse(&out);
+        assert!(out.status.success());
+        assert_eq!(v["state"], "READY");
+        // Unknown is not false: `show` did not unlock anything.
+        assert_eq!(v["evidence"]["node_identity"], "not_reverified");
+        assert_eq!(v["evidence"]["treasury_key_provenance"], "not_reverified");
+        assert_eq!(v["evidence"]["durable_state"], "verified");
+    }
+}
+
+/// Key material this ceremony mints is not world-readable.
+///
+/// `AgeKeyStore` writes at the process umask, so a keystore normally lands 0664.
+/// The content is encrypted at rest, so that exposes ciphertext rather than
+/// keys — defence-in-depth, not a plaintext leak — but a privileged founding
+/// operation should not create new secret files that way.
+///
+/// Scoped to what this ceremony owns: the node's own `identity.age` predates it
+/// and is left alone, because changing `AgeKeyStore` for every caller is
+/// icn#2748's to own.
+#[test]
+fn minted_key_material_is_not_world_readable() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = genesis_dir("Key Mode Coop");
+    for name in ["treasury.age", "genesis-trust-root.age"] {
+        let mode = std::fs::metadata(dir.path().join(name))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o600, "{name} must be owner-only; got {mode:o}");
+    }
+
+    // The pre-existing node keystore is deliberately untouched — that is
+    // icn#2748's scope, not this ceremony's.
+    assert!(
+        dir.path().join("identity.age").exists(),
+        "fixture: the node keystore must exist"
+    );
+}

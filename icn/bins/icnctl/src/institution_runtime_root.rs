@@ -762,6 +762,46 @@ fn mint_principal(path: &Path, passphrase: &[u8], what: &str) -> Result<Did> {
     //
     // The file is opened read-only and its contents are never touched, so
     // nothing secret is read into this process to sync it.
+    // Tighten the mode on the material THIS ceremony creates.
+    //
+    // `AgeKeyStore` writes through `fs::write`, so a keystore lands at the
+    // process umask — commonly 0664. The content is encrypted at rest under a
+    // passphrase, so that exposes ciphertext and salt rather than keys, which is
+    // why it is defence-in-depth and not a plaintext leak. But this ceremony
+    // mints two *new* secret files, and leaving them world-readable when a
+    // one-line tightening exists is not defensible for a privileged founding
+    // operation.
+    //
+    // Deliberately scoped to the two files owned here. Changing `AgeKeyStore`
+    // for every caller — including the node identity that predates this
+    // ceremony — is icn#2748's to own, and doing it from here would give one
+    // caller different keystore semantics from the rest.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).with_context(
+            || {
+                format!(
+                    "Failed to restrict permissions on the {what} keystore at {}",
+                    path.display()
+                )
+            },
+        )?;
+    }
+
+    // Test-only injection, so the failure PATH can be exercised. A power cut
+    // cannot be simulated in a unit test, and this does not pretend to: what it
+    // establishes is narrower and still worth holding — a detected failure to
+    // establish the durability barrier cannot be followed by a committed READY
+    // marker.
+    #[cfg(test)]
+    if DurabilityFailureGuard::armed_for(path) {
+        bail!(
+            "Failed to sync the {what} keystore at {} (injected)",
+            path.display()
+        );
+    }
+
     let file = std::fs::File::open(path)
         .with_context(|| format!("Failed to reopen the {what} keystore to make it durable"))?;
     file.sync_all()
@@ -855,6 +895,52 @@ pub(crate) enum RuntimeRootFailpoint {
     AfterAuthorityEdge,
     AfterTreasuryAuthorityEdge,
     AfterConfigPublish,
+}
+
+/// Test-only switch that makes the keystore durability barrier report failure,
+/// **scoped to one data root**.
+///
+/// Scoping is not optional. `cargo test` runs these in parallel, and a global
+/// flag fires inside whichever ceremony happens to be minting at the time —
+/// failing an unrelated test. That is the same hazard the boundary observer has,
+/// and it bit this flag within minutes of being introduced.
+#[cfg(test)]
+static FAIL_KEYSTORE_DURABILITY: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// Arm the durability failure for one root, disarming on drop so a panicking
+/// test cannot leave it armed for whatever runs next.
+#[cfg(test)]
+struct DurabilityFailureGuard;
+
+#[cfg(test)]
+impl DurabilityFailureGuard {
+    fn arm(root: &Path) -> Self {
+        if let Ok(mut slot) = FAIL_KEYSTORE_DURABILITY.lock() {
+            *slot = Some(icn_core::DataDirLock::lock_path(root));
+        }
+        Self
+    }
+
+    fn armed_for(path: &Path) -> bool {
+        // `path` is the keystore file; its parent is the data root.
+        let Some(root) = path.parent() else {
+            return false;
+        };
+        FAIL_KEYSTORE_DURABILITY
+            .lock()
+            .ok()
+            .and_then(|slot| slot.clone())
+            .is_some_and(|armed| armed == icn_core::DataDirLock::lock_path(root))
+    }
+}
+
+#[cfg(test)]
+impl Drop for DurabilityFailureGuard {
+    fn drop(&mut self) {
+        if let Ok(mut slot) = FAIL_KEYSTORE_DURABILITY.lock() {
+            *slot = None;
+        }
+    }
 }
 
 /// Called at each failpoint boundary **while the ceremony guard is still
@@ -1897,6 +1983,79 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
     sync_parent()?;
     Ok(())
 }
+/// Classify the root, and make sure a `--json` caller gets a document even when
+/// classification itself fails.
+///
+/// `runtime_root_state` can fail before any output arm is reached — a receipt
+/// whose schema this binary does not understand, several receipts where there
+/// may be only one, a store it cannot read. Those are precisely the cases
+/// automation needs to distinguish, and returning bare prose there means the
+/// machine surface is absent exactly when it matters.
+///
+/// Errors carry a small, stable set of codes. Deliberately not a taxonomy: it is
+/// enough for a caller to tell state classes apart, and anything finer would be
+/// inventing categories no consumer has asked for.
+fn classify_for_show(data_dir: &Path, json: bool) -> Result<RuntimeRootState> {
+    match runtime_root_state(data_dir) {
+        Ok(state) => Ok(state),
+        Err(e) if json => {
+            let message = format!("{e:#}");
+            let (code, remediation) = classify_show_error(&message);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "kind": "institutional_runtime_root",
+                    "state": "ERROR",
+                    "error": {
+                        "code": code,
+                        "message": message,
+                        "remediation": remediation,
+                    },
+                }))?
+            );
+            bail!("{e:#}")
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Map a classification failure onto a stable-ish machine category.
+fn classify_show_error(message: &str) -> (&'static str, &'static str) {
+    if message.contains("genesis receipts") || message.contains("receipts:") {
+        (
+            "multiple_receipts",
+            "A data directory has exactly one runtime root. Inspect the extra receipts and \
+             remove the wrong one deliberately.",
+        )
+    } else if message.contains("schema version") {
+        (
+            "receipt_schema_unsupported",
+            "This binary does not understand the receipt's schema version. Use a build that \
+             does rather than reinterpreting it.",
+        )
+    } else if message.contains("unreadable") || message.contains("not valid") {
+        (
+            "receipt_unreadable",
+            "The receipt is present but cannot be decoded. Do not guess what it said; treat \
+             the root as unverified.",
+        )
+    } else if message.contains("could not be opened")
+        || message.contains("could not be scanned")
+        || message.contains("Failed to open")
+        || message.contains("exclusive lock")
+    {
+        (
+            "state_unreadable",
+            "Durable state could not be inspected. If the daemon is running, stop it first — \
+             this command opens the same stores.",
+        )
+    } else {
+        (
+            "classification_failed",
+            "The runtime-root state could not be classified. The message names what failed.",
+        )
+    }
+}
 
 /// Print the receipt with an explicit statement of what was actually verified.
 ///
@@ -1977,7 +2136,7 @@ pub fn handle_institution_runtime_root_command(
             let receipt = provision_runtime_root(data_dir, &name, &currency)?;
             print_receipt(&receipt, true);
         }
-        InstitutionRuntimeRootCommands::Show { json } => match runtime_root_state(data_dir)? {
+        InstitutionRuntimeRootCommands::Show { json } => match classify_for_show(data_dir, json)? {
             RuntimeRootState::Ready(receipt) => {
                 if json {
                     // Wrap rather than print the receipt bare: a script
@@ -2788,6 +2947,51 @@ mod failpoint_tests {
             CONTENDED.load(Ordering::SeqCst),
             "the ceremony must STILL own the root after publishing the \
              configuration — this is the window a daemon could otherwise use"
+        );
+    }
+
+    /// A failed durability barrier cannot be followed by a committed READY.
+    ///
+    /// This is deliberately not a power-loss simulation. What it establishes:
+    /// when the barrier that makes minted key material durable reports failure,
+    /// the ceremony stops, no receipt is written, the leftover state is
+    /// classified honestly, and a rerun refuses instead of silently reminting
+    /// over key material that may or may not have reached the disk.
+    #[test]
+    fn a_failed_keystore_durability_barrier_cannot_be_followed_by_a_ready_receipt() {
+        let dir = provisioned();
+        let armed = DurabilityFailureGuard::arm(dir.path());
+        let outcome =
+            provision_runtime_root_inner(dir.path(), "Durability Failure Coop", "HOURS", None);
+        drop(armed);
+
+        let err = outcome.expect_err("a failed durability barrier must stop the ceremony");
+        assert!(
+            format!("{err:#}").contains("Failed to sync"),
+            "the failure must name the durability barrier: {err:#}"
+        );
+
+        // No commit marker.
+        let components = runtime_root_components(dir.path()).unwrap();
+        assert!(
+            !components.receipt,
+            "a READY receipt must not exist after a durability failure: {components:?}"
+        );
+        assert!(
+            matches!(
+                runtime_root_state(dir.path()).unwrap(),
+                RuntimeRootState::Incomplete { .. }
+            ),
+            "the leftover state must be reported as incomplete, not as untouched \
+             and not as ready"
+        );
+
+        // And a rerun refuses rather than reminting over it.
+        let rerun = provision_runtime_root_inner(dir.path(), "Rerun After Failure", "HOURS", None)
+            .expect_err("a rerun over partial state must refuse");
+        assert!(
+            format!("{rerun:#}").contains("INCOMPLETE"),
+            "the rerun must name the partial state: {rerun:#}"
         );
     }
 
