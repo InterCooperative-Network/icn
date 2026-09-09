@@ -834,10 +834,10 @@ async fn spawn_actors_with_identity(
         // pre-genesis deployment; a configured-but-unusable value now refuses
         // instead of silently becoming the node DID (#2744).
         let resolved = config.cooperative.resolve_treasury_did(&did)?;
-        if resolved.is_institutional() {
+        if resolved.is_configured() {
             info!(
                 treasury_did = %resolved.did(),
-                "Ledger service using the cooperative's own treasury principal"
+                "Ledger service using the treasury principal named by the configuration"
             );
         } else {
             debug!("No treasury_did configured, using node DID for budget payouts");

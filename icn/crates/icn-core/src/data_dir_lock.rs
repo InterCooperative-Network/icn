@@ -115,9 +115,15 @@ enum Sharing {
 ///
 /// If the normalization itself fails, the file this process just created is
 /// removed before returning. Leaving it would be the exact permanent-lockout
-/// state this function exists to prevent, and removing it is safe precisely
-/// because `create_new` established that nobody else's file is at that path —
-/// a later process simply creates it again.
+/// state this function exists to prevent, and a later process simply creates it
+/// again.
+///
+/// What makes the removal safe is narrower than "`create_new` proved the path
+/// was ours" — that was true at creation, and the unlink happens afterwards. It
+/// is that **no ICN process ever unlinks these files**: `Drop` deliberately
+/// leaves them, precisely so nobody races a process that has just opened one.
+/// The only actor who could have replaced the file in that window is an
+/// operator repairing it by hand.
 #[cfg(unix)]
 fn set_created_mode(path: &Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt as _;
@@ -369,9 +375,28 @@ impl DataDirLock {
             use std::os::unix::fs::OpenOptionsExt as _;
             create.mode(0o600);
         }
-        if let Ok(f) = create.open(&path) {
-            set_created_mode(&path)?;
-            return Self::lock(f, path, sharing, refusal);
+        match create.open(&path) {
+            Ok(f) => {
+                set_created_mode(&path)?;
+                return Self::lock(f, path, sharing, refusal);
+            }
+            // Somebody else has it; fall through and contend for it below.
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            // The file is absent and cannot be created. Reporting this now
+            // matters: falling through would open a non-existent path and
+            // surface `ENOENT`, naming neither the permission nor the
+            // read-only cause an operator has to act on.
+            Err(e) => {
+                return Err(e).with_context(|| {
+                    format!(
+                        "Failed to create the lock {}. ICN maintenance is expected to run under \
+                         the same account as the daemon (`runuser -u icn` / `sudo -u icn`); make \
+                         this directory writable by that account, or point the command at one it \
+                         owns.",
+                        path.display()
+                    )
+                })
+            }
         }
 
         let mut open = std::fs::OpenOptions::new();
@@ -700,6 +725,43 @@ mod tests {
         assert!(
             msg.contains("may not create it"),
             "the refusal must say why it cannot conclude: {msg}"
+        );
+    }
+
+    /// A directory the lock cannot be created in must say *why*.
+    ///
+    /// The exclusive path creates through `take`. When `create_new` fails and
+    /// the file does not exist, falling through to a plain open would report
+    /// `ENOENT` — naming neither the permission nor the read-only cause an
+    /// operator has to act on.
+    #[cfg(unix)]
+    #[test]
+    fn an_uncreatable_exclusive_lock_names_its_actual_cause() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::TempDir::new().unwrap();
+        let inner = dir.path().join("locked-out");
+        std::fs::create_dir(&inner).unwrap();
+        std::fs::set_permissions(&inner, std::fs::Permissions::from_mode(0o500)).unwrap();
+        if std::fs::File::create(inner.join(".probe")).is_ok() {
+            let _ = std::fs::remove_file(inner.join(".probe"));
+            std::fs::set_permissions(&inner, std::fs::Permissions::from_mode(0o700)).unwrap();
+            eprintln!(
+                "SKIPPED an_uncreatable_exclusive_lock_names_its_actual_cause: this process \
+                 can write through a 0500 directory (running as root?). Not evidence here."
+            );
+            return;
+        }
+
+        let err = DataDirLock::acquire(&inner, "the daemon");
+        std::fs::set_permissions(&inner, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let msg = format!("{:#}", err.expect_err("an uncreatable lock must refuse"));
+        assert!(
+            msg.contains("Failed to create the lock"),
+            "the refusal must name creation, not a later open: {msg}"
+        );
+        assert!(
+            !msg.contains("No such file or directory"),
+            "and must not report ENOENT for a directory it simply may not write: {msg}"
         );
     }
 

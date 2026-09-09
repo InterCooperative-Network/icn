@@ -2683,10 +2683,15 @@ fn a_hard_linked_configuration_is_refused_before_anything_is_provisioned() {
 /// started the process.
 ///
 /// `OpenOptions::mode` is `open(2)`'s third argument, and the kernel applies it
-/// as `mode & !umask`. Under `umask 0777` that yields a mode-`000` file — which
-/// not even its owner can reopen — and these files are deliberately retained
-/// after release, so it would lock every later ICN process out of the directory
-/// permanently. `chmod(2)` after creation is not masked.
+/// as `mode & !umask`. Under `umask 0777` that yields a mode-`000` file, which
+/// the supported same-account actor cannot reopen — root bypasses ordinary mode
+/// checks, but root is not the account this protocol coordinates. These files
+/// are deliberately retained after release, so such a file would lock every
+/// later ICN process out of the directory permanently. `chmod(2)` after
+/// creation is not masked.
+///
+/// Run as root, the two reopen assertions below go vacuous (root could reopen a
+/// mode-`000` file); the two `mode == 0o600` assertions still carry the test.
 ///
 /// This is driven from a child process because `umask` is process-global: set
 /// in-process it would leak into every test sharing this binary, which is the

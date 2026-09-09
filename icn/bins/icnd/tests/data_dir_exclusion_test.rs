@@ -319,3 +319,58 @@ impl Drop for Daemon {
         let _ = self.child.wait();
     }
 }
+
+/// `--validate-config` must work where the daemon itself could not start.
+///
+/// It parses, prints a verdict and exits: no daemon, no retained interpretation
+/// of those bytes, so nothing for a ceremony to invalidate and nothing to
+/// exclude. Taking the configuration lock made the documented validation-only
+/// command unusable wherever the account can read a configuration directory it
+/// may not write — a root-owned `/etc/icn` inspected by a service or CI
+/// account, which is an ordinary layout.
+#[cfg(unix)]
+#[test]
+fn validate_config_works_in_a_directory_the_lock_cannot_be_created_in() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let config = write_unloadable_config(dir.path());
+
+    // Readable, not writable — the shape that yields EACCES on lock creation.
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
+    let creatable = std::fs::File::create(dir.path().join(".probe")).is_ok();
+    if creatable {
+        let _ = std::fs::remove_file(dir.path().join(".probe"));
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        eprintln!(
+            "SKIPPED validate_config_works_in_a_directory_the_lock_cannot_be_created_in: \
+             this process can write through a 0500 directory (running as root?). Not \
+             evidence in this environment."
+        );
+        return;
+    }
+
+    let out = std::process::Command::new(icnd_bin())
+        .arg("--config")
+        .arg(&config)
+        .arg("--validate-config")
+        .output()
+        .expect("the icnd binary must be runnable");
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !text.contains("may not create it"),
+        "validation-only must not be blocked by the configuration lock:\n{text}"
+    );
+    // This fixture's configuration is deliberately unloadable, so validation
+    // reports that — which is the point: it got far enough to have an opinion.
+    assert!(
+        text.contains("Failed to load config") || text.contains("missing field"),
+        "it must reach the configuration and report on it:\n{text}"
+    );
+}

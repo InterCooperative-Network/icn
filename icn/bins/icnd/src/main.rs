@@ -592,6 +592,14 @@ async fn main() -> Result<()> {
     // deliberate consequence that a daemon will not start over a configuration
     // directory owned by a more privileged account.
     let pre_config_lock = match &args.config {
+        // `--validate-config` parses, prints a verdict and exits: it starts no
+        // daemon and retains no interpretation of these bytes, so there is
+        // nothing for a ceremony to invalidate and nothing to exclude. Taking
+        // the lock here made the documented validation-only command unusable
+        // wherever the account can read a configuration directory it may not
+        // write — a root-owned `/etc/icn` inspected by a service or CI account,
+        // which is an ordinary layout.
+        Some(_) if args.validate_config => None,
         Some(config_path) => {
             // Canonicalize the FILE first, then take its parent.
             //

@@ -2072,6 +2072,21 @@ fn verify_durable_state(
         // supply a placeholder and re-validate. If everything else passes, the
         // environment was the only gap. If anything else fails, that failure is
         // about the file and is fatal here.
+        //
+        // This deliberately diverges from the preflight, which bails on any
+        // validation error including this one. The two commands are answering
+        // different questions: `create` is about to *write* and certify, so
+        // requiring the operator to present a configuration that demonstrably
+        // starts a daemon is a reasonable precondition and fails closed;
+        // `show` only *reports* durable state, where "this shell cannot see the
+        // secret" is not a fact about the bytes on disk. An operator can
+        // therefore see `create` refuse and `show` report READY over one file.
+        // That is the safe direction — the stricter side is the one that
+        // writes — and it is recorded here rather than smoothed over.
+        //
+        // Note also that when this carve-out does not fire, the refusal prints
+        // the validator'"'"'s own error list verbatim, which may still mention the
+        // secret among the daemon'"'"'s reasons.
         let only_the_environment_secret = secret_from_environment.is_none() && {
             let mut probe = config.clone();
             probe.gateway.jwt_secret = "x".repeat(64);
@@ -2091,7 +2106,7 @@ fn verify_durable_state(
         .cooperative
         .resolve_treasury_did(&node_did)
         .context("Verification: the published configuration does not resolve a treasury")?;
-    if !resolved.is_institutional() || resolved.did().as_str() != receipt.treasury_did {
+    if !resolved.is_configured() || resolved.did().as_str() != receipt.treasury_did {
         bail!(
             "Verification: the published configuration resolves treasury {:?}, not the {} this \
              ceremony created. The daemon would not consume the institution's treasury.",

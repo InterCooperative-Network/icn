@@ -67,7 +67,7 @@ impl CooperativeConfig {
             None => Ok(TreasuryDid::NodeFallback(node_did.clone())),
             Some(configured) => configured
                 .parse::<icn_identity::Did>()
-                .map(TreasuryDid::Institutional)
+                .map(TreasuryDid::Configured)
                 .map_err(|e| {
                     anyhow::anyhow!(
                         "Configured [cooperative] treasury_did {configured:?} is not a usable \
@@ -87,8 +87,20 @@ impl CooperativeConfig {
 /// treasury was configured, so the machine stands in" as the same fact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TreasuryDid {
-    /// A treasury principal of the institution's own.
-    Institutional(icn_identity::Did),
+    /// A treasury principal named by the configuration.
+    ///
+    /// **`Configured`, not `Institutional`.** Parsing a DID out of
+    /// `[cooperative] treasury_did` establishes that a treasury was configured
+    /// and that the value is usable. It establishes nothing about *provenance*:
+    /// there is no receipt, no cooperative registration and no governance
+    /// behind it, and a hand-written file naming this node's own DID would land
+    /// here too. `docs/architecture/IDENTITY_SEMANTICS.md` reserves
+    /// institutional meaning for governed `EntityId` semantics, so calling this
+    /// variant institutional would re-import at the type level exactly the
+    /// claim icn#2744 spent its scope disclaiming. Callers that need the
+    /// stronger fact establish it themselves — `institution runtime-root`
+    /// checks this DID against its receipt.
+    Configured(icn_identity::Did),
     /// No treasury configured; the node's DID, as every pre-genesis
     /// deployment has always used.
     NodeFallback(icn_identity::Did),
@@ -97,18 +109,18 @@ pub enum TreasuryDid {
 impl TreasuryDid {
     pub fn did(&self) -> &icn_identity::Did {
         match self {
-            Self::Institutional(d) | Self::NodeFallback(d) => d,
+            Self::Configured(d) | Self::NodeFallback(d) => d,
         }
     }
 
     pub fn into_did(self) -> icn_identity::Did {
         match self {
-            Self::Institutional(d) | Self::NodeFallback(d) => d,
+            Self::Configured(d) | Self::NodeFallback(d) => d,
         }
     }
 
-    pub fn is_institutional(&self) -> bool {
-        matches!(self, Self::Institutional(_))
+    pub fn is_configured(&self) -> bool {
+        matches!(self, Self::Configured(_))
     }
 }
 
@@ -127,7 +139,7 @@ mod treasury_resolution_tests {
             .resolve_treasury_did(&node)
             .unwrap();
         assert_eq!(resolved, TreasuryDid::NodeFallback(node.clone()));
-        assert!(!resolved.is_institutional());
+        assert!(!resolved.is_configured());
         assert_eq!(resolved.did(), &node);
     }
 
@@ -140,7 +152,7 @@ mod treasury_resolution_tests {
             ..Default::default()
         };
         let resolved = cfg.resolve_treasury_did(&node).unwrap();
-        assert!(resolved.is_institutional());
+        assert!(resolved.is_configured());
         assert_eq!(resolved.did(), &treasury);
         assert_ne!(resolved.did(), &node);
     }
