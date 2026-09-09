@@ -219,20 +219,52 @@ impl DataDirLock {
             return Self::take(path, Sharing::Shared, &refusal).map(Some);
         }
 
-        match std::fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&path)
+        let mut create = std::fs::OpenOptions::new();
+        create.create_new(true).write(true);
+        #[cfg(unix)]
         {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            // An explicit mode, not `0666 & !umask`. These files are retained
+            // after release, so a ceremony run under a restrictive umask would
+            // otherwise leave a coordination file whose permissions depend on
+            // the shell that happened to start it.
+            create.mode(0o600);
+        }
+        match create.open(&path) {
             Ok(_) => Self::take(path, Sharing::Shared, &refusal).map(Some),
             // Created between the check and here — contend rather than assume.
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                 Self::take(path, Sharing::Shared, &refusal).map(Some)
             }
-            // Genuinely absent and uncreatable: nothing holds a lock that does
-            // not exist, and a ceremony that cannot write here cannot publish a
-            // configuration here either.
-            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Ok(None),
+            // A read-only *filesystem* is immutable to every actor on it — a
+            // Kubernetes ConfigMap mount (`readOnly: true`), a packaged image
+            // layer. No process on this machine can publish a configuration
+            // there, so there is genuinely nothing to exclude and the daemon
+            // starts exactly as before. This is the case the earlier
+            // `PermissionDenied` carve-out was actually aiming at.
+            Err(e) if e.kind() == std::io::ErrorKind::ReadOnlyFilesystem => Ok(None),
+            // Permission is a different statement. It says only that *this*
+            // process may not write here, and a more privileged one still can:
+            // a daemon running as its service account over a root-owned
+            // configuration directory cannot create this file, while a ceremony
+            // run under `sudo` in the same directory can — and can republish
+            // the configuration underneath it. Answering "nothing to exclude"
+            // there is not a conclusion, it is an absence of one.
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                Err(e).with_context(|| {
+                    format!(
+                        "Refusing to start {holder}: the configuration lock {} does not exist and \
+                     this process may not create it, so it cannot be established that no other \
+                     ICN process will republish this configuration.\n\
+                     ICN maintenance runs under the same account as the daemon — the deployment \
+                     scripts use `runuser -u icn` / `sudo -u icn` — so make this directory \
+                     writable by that account, or point `--config` at a directory it owns. A \
+                     configuration that is genuinely immutable to every actor (a read-only \
+                     mount) is recognised as such and needs no lock.",
+                        path.display()
+                    )
+                })
+            }
             Err(e) => Err(e).with_context(|| {
                 format!("Failed to create the configuration lock {}", path.display())
             }),
@@ -271,16 +303,28 @@ impl DataDirLock {
         // a process that may only read the file can still discover — and
         // contend for — ownership. Requiring write permission here would turn an
         // unwritable directory into a silent absence of exclusion.
-        let file = match std::fs::OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(&path)
+        let mut open = std::fs::OpenOptions::new();
+        open.create(true).truncate(false).write(true);
+        #[cfg(unix)]
         {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            // Deterministic, umask-independent. Applies only on creation.
+            open.mode(0o600);
+        }
+        let file = match open.open(&path) {
             Ok(f) => f,
             Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
                 std::fs::File::open(&path).with_context(|| {
-                    format!("Failed to open the lock {} even read-only", path.display())
+                    format!(
+                        "Failed to open the lock {} even read-only.\n\
+                         These coordination files are retained after release, so one created by \
+                         a process running under a different account can lock every later ICN \
+                         process out of this directory. ICN maintenance is expected to run under \
+                         the same account as the daemon (`runuser -u icn` / `sudo -u icn`); if \
+                         this file belongs to another account, remove it or give it back to the \
+                         daemon's.",
+                        path.display()
+                    )
                 })?
             }
             Err(e) => {
@@ -484,6 +528,85 @@ mod tests {
         // And both still exclude the ceremony's corresponding acquisition.
         assert!(DataDirLock::acquire(dir.path(), "a ceremony").is_err());
         assert!(DataDirLock::acquire_config(dir.path(), "a ceremony").is_err());
+    }
+
+    /// A directory this process cannot write to is not evidence that nobody can.
+    ///
+    /// The daemon runs as a service account; a configuration directory owned by
+    /// `root` is readable by it and not writable. Answering `Ok(None)` there
+    /// let the daemon consume a configuration that a `sudo` ceremony in the same
+    /// directory was free to republish — the two are cooperating ICN processes
+    /// with *unequal* filesystem authority, which the earlier actor model did
+    /// not account for.
+    #[cfg(unix)]
+    #[test]
+    fn an_unwritable_configuration_directory_fails_closed() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::TempDir::new().unwrap();
+        let inner = dir.path().join("etc-icn");
+        std::fs::create_dir(&inner).unwrap();
+        std::fs::write(inner.join("icn.toml"), b"# readable, not writable\n").unwrap();
+
+        // r-x: this process may read the directory and list it, but not create
+        // the lock file in it. (Root ignores mode bits, so this witness only
+        // means anything unprivileged — asserted below rather than assumed.)
+        std::fs::set_permissions(&inner, std::fs::Permissions::from_mode(0o500)).unwrap();
+        let creatable = std::fs::File::create(inner.join(".probe")).is_ok();
+        if creatable {
+            let _ = std::fs::remove_file(inner.join(".probe"));
+            std::fs::set_permissions(&inner, std::fs::Permissions::from_mode(0o700)).unwrap();
+            eprintln!(
+                "SKIPPED an_unwritable_configuration_directory_fails_closed: this process can \
+                 write through a 0500 directory (running as root?), so the precondition cannot \
+                 be built. Not evidence in this environment."
+            );
+            return;
+        }
+
+        let outcome = DataDirLock::acquire_config_shared_if_manageable(&inner, "the daemon");
+        // Restore before asserting, so a failure does not leave an undeletable dir.
+        std::fs::set_permissions(&inner, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let err = outcome.expect_err(
+            "a directory this process cannot write must not be reported as having nothing to \
+             exclude",
+        );
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("may not create it"),
+            "the refusal must say why it cannot conclude: {msg}"
+        );
+    }
+
+    /// The coordination files are created with a deliberate mode, not the
+    /// invoking shell's umask.
+    ///
+    /// They are retained after release, so a mode inherited from whatever
+    /// started the process becomes a durable property of the directory.
+    #[cfg(unix)]
+    #[test]
+    fn coordination_files_are_created_with_a_deliberate_mode() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::TempDir::new().unwrap();
+
+        let config = DataDirLock::acquire_config_shared_if_manageable(dir.path(), "the daemon")
+            .unwrap()
+            .expect("manageable");
+        let storage = DataDirLock::acquire(dir.path(), "the daemon").unwrap();
+
+        for path in [config.path(), storage.path()] {
+            let mode = std::fs::symlink_metadata(path)
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o7777;
+            assert_eq!(
+                mode,
+                0o600,
+                "{} must be created with an explicit mode, not the process umask; got {mode:o}",
+                path.display()
+            );
+        }
     }
 
     /// Holding the storage lock says nothing about the configuration directory.
