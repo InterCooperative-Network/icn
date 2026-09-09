@@ -1102,6 +1102,12 @@ fn provision_runtime_root_inner(
     // (1) Never write authoritative state where the daemon will not read it.
     resolve_storage_root(data_dir)?;
 
+    // (1a) Refuse an account mismatch BEFORE anything is created — including the
+    // coordination lock files below, which are retained after release and which
+    // a wrong-account run would otherwise leave behind for the daemon to trip
+    // over. See `refuse_if_the_configuration_belongs_to_another_account`.
+    refuse_if_the_configuration_belongs_to_another_account(data_dir)?;
+
     // (1b) Take exclusive ownership of the data root BEFORE any state-sensitive
     // observation. Everything from here to the receipt is a read that a
     // concurrent ceremony could invalidate, so the boundary has to span all of
@@ -1777,6 +1783,190 @@ fn verify_durable_state(
     Ok(())
 }
 
+/// The access identity a file carries: the owner and group that, together with
+/// the mode bits, decide which accounts may read it.
+///
+/// Captured from the inode rather than from the process, deliberately. A file
+/// created in a setgid directory takes the *directory's* group, not the
+/// creator's, so asking "what does a new file here actually get?" answers a
+/// question `geteuid`/`getegid` cannot.
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AccessIdentity {
+    uid: u32,
+    gid: u32,
+}
+
+#[cfg(unix)]
+impl AccessIdentity {
+    fn of(meta: &std::fs::Metadata) -> Self {
+        use std::os::unix::fs::MetadataExt as _;
+        Self {
+            uid: meta.uid(),
+            gid: meta.gid(),
+        }
+    }
+}
+
+#[cfg(unix)]
+impl std::fmt::Display for AccessIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "uid {} gid {}", self.uid, self.gid)
+    }
+}
+
+/// What replacing a file with a newly created one would do to its access
+/// identity.
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OwnershipTransfer {
+    /// The replacement carries the same owner and group. Who may read the file
+    /// is unchanged.
+    Preserved,
+    /// The replacement would be owned by a different account, so accounts that
+    /// could read the file may no longer be able to.
+    WouldChange {
+        existing: AccessIdentity,
+        replacement: AccessIdentity,
+    },
+}
+
+/// The policy, as a pure function.
+///
+/// Separated from every filesystem call on purpose: an unprivileged test
+/// process cannot create a file owned by another account, but it can — and
+/// does — drive this with identities it could never construct on disk.
+#[cfg(unix)]
+fn classify_ownership_transfer(
+    existing: AccessIdentity,
+    replacement: AccessIdentity,
+) -> OwnershipTransfer {
+    if existing == replacement {
+        OwnershipTransfer::Preserved
+    } else {
+        OwnershipTransfer::WouldChange {
+            existing,
+            replacement,
+        }
+    }
+}
+
+/// Why this refuses rather than restoring the ownership itself.
+///
+/// Atomic publication replaces the inode, so the new file's owner and group
+/// come from the process that created it. `chown(2)` could put them back — but
+/// that would fix the *configuration* alone. This same ceremony mints
+/// `genesis-trust-root.age` and `treasury.age` and writes three sled databases,
+/// all as the invoking account. A ceremony running as the wrong account
+/// produces a runtime root the daemon cannot read in its entirety; repairing
+/// one file of it would buy a receipt that looks right over state that is not.
+///
+/// So the account mismatch is treated as what it is — the ceremony being run as
+/// the wrong user — and the remedy is to run it as the right one.
+#[cfg(unix)]
+fn refuse_ownership_change(
+    path: &Path,
+    existing: AccessIdentity,
+    replacement: AccessIdentity,
+) -> anyhow::Error {
+    anyhow::anyhow!(
+        "Refusing institutional runtime-root provisioning: publishing {} would change which \
+         account owns it.\n  \
+         it is owned by:            {existing}\n  \
+         this process writes as:    {replacement}\n\
+         Publication replaces the file, so the replacement would carry this process's identity \
+         and an account that can read the configuration today might not be able to afterwards — \
+         while the receipt reported success. The keystores and stores this ceremony writes \
+         would carry the same identity, so this is not a property of the configuration alone: \
+         it is the ceremony running as the wrong account.\n\
+         Re-run provisioning as the account that owns this data directory (the deployment \
+         scripts use `runuser -u icn` / `sudo -u icn`).",
+        path.display()
+    )
+}
+
+/// Refuse when publication would hand the configuration to a different account.
+///
+/// Called twice, and both call sites matter.
+///
+/// * **Before the exclusion locks are taken**, so a ceremony started under the
+///   wrong account creates nothing at all. This ordering is not cosmetic: the
+///   coordination lock files are deliberately retained after release, so a
+///   ceremony that took them as `root` and only then discovered the mismatch
+///   would leave behind files the daemon's own account cannot reopen — turning
+///   an operator's wrong `sudo` into a permanent startup failure.
+/// * **From [`check_config_linkable`]**, which publication re-runs immediately
+///   before it replaces the file, closing the window between the two.
+#[cfg(unix)]
+fn refuse_if_the_configuration_belongs_to_another_account(data_dir: &Path) -> Result<()> {
+    let config_path = data_dir.join("icn.toml");
+    let existing = match std::fs::symlink_metadata(&config_path) {
+        Ok(meta) => meta,
+        // No configuration yet: nothing to take away from anyone. Its absence
+        // is refused separately, by `check_config_linkable`.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => {
+            return Err(e).with_context(|| format!("Failed to inspect {}", config_path.display()))
+        }
+    };
+    // A non-regular configuration is refused by the publication step and, before
+    // it, by the N2-A gate; its ownership is not this check's question.
+    if existing.file_type().is_symlink() || !existing.is_file() {
+        return Ok(());
+    }
+    if let OwnershipTransfer::WouldChange {
+        existing,
+        replacement,
+    } = classify_ownership_transfer(
+        AccessIdentity::of(&existing),
+        identity_new_files_receive(data_dir)?,
+    ) {
+        return Err(refuse_ownership_change(&config_path, existing, replacement));
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn refuse_if_the_configuration_belongs_to_another_account(_data_dir: &Path) -> Result<()> {
+    Ok(())
+}
+
+/// What accounts new files in this directory are actually created with.
+///
+/// A transient probe rather than a computation: it costs one `create_new` and
+/// one unlink, and it observes the same thing publication will experience,
+/// including the setgid case a `getegid` answer would get wrong. It runs during
+/// preflight so an account mismatch is refused *before* key material is minted,
+/// rather than at publication with a half-provisioned directory left behind.
+#[cfg(unix)]
+fn identity_new_files_receive(dir: &Path) -> Result<AccessIdentity> {
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let probe = dir.join(format!(
+        ".icn-runtime-root-identity-probe.{}",
+        std::process::id()
+    ));
+    // A stale probe is not a reason to guess: `create_new` refuses rather than
+    // reusing whatever sits there, and an unreadable one is refused below.
+    let _ = std::fs::remove_file(&probe);
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&probe)
+        .with_context(|| {
+            format!(
+                "Refusing to proceed: could not create {} to determine which account new files \
+                 in this directory are owned by",
+                probe.display()
+            )
+        })?;
+    let identity = std::fs::symlink_metadata(&probe)
+        .map(|m| AccessIdentity::of(&m))
+        .with_context(|| format!("Failed to inspect {}", probe.display()));
+    let _ = std::fs::remove_file(&probe);
+    identity
+}
+
 /// Link the treasury identity into the configuration the daemon will read.
 ///
 /// Appends a `[cooperative]` section rather than round-tripping the file
@@ -1802,6 +1992,8 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
             config_path.display()
         );
     }
+    refuse_if_the_configuration_belongs_to_another_account(data_dir)?;
+
     let text = std::fs::read_to_string(&config_path)
         .with_context(|| format!("Failed to read {}", config_path.display()))?;
     // `toml::from_str`, not `str::parse` — in toml 0.9 `FromStr for Value`
@@ -1976,11 +2168,37 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
         })?,
         Err(_) => {}
     }
+    // The destination gets the same treatment as the temporary path. `rename`
+    // replaces a symlink rather than following it, so publishing over one would
+    // silently convert a deliberate indirection — a config shared from
+    // `/etc/icn`, say — into a private regular file, and the metadata captured
+    // below would be the *target's* rather than the link's.
+    let published_contract = match std::fs::symlink_metadata(&config_path) {
+        Ok(meta) if meta.file_type().is_symlink() || !meta.is_file() => bail!(
+            "Refusing to publish the configuration: {} is not a regular file. Replacing it \
+             would discard whatever it is — a symlink to a shared configuration, most likely — \
+             rather than update it.",
+            config_path.display()
+        ),
+        Ok(meta) => Some(meta),
+        // Nothing to replace, and nothing to preserve. Preflight requires the
+        // file to exist, so this is only reachable if it vanished mid-ceremony.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => {
+            return Err(e).with_context(|| {
+                format!(
+                    "Refusing to publish the configuration: could not inspect {}",
+                    config_path.display()
+                )
+            })
+        }
+    };
+
     {
-        // Created 0600, then widened to the original file's mode after the
-        // content is written. The published `icn.toml` may hold a plaintext
-        // `jwt_secret`, and creating the temp file at the process umask would
-        // expose it world-readable for the duration of the write.
+        // Created 0600, then given the original file's mode once the content is
+        // written. The published `icn.toml` may hold a plaintext `jwt_secret`,
+        // and creating the temp file at the process umask would expose it
+        // world-readable for the duration of the write.
         let mut opts = std::fs::OpenOptions::new();
         opts.write(true).create_new(true);
         #[cfg(unix)]
@@ -1993,24 +2211,37 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
             .with_context(|| format!("Failed to create {}", tmp_path.display()))?;
         f.write_all(out.as_bytes())
             .with_context(|| format!("Failed to write {}", tmp_path.display()))?;
-        f.sync_all()
-            .with_context(|| format!("Failed to flush {}", tmp_path.display()))?;
-    }
-    // Carry the original file's permissions onto the replacement. `init-coop`'s
-    // template invites a plaintext secret into this very file
-    // (`# jwt_secret = "CHANGE_ME"  # Set this before starting!`), so a
-    // deployment that hardened it to 0600 must not silently get 0644 back from
-    // the process umask.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        if let Ok(meta) = std::fs::metadata(&config_path) {
+
+        // Access metadata is applied BEFORE the durability barrier, not after.
+        // `sync_all` is `fsync`, which flushes the inode as well as the data, so
+        // a mode set afterwards would not have crossed the same barrier the
+        // receipt is about to certify — the file could survive a power cut with
+        // its 0600 creation mode instead of the mode this publication chose.
+        #[cfg(unix)]
+        if let Some(meta) = published_contract.as_ref() {
+            use std::os::unix::fs::PermissionsExt as _;
+
+            // Ownership is deliberately NOT re-checked here. `check_config_linkable`
+            // runs at the top of this function as well as at ceremony start, and it
+            // carries the account guard — so a second copy at this point can never
+            // answer first, and a mutation deleting it is invisible. One guard, in
+            // the place that is actually reached. The post-condition after the
+            // rename is what confirms the outcome.
+
+            // Carry the original file's mode. `init-coop`'s template invites a
+            // plaintext secret into this very file (`# jwt_secret =
+            // "CHANGE_ME"  # Set this before starting!`), so a deployment that
+            // hardened it to 0600 must not silently get 0644 back from the
+            // process umask.
             let mode = meta.permissions().mode();
             std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(mode))
                 .with_context(|| {
                     format!("Failed to carry permissions onto {}", tmp_path.display())
                 })?;
         }
+
+        f.sync_all()
+            .with_context(|| format!("Failed to flush {}", tmp_path.display()))?;
     }
     // The rename is atomic, but atomicity is not durability: on a crash the
     // directory entry can still be lost unless the *directory* is synced. The
@@ -2033,6 +2264,47 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
         )
     })?;
     sync_parent()?;
+
+    // Post-condition, checked rather than assumed: the file an operator and the
+    // daemon will now open is a regular file carrying the access metadata of the
+    // one it replaced.
+    //
+    // This proves the metadata was PRESERVED. It does not prove the daemon can
+    // read it: this process is not running under the daemon's credentials, and
+    // a check it performs itself could only ever speak for its own.
+    #[cfg(unix)]
+    if let Some(before) = published_contract.as_ref() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let after = std::fs::symlink_metadata(&config_path).with_context(|| {
+            format!(
+                "Failed to re-inspect {} after publishing",
+                config_path.display()
+            )
+        })?;
+        if after.file_type().is_symlink() || !after.is_file() {
+            bail!(
+                "Verification: {} is not a regular file after publication",
+                config_path.display()
+            );
+        }
+        let (was, now) = (AccessIdentity::of(before), AccessIdentity::of(&after));
+        if was != now {
+            bail!(
+                "Verification: publishing {} changed its owner from {was} to {now}",
+                config_path.display()
+            );
+        }
+        let (was_mode, now_mode) = (
+            before.permissions().mode() & 0o7777,
+            after.permissions().mode() & 0o7777,
+        );
+        if was_mode != now_mode {
+            bail!(
+                "Verification: publishing {} changed its mode from {was_mode:o} to {now_mode:o}",
+                config_path.display()
+            );
+        }
+    }
     Ok(())
 }
 /// Classify the root, and make sure a `--json` caller gets a document even when
@@ -2533,6 +2805,173 @@ mod failpoint_tests {
             "F: a published configuration is not a committed runtime root"
         );
         assert_rerun_refuses_without_minting(dir.path(), "F");
+    }
+
+    /// The ownership policy, driven with identities this process could never
+    /// create on disk.
+    ///
+    /// This is the primary evidence for the policy itself. An unprivileged test
+    /// cannot `chown` a file to another user, so a test that only exercised
+    /// real files would be able to check the *equal* case and nothing else —
+    /// and would pass just as happily if the comparison were deleted.
+    #[cfg(unix)]
+    #[test]
+    fn any_change_of_owner_or_group_is_refused_not_repaired() {
+        let daemon = AccessIdentity { uid: 998, gid: 998 };
+
+        assert_eq!(
+            classify_ownership_transfer(daemon, daemon),
+            OwnershipTransfer::Preserved,
+            "the same account publishing its own configuration must be allowed"
+        );
+
+        // A different user: `sudo icnctl ...` over a service-owned config.
+        assert_eq!(
+            classify_ownership_transfer(daemon, AccessIdentity { uid: 0, gid: 998 }),
+            OwnershipTransfer::WouldChange {
+                existing: daemon,
+                replacement: AccessIdentity { uid: 0, gid: 998 },
+            },
+            "a different owner must be refused"
+        );
+
+        // Same user, different group. This one is easy to miss: the file stays
+        // readable by its owner, so an owner-only check would call it fine,
+        // while every account that reached it through the group loses access.
+        assert_eq!(
+            classify_ownership_transfer(daemon, AccessIdentity { uid: 998, gid: 0 }),
+            OwnershipTransfer::WouldChange {
+                existing: daemon,
+                replacement: AccessIdentity { uid: 998, gid: 0 },
+            },
+            "a different group must be refused too"
+        );
+    }
+
+    /// The probe answers the question publication will actually ask.
+    #[cfg(unix)]
+    #[test]
+    fn the_identity_probe_reports_what_new_files_here_are_owned_by() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let probed = identity_new_files_receive(dir.path()).unwrap();
+
+        let witness = dir.path().join("witness");
+        std::fs::write(&witness, b"").unwrap();
+        let actual = AccessIdentity::of(&std::fs::symlink_metadata(&witness).unwrap());
+        assert_eq!(
+            probed, actual,
+            "the probe must report the identity a real new file receives here"
+        );
+
+        // And it must leave nothing behind.
+        assert!(
+            !dir.path().join(".icn-runtime-root-identity-probe").exists(),
+            "the probe file must be removed"
+        );
+    }
+
+    /// The publication step refuses a destination that is not a regular file.
+    ///
+    /// Driven directly, because the N2-A gate refuses a symlink under the data
+    /// directory first and this guard is therefore unreachable through the
+    /// command. It is kept for the window *after* the gate — the gate releases
+    /// its locks when it returns — and because the access metadata carried onto
+    /// the replacement is read from this path: following a link here would
+    /// capture the target's identity and then replace the link instead.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_destination_is_refused_at_publication() {
+        let dir = provisioned();
+        let cfg = dir.path().join("icn.toml");
+        let elsewhere = tempfile::TempDir::new().unwrap();
+        let real = elsewhere.path().join("shared.toml");
+        std::fs::rename(&cfg, &real).unwrap();
+        std::os::unix::fs::symlink(&real, &cfg).unwrap();
+
+        let treasury = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let err = publish_cooperative_config(dir.path(), "Linked Coop", &treasury)
+            .expect_err("publication must refuse a non-regular destination");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("is not a regular file"),
+            "the refusal must name the destination's shape: {msg}"
+        );
+        assert!(
+            std::fs::symlink_metadata(&cfg)
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "the link must survive"
+        );
+    }
+
+    /// A supplementary group of this process that is not its effective group.
+    ///
+    /// The one on-disk identity change an unprivileged process can make.
+    #[cfg(unix)]
+    fn a_supplementary_group() -> Option<u32> {
+        let egid = unsafe { libc::getegid() };
+        let mut groups = vec![0 as libc::gid_t; 64];
+        let n = unsafe { libc::getgroups(groups.len() as libc::c_int, groups.as_mut_ptr()) };
+        if n < 0 {
+            return None;
+        }
+        groups.truncate(n as usize);
+        groups.into_iter().find(|g| *g != egid)
+    }
+
+    #[cfg(unix)]
+    fn chgrp(path: &Path, gid: u32) {
+        let c = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()).unwrap();
+        // `u32::MAX` is `(uid_t)-1`: leave the owner alone.
+        let rc = unsafe { libc::chown(c.as_ptr(), u32::MAX, gid) };
+        assert_eq!(
+            rc, 0,
+            "fixture: chgrp({gid}) must succeed for a group we are in"
+        );
+    }
+
+    /// Publication must not trust the preflight answer.
+    ///
+    /// The ownership check runs twice for a reason: preflight refuses an account
+    /// mismatch before any key material is minted, but the *entire* ceremony
+    /// happens between that answer and the write it is about. This moves the
+    /// configuration into another group inside that window — at the last
+    /// boundary before publication — and requires the publication step to
+    /// refuse on its own account.
+    ///
+    /// Without this, deleting the publication-time check is invisible: the
+    /// preflight one answers first in every ordinary run.
+    #[cfg(unix)]
+    #[test]
+    fn a_configuration_regrouped_mid_ceremony_is_refused_at_publication() {
+        let Some(_) = a_supplementary_group() else {
+            eprintln!(
+                "SKIPPED a_configuration_regrouped_mid_ceremony_is_refused_at_publication: \
+                 this account has no supplementary group, so an on-disk identity change \
+                 cannot be made without privilege. Not evidence in this environment."
+            );
+            return;
+        };
+
+        fn regroup(root: &Path, point: RuntimeRootFailpoint) {
+            if point == RuntimeRootFailpoint::AfterTreasuryAuthorityEdge {
+                if let Some(gid) = a_supplementary_group() {
+                    chgrp(&root.join("icn.toml"), gid);
+                }
+            }
+        }
+
+        let dir = provisioned();
+        let _observer = ObserverGuard::install(dir.path(), regroup);
+
+        let err = provision_runtime_root_inner(dir.path(), "Regrouped Coop", "HOURS", None)
+            .expect_err("publication must re-check the identity it is about to replace");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("would change which account owns it"),
+            "the refusal must come from the ownership check at publication: {msg}"
+        );
     }
 
     /// Every input this ceremony accepts must be one the gateway accepts.

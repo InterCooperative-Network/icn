@@ -2335,3 +2335,211 @@ fn provisioning_is_refused_while_a_daemon_holds_this_directorys_configuration() 
         "and it must not have republished the file it was refused over"
     );
 }
+
+/// Publication replaces the inode, so the access metadata of the file it
+/// replaces has to be carried deliberately — and provably.
+///
+/// The inode assertion is the point: without it this would pass even if the
+/// ceremony edited the file in place, which is a different (and less safe)
+/// mechanism than the atomic replacement the crash-safety argument rests on.
+#[cfg(unix)]
+#[test]
+fn publishing_the_configuration_preserves_its_access_metadata() {
+    use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let cfg = data_dir.join("icn.toml");
+    // 0640, not 0600, and that distinction is the whole test. The temporary
+    // file is *created* 0600, so a fixture that starts at 0600 cannot tell
+    // "the original mode was carried onto the replacement" apart from "the
+    // creation mode happened to match". A mutation deleting the carry-over
+    // survived exactly that fixture.
+    std::fs::set_permissions(&cfg, std::fs::Permissions::from_mode(0o640)).unwrap();
+    let before = std::fs::symlink_metadata(&cfg).unwrap();
+    let (uid, gid, mode, ino) = (
+        before.uid(),
+        before.gid(),
+        before.permissions().mode() & 0o7777,
+        before.ino(),
+    );
+    assert_eq!(
+        mode, 0o640,
+        "fixture: the configuration must start at a mode the temporary file is \
+         not created with, or this proves nothing"
+    );
+
+    let out = provision_runtime_root(data_dir, "Metadata Coop");
+    assert!(
+        out.status.success(),
+        "provisioning must succeed for the same account:\n{}",
+        combined(&out)
+    );
+
+    let after = std::fs::symlink_metadata(&cfg).unwrap();
+    assert_ne!(
+        ino,
+        after.ino(),
+        "fixture: publication must have replaced the file, not edited it in place"
+    );
+    assert_eq!(uid, after.uid(), "the owner must be preserved");
+    assert_eq!(gid, after.gid(), "the group must be preserved");
+    assert_eq!(
+        mode,
+        after.permissions().mode() & 0o7777,
+        "the original mode must be carried onto the replacement — not left at the \
+         0600 the temporary file is created with, and not reset to the process umask"
+    );
+    assert!(
+        !after.file_type().is_symlink() && after.is_file(),
+        "the published configuration must be a regular file"
+    );
+}
+
+/// A configuration reached through a symlink is refused before publication —
+/// **by the N2-A startup gate**, not by this ceremony's own destination check.
+///
+/// Attribution matters here. `publish_cooperative_config` also refuses a
+/// non-regular destination, but the gate runs first and sled discovery already
+/// refuses to decide whether a symlink under the data directory names a store
+/// inside or outside it. So in the real flow this is the gate's refusal; the
+/// ceremony's own guard covers the window after the gate and is pinned
+/// separately by `a_symlinked_destination_is_refused_at_publication`.
+#[cfg(unix)]
+#[test]
+fn a_symlinked_configuration_is_refused_before_anything_is_published() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    // Move the real configuration aside and leave a link in its place.
+    let cfg = data_dir.join("icn.toml");
+    let elsewhere = TempDir::new().unwrap();
+    let real = elsewhere.path().join("shared.toml");
+    std::fs::rename(&cfg, &real).unwrap();
+    std::os::unix::fs::symlink(&real, &cfg).unwrap();
+
+    let refused = combined(&provision_runtime_root(data_dir, "Symlinked Coop"));
+    assert!(
+        refused.contains("N2-A startup gate") && refused.contains("found a symlink"),
+        "the gate must refuse a symlink under the data directory:\n{refused}"
+    );
+    assert!(
+        std::fs::symlink_metadata(&cfg)
+            .unwrap()
+            .file_type()
+            .is_symlink(),
+        "and the link must survive the refusal"
+    );
+    assert!(
+        !std::fs::read_to_string(&real)
+            .unwrap()
+            .contains("[cooperative]"),
+        "nothing may have been written through the link"
+    );
+}
+
+/// The cross-identity case, driven through the real binary.
+///
+/// Supplementary evidence, and gated honestly: an unprivileged process cannot
+/// `chown` a file to another *user*, so this uses the one identity change it
+/// can make — moving the file to a supplementary group it belongs to. Where the
+/// test account has no supplementary group, the precondition cannot be built
+/// and the witness says so out loud rather than reporting a pass it did not
+/// earn. The policy itself is covered unconditionally by
+/// `any_change_of_owner_or_group_is_refused_not_repaired`.
+#[cfg(unix)]
+#[test]
+fn provisioning_refuses_when_it_would_change_the_configurations_group() {
+    let Some(other_gid) = a_supplementary_group() else {
+        eprintln!(
+            "SKIPPED provisioning_refuses_when_it_would_change_the_configurations_group: \
+             this account has no supplementary group, so a differing on-disk identity \
+             cannot be constructed without privilege. The policy is covered by the \
+             unit test; this witness is not evidence in this environment."
+        );
+        return;
+    };
+
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let cfg = data_dir.join("icn.toml");
+    chgrp(&cfg, other_gid);
+    let before = std::fs::symlink_metadata(&cfg).unwrap();
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        assert_eq!(
+            before.gid(),
+            other_gid,
+            "fixture: the configuration must actually belong to the other group"
+        );
+    }
+
+    let refused = combined(&provision_runtime_root(data_dir, "Wrong Account Coop"));
+    assert!(
+        refused.contains("would change which account owns it"),
+        "provisioning must refuse rather than silently re-owning the file:\n{refused}"
+    );
+
+    // The refusal must land before anything durable exists, so an operator is
+    // not left with a half-provisioned directory to clean up.
+    for artefact in ["genesis-trust-root.age", "treasury.age"] {
+        assert!(
+            !data_dir.join(artefact).exists(),
+            "{artefact} must not have been minted before the refusal"
+        );
+    }
+    // And before the coordination files, which are retained after release. A
+    // ceremony that took them under the wrong account and only then refused
+    // would leave behind files the daemon's own account cannot reopen — turning
+    // a mistaken `sudo` into a permanent startup failure.
+    for lock in [".icn-config.lock", ".icn-data-dir.lock"] {
+        assert!(
+            !data_dir.join(lock).exists(),
+            "{lock} must not have been created before the account check refused"
+        );
+    }
+    let after = std::fs::symlink_metadata(&cfg).unwrap();
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        assert_eq!(
+            before.ino(),
+            after.ino(),
+            "the configuration must be untouched"
+        );
+        assert_eq!(before.gid(), after.gid(), "and must keep its group");
+    }
+}
+
+/// A supplementary group of this process that is not its effective group, or
+/// `None` when there is no such group to use.
+#[cfg(unix)]
+fn a_supplementary_group() -> Option<u32> {
+    let egid = unsafe { libc::getegid() };
+    let mut groups = vec![0 as libc::gid_t; 64];
+    let n = unsafe { libc::getgroups(groups.len() as libc::c_int, groups.as_mut_ptr()) };
+    if n < 0 {
+        return None;
+    }
+    groups.truncate(n as usize);
+    groups.into_iter().find(|g| *g != egid)
+}
+
+#[cfg(unix)]
+fn chgrp(path: &Path, gid: u32) {
+    let c = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()).unwrap();
+    // -1 leaves the owner alone; changing only the group to one this process
+    // belongs to is permitted without privilege.
+    let rc = unsafe { libc::chown(c.as_ptr(), u32::MAX, gid) };
+    assert_eq!(
+        rc, 0,
+        "fixture: chgrp({gid}) must succeed for a group we are in"
+    );
+}
