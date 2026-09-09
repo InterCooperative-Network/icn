@@ -2678,3 +2678,274 @@ fn a_hard_linked_configuration_is_refused_before_anything_is_provisioned() {
         combined(&out)
     );
 }
+
+/// The coordination file's mode must not depend on the umask of whatever
+/// started the process.
+///
+/// `OpenOptions::mode` is `open(2)`'s third argument, and the kernel applies it
+/// as `mode & !umask`. Under `umask 0777` that yields a mode-`000` file — which
+/// not even its owner can reopen — and these files are deliberately retained
+/// after release, so it would lock every later ICN process out of the directory
+/// permanently. `chmod(2)` after creation is not masked.
+///
+/// This is driven from a child process because `umask` is process-global: set
+/// in-process it would leak into every test sharing this binary, which is the
+/// class of defect this suite has already been bitten by twice.
+#[cfg(unix)]
+#[test]
+fn coordination_files_ignore_a_hostile_umask() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join("shared")).unwrap();
+    std::fs::create_dir_all(dir.path().join("exclusive")).unwrap();
+    let out = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "umask_hostile_lock_child", "--nocapture"])
+        .env("ICN_TEST_HOSTILE_UMASK_ROOT", dir.path())
+        .output()
+        .expect("the test binary must be re-invokable as a child");
+    assert!(
+        out.status.success(),
+        "the child must create the lock:\n{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // Both creation paths, separately. The shared path creates through
+    // `acquire_config_shared_if_manageable`; the exclusive path creates inside
+    // `DataDirLock::take`. Those are different `create_new` sites, so a fixture
+    // exercising only one would let a mutation of the other survive.
+    let shared = dir.path().join("shared");
+    let exclusive = dir.path().join("exclusive");
+    for (lock, what) in [
+        (
+            icn_core::DataDirLock::config_lock_path(&shared),
+            "the shared configuration lock",
+        ),
+        (
+            icn_core::DataDirLock::lock_path(&exclusive),
+            "the exclusive storage lock",
+        ),
+    ] {
+        let mode = std::fs::symlink_metadata(&lock)
+            .unwrap_or_else(|e| panic!("{what} must exist at {}: {e}", lock.display()))
+            .permissions()
+            .mode()
+            & 0o7777;
+        assert_eq!(
+            mode, 0o600,
+            "created under `umask 0777`, {what} must still be 0600, not {mode:o}"
+        );
+    }
+
+    // Narrow is not the same as reopenable — mode 000 is narrow too.
+    icn_core::DataDirLock::acquire_config_shared_if_manageable(&shared, "a later daemon")
+        .expect("a later process must be able to reopen the shared lock")
+        .expect("and it must be a real lock");
+    icn_core::DataDirLock::acquire(&exclusive, "a later daemon")
+        .expect("a later process must be able to reopen the exclusive lock");
+}
+
+/// Child half of `coordination_files_ignore_a_hostile_umask`.
+#[cfg(unix)]
+#[test]
+fn umask_hostile_lock_child() {
+    let Ok(root) = std::env::var("ICN_TEST_HOSTILE_UMASK_ROOT") else {
+        return;
+    };
+    // Strip every permission bit the kernel would otherwise let through.
+    unsafe { libc::umask(0o777) };
+    // The directories themselves are created by the parent, under an ordinary
+    // umask. Creating them here would make them mode 000 too, and the child
+    // could not write into its own fixture — which would prove nothing about
+    // the file modes under test.
+    let root = Path::new(&root);
+    let shared = root.join("shared");
+    let exclusive = root.join("exclusive");
+
+    // Creation path A: the shared configuration lock.
+    let a = icn_core::DataDirLock::acquire_config_shared_if_manageable(&shared, "the child")
+        .expect("shared acquisition must succeed")
+        .expect("a writable directory is manageable");
+    // Creation path B: the exclusive storage lock, created inside `take`.
+    let b = icn_core::DataDirLock::acquire(&exclusive, "the child")
+        .expect("exclusive acquisition must succeed");
+    drop(a);
+    drop(b);
+}
+
+/// READY must not survive a configuration the daemon would refuse to start on.
+///
+/// The preflight runs `Config::validate`; the readback did not. So a
+/// configuration edited after provisioning to something that still *parses* but
+/// is fatally invalid — an empty `network.listen_addr` — kept resolving a
+/// treasury here while `icnd` exits on it at startup. READY has to be true from
+/// the daemon's execution context, not merely from this command's.
+#[test]
+fn show_refuses_ready_over_a_configuration_the_daemon_would_reject() {
+    let dir = genesis_dir("Invalid Config Coop");
+    let cfg = dir.path().join("icn.toml");
+
+    let text = std::fs::read_to_string(&cfg).unwrap();
+    let broken = regex_replace_listen_addr(&text);
+    assert_ne!(
+        broken, text,
+        "fixture: the listen_addr line must be present"
+    );
+    std::fs::write(&cfg, &broken).unwrap();
+
+    // Still valid TOML, and still a parseable `Config` — the point of the case.
+    assert!(
+        toml::from_str::<toml::Value>(&broken).is_ok(),
+        "fixture: the edited configuration must still parse as TOML"
+    );
+
+    let out = icnctl(dir.path())
+        .args(["institution", "runtime-root", "show"])
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(
+        !out.status.success(),
+        "`show` must not report success over a configuration the daemon rejects:\n{text}"
+    );
+    assert!(
+        !text.contains("READY"),
+        "and must not report READY:\n{text}"
+    );
+    assert!(
+        text.contains("would refuse to start"),
+        "the refusal must name the daemon's validation, not something incidental:\n{text}"
+    );
+}
+
+/// Blank out `network.listen_addr` while leaving the document parseable.
+fn regex_replace_listen_addr(text: &str) -> String {
+    text.lines()
+        .map(|l| {
+            if l.trim_start().starts_with("listen_addr") {
+                "listen_addr = \"\"".to_string()
+            } else {
+                l.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The machine surface must survive the new readback error path.
+///
+/// `show --json` promises exactly one JSON document on stdout for every
+/// outcome. Adding daemon-fatal validation to the readback created a fresh way
+/// to fail, and a contract that held before a new error path existed has to be
+/// re-proven after it.
+#[test]
+fn show_json_stays_one_document_over_a_daemon_invalid_configuration() {
+    let dir = genesis_dir("Invalid Config Json Coop");
+    let cfg = dir.path().join("icn.toml");
+    let text = std::fs::read_to_string(&cfg).unwrap();
+    std::fs::write(&cfg, regex_replace_listen_addr(&text)).unwrap();
+
+    let out = icnctl(dir.path())
+        .args(["institution", "runtime-root", "show", "--json"])
+        .output()
+        .unwrap();
+
+    // The WHOLE of stdout, not an extracted fragment.
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+        panic!(
+            "stdout must be exactly one JSON document: {e}\n--- stdout ---\n{}\n--- stderr ---\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        )
+    });
+    let state = doc["state"].as_str().unwrap_or_default();
+    assert!(
+        matches!(state, "INCONSISTENT" | "ERROR"),
+        "a configuration the daemon would reject must not read as READY; got {state}: {doc}"
+    );
+    assert_ne!(state, "READY");
+}
+
+/// A secret the daemon takes from its environment is not durable-state damage.
+///
+/// `show` runs in whatever shell an operator happens to use, which is not the
+/// service's environment. `init-coop` recommends supplying the gateway secret
+/// through `ICN_GATEWAY_JWT_SECRET`, and `Config::validate` treats an empty
+/// secret with the gateway enabled as fatal — so validating the readback
+/// naively would report INCONSISTENT for a perfectly sound runtime root merely
+/// because this invocation cannot see the secret. That is the
+/// boolean-for-unknown mistake this command avoids everywhere else.
+///
+/// The pair below is the discriminator: the same command over the same
+/// directory must stay READY when only the environment-supplied secret is
+/// missing, and must still refuse when something the environment cannot supply
+/// is wrong.
+#[test]
+fn a_secret_only_the_daemons_environment_holds_does_not_read_as_inconsistent() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    // Put the configuration back to the template's shape: gateway enabled, the
+    // secret only commented out, exactly as `init-coop` leaves it.
+    let cfg = data_dir.join("icn.toml");
+    let text = std::fs::read_to_string(&cfg).unwrap();
+    let without = text.replace(
+        "jwt_secret = \"fixture-jwt-secret-not-a-real-credential\"",
+        "# jwt_secret = \"CHANGE_ME\"  # Set this before starting!",
+    );
+    assert_ne!(without, text, "fixture: the secret line must be present");
+    std::fs::write(&cfg, without).unwrap();
+
+    let provisioned = icnctl(data_dir)
+        .env(
+            "ICN_GATEWAY_JWT_SECRET",
+            "an-environment-supplied-secret-of-adequate-length",
+        )
+        .args([
+            "institution",
+            "runtime-root",
+            "create",
+            "--name",
+            "Env Coop",
+            "--yes",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        provisioned.status.success(),
+        "fixture: provisioning with the environment secret must succeed:\n{}",
+        combined(&provisioned)
+    );
+
+    // `show` WITHOUT the secret in its environment. `icnctl()` does not set it.
+    let out = icnctl(data_dir)
+        .args(["institution", "runtime-root", "show"])
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(
+        out.status.success(),
+        "a secret this invocation cannot see is not durable-state damage:\n{text}"
+    );
+    assert!(
+        !text.contains("would refuse to start"),
+        "and must not be reported as a configuration the daemon rejects:\n{text}"
+    );
+
+    // The control: something the environment cannot supply is still fatal.
+    let cfg_text = std::fs::read_to_string(&cfg).unwrap();
+    std::fs::write(&cfg, regex_replace_listen_addr(&cfg_text)).unwrap();
+    let broken = combined(
+        &icnctl(data_dir)
+            .args(["institution", "runtime-root", "show"])
+            .output()
+            .unwrap(),
+    );
+    assert!(
+        broken.contains("would refuse to start"),
+        "an empty listen_addr is not environment-suppliable and must still refuse:\n{broken}"
+    );
+}

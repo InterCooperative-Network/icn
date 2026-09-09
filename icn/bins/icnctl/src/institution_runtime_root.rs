@@ -2034,13 +2034,59 @@ fn verify_durable_state(
     // Through the daemon's own loader, not a sub-table read: a receipt that
     // certifies "the daemon will consume this treasury" must be backed by the
     // same parse the daemon performs.
-    let config: icn_core::Config = toml::from_str(&text).with_context(|| {
+    let mut config: icn_core::Config = toml::from_str(&text).with_context(|| {
         format!(
             "Verification: {} is not loadable by the daemon, so a runtime root linked into it \
              would never be consumed (see icn#2747)",
             config_path.display()
         )
     })?;
+
+    // Parsing is necessary but not sufficient on the readback path either, and
+    // for the same reason it is not sufficient at preflight: `icnd` runs
+    // `Config::validate` at startup and exits on the fatal arm. Without this, a
+    // configuration edited after provisioning to something syntactically valid
+    // but fatally invalid — an empty `network.listen_addr`, a trust threshold
+    // outside [0,1] — still resolved a treasury here, and `show` reported READY
+    // over a file the daemon refuses to start on.
+    //
+    // The environment override is applied first, exactly as the daemon applies
+    // it before validating, so this stays neither weaker nor stricter than the
+    // process it models.
+    let secret_from_environment = std::env::var("ICN_GATEWAY_JWT_SECRET").ok();
+    if let Some(jwt_secret) = secret_from_environment.clone() {
+        config.gateway.jwt_secret = jwt_secret;
+    }
+    if let Err(errors) = config.validate() {
+        // One fatal error is *not* evidence about durable state: the gateway
+        // secret may legitimately live in the daemon's environment rather than
+        // in the file (`init-coop` recommends exactly that, and the daemon
+        // applies it before validating). `show` runs in whatever shell an
+        // operator happens to use, which is not the service's environment — so
+        // a missing secret here means "this invocation cannot tell", not "the
+        // published configuration is broken". Reporting INCONSISTENT for it
+        // would be the boolean-for-unknown mistake this command avoids
+        // everywhere else.
+        //
+        // Distinguished by substitution rather than by matching message text:
+        // supply a placeholder and re-validate. If everything else passes, the
+        // environment was the only gap. If anything else fails, that failure is
+        // about the file and is fatal here.
+        let only_the_environment_secret = secret_from_environment.is_none() && {
+            let mut probe = config.clone();
+            probe.gateway.jwt_secret = "x".repeat(64);
+            probe.validate().is_ok()
+        };
+        if !only_the_environment_secret {
+            bail!(
+                "Verification: {} parses, but the daemon would refuse to start on it, so a \
+                 runtime root linked into it would never be consumed:\n  {}",
+                config_path.display(),
+                errors.join("\n  ")
+            );
+        }
+    }
+
     let resolved = config
         .cooperative
         .resolve_treasury_did(&node_did)

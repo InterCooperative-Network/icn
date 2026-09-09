@@ -93,6 +93,54 @@ enum Sharing {
     Shared,
 }
 
+/// Normalize a freshly created coordination file's mode, or remove it.
+///
+/// `OpenOptions::mode` is `open(2)`'s third argument, and the kernel applies it
+/// as `mode & !umask`. Under `umask 0777` that yields a mode-`000` file, which
+/// the supported same-account actor cannot reopen (root bypasses ordinary mode
+/// checks, but root is not the account this protocol coordinates). These files
+/// are retained after release, so such a file would lock every later ICN
+/// process out of the directory until an operator repaired it by hand.
+///
+/// `chmod(2)` is not masked, so the mode is set *after* creation. The precise
+/// claim is therefore: **a newly created coordination file is normalized to
+/// 0600 after creation, so its final mode does not depend on the invoking
+/// process's umask** — not that `OpenOptionsExt::mode` is umask-independent,
+/// which it is not. This is the Unix implementation; the non-Unix stub makes no
+/// mode claim at all.
+///
+/// Applied only to a file this process just created, established by
+/// `create_new` rather than assumed: re-moding one that was already there would
+/// be this process asserting authority over another's coordination file.
+///
+/// If the normalization itself fails, the file this process just created is
+/// removed before returning. Leaving it would be the exact permanent-lockout
+/// state this function exists to prevent, and removing it is safe precisely
+/// because `create_new` established that nobody else's file is at that path —
+/// a later process simply creates it again.
+#[cfg(unix)]
+fn set_created_mode(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    match std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let _ = std::fs::remove_file(path);
+            Err(e).with_context(|| {
+                format!(
+                    "Failed to set the mode of {}; the partially created coordination file was \
+                     removed rather than left where a later process could not reopen it",
+                    path.display()
+                )
+            })
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn set_created_mode(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
 /// Ownership of one lock, released on drop or on death.
 #[derive(Debug)]
 pub struct DataDirLock {
@@ -230,14 +278,16 @@ impl DataDirLock {
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt as _;
-            // An explicit mode, not `0666 & !umask`. These files are retained
-            // after release, so a ceremony run under a restrictive umask would
-            // otherwise leave a coordination file whose permissions depend on
-            // the shell that happened to start it.
+            // Narrow at birth so the file is never briefly wider than intended;
+            // `set_created_mode` below is what actually fixes the mode, because
+            // this argument is still masked by the umask.
             create.mode(0o600);
         }
         match create.open(&path) {
-            Ok(_) => Self::take(path, Sharing::Shared, &refusal).map(Some),
+            Ok(_) => {
+                set_created_mode(&path)?;
+                Self::take(path, Sharing::Shared, &refusal).map(Some)
+            }
             // Created between the check and here — contend rather than assume.
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                 Self::take(path, Sharing::Shared, &refusal).map(Some)
@@ -309,14 +359,23 @@ impl DataDirLock {
         // a process that may only read the file can still discover — and
         // contend for — ownership. Requiring write permission here would turn an
         // unwritable directory into a silent absence of exclusion.
-        let mut open = std::fs::OpenOptions::new();
-        open.create(true).truncate(false).write(true);
+        // `create_new` first, so that "did this process create the file?" is
+        // answered by the kernel rather than guessed. Only then is it ours to
+        // set a mode on.
+        let mut create = std::fs::OpenOptions::new();
+        create.create_new(true).write(true);
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt as _;
-            // Deterministic, umask-independent. Applies only on creation.
-            open.mode(0o600);
+            create.mode(0o600);
         }
+        if let Ok(f) = create.open(&path) {
+            set_created_mode(&path)?;
+            return Self::lock(f, path, sharing, refusal);
+        }
+
+        let mut open = std::fs::OpenOptions::new();
+        open.truncate(false).write(true);
         let file = match open.open(&path) {
             Ok(f) => f,
             // Both errno values mean the same thing here — this process cannot
@@ -351,6 +410,10 @@ impl DataDirLock {
             }
         };
 
+        Self::lock(file, path, sharing, refusal)
+    }
+
+    fn lock(file: std::fs::File, path: PathBuf, sharing: Sharing, refusal: &str) -> Result<Self> {
         let taken = match sharing {
             Sharing::Exclusive => file.try_lock(),
             Sharing::Shared => file.try_lock_shared(),
