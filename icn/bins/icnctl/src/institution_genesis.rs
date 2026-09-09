@@ -251,6 +251,22 @@ fn resolve_storage_root(data_dir: &Path) -> Result<()> {
         return Ok(());
     };
 
+    // A relative `data_dir` cannot be proven equivalent to the CLI root. Both
+    // sides would be resolved against *this* process's working directory, while
+    // `icnd` resolves the same string against whatever directory it is started
+    // in — so agreeing here would prove nothing about where the daemon will
+    // actually read. Refuse rather than certify a cwd-dependent equivalence.
+    if std::path::Path::new(configured).is_relative() {
+        bail!(
+            "Refusing institutional genesis: {} sets a relative `data_dir` \
+             ({configured:?}).\n\
+             It would be resolved against whatever directory the daemon happens \
+             to start in, so this ceremony cannot prove it names the same root \
+             it is about to write. Use an absolute path.",
+            config_path.display()
+        );
+    }
+
     // Compare resolved paths so `/A` and `/A/` — or a relative spelling of the
     // same directory — are not reported as a disagreement. `canonicalize` is
     // used only when the target exists; otherwise the lexical forms are
@@ -496,6 +512,146 @@ pub fn genesis_state(data_dir: &Path) -> Result<GenesisState> {
     }
 }
 
+/// Reject operator-supplied values before the ceremony writes or prompts.
+///
+/// Deliberately conservative rather than clever: this is a founding act, the
+/// name lands in a durable record and in the daemon's configuration, and the
+/// currency is recorded on the treasury. A value that is empty, whitespace-only
+/// or absurdly long is a mistake, and discovering it after key material exists
+/// means an operator has to clean up a half-founded institution by hand.
+fn validate_genesis_inputs(name: &str, currency: &str) -> Result<()> {
+    /// Long enough for any real cooperative name, short enough that a paste
+    /// accident cannot bloat the configuration.
+    const MAX_NAME: usize = 200;
+    const MAX_CURRENCY: usize = 32;
+
+    if name.trim().is_empty() {
+        bail!("Refusing institutional genesis: the cooperative name is empty or only whitespace.");
+    }
+    if name.chars().count() > MAX_NAME {
+        bail!(
+            "Refusing institutional genesis: the cooperative name is {} characters; the \
+             maximum is {MAX_NAME}.",
+            name.chars().count()
+        );
+    }
+    if name.chars().any(|c| c.is_control()) {
+        bail!("Refusing institutional genesis: the cooperative name contains control characters.");
+    }
+    if currency.trim().is_empty() {
+        bail!("Refusing institutional genesis: the currency is empty or only whitespace.");
+    }
+    if currency.chars().count() > MAX_CURRENCY {
+        bail!(
+            "Refusing institutional genesis: the currency is {} characters; the maximum is \
+             {MAX_CURRENCY}.",
+            currency.chars().count()
+        );
+    }
+    if currency
+        .chars()
+        .any(|c| c.is_control() || c.is_whitespace())
+    {
+        bail!(
+            "Refusing institutional genesis: the currency contains whitespace or control \
+             characters."
+        );
+    }
+    Ok(())
+}
+
+/// Refuse a data directory that already holds another institution's state.
+///
+/// **This is a different question from [`GenesisComponents::is_untouched`], and
+/// conflating them was a real defect.** That predicate answers "was a genesis
+/// attempted here?", and deliberately ignores cooperative records because the
+/// gateway's `CoopManager` creates them — counting them there would refuse
+/// genesis on an ordinary node. This one answers "is it *safe* to found a new
+/// institution here?", and the answer is no as soon as any other cooperative or
+/// treasury state exists.
+///
+/// The reason is a live runtime hazard, not tidiness. The daemon publishes ONE
+/// global `CooperativeConfig.treasury_did`, and `LedgerServiceImpl` is a
+/// singleton whose `build_account_deltas` debits `self.treasury_did` — the
+/// configured one — rather than selecting an account from the request's
+/// `treasury_id` (`icn/crates/icn-core/src/services/ledger_service.rs:166`).
+/// So founding a second cooperative here and repointing the configuration would
+/// make treasury operations belonging to the *pre-existing* cooperative debit
+/// the newly founded one's treasury.
+///
+/// Cooperative-scoped treasury routing is the real answer to that, and it is a
+/// runtime architecture problem well outside this ceremony. Until it exists,
+/// genesis refuses rather than silently making one cooperative spend another's
+/// treasury.
+fn refuse_if_foreign_institutional_state(data_dir: &Path) -> Result<()> {
+    let mut found: Vec<String> = Vec::new();
+
+    // Inspect **fail-closed**. A store that exists but cannot be opened or
+    // scanned tells us nothing about what it holds, and for a privileged
+    // founding ceremony "I could not look" must never be recorded as "there is
+    // nothing there". An earlier draft used `if let Ok(..)` here, which quietly
+    // turned every inspection failure — a lock held by a running daemon, a
+    // permission error, a corrupt database — into permission to found.
+    //
+    // A path that does not exist is genuinely clean: there is nothing to hold
+    // state. It is also deliberately NOT created here; `sled::open` would
+    // materialise an empty database as a side effect of asking the question.
+    let inspect = |db: std::path::PathBuf, prefix: &[u8], label: &str| -> Result<Vec<String>> {
+        if !db.exists() {
+            return Ok(Vec::new());
+        }
+        let store = icn_store::SledStore::open(&db).with_context(|| {
+            format!(
+                "Refusing institutional genesis: {} exists but could not be opened to check for \
+                 existing institutional state (if the daemon is running, stop it first). \
+                 Genesis refuses rather than assume an unreadable store is empty",
+                db.display()
+            )
+        })?;
+        let rows = {
+            use icn_store::Store;
+            store.scan(prefix).with_context(|| {
+                format!(
+                    "Refusing institutional genesis: {} could not be scanned for existing \
+                     institutional state. Genesis refuses rather than assume absence",
+                    db.display()
+                )
+            })?
+        };
+        let mut out = Vec::new();
+        for (k, _) in rows {
+            let key = String::from_utf8_lossy(&k).into_owned();
+            // Skip the coop index rows; the primary rows name the problem once.
+            if !key.starts_with("ledger:treasury:idx:") {
+                out.push(format!("{label} {key}"));
+            }
+        }
+        drop(store);
+        Ok(out)
+    };
+
+    found.extend(inspect(coop_db_path(data_dir), b"coop:", "cooperative")?);
+    found.extend(inspect(
+        icn_core::config::ledger_store_path(data_dir),
+        b"ledger:treasury:",
+        "treasury",
+    )?);
+
+    if !found.is_empty() {
+        bail!(
+            "Refusing institutional genesis: this data directory already holds \
+             institutional state that this ceremony did not create:\n  {}\n\
+             The daemon publishes a single `[cooperative] treasury_did` and its \
+             ledger service debits that one treasury for every treasury \
+             operation, so founding another institution here would make the \
+             existing cooperative's operations debit the new treasury. Found a \
+             new institution in a fresh data directory.",
+            found.join("\n  ")
+        );
+    }
+    Ok(())
+}
+
 /// Refuse unless the data directory shows no prior ceremony.
 ///
 /// This is **duplicate-safe, partial-state-detecting and fail-closed**. It is
@@ -584,6 +740,22 @@ pub fn load_receipt(data_dir: &Path) -> Result<Option<GenesisReceipt>> {
         use icn_store::Store;
         store.scan(RECEIPT_KEY_PREFIX.as_bytes())?
     };
+    if found.len() > 1 {
+        let keys: Vec<String> = found
+            .iter()
+            .map(|(k, _)| String::from_utf8_lossy(k).into_owned())
+            .collect();
+        bail!(
+            "Refusing to read genesis state: {} holds {} genesis receipts:\n  {}\n\
+             A data directory has exactly one genesis. More than one is \
+             corruption or a manual edit, and picking one would make `show` and \
+             the rerun guard report whichever happened to sort first. Resolve \
+             this deliberately.",
+            coop_db.display(),
+            found.len(),
+            keys.join("\n  ")
+        );
+    }
     let Some((_, value)) = found.into_iter().next() else {
         return Ok(None);
     };
@@ -701,6 +873,17 @@ fn run_genesis_inner(
 
     // (3) Refuse over existing key material before minting anything.
     refuse_if_already_started(data_dir)?;
+
+    // (3-) Operator-supplied values are checked before anything is prompted for
+    // or written. A whitespace-only cooperative name would otherwise reach the
+    // durable record and the configuration, and an oversized one would be
+    // discovered only when the config was published — after the institution had
+    // been minted.
+    validate_genesis_inputs(name, currency)?;
+
+    // (3a) And refuse a directory that already belongs to another institution.
+    // Distinct question, distinct predicate — see the function's own docs.
+    refuse_if_foreign_institutional_state(data_dir)?;
 
     // (3b) There is no authority to found under without the node keystore.
     // Checked for *existence* here, among the other cheap refusals, so that a
@@ -822,7 +1005,7 @@ fn run_genesis_inner(
     // `TreasuryManager::new()` keeps its maps in memory only, and a treasury
     // that vanishes on restart is not institutional state.
     let ledger_db_path = icn_core::config::ledger_store_path(data_dir);
-    let ledger_store: Arc<dyn icn_store::Store> = Arc::new(
+    let ledger_sled = Arc::new(
         icn_store::SledStore::open(&ledger_db_path).with_context(|| {
             format!(
                 "Failed to open the ledger store at {} (stop the daemon first; \
@@ -831,6 +1014,7 @@ fn run_genesis_inner(
             )
         })?,
     );
+    let ledger_store: Arc<dyn icn_store::Store> = ledger_sled.clone();
     let mut treasury_manager = icn_ledger::TreasuryManager::with_store(ledger_store)
         .context("Failed to open the treasury manager over the ledger store")?;
     treasury_manager
@@ -876,14 +1060,14 @@ fn run_genesis_inner(
     // Genesis never writes the `node -> node` self-edge that ICN_DEV_SELF_TRUST
     // writes.
     let trust_db_path = icn_core::config::trust_store_path(data_dir);
-    let trust_store: Arc<dyn icn_store::Store> =
-        Arc::new(icn_store::SledStore::open(&trust_db_path).with_context(|| {
-            format!(
-                "Failed to open the trust store at {} (stop the daemon first; \
-                 it holds an exclusive lock)",
-                trust_db_path.display()
-            )
-        })?);
+    let trust_sled = Arc::new(icn_store::SledStore::open(&trust_db_path).with_context(|| {
+        format!(
+            "Failed to open the trust store at {} (stop the daemon first; \
+             it holds an exclusive lock)",
+            trust_db_path.display()
+        )
+    })?);
+    let trust_store: Arc<dyn icn_store::Store> = trust_sled.clone();
     let mut trust_graph = icn_trust::TrustGraph::new(trust_store, node_did.clone());
     let full =
         icn_trust::TrustScore::new(1.0).map_err(|e| anyhow::anyhow!("Invalid trust score: {e}"))?;
@@ -922,13 +1106,25 @@ fn run_genesis_inner(
     // directory lock, so the fresh handles in (11) cannot open these databases
     // while this ceremony still holds them — and a verification that read back
     // through the writer's own handle would prove nothing about durability.
+    // Flush every store before dropping it. Reopening a handle proves a write is
+    // *visible*, not that it survived a crash: sled buffers, and the receipt is
+    // about to certify this state as durable. Cooperative, ledger and trust are
+    // three separate databases and each needs its own flush.
     drop(coop_store);
     coop_sled
         .flush()
         .context("Failed to flush cooperative state")?;
     drop(coop_sled);
     drop(treasury_manager);
+    ledger_sled
+        .flush()
+        .context("Failed to flush the treasury registration")?;
+    drop(ledger_sled);
     drop(trust_graph);
+    trust_sled
+        .flush()
+        .context("Failed to flush the trust facts")?;
+    drop(trust_sled);
 
     // (10) Publish the configuration. This is what makes the treasury
     // *consumed* by the daemon rather than merely stored, so it precedes the
@@ -1078,6 +1274,42 @@ fn verify_durable_state(
             bail!("Verification: {what} is not readable back from the trust store.");
         }
     }
+
+    // Edge *presence* is not the property the ledger enforces. If either edge is
+    // later rewritten with a lower score, both rows still read back while the
+    // treasury falls under the author-trust threshold and every
+    // governance-authored entry is refused — with the receipt still saying
+    // COMPLETE. So score the treasury the way the gate does and enforce the
+    // production threshold.
+    //
+    // Computed through `TrustGraph::compute_trust_score`, which is what
+    // `TrustServiceImplTokio::trust_score` calls, over the same persisted store.
+    //
+    // The threshold is `icn_ledger::DEFAULT_MIN_TRUST_FOR_ENTRY` rather than a
+    // literal copied here. What that constant proves, stated exactly: `Ledger`
+    // initialises `min_trust_for_entry` from it, and the only non-test caller of
+    // `set_min_trust_for_entry` anywhere in the workspace is
+    // `icn-ledger/tests/witness_trust.rs` — there is no configuration, env var
+    // or production path that overrides it today. It is therefore the effective
+    // gate *for the current production constructor*, not a value guaranteed
+    // immutable for all time. Should a configured threshold ever be introduced,
+    // this check must read the configured value instead.
+    //
+    // One honest caveat: this runs on a graph that has added no edge of its own,
+    // which is the arm icn#2750 does NOT break. It therefore verifies the facts
+    // are *sufficient*, not that a long-running daemon will still honour them —
+    // that is exactly what icn#2750 blocks, and it is not papered over here.
+    let scored = graph.compute_trust_score(&treasury_did).map_err(|e| {
+        anyhow::anyhow!("Verification: could not score the treasury as the ledger would ({e})")
+    })?;
+    if scored < icn_ledger::DEFAULT_MIN_TRUST_FOR_ENTRY {
+        bail!(
+            "Verification: the treasury scores {scored:.3} against the ledger's author-trust \
+             threshold of {:.3}, so a governance-authored entry would be refused. The trust \
+             facts exist but do not carry the authority the receipt would claim.",
+            icn_ledger::DEFAULT_MIN_TRUST_FOR_ENTRY
+        );
+    }
     drop(graph);
 
     // The configuration the daemon will actually parse, resolved through the
@@ -1103,7 +1335,23 @@ fn verify_durable_state(
     // pins that distinction so this comment cannot drift back into claiming
     // detection it does not perform. Post-hoc cryptographic verification is
     // recorded as a limitation, not implemented here.
+    // The NODE keystore is checked alongside the two the ceremony minted, and
+    // for a reason the other two do not have. The daemon builds its trust graph
+    // rooted at whatever `identity.age` currently holds — not at the DID the
+    // receipt recorded. If the node identity is replaced or rotated after
+    // genesis, the persisted `node -> trust root` edge still reads back, so a
+    // presence-only check reports COMPLETE while the running daemon roots trust
+    // at a different DID and scores the treasury from there. Comparing the
+    // receipt's `node_did` against the keystore's current DID is what makes
+    // COMPLETE mean "the daemon that will run here still recognises this
+    // institution".
+    //
+    // Like key provenance, this needs the passphrase and so is unavailable to
+    // `show`. There is no non-secret source for the node's current DID:
+    // `AgeKeyStore::open` populates nothing until `unlock`, and `id init`
+    // writes no public DID artifact beside the keystore.
     for (path, what, expected) in [
+        (get_keystore_path(data_dir), "node", &receipt.node_did),
         (
             trust_root_keystore_path(data_dir),
             "genesis trust-root",
@@ -1135,8 +1383,10 @@ fn verify_durable_state(
                 .clone();
             if actual.as_str() != expected {
                 bail!(
-                    "Verification: {} holds key material for {}, but the receipt names {}. \
-                     Refusing to certify a principal whose key does not back it.",
+                    "Verification: {} holds key material for {}, but the receipt names {} as \
+                     the {what}. Refusing to certify a principal whose key does not back it — \
+                     for the node keystore this also means the running daemon would root its \
+                     trust graph at a different DID than this genesis recorded.",
                     path.display(),
                     actual.as_str(),
                     expected
@@ -1369,6 +1619,19 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
                 })?;
         }
     }
+    // The rename is atomic, but atomicity is not durability: on a crash the
+    // directory entry can still be lost unless the *directory* is synced. The
+    // receipt is about to certify that the daemon will read this treasury, so
+    // the linkage has to outlive a power cut, not merely a process exit.
+    let sync_parent = || -> Result<()> {
+        if let Some(parent) = config_path.parent() {
+            let dir = std::fs::File::open(parent)
+                .with_context(|| format!("Failed to open {} to sync", parent.display()))?;
+            dir.sync_all()
+                .with_context(|| format!("Failed to sync {}", parent.display()))?;
+        }
+        Ok(())
+    };
     std::fs::rename(&tmp_path, &config_path).with_context(|| {
         format!(
             "Failed to publish {} over {}",
@@ -1376,6 +1639,7 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
             config_path.display()
         )
     })?;
+    sync_parent()?;
     Ok(())
 }
 
@@ -1403,15 +1667,19 @@ fn print_receipt(receipt: &GenesisReceipt, provenance_verified: bool) {
     println!();
     if provenance_verified {
         println!(
-            "Verified: durable state, configuration linkage, and key provenance\n\
-             (both keystores were unlocked and derive the DIDs above)."
+            "Verified: durable state, configuration linkage, trust facts scoring\n\
+             above the ledger's author threshold, and key provenance — the node,\n\
+             trust-root and treasury keystores were each unlocked and derive the\n\
+             DIDs above."
         );
     } else {
         println!(
-            "Verified: durable state and configuration linkage.\n\
-             NOT re-verified: key provenance. This command does not prompt for a\n\
-             passphrase, so it cannot confirm the keystores still derive the DIDs\n\
-             above — only that they are present."
+            "Verified: durable state, configuration linkage, and that the trust\n\
+             facts still score the treasury above the ledger's author threshold.\n\
+             NOT re-verified: key provenance, and whether the node identity still\n\
+             matches the one recorded. This command does not prompt for a\n\
+             passphrase, so it cannot open the keystores — only see that they are\n\
+             present."
         );
     }
     println!(
@@ -1468,8 +1736,10 @@ pub fn handle_institution_genesis_command(
                             "verified": {
                                 "durable_state": true,
                                 "config_linkage": true,
+                                "trust_score_above_ledger_threshold": true,
                                 "key_presence": true,
                                 "key_provenance": false,
+                                "node_identity_still_matches": false,
                             },
                             "note": "key provenance is not re-verified by `show`; it does not prompt for a passphrase. The ceremony verifies it before writing the receipt.",
                             "receipt": receipt,
@@ -1572,6 +1842,19 @@ mod failpoint_tests {
     use icn_identity::AgeKeyStore;
 
     const PASSPHRASE: &str = "failpoint-fixture-passphrase";
+
+    /// `expect_err` with a label, returning the rendered message.
+    trait UnwrapErrMsg {
+        fn unwrap_err_or_else_msg(self, why: &str) -> String;
+    }
+    impl<T> UnwrapErrMsg for Result<T> {
+        fn unwrap_err_or_else_msg(self, why: &str) -> String {
+            match self {
+                Ok(_) => panic!("{why}: expected a refusal, but the ceremony succeeded"),
+                Err(e) => format!("{e:#}"),
+            }
+        }
+    }
 
     /// A data directory provisioned to the point genesis expects: a node
     /// keystore, and a configuration the daemon could actually load.
@@ -1836,9 +2119,52 @@ mod failpoint_tests {
             "a node with pre-existing cooperatives must still be foundable"
         );
 
-        // And genesis must actually proceed on such a node.
-        run_genesis_inner(dir.path(), "Founded Anyway", "HOURS", None)
-            .expect("genesis must not be refused because a cooperative already existed");
+        // But genesis must still REFUSE — for a different reason, from a
+        // different predicate. The directory is not mid-ceremony (above), and it
+        // is also not safe to found in, because the daemon has one global
+        // treasury and the existing cooperative's operations would debit the new
+        // one. Conflating these two questions is what made an earlier draft
+        // wrong in both directions at once.
+        let err = run_genesis_inner(dir.path(), "Founded Anyway", "HOURS", None)
+            .expect_err("genesis must refuse a directory that already holds a cooperative");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("already holds institutional state"),
+            "the refusal must be the foreign-state one, not the partial-ceremony \
+             one: {msg}"
+        );
+
+        // And it must refuse before minting anything.
+        let after = genesis_components(dir.path()).unwrap();
+        assert!(
+            !after.trust_root_key && !after.treasury_key && !after.receipt,
+            "no genesis-exclusive artefact may exist after a preflight refusal: {after:?}"
+        );
+    }
+
+    /// Operator-supplied values are rejected before anything is written.
+    #[test]
+    fn invalid_genesis_inputs_are_refused_before_any_artefact_exists() {
+        let long_name = "x".repeat(500);
+        for (name, currency, why) in [
+            ("   ", "HOURS", "whitespace-only name"),
+            ("Valid Name", "  ", "whitespace-only currency"),
+            (long_name.as_str(), "HOURS", "oversized name"),
+            ("Valid Name", "HO URS", "currency containing whitespace"),
+        ] {
+            let dir = provisioned();
+            let err =
+                run_genesis_inner(dir.path(), name, currency, None).unwrap_err_or_else_msg(why);
+            assert!(
+                err.contains("Refusing institutional genesis"),
+                "{why}: expected a refusal, got: {err}"
+            );
+            let c = genesis_components(dir.path()).unwrap();
+            assert!(
+                c.is_untouched(),
+                "{why}: nothing may be written before input validation passes: {c:?}"
+            );
+        }
     }
 
     /// A keystore that does not derive the DID the receipt names must be
@@ -1913,6 +2239,134 @@ mod failpoint_tests {
         let provenance = verify_durable_state(dir.path(), &receipt, Some(PASSPHRASE.as_bytes()))
             .expect_err("passphrase-backed verification must catch the substitution");
         assert!(format!("{provenance:#}").contains("does not back it"));
+    }
+
+    /// Inability to inspect existing state is a refusal, never an absence.
+    ///
+    /// Kills the `if let Ok(..)` swallowing an earlier draft used: with that
+    /// behaviour restored, an unopenable cooperative store reads as "no foreign
+    /// state" and the ceremony proceeds to found over it.
+    #[test]
+    fn an_uninspectable_store_refuses_rather_than_reading_as_empty() {
+        let dir = provisioned();
+        // The LEDGER store specifically. The cooperative store is already opened
+        // earlier by `load_receipt`, which fails closed on its own, so corrupting
+        // that one would prove nothing about this check. Only
+        // `refuse_if_foreign_institutional_state` reads the ledger store during
+        // preflight, which makes this a discriminator for *this* guard.
+        let ledger_db = icn_core::config::ledger_store_path(dir.path());
+        std::fs::create_dir_all(ledger_db.parent().unwrap()).unwrap();
+        std::fs::write(&ledger_db, b"not a database").unwrap();
+
+        let err = run_genesis_inner(dir.path(), "Uninspectable", "HOURS", None)
+            .expect_err("an uninspectable store must refuse");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("could not be opened") || msg.contains("could not be scanned"),
+            "the refusal must name the inspection failure, not report absence: {msg}"
+        );
+        assert!(
+            msg.contains(&ledger_db.display().to_string()),
+            "and must name the store it could not inspect: {msg}"
+        );
+        assert!(
+            !genesis_components(dir.path()).unwrap().trust_root_key,
+            "nothing may be minted when existing state cannot be inspected"
+        );
+    }
+
+    /// A trust edge rewritten to a low score keeps both rows but drops the
+    /// treasury under the ledger's gate. Presence checks cannot see that.
+    #[test]
+    fn an_edge_rewritten_below_the_ledger_threshold_is_refused() {
+        let dir = provisioned();
+        let receipt = run_genesis_inner(dir.path(), "Low Score Coop", "HOURS", None).unwrap();
+
+        // 1.0 * 0.2 * 0.3 = 0.06, under the 0.1 gate, with both rows intact.
+        {
+            let store: Arc<dyn icn_store::Store> = Arc::new(
+                icn_store::SledStore::open(icn_core::config::trust_store_path(dir.path())).unwrap(),
+            );
+            let node: Did = receipt.node_did.parse().unwrap();
+            let root: Did = receipt.trust_root_did.parse().unwrap();
+            let treasury: Did = receipt.treasury_did.parse().unwrap();
+            let mut g = icn_trust::TrustGraph::new(store, node);
+            g.add_edge(icn_trust::TrustEdge::new(
+                root.clone(),
+                treasury.clone(),
+                icn_trust::TrustScore::new(0.2).unwrap(),
+            ))
+            .unwrap();
+            assert!(
+                g.get_edge(&root, &treasury).unwrap().is_some(),
+                "fixture: the row must still exist — that is the whole point"
+            );
+        }
+
+        let err = verify_durable_state(dir.path(), &receipt, None)
+            .expect_err("a treasury under the ledger's gate must not verify");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("author-trust threshold"),
+            "the refusal must name the insufficient effective score, not a missing row: {msg}"
+        );
+    }
+
+    /// A relative configured `data_dir` cannot be proven equivalent to the CLI
+    /// root, so it is refused before anything is written.
+    #[test]
+    fn a_relative_configured_data_dir_is_refused() {
+        let dir = provisioned();
+        let path = dir.path().join("icn.toml");
+        let text = std::fs::read_to_string(&path).unwrap();
+        let patched = text.replace(
+            &format!("data_dir = \"{}\"", dir.path().display()),
+            "data_dir = \"relative/sub/dir\"",
+        );
+        assert_ne!(patched, text, "fixture: the data_dir line must be present");
+        std::fs::write(&path, patched).unwrap();
+
+        let err = run_genesis_inner(dir.path(), "Relative Root", "HOURS", None)
+            .expect_err("a relative configured data_dir must refuse");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("relative `data_dir`"),
+            "the refusal must name the relative root specifically: {msg}"
+        );
+        assert!(
+            genesis_components(dir.path()).unwrap().is_untouched(),
+            "nothing may be written when the storage root cannot be proven"
+        );
+    }
+
+    /// More than one receipt is corruption, not a menu.
+    #[test]
+    fn multiple_genesis_receipts_are_refused_rather_than_picking_one() {
+        use icn_store::Store;
+
+        let dir = provisioned();
+        let receipt = run_genesis_inner(dir.path(), "First Receipt Coop", "HOURS", None).unwrap();
+
+        {
+            let store = icn_store::SledStore::open(coop_db_path(dir.path())).unwrap();
+            let mut second = receipt.clone();
+            second.cooperative_id = "coop:second".to_string();
+            second.cooperative_name = "Second Receipt Coop".to_string();
+            store
+                .put(
+                    format!("{RECEIPT_KEY_PREFIX}coop:second").as_bytes(),
+                    &serde_json::to_vec(&second).unwrap(),
+                )
+                .unwrap();
+            store.flush().unwrap();
+        }
+
+        let err = load_receipt(dir.path()).expect_err("two receipts must refuse");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("2 genesis receipts"),
+            "the refusal must name the multiplicity rather than parsing one: {msg}"
+        );
     }
 
     /// Without a failpoint the same code path commits, and the state machine

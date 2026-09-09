@@ -100,7 +100,7 @@ pub use fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
 };
 pub use freeze::{FreezeManager, FrozenMember, UnfreezeEvent};
-pub use ledger::{ForkStats, Ledger, PaginationCursor};
+pub use ledger::{ForkStats, Ledger, PaginationCursor, DEFAULT_MIN_TRUST_FOR_ENTRY};
 pub use membership::{MembershipStore, SledMembershipStore};
 pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
 pub use obligation::{Obligation, ObligationId, ObligationRegistry, ObligationState};

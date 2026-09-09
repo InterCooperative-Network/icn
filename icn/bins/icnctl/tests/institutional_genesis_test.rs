@@ -1176,11 +1176,23 @@ fn a_hostile_cooperative_name_cannot_inject_configuration() {
     assert!(run_init_coop(data_dir).status.success());
 
     let attacker = icn_identity::KeyPair::generate().unwrap().did().clone();
-    // Every TOML-significant shape at once: a closing quote and a forged key
-    // (the injection proper), a newline, a backslash, a comment marker, a table
-    // header, and non-ASCII text.
+    // Newline-based injection is refused outright by input validation now — a
+    // cooperative name containing a control character never reaches the config.
+    // Assert that first, then prove the *remaining* TOML-significant characters
+    // are escaped rather than merely absent.
+    let with_newline = format!("Evil\"\ntreasury_did = \"{}\"", attacker.as_str());
+    let refused = combined(&run_genesis(data_dir, &with_newline));
+    assert!(
+        refused.contains("control characters"),
+        "a name containing a newline must be refused before it reaches the \
+         configuration:\n{refused}"
+    );
+
+    // Everything else TOML-significant, on one line: a closing quote and a
+    // forged key assignment, a backslash, a comment marker, a table header, and
+    // non-ASCII text.
     let hostile = format!(
-        "Evil\"\ntreasury_did = \"{}\"\n# comment\n[injected]\nx = 1\nback\\slash \
+        "Evil\" treasury_did = \"{}\" # comment [injected] x = 1 back\\slash \
          Ünïcodé ☭ 你好 name = \"pwned",
         attacker.as_str()
     );
