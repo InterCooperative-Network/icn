@@ -1354,10 +1354,58 @@ fn verify_durable_state(
         .treasury_did
         .parse()
         .context("Verification: the treasury DID in the receipt is not a usable DID")?;
-    if manager.get_treasury(&treasury_did).is_none() {
+    // Verify the **establishment facts**, and only those.
+    //
+    // Classified from `icn-ledger/src/treasury.rs` rather than from a reviewer's
+    // list, because over-verifying is its own defect: a runtime root must not
+    // report itself inconsistent because ordinary treasury operation changed
+    // something it never claimed.
+    //
+    // | field         | mutable after registration? | reverified here |
+    // |---------------|------------------------------|-----------------|
+    // | `treasury_did`| no — primary key             | yes             |
+    // | `coop_id`     | no — the one mutator asserts it byte-for-byte | yes |
+    // | `currency`    | no mutator exists            | yes             |
+    // | `created_by`  | no mutator exists            | yes             |
+    // | `entity_id`   | **YES** — `populate_entity_id_at_*` sets None -> Some (#2082) | **no** |
+    // | `description` | no mutator, but audit metadata only | no       |
+    // | `is_active`   | operational lifecycle state  | no              |
+    //
+    // `entity_id` is the important exclusion. Populating it later is the
+    // legitimate #2082 backfill, and treating it as an establishment fact would
+    // make a previously-READY root report INCONSISTENT the moment that backfill
+    // ran.
+    let Some(stored_treasury) = manager.get_treasury(&treasury_did) else {
         bail!(
             "Verification: treasury {} is not readable back from the ledger store.",
             receipt.treasury_did
+        );
+    };
+    if stored_treasury.coop_id != receipt.cooperative_id {
+        bail!(
+            "Verification: treasury {} is registered to cooperative {:?}, but the receipt \
+             claims {:?}. The treasury does not belong to the cooperative this root \
+             established.",
+            receipt.treasury_did,
+            stored_treasury.coop_id,
+            receipt.cooperative_id
+        );
+    }
+    if stored_treasury.currency != receipt.currency {
+        bail!(
+            "Verification: treasury {} records currency {:?}, but the receipt claims {:?}.",
+            receipt.treasury_did,
+            stored_treasury.currency,
+            receipt.currency
+        );
+    }
+    if stored_treasury.created_by.as_str() != receipt.genesis_authority_did {
+        bail!(
+            "Verification: treasury {} records {:?} as its creating authority, but the receipt \
+             claims {:?}.",
+            receipt.treasury_did,
+            stored_treasury.created_by.as_str(),
+            receipt.genesis_authority_did
         );
     }
     drop(manager);
@@ -2524,6 +2572,76 @@ mod failpoint_tests {
         assert!(
             msg.contains("2 genesis receipts"),
             "the refusal must name the multiplicity rather than parsing one: {msg}"
+        );
+    }
+
+    /// Legitimate mutable treasury state must NOT invalidate the runtime root.
+    ///
+    /// `entity_id` moving from `None` to `Some` is the #2082 backfill, an
+    /// ordinary and correct later operation. Over-verifying it would make a
+    /// previously-READY root report INCONSISTENT the moment that ran — which is
+    /// its own defect, and the reason this ceremony verifies establishment facts
+    /// rather than the whole record.
+    #[test]
+    fn populating_the_treasury_entity_id_does_not_invalidate_the_runtime_root() {
+        let dir = provisioned();
+        let receipt =
+            provision_runtime_root_inner(dir.path(), "Entity Backfill Coop", "HOURS", None)
+                .unwrap();
+
+        {
+            let store: Arc<dyn icn_store::Store> = Arc::new(
+                icn_store::SledStore::open(icn_core::config::ledger_store_path(dir.path()))
+                    .unwrap(),
+            );
+            let mut mgr = icn_ledger::TreasuryManager::with_store(store).unwrap();
+            let treasury: Did = receipt.treasury_did.parse().unwrap();
+            let entity = icn_entity::EntityId::cooperative("runtime-root-backfill").unwrap();
+            let outcome = mgr
+                .populate_entity_id_at_activation(&treasury, &receipt.cooperative_id, entity)
+                .expect("the backfill seam must not error");
+            assert!(
+                matches!(
+                    outcome,
+                    icn_ledger::TreasuryEntityIdPopulateResult::Populated
+                ),
+                "fixture: the backfill must actually have applied, got {outcome:?}"
+            );
+        }
+
+        verify_durable_state(dir.path(), &receipt, None)
+            .expect("an entity_id backfill is legitimate and must not invalidate the root");
+    }
+
+    /// An immutable establishment fact changing DOES invalidate it.
+    #[test]
+    fn a_treasury_reregistered_to_another_cooperative_is_refused() {
+        let dir = provisioned();
+        let receipt =
+            provision_runtime_root_inner(dir.path(), "Rebound Treasury Coop", "HOURS", None)
+                .unwrap();
+
+        // Rewrite the persisted treasury row so it names a different cooperative.
+        {
+            use icn_store::Store;
+            let store = icn_store::SledStore::open(icn_core::config::ledger_store_path(dir.path()))
+                .unwrap();
+            let key = format!("ledger:treasury:{}", receipt.treasury_did);
+            let raw = store.get(key.as_bytes()).unwrap().expect("treasury row");
+            let mut row: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+            row["coop_id"] = serde_json::Value::String("coop:someone-else".to_string());
+            store
+                .put(key.as_bytes(), &serde_json::to_vec(&row).unwrap())
+                .unwrap();
+            store.flush().unwrap();
+        }
+
+        let err = verify_durable_state(dir.path(), &receipt, None)
+            .expect_err("a treasury bound to another cooperative must refuse");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("does not belong to the cooperative"),
+            "the refusal must name the broken establishment relation: {msg}"
         );
     }
 
