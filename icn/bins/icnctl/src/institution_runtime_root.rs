@@ -1787,7 +1787,7 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
     // That is icn#2747, a pre-existing defect this ceremony does not fix —
     // refusing loudly is the honest outcome.
     match toml::from_str::<icn_core::Config>(&text) {
-        Ok(config) => {
+        Ok(mut config) => {
             // Parsing is necessary but not sufficient. `icnd` additionally runs
             // `Config::validate` at startup and exits on a fatal constraint — an
             // empty `network.listen_addr`, a trust threshold outside [0,1] — so a
@@ -1796,6 +1796,22 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
             // `validate` returns Ok(warnings) / Err(fatal errors), and `icnd`
             // exits on the error arm. Warnings are the daemon's business, not
             // this ceremony's; only the fatal arm is a reason to refuse.
+            // Apply the same runtime override the daemon applies *before* it
+            // validates (`icnd` reads `--gateway-jwt-secret`, then
+            // `ICN_GATEWAY_JWT_SECRET`, then the file). Validating the raw file
+            // would make this ceremony stricter than the daemon it is checking
+            // for: it would reject the standard `init-coop` flow, whose own
+            // instructions recommend supplying the secret through the
+            // environment, and push an operator into persisting a plaintext
+            // secret in the configuration purely to satisfy a provisioning
+            // check.
+            //
+            // The CLI flag is the daemon's own and has no counterpart here; the
+            // environment variable is the part both processes can see.
+            if let Ok(jwt_secret) = std::env::var("ICN_GATEWAY_JWT_SECRET") {
+                config.gateway.jwt_secret = jwt_secret;
+            }
+
             if let Err(errors) = config.validate() {
                 bail!(
                     "Refusing to provision: {} parses, but the daemon would refuse to start \

@@ -2229,3 +2229,64 @@ fn minted_key_material_is_not_world_readable() {
         "fixture: the node keystore must exist"
     );
 }
+
+/// The gateway secret may come from the environment, exactly as it does for the
+/// daemon — provisioning must not be stricter than the process it validates for.
+///
+/// `icnd` applies `--gateway-jwt-secret`, then `ICN_GATEWAY_JWT_SECRET`, then
+/// the file, and only then validates. Validating the raw file would reject the
+/// standard `init-coop` flow — whose own instructions recommend the environment
+/// variable — and push an operator into persisting a plaintext secret purely to
+/// satisfy a provisioning check.
+#[test]
+fn the_gateway_secret_may_come_from_the_environment_as_it_does_for_the_daemon() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    // Put the configuration back to the template's shape: gateway enabled with
+    // the secret only commented out.
+    let cfg = data_dir.join("icn.toml");
+    let text = std::fs::read_to_string(&cfg).unwrap();
+    let without = text.replace(
+        "jwt_secret = \"fixture-jwt-secret-not-a-real-credential\"",
+        "# jwt_secret = \"CHANGE_ME\"  # Set this before starting!",
+    );
+    assert_ne!(without, text, "fixture: the secret line must be present");
+    std::fs::write(&cfg, without).unwrap();
+
+    // Without the environment variable, provisioning must refuse — the daemon
+    // would not start either.
+    let refused = combined(&provision_runtime_root(data_dir, "No Secret Coop"));
+    assert!(
+        refused.contains("jwt_secret"),
+        "an absent gateway secret must be refused, as the daemon refuses it:\n{refused}"
+    );
+
+    // With it supplied the way the daemon accepts it, provisioning proceeds.
+    let out = icnctl(data_dir)
+        .env("ICN_GATEWAY_JWT_SECRET", "supplied-through-the-environment")
+        .args([
+            "institution",
+            "runtime-root",
+            "create",
+            "--name",
+            "Env Secret Coop",
+            "--yes",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "the environment-supplied secret must be honoured:\n{}",
+        combined(&out)
+    );
+
+    // And the plaintext secret was never written into the configuration.
+    let after = std::fs::read_to_string(&cfg).unwrap();
+    assert!(
+        !after.contains("supplied-through-the-environment"),
+        "the secret must not be persisted into the configuration:\n{after}"
+    );
+}
