@@ -2290,3 +2290,48 @@ fn the_gateway_secret_may_come_from_the_environment_as_it_does_for_the_daemon() 
         "the secret must not be persisted into the configuration:\n{after}"
     );
 }
+
+/// A ceremony must not republish a configuration a daemon is still holding —
+/// including a daemon whose storage is somewhere else entirely.
+///
+/// `icnd --config <data_dir>/icn.toml --data-dir /elsewhere` mutates
+/// `/elsewhere` and contends for nothing under `<data_dir>`. A storage-only
+/// exclusion protocol would wave this ceremony straight through, and it would
+/// rewrite `<data_dir>/icn.toml` under a live process still acting on the old
+/// contents. The fixture below asserts that absence of a storage claim
+/// explicitly, so the witness cannot pass for the wrong reason.
+#[test]
+fn provisioning_is_refused_while_a_daemon_holds_this_directorys_configuration() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let before = std::fs::read(data_dir.join("icn.toml")).unwrap();
+
+    // Exactly what such a daemon holds: the reader's share of this directory's
+    // configuration.
+    let reader = icn_core::DataDirLock::acquire_config_shared_if_manageable(data_dir, "the daemon")
+        .unwrap()
+        .expect("a writable directory is manageable");
+
+    // And exactly what it does not hold. If this ever starts failing, the
+    // refusal below stops being evidence about the configuration lock.
+    drop(
+        icn_core::DataDirLock::acquire(data_dir, "a probe")
+            .expect("fixture: a daemon storing elsewhere holds no storage lock here"),
+    );
+
+    let refused = combined(&provision_runtime_root(data_dir, "Contended Coop"));
+    drop(reader);
+
+    assert!(
+        refused.contains("already holds the configuration"),
+        "provisioning must refuse while a daemon holds this configuration:\n{refused}"
+    );
+    assert_eq!(
+        before,
+        std::fs::read(data_dir.join("icn.toml")).unwrap(),
+        "and it must not have republished the file it was refused over"
+    );
+}

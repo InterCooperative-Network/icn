@@ -1081,8 +1081,19 @@ fn provision_runtime_root_inner(
     // (1b) Take exclusive ownership of the data root BEFORE any state-sensitive
     // observation. Everything from here to the receipt is a read that a
     // concurrent ceremony could invalidate, so the boundary has to span all of
-    // it. Held until `_ceremony` drops at the end of this function — including
+    // it. Held until these guards drop at the end of this function — including
     // on every error path.
+    //
+    // Two locks, because this ceremony changes two things a daemon depends on:
+    // it publishes `<data_dir>/icn.toml`, and it rewrites the state under
+    // `<data_dir>`. A daemon started as `icnd --config <data_dir>/icn.toml
+    // --data-dir /elsewhere` holds the *configuration* of this directory and
+    // the storage of another, so it does not contend for the storage lock at
+    // all — republishing its configuration without the first lock would leave
+    // it running on bytes that no longer exist. Taken in the same order the
+    // daemon takes them, and non-blocking, so neither ordering can hang.
+    let _ceremony_config =
+        icn_core::DataDirLock::acquire_config(data_dir, "runtime-root provisioning")?;
     let _ceremony = icn_core::DataDirLock::acquire(data_dir, "runtime-root provisioning")?;
 
     // (2) Before anything opens or writes a store. The gate takes exclusive

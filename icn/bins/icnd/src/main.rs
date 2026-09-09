@@ -572,15 +572,23 @@ async fn main() -> Result<()> {
     // *after* the read does not help; the stale value is already in hand.
     //
     // The identity both actors can know before that read is the directory
-    // holding the configuration file. Runtime-root provisioning publishes
-    // `<data_dir>/icn.toml` and refuses a configuration whose `data_dir` names a
-    // different root, so for any root it manages that directory *is* the data
-    // root — which is what makes one lock cover both actors.
+    // holding the configuration file: runtime-root provisioning publishes
+    // `<data_dir>/icn.toml`, so a ceremony rooted there is exactly the writer of
+    // the bytes about to be consumed.
     //
-    // `acquire_if_manageable` returns `None` when the directory is not writable.
-    // A ceremony that cannot write there cannot provision there either, so there
-    // is nothing to exclude, and a packaged read-only configuration keeps
-    // working as before.
+    // This is the *reader's* share. A daemon only reads a configuration, so
+    // several may hold one directory at once — the shipped two-node demo keeps
+    // both node configurations in `config/` with different data roots — while a
+    // ceremony publishing there takes the exclusive side and is refused.
+    //
+    // It is held for the whole life of the process, not merely across the read;
+    // see the storage lock below for why releasing it afterwards would put the
+    // race straight back.
+    //
+    // The `if_manageable` form returns `None` when the directory is not
+    // writable. A ceremony that cannot write there cannot publish there either,
+    // so there is nothing to exclude, and a packaged read-only configuration —
+    // a ConfigMap mount, say — keeps working as before.
     let pre_config_lock = match &args.config {
         Some(config_path) => {
             // Canonicalize the FILE first, then take its parent.
@@ -602,7 +610,7 @@ async fn main() -> Result<()> {
                 .filter(|p| !p.as_os_str().is_empty())
                 .map(|p| p.to_path_buf())
                 .unwrap_or_else(|| std::path::PathBuf::from("."));
-            icn_core::DataDirLock::acquire_if_manageable(&root, "the daemon")?
+            icn_core::DataDirLock::acquire_config_shared_if_manageable(&root, "the daemon")?
         }
         // With no `--config` there is no configuration file for a ceremony to
         // replace, so there is nothing to exclude before the default is built.
@@ -775,22 +783,33 @@ async fn main() -> Result<()> {
     // Held until this guard drops at process exit; the kernel releases it if the
     // process dies, so a crash cannot strand the directory.
     //
-    // If the pre-config lock above already covers this root, keep it rather than
-    // taking a second one: `File::try_lock` is `flock(2)`, which is per
-    // open-file-description, so a second handle on the same path conflicts even
-    // inside one process.
-    let already_covers_data_dir = pre_config_lock
-        .as_ref()
-        .is_some_and(|held| held.path() == icn_core::DataDirLock::lock_path(&config.data_dir));
-    let _data_dir_lock = if already_covers_data_dir {
-        pre_config_lock
-    } else {
-        drop(pre_config_lock);
-        Some(icn_core::DataDirLock::acquire(
-            &config.data_dir,
-            "the daemon",
-        )?)
-    };
+    // Both locks are retained for the daemon's lifetime, and they protect
+    // different things:
+    //
+    // * the configuration lock (`pre_config_lock`, taken above) protects the
+    //   bytes this process has already interpreted;
+    // * this one protects the state this process is about to mutate.
+    //
+    // They are not the same directory whenever `data_dir` points somewhere
+    // other than beside the configuration file — `--config /A/icn.toml
+    // --data-dir /B`, or any configuration like the shipped
+    // `config/icn-alpha.toml`, whose `data_dir` is `/tmp/icn-alpha`. Releasing
+    // the configuration lock here, as an earlier revision did, left a running
+    // daemon acting on an interpretation that a ceremony rooted at `/A` was
+    // free to republish underneath it — the stale-configuration race this
+    // protocol exists to prevent, reintroduced in the one case where the
+    // storage lock cannot stand in for it.
+    //
+    // They are separate lock *files*, so holding both is safe even when the two
+    // roots coincide: `File::try_lock` is `flock(2)`, which is per
+    // open-file-description, and a second handle on one path would conflict
+    // with the first inside this very process.
+    //
+    // Nothing here can deadlock. Every acquisition is non-blocking, so two
+    // daemons taking these roots in opposite orders get an immediate refusal on
+    // one side rather than a hang.
+    let _config_root_lock = pre_config_lock;
+    let _data_dir_lock = icn_core::DataDirLock::acquire(&config.data_dir, "the daemon")?;
 
     // N2-A startup gate (#2627). `Did` equality now names the principal, not
     // the spelling (I7), so the first start of this binary over a store holding
