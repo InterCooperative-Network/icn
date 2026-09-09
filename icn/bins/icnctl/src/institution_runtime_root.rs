@@ -67,6 +67,208 @@
 //! prevent. A keypair-backed DID always parses. `AgeKeyStore` holds a single
 //! identity bundle, so a distinct Principal is necessarily a distinct keystore.
 //!
+//! # Principals and roles
+//!
+//! | role | what it is today |
+//! |---|---|
+//! | node Principal | the node's own `identity.age` keypair |
+//! | provisioning authority | **cryptographically the node Principal**, proven by opening that keystore rather than asserted |
+//! | runtime trust root | a distinct, newly minted, keypair-backed Principal — **not** the Institution |
+//! | treasury | a distinct, newly minted, keypair-backed Principal |
+//! | canonical Institution | does not exist here; `EntityId` is unallocated |
+//!
+//! # Durable state
+//!
+//! Seven components, each reported individually by `show`:
+//!
+//! 1. runtime trust-root keystore (minted, 0600);
+//! 2. treasury keystore (minted, 0600);
+//! 3. cooperative record, in the store the daemon opens;
+//! 4. treasury registration, in the ledger store;
+//! 5. two trust edges, in the trust store;
+//! 6. configuration linkage — `<data_dir>/icn.toml` naming the treasury;
+//! 7. the runtime-root receipt, written last.
+//!
+//! Only three are exclusive to this ceremony, and `is_untouched` keys on those
+//! alone: the gateway's `CoopManager` creates cooperative records and
+//! `init-coop` writes trust edges, so counting the shared ones would report an
+//! ordinary node as mid-ceremony.
+//!
+//! # Trust topology, and the authority boundary
+//!
+//! ```text
+//! node Principal
+//!   --local recognition-->        direct edge, 0.7 tier
+//! runtime trust-root Principal
+//!   --runtime-root-attributed-->  transitive, 0.3 tier
+//! treasury Principal
+//! ```
+//!
+//! Effective author score `1.0 * 1.0 * 0.3 = 0.300`, against the ledger's
+//! `DEFAULT_MIN_TRUST_FOR_ENTRY = 0.1`. **Both** edges are required: the gate is
+//! ego-centric from the node's own DID, so a `trust-root -> treasury` edge alone
+//! is unreachable and scores `0.0`. Removing either drops the treasury below the
+//! gate, and both directions are pinned by tests, as is a stranger DID scoring
+//! below it.
+//!
+//! The trust root's key does **not** sign the second edge. `TrustEdge` carries
+//! no signature or provenance field, so the store records no evidence of who
+//! established it; it is written through `TrustGraph::add_edge` under the
+//! privilege of a local ceremony authenticated by the founding Principal's
+//! keystore. The honest description is an *institution-attributed trust fact
+//! established under privileged local ceremony*, not a cryptographic
+//! authorisation — and therefore the cooperative's authority here is not
+//! independent of the node.
+//!
+//! # Operator input, and who owns the limits
+//!
+//! The ceremony applies its own rules — non-empty, no control characters, no
+//! whitespace inside a currency, a 200-scalar paste-accident cap on the name —
+//! and then calls `icn_gateway::validation::validate_coop_name` and
+//! `validate_unit` directly rather than restating their constants.
+//!
+//! Restating them is what produced icn#2749's byte-versus-scalar defect: the
+//! gateway measures `str::len()`, which is BYTES, while a hand-written check
+//! counted Unicode scalars, so nine four-byte characters passed a "32
+//! character" rule and failed the gateway's 32-byte one. These values are
+//! written straight into durable state and never re-checked, and a rerun is
+//! refused, so an accepted-here/rejected-there value is permanent.
+//!
+//! The rule, stated once: **every value this ceremony permanently provisions
+//! must be accepted by the subsystem that later consumes it.** It may be
+//! stricter than that consumer for a declared local reason. It may not be
+//! weaker.
+//!
+//! The same principle governs the configuration preflight, in the other
+//! direction: `icnd` applies `--gateway-jwt-secret`, then
+//! `ICN_GATEWAY_JWT_SECRET`, then the file, and only then runs
+//! `Config::validate`. This ceremony applies the environment variable before
+//! validating for exactly that reason — validating the raw file would make it
+//! *stricter* than the daemon it is checking for, rejecting the standard
+//! `init-coop` flow and pushing an operator into persisting a plaintext secret.
+//!
+//! # Coordination protocol
+//!
+//! Two resources, because a daemon depends on two things it does not own alone.
+//! See [`icn_core::DataDirLock`] for the mechanism.
+//!
+//! | resource | file | daemon | this ceremony |
+//! |---|---|---|---|
+//! | storage it mutates | `<data_dir>/.icn-data-dir.lock` | exclusive | exclusive |
+//! | configuration it consumed | `<config_root>/.icn-config.lock` | **shared** | **exclusive** |
+//!
+//! The configuration side is shared/exclusive because a daemon *reads* a
+//! configuration and this ceremony *writes* one. Several daemons may hold one
+//! directory at once — the shipped two-node demo keeps both node configurations
+//! in `config/` with different data roots — while any publisher is refused.
+//!
+//! They are separate **files** rather than two modes of one because `flock(2)`
+//! is per open-file-description: a second handle on one path conflicts with the
+//! first inside the same process. Separate files let a daemon whose config root
+//! and data root coincide hold both without contending with itself.
+//!
+//! Both are held for the daemon's whole life. Releasing the configuration lock
+//! after `Config::from_file` leaves a running daemon acting on an
+//! interpretation a ceremony is free to republish underneath it — the case
+//! where `--data-dir` (or any `data_dir` pointing elsewhere) makes the two roots
+//! differ. Ordering is configuration-then-storage in both actors but is not
+//! load-bearing: every acquisition is non-blocking, so a crossed pair is refused
+//! rather than hung.
+//!
+//! **Actor model.** Both parties run under the *same account*. Every scripted
+//! invocation in this repository drops to the service user first (`sudo -u icn`,
+//! `runuser -u icn`), and the ceremony enforces it (below). This matters
+//! because advisory locking coordinates equals: a daemon that cannot create the
+//! coordination file has not established that no more privileged writer can, so
+//! that case fails closed. A genuinely immutable filesystem — a read-only
+//! ConfigMap mount — reports `ReadOnlyFilesystem` and is recognised as having
+//! nothing to exclude. None of this is a boundary against a privileged local
+//! adversary, who can remove the file or ignore advisory locking.
+//!
+//! A symlinked `<data_dir>/icn.toml` is refused, twice and independently: the
+//! N2-A startup gate refuses a symlink under the data directory before any
+//! mutation, and publication refuses a non-regular destination. A ceremony that
+//! refuses symlinked managed configuration does not need to join the link
+//! target's lock domain.
+//!
+//! # Publishing the configuration
+//!
+//! `rename` replaces the inode, so the replacement's owner and group come from
+//! the process that created it. That is refused, not repaired:
+//!
+//! * the destination must be a regular, non-symlinked file;
+//! * a replacement whose uid/gid would differ from the file it replaces is
+//!   refused — before the exclusion locks are taken, so a wrong-account run
+//!   creates nothing at all (the coordination files are retained after release,
+//!   and root-owned ones would lock the daemon's account out permanently), and
+//!   again inside `check_config_linkable`, which publication re-runs;
+//! * the original mode is carried onto the replacement **before** `sync_all`,
+//!   because `fsync` flushes the inode as well as the data and a mode set
+//!   afterwards would not have crossed the barrier the receipt certifies;
+//! * `rename`, then the parent directory is synced — atomicity is not
+//!   durability;
+//! * a post-condition then requires the published file to be a regular file
+//!   whose uid, gid and mode equal the one it replaced.
+//!
+//! Repairing ownership with `chown` was rejected: it would fix `icn.toml` while
+//! the two keystores and three sled databases stayed owned by the invoking
+//! account, buying a receipt that looks right over state that is not — and it
+//! would add a privilege-bearing path to a command that needs none.
+//!
+//! # Commit order
+//!
+//! ```text
+//! resolve storage root -> refuse a foreign account -> configuration lock
+//!   -> storage lock -> N2-A gate -> refuse over existing key material
+//!   -> validate operator input -> refuse a foreign institution
+//!   -> require the node keystore -> check the configuration is linkable
+//!   -> PROVE founding authority by opening the node keystore
+//!   -> mint both principals (0600, fsync file, fsync parent)
+//!   -> cooperative record + flush -> treasury registration + flush
+//!   -> trust edges + flush -> close every store handle
+//!   -> publish the configuration -> re-verify through FRESH handles
+//!   -> completion receipt LAST
+//! ```
+//!
+//! Two details that are load-bearing and easy to prettify away: handles are
+//! closed *before* verification, because sled takes an exclusive directory lock
+//! and reading back through the writer's own handle would prove nothing about
+//! durability; and cooperative, ledger and trust are three separate databases,
+//! each flushed separately, because reopening proves visibility rather than
+//! survival.
+//!
+//! # Partial state, and evidence levels
+//!
+//! `show` classifies into `NOT_STARTED`, `INCOMPLETE` (with the component
+//! list), `READY`, `INCONSISTENT`, and an `ERROR` envelope for unreadable
+//! cases. A directory already holding institutional state is **refused**, never
+//! repaired or resumed: no silent remint, no partial overwrite.
+//!
+//! Evidence is tri-state, never boolean — `false` would conflate *checked and
+//! wrong* with *not checked*. `create` holds the passphrase and verifies key
+//! provenance and the current node identity. `show` deliberately does not
+//! prompt, so those read `not_reverified` while the durable relationships,
+//! configuration linkage, trust score and key presence read `verified`.
+//! **Unknown is not false**, and the output says so rather than leaving a reader
+//! to infer it.
+//!
+//! Exactly one JSON document reaches stdout for every outcome, including load
+//! failures; tracing goes to stderr so `--json` stays machine-parseable.
+//!
+//! # External defects this does not fix
+//!
+//! * **icn#2747** — stock `init-coop` output cannot start a daemon (`[network]`
+//!   omits `bootstrap_peers`, which has no serde default; the gateway is
+//!   enabled with `jwt_secret` commented out). This ceremony refuses such a
+//!   configuration rather than certify a node that cannot start.
+//! * **icn#2748** — general `AgeKeyStore` file-mode behaviour. The two
+//!   keystores minted here are hardened to 0600.
+//! * **icn#2750** — persisted trust edges become invisible to
+//!   `compute_trust_score_weighted` once any unrelated in-process edge exists
+//!   (`0.300 -> 0.000`). Not introduced here, and deliberately not fixed here:
+//!   special-casing this ceremony inside the trust substrate would be the wrong
+//!   owner.
+//!
 //! # Standing non-claims
 //!
 //! * not canonical Institution genesis; no `EntityId`, no signed founding act;
@@ -77,6 +279,36 @@
 //!   node today — the roles differ, the subjects do not;
 //! * the boundary crossed is the ledger **author-trust gate**; the `PolicyOracle`
 //!   beside it is `AllowAllOracle::wildcard()` (pre-existing, permissive).
+//!
+//! # Honest evidence limits
+//!
+//! * no full composite stale-configuration orchestration: the exclusion
+//!   protocol is proved by a live daemon and by lock-level probes, not by
+//!   driving a ceremony to completion against a daemon mid-flight;
+//! * no power-loss simulation. Durability is argued from fsync ordering, an
+//!   injected-failure discriminator, and re-reads through fresh handles;
+//! * **extended ACLs are neither preserved nor certified.** What the publication
+//!   contract covers is uid, gid and mode — the *supported* access metadata.
+//!   There is no ACL or xattr usage anywhere in this repository's deployment
+//!   material; if that changes, this needs revisiting;
+//! * **daemon readability is not proven.** This process does not run under the
+//!   daemon's credentials, so a check it performs speaks only for its own. The
+//!   claim is that the original supported access metadata was preserved;
+//! * the cross-*user* ownership case is argued from the policy function but was
+//!   executed only cross-*group*: an unprivileged test cannot `chown` to another
+//!   uid.
+//!
+//! And the largest one, measured rather than assumed: **the shipped native
+//! service does not consume what this publishes.** `deploy/icnd.service` passes
+//! `--data-dir` and no `--config`, so `icnd` builds `Config::default()` and
+//! falls back to the node DID. On one provisioned data directory the real
+//! daemon reports *"No treasury_did configured, using node DID for budget
+//! payouts"* without `--config` and *"Ledger service using the cooperative's own
+//! treasury principal"* with it. What this ceremony establishes is a
+//! **daemon-consumable** configuration, proved against `icnd --config <managed
+//! file>`; that the deployed unit *selects* that configuration is a separate
+//! property and is icn#2755. Consumer compatibility and consumer reachability
+//! are not the same claim.
 
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
@@ -2390,7 +2622,7 @@ fn classify_show_error(message: &str) -> (&'static str, &'static str) {
 ///   DIDs before writing its commit marker;
 /// * `show` re-checks every non-secret durable relationship but does not
 ///   prompt for a passphrase, so it cannot speak to key provenance.
-fn print_receipt(receipt: &RuntimeRootReceipt, provenance_verified: bool) {
+fn print_receipt(data_dir: &Path, receipt: &RuntimeRootReceipt, provenance_verified: bool) {
     println!("Institutional Runtime Root");
     println!("==========================\n");
     println!("Cooperative:        {}", receipt.cooperative_name);
@@ -2422,9 +2654,26 @@ fn print_receipt(receipt: &RuntimeRootReceipt, provenance_verified: bool) {
     }
     println!(
         "\nThe treasury is a principal of its own; it is not the node.\n\
-         This is Principal-generation runtime genesis. It does not implement\n\
+         This provisions the institutional runtime root. It does not implement\n\
          the GEN protocol (#2602), stable Subject-generation (#2694),\n\
          federation, or the Technical Alpha as a whole."
+    );
+    // Say how this becomes effective, because it does not become effective on
+    // its own. A daemon started without `--config` builds `Config::default()`,
+    // whose `cooperative.treasury_did` is `None`, and falls back to the node
+    // DID — measured, not inferred: the same data directory yields "using node
+    // DID for budget payouts" without the flag and "using the cooperative's own
+    // treasury principal" with it. The shipped `deploy/icnd.service` passes no
+    // `--config` (icn#2755), so an operator who is not told this gets a
+    // provisioned runtime root the daemon never reads.
+    println!(
+        "\nTo take effect, the daemon must be started with this configuration:\n\
+        \x20   icnd --config {} --data-dir {}\n\
+         A daemon started without --config falls back to the node DID for\n\
+         governance-authored ledger entries, whatever this receipt says. The\n\
+         shipped systemd unit does not pass --config yet (icn#2755).",
+        data_dir.join("icn.toml").display(),
+        data_dir.display()
     );
 }
 
@@ -2458,7 +2707,7 @@ pub fn handle_institution_runtime_root_command(
                 }
             }
             let receipt = provision_runtime_root(data_dir, &name, &currency)?;
-            print_receipt(&receipt, true);
+            print_receipt(data_dir, &receipt, true);
         }
         InstitutionRuntimeRootCommands::Show { json } => match classify_for_show(data_dir, json)? {
             RuntimeRootState::Ready(receipt) => {
@@ -2490,7 +2739,7 @@ pub fn handle_institution_runtime_root_command(
                         }))?
                     );
                 } else {
-                    print_receipt(&receipt, false);
+                    print_receipt(data_dir, &receipt, false);
                 }
             }
             RuntimeRootState::Inconsistent { receipt, problem } if json => {

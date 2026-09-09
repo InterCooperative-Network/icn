@@ -2543,3 +2543,46 @@ fn chgrp(path: &Path, gid: u32) {
         "fixture: chgrp({gid}) must succeed for a group we are in"
     );
 }
+
+/// A successful ceremony must tell the operator how the configuration becomes
+/// effective, because it does not become effective on its own.
+///
+/// Measured against the real daemon on one provisioned data directory:
+///
+/// * `icnd --data-dir ROOT` — *"No treasury_did configured, using node DID for
+///   budget payouts"*;
+/// * `icnd --config ROOT/icn.toml --data-dir ROOT` — *"Ledger service using the
+///   cooperative's own treasury principal"*.
+///
+/// The shipped `deploy/icnd.service` passes no `--config` (icn#2755), so an
+/// operator who is not told this ends up with a provisioned runtime root the
+/// daemon never reads, and a receipt that says READY over it. This pins the
+/// guidance so it cannot quietly disappear while that remains true.
+#[test]
+fn a_successful_ceremony_says_how_the_configuration_becomes_effective() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let out = provision_runtime_root(data_dir, "Consumption Coop");
+    let text = combined(&out);
+    assert!(
+        out.status.success(),
+        "fixture: provisioning must succeed:\n{text}"
+    );
+
+    assert!(
+        text.contains("--config") && text.contains("icn.toml"),
+        "the receipt must name the invocation that consumes this configuration:\n{text}"
+    );
+    assert!(
+        text.contains("falls back to the node DID"),
+        "and must say what happens without it — the whole point of the ceremony \
+         is removing that fallback:\n{text}"
+    );
+    assert!(
+        text.contains("2755"),
+        "and must name the deployment issue, so the limitation is traceable:\n{text}"
+    );
+}
