@@ -716,7 +716,7 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
     // operator uses to decide what to delete by hand. That is the same defect
     // `refuse_if_foreign_institutional_state` documents having removed.
     let scan_any = |db: PathBuf, prefix: &[u8]| -> Result<bool> {
-        if !db.exists() {
+        if !store_directory_exists(&db)? {
             return Ok(false);
         }
         let store = icn_store::SledStore::open(&db)
@@ -729,7 +729,7 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
         Ok(found)
     };
     let scan_count = |db: PathBuf, prefix: &[u8]| -> Result<usize> {
-        if !db.exists() {
+        if !store_directory_exists(&db)? {
             return Ok(0);
         }
         let store = icn_store::SledStore::open(&db)
@@ -915,7 +915,7 @@ fn refuse_if_foreign_institutional_state(data_dir: &Path) -> Result<()> {
     // state. It is also deliberately NOT created here; `sled::open` would
     // materialise an empty database as a side effect of asking the question.
     let inspect = |db: std::path::PathBuf, prefix: &[u8], label: &str| -> Result<Vec<String>> {
-        if !db.exists() {
+        if !store_directory_exists(&db)? {
             return Ok(Vec::new());
         }
         let store = icn_store::SledStore::open(&db).with_context(|| {
@@ -1114,7 +1114,7 @@ fn mint_principal(path: &Path, passphrase: &[u8], what: &str) -> Result<Did> {
 /// Read the genesis receipt back out of the cooperative store.
 pub fn load_receipt(data_dir: &Path) -> Result<Option<RuntimeRootReceipt>> {
     let coop_db = coop_db_path(data_dir);
-    if !coop_db.exists() {
+    if !store_directory_exists(&coop_db)? {
         return Ok(None);
     }
     let store = icn_store::SledStore::open(&coop_db).with_context(|| {
@@ -2217,6 +2217,31 @@ fn refuse_ownership_change(
          scripts use `runuser -u icn` / `sudo -u icn`).",
         path.display()
     )
+}
+
+/// Does this store directory exist, or could we not tell?
+///
+/// `Path::exists()` answers `false` for *every* metadata error, including a
+/// traversal or permission failure on an existing directory — so an
+/// inaccessible store reads as a clean one. That is the same fail-open shape
+/// this file removed from its scan closures, one layer further out: preflight
+/// would call the directory absent, mint both keystores, and only then fail
+/// opening it, leaving a permanently INCOMPLETE root.
+///
+/// Only `NotFound` means absent. Anything else is "cannot tell", which is not
+/// evidence and is refused.
+fn store_directory_exists(db: &Path) -> Result<bool> {
+    match std::fs::symlink_metadata(db) {
+        Ok(_) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e).with_context(|| {
+            format!(
+                "Refusing to proceed: could not determine whether {} exists, so it cannot be \
+                 established that no institutional state is already there",
+                db.display()
+            )
+        }),
+    }
 }
 
 /// Refuse a managed configuration that has more than one directory entry.
@@ -3836,6 +3861,48 @@ mod failpoint_tests {
                 artefact.display()
             );
         }
+    }
+
+    /// A store directory that cannot be inspected is not an absent one.
+    ///
+    /// `Path::exists()` answers `false` for every metadata error, so an
+    /// unreadable store read as clean — and preflight would then mint both
+    /// keystores before failing to open it, leaving a permanently INCOMPLETE
+    /// root. Driven through the guard directly, because an unreadable parent
+    /// directory is easier to build than to reach through the whole command.
+    #[cfg(unix)]
+    #[test]
+    fn a_store_directory_that_cannot_be_inspected_is_not_reported_absent() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::TempDir::new().unwrap();
+        let parent = dir.path().join("store");
+        let db = parent.join("cooperative");
+        std::fs::create_dir_all(&db).unwrap();
+
+        // No traversal: `symlink_metadata` on the child now fails with EACCES
+        // rather than reporting the directory absent.
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let reachable = std::fs::symlink_metadata(&db).is_ok();
+        if reachable {
+            std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o700)).unwrap();
+            eprintln!(
+                "SKIPPED a_store_directory_that_cannot_be_inspected_is_not_reported_absent: \
+                 this process traverses a 0000 directory (running as root?). Not evidence here."
+            );
+            return;
+        }
+
+        let outcome = store_directory_exists(&db);
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let msg = format!(
+            "{:#}",
+            outcome.expect_err("an uninspectable store must refuse, not read as absent")
+        );
+        assert!(
+            msg.contains("could not determine whether"),
+            "the refusal must say the question could not be answered: {msg}"
+        );
     }
 
     /// The component scan's own witness: the trust store.
