@@ -77,6 +77,20 @@ You may attach a severity to help the maintainer triage. It carries no authority
 satisfies the predicate, and it never breaks a freeze. `automated_severity_is_advisory` in the
 policy is the governing statement.
 
+## Naming a systemic candidate
+
+When a finding looks like an instance of a recurring class rather than a one-off, you may name the
+class. Match it against `patterns[].signal` in `ops/state/truth/engineering-leverage.json` and cite
+the pattern id and its existing precedent, so the author inherits the direction instead of
+rediscovering it.
+
+This changes nothing about the finding's disposition. A systemic observation does not satisfy
+`blocker_predicate.all_must_hold`, does not widen the acceptance contract, and does not reopen a
+freeze. A recurring class whose instance here is genuinely repaired is **FOLLOW_UP**, and belongs
+in the follow-up ledger — not in a demand that this pull request grow.
+
+If no pattern matches and you cannot name a second real occurrence, do not invent a class.
+
 ## Reviewing a frozen pull request
 
 The freeze means the comprehensive generation is closed. Apply the late-blocker threshold in

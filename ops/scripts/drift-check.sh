@@ -137,6 +137,29 @@ else
   fail "scripts/check-skill-registry.py missing — in-repo skill ownership is unenforced"
 fi
 
+# ─── Check 2c: The systemic-leverage policy must have exactly one owner ──────
+#
+# ops/state/truth/engineering-leverage.json owns the causal escalation an agent
+# performs after establishing a defect, and the catalogue of classes ICN has
+# already seen. Its checker proves the owner parses, is registered in the truth
+# spine, is projected to the surfaces the skill registry declares, has not grown
+# a rival copy of the delivery lifecycle, and is actually referenced by the
+# surfaces agents read — a policy nobody is routed to is prose.
+
+LEVERAGE_CHECK="${REPO_ROOT}/scripts/check-engineering-leverage.py"
+if [[ -f "${LEVERAGE_CHECK}" ]]; then
+  if lev_out="$(python3 "${LEVERAGE_CHECK}" 2>&1)"; then
+    ok "engineering leverage policy: ${lev_out}"
+  else
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && echo "  ${line}" >&2
+    done <<< "${lev_out}"
+    fail "engineering-leverage policy is not mechanically true (see output above)"
+  fi
+else
+  fail "scripts/check-engineering-leverage.py missing — the systemic-leverage policy is unenforced"
+fi
+
 # ─── Check 3: Stale path patterns must not appear in agent tooling files ─────
 
 # These patterns have historically caused drift. Any hit is a FAIL.
