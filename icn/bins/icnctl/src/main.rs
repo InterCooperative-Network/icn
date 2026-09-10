@@ -3453,6 +3453,14 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
         IdCommands::UpgradePq => true,
     };
     let _identity_lock = if mutates_identity {
+        // The lock is *created* here, retained after release, and mode 0600. Run
+        // under `sudo` against a service-owned root it would be root-owned, and
+        // the daemon's account could no longer open it — a mistaken maintenance
+        // command turned into a permanent startup failure. The ceremony refuses
+        // that before it creates anything; so must every other creating holder.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
         Some(icn_core::DataDirLock::acquire(
             data_dir,
             "this identity command",
@@ -3740,10 +3748,20 @@ async fn handle_recovery_command(
     // exclusion domain. The rest of these commands talk to a running daemon
     // over RPC and write nothing here.
     let _identity_lock = match cmd {
-        RecoveryCommands::Setup { .. } => Some(icn_core::DataDirLock::acquire(
-            data_dir,
-            "this recovery command",
-        )?),
+        RecoveryCommands::Setup { .. } => {
+            // The lock is *created* here, retained after release, and mode 0600. Run
+            // under `sudo` against a service-owned root it would be root-owned, and
+            // the daemon's account could no longer open it — a mistaken maintenance
+            // command turned into a permanent startup failure. The ceremony refuses
+            // that before it creates anything; so must every other creating holder.
+            institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+                data_dir,
+            )?;
+            Some(icn_core::DataDirLock::acquire(
+                data_dir,
+                "this recovery command",
+            )?)
+        }
         _ => None,
     };
 
@@ -6251,6 +6269,14 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
         DeviceCommands::List | DeviceCommands::Add { .. } => false,
     };
     let _identity_lock = if mutates_identity {
+        // The lock is *created* here, retained after release, and mode 0600. Run
+        // under `sudo` against a service-owned root it would be root-owned, and
+        // the daemon's account could no longer open it — a mistaken maintenance
+        // command turned into a permanent startup failure. The ceremony refuses
+        // that before it creates anything; so must every other creating holder.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
         Some(icn_core::DataDirLock::acquire(
             data_dir,
             "this device command",

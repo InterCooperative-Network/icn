@@ -3457,3 +3457,96 @@ fn lchgrp(path: &Path, gid: u32) {
         std::io::Error::last_os_error()
     );
 }
+
+/// A creating lock acquisition must ask the same account question the ceremony asks.
+///
+/// `acquire` creates `.icn-data-dir.lock`, retains it after release, and gives
+/// it mode 0600. Run under `sudo` against a service-owned root, the daemon's
+/// account can no longer open it and refuses to start — the same
+/// inspection-poisoning defect already removed from `id init` and `device
+/// list`, reached this time through a *mutating* command that legitimately
+/// needs the lock.
+///
+/// The guard is now on every creating holder, not just the ceremony: the review
+/// named `id rotate`, but `recovery setup` and `device approve`/`revoke` took
+/// the lock unguarded too.
+#[cfg(unix)]
+#[test]
+fn a_mutating_maintenance_command_refuses_to_create_the_lock_under_the_wrong_account() {
+    let Some(other_gid) = a_supplementary_group() else {
+        eprintln!(
+            "SKIPPED a_mutating_maintenance_command_refuses_to_create_the_lock_under_the_wrong_account: \
+             this account has no supplementary group."
+        );
+        return;
+    };
+
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    let lock = data_dir.join(".icn-data-dir.lock");
+    assert!(
+        !lock.exists(),
+        "fixture: `id init` must not have left the lock behind"
+    );
+
+    chgrp(data_dir, other_gid);
+
+    let out = combined(
+        &icnctl(data_dir)
+            .args(["device", "revoke", "not-a-real-device"])
+            .output()
+            .unwrap(),
+    );
+    assert!(
+        out.contains("that the account owning it cannot use"),
+        "a creating acquisition must refuse under the wrong account:\n{out}"
+    );
+    assert!(
+        !lock.exists(),
+        "and must not have created {} — the owning account could not reopen it",
+        lock.display()
+    );
+}
+
+/// The temp-path refusal must land before the first durable write, not after
+/// the last one.
+///
+/// Publication already refused a non-regular entry at
+/// `icn.toml.genesis-tmp`, so the defect was never a missing check — it was
+/// *when* it ran. Reaching it only at publication meant both keystores were
+/// minted and the cooperative record, treasury registration and trust rows were
+/// durable before the ceremony aborted, leaving an INCOMPLETE root that every
+/// later `create` refuses until somebody clears it by hand.
+///
+/// The assertions are therefore about what does NOT exist afterwards; the
+/// refusal message alone would pass either way.
+#[cfg(unix)]
+#[test]
+fn a_blocked_publication_temp_path_is_refused_before_anything_is_minted() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    std::fs::create_dir(data_dir.join("icn.toml.genesis-tmp")).unwrap();
+
+    let refused = combined(&provision_runtime_root(data_dir, "Blocked Tmp Coop"));
+    assert!(
+        refused.contains("is not a regular file"),
+        "the blocked temporary path must be refused:\n{refused}"
+    );
+
+    for artefact in [
+        "genesis-trust-root.age",
+        "treasury.age",
+        ".icn-config.lock",
+        ".icn-data-dir.lock",
+    ] {
+        assert!(
+            !data_dir.join(artefact).exists(),
+            "{artefact} must not exist — the refusal has to precede the first durable write, \
+             or the operator is left with a root to clean up by hand"
+        );
+    }
+}

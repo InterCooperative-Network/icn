@@ -1696,6 +1696,7 @@ fn provision_runtime_root_inner(
     // governs everything this ceremony writes, not just the one file.
     refuse_if_new_files_would_not_belong_to_the_data_root_account(data_dir)?;
     refuse_if_the_configuration_belongs_to_another_account(data_dir)?;
+    refuse_unusable_publication_temp_path(data_dir)?;
     refuse_if_the_configuration_is_hard_linked(data_dir)?;
 
     // (1b) Take exclusive ownership of the data root BEFORE any state-sensitive
@@ -1745,10 +1746,24 @@ fn provision_runtime_root_inner(
     // is the more fundamental question, and a data directory missing both
     // should say so rather than reporting the shallower problem.
     let node_keystore_path = get_keystore_path(data_dir);
-    if std::fs::symlink_metadata(&node_keystore_path)
-        .map(|m| m.file_type().is_symlink())
-        .unwrap_or(false)
-    {
+    // `unwrap_or(false)` here would read "could not tell" as "not a symlink"
+    // and proceed to prove founding authority against key material this never
+    // managed to look at. Absence is answered by the keystore open below, which
+    // reports it far better than this guard could.
+    let node_keystore_is_symlink = match std::fs::symlink_metadata(&node_keystore_path) {
+        Ok(meta) => meta.file_type().is_symlink(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => {
+            return Err(e).with_context(|| {
+                format!(
+                    "Refusing institutional runtime-root provisioning: could not determine \
+                     whether the node keystore at {} is a symlink",
+                    node_keystore_path.display()
+                )
+            })
+        }
+    };
+    if node_keystore_is_symlink {
         bail!(
             "Refusing institutional runtime-root provisioning: the node keystore at {} is a \
              symlink. Founding authority must be proven against real key \
@@ -2384,11 +2399,21 @@ fn verify_durable_state(
         // must check it. Provenance — that the key derives the recorded DID —
         // still needs the passphrase and remains unavailable to `show`.
         match std::fs::symlink_metadata(&path) {
-            Err(_) => bail!(
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
                 "Verification: {what} key material is missing from {}. The \
                  principal named by the receipt has no key behind it.",
                 path.display()
             ),
+            // Anything else is a failed observation, not an observed absence.
+            // Reporting it as missing would render INCONSISTENT — a positive
+            // claim that durable state contradicts the receipt — for a look
+            // that never happened.
+            Err(e) => {
+                return Err(uninspectable(anyhow::Error::new(e).context(format!(
+                    "Verification: could not determine whether {what} key material exists at {}",
+                    path.display()
+                ))))
+            }
             Ok(meta) if meta.file_type().is_symlink() => bail!(
                 "Verification: {what} key material at {} is a symlink. Runtime-root key \
                  material must be a regular file inside the data directory; a link could \
@@ -2855,6 +2880,64 @@ fn refuse_if_the_configuration_is_hard_linked(_data_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Where publication stages the new configuration before renaming it into place.
+fn config_publish_tmp_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("icn.toml").with_extension("toml.genesis-tmp")
+}
+
+/// Refuse anything at the publication temporary path that cannot be written
+/// through safely.
+///
+/// Called twice, and both call sites matter — the same shape as the ownership
+/// check above.
+///
+/// Publication needs it because the entire ceremony happens between preflight
+/// and the write, so the answer can change underneath it.
+///
+/// Preflight needs it because otherwise the *first* time anything looks is at
+/// publication — after both keystores are minted and the cooperative record,
+/// the treasury registration and the trust rows are durable. A directory left
+/// at `icn.toml.genesis-tmp` then aborts the ceremony having already written
+/// all of that, leaving an INCOMPLETE root that every later `create` refuses
+/// until somebody clears it by hand. A refusal that costs nothing belongs
+/// before the first durable write, not after the last one.
+///
+/// Two things are deliberately *not* refused here.
+///
+/// A stale *regular* file is not: publication clears it on purpose, and
+/// refusing it in preflight would strand a root after an interrupted run — the
+/// failure mode this ceremony documents having removed.
+///
+/// A *symlink* is not either, and that boundary is load-bearing. The N2-A sweep
+/// already refuses one, before anything durable exists, with a message naming
+/// the link. Refusing it here first would pre-empt that gate and replace a
+/// specific diagnosis with a vaguer one — and a test pinning the gate's own
+/// refusal would then be satisfied by this guard instead, which is precisely
+/// the attribution trap this file has had to remove before. The gap this closes
+/// is the *non-symlink* non-regular entry — a directory, a socket — which the
+/// sweep does not reject and nothing else looked at until publication.
+fn refuse_unusable_publication_temp_path(data_dir: &Path) -> Result<()> {
+    let tmp_path = config_publish_tmp_path(data_dir);
+    match std::fs::symlink_metadata(&tmp_path) {
+        Ok(meta) if meta.file_type().is_symlink() => Ok(()),
+        Ok(meta) if !meta.is_file() => bail!(
+            "Refusing institutional runtime-root provisioning: {} exists and is not a \
+             regular file. Publication will not write through it, so this would fail \
+             after the ceremony had already written durable state. Remove it and re-run.",
+            tmp_path.display()
+        ),
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e).with_context(|| {
+            format!(
+                "Refusing institutional runtime-root provisioning: could not determine what \
+                 is at {}",
+                tmp_path.display()
+            )
+        }),
+    }
+}
+
 /// Refuse when this account would create files the daemon cannot use.
 ///
 /// The reference is the data directory itself, exactly as in
@@ -2876,7 +2959,9 @@ fn refuse_if_the_configuration_is_hard_linked(_data_dir: &Path) -> Result<()> {
 /// Provisioning writes incomparably more, so it must not be the laxer path —
 /// which, until this guard, it was.
 #[cfg(unix)]
-fn refuse_if_new_files_would_not_belong_to_the_data_root_account(data_dir: &Path) -> Result<()> {
+pub fn refuse_if_new_files_would_not_belong_to_the_data_root_account(
+    data_dir: &Path,
+) -> Result<()> {
     let root_owner = match data_root_account(data_dir) {
         Ok(identity) => identity,
         // A root that is not there yet is refused with its own message by
@@ -2915,7 +3000,9 @@ fn refuse_if_new_files_would_not_belong_to_the_data_root_account(data_dir: &Path
 }
 
 #[cfg(not(unix))]
-fn refuse_if_new_files_would_not_belong_to_the_data_root_account(_data_dir: &Path) -> Result<()> {
+pub fn refuse_if_new_files_would_not_belong_to_the_data_root_account(
+    _data_dir: &Path,
+) -> Result<()> {
     Ok(())
 }
 
@@ -3181,7 +3268,7 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
         );
     }
 
-    let tmp_path = config_path.with_extension("toml.genesis-tmp");
+    let tmp_path = config_publish_tmp_path(data_dir);
 
     // Never write through whatever happens to sit at the temporary path.
     // `File::create` follows symlinks, so a pre-placed link here would redirect
@@ -3201,7 +3288,18 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
                 tmp_path.display()
             )
         })?,
-        Err(_) => {}
+        // Only absence means "nothing is in the way". Any other failure is a
+        // look that did not happen, and creating through it would be writing
+        // somewhere this never established was safe.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            return Err(e).with_context(|| {
+                format!(
+                    "Refusing to publish the configuration: could not determine what is at {}",
+                    tmp_path.display()
+                )
+            })
+        }
     }
     // The destination gets the same treatment as the temporary path. `rename`
     // replaces a symlink rather than following it, so publishing over one would
