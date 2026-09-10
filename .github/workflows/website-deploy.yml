@@ -44,7 +44,9 @@ jobs:
         run: npm run build
 
       - name: Deploy to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
+        # Pinned to the commit v4 resolved to on 2026-09-10. This job holds
+        # contents: write and the GITHUB_TOKEN that publishes the public site.
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4 as of 2026-09-10
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: website/dist

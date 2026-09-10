@@ -46,7 +46,11 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1
+        # Pinned to the commit the v1 tag resolved to on 2026-09-10. A tag can be
+        # repointed by its owner at any time, and this step is handed
+        # CLAUDE_CODE_OAUTH_TOKEN — so an unpinned ref lets third-party code change
+        # under a credential-bearing job with no commit landing in this repository.
+        uses: anthropics/claude-code-action@0a8d3c9443bbff909ab973b6a17a340b913f229f # v1 as of 2026-09-10
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
