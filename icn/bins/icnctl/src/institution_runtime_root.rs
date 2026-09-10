@@ -866,6 +866,94 @@ pub fn runtime_root_state(data_dir: &Path) -> Result<RuntimeRootState> {
     }
 }
 
+/// Refuse an offline command that would replace the node DID, once a runtime
+/// root exists that depends on the current one.
+///
+/// # The invariant this defends
+///
+/// Serialising the ceremony against concurrent identity commands — which
+/// `DataDirLock` already does — establishes that *the node identity cannot
+/// change during the runtime-root transaction*. It says nothing about
+/// afterwards. This is the other half: once a runtime root has been committed,
+/// an offline DID-changing operation must not be able to silently invalidate
+/// the authority relationship that committed state depends on.
+///
+/// Without this, `id rotate` / `id import` succeed the moment no ceremony holds
+/// the lock, and leave three durable facts disagreeing:
+///
+///   * the receipt still names the **old** node DID;
+///   * the persisted `node -> trust_root` edge still starts at the old DID;
+///   * the daemon roots its trust computation at the **new** DID.
+///
+/// The treasury then scores zero for the runtime authority path and
+/// governance-authored ledger entries are rejected — while `runtime-root show`,
+/// reading the receipt, can still report `READY`. The failure is silent in
+/// exactly the place an operator would look.
+///
+/// # Why refuse rather than migrate
+///
+/// Migrating the binding means rewriting the receipt and the trust edge
+/// atomically with the keystore replacement. No existing primitive does that
+/// completely, and a partial migration is strictly worse than a refusal: it
+/// would leave the same three-way disagreement with the added claim that it had
+/// been handled. Refusal is the fail-closed choice; atomic node-authority
+/// migration is tracked separately.
+///
+/// # Scope
+///
+/// Only commands that can *replace the DID*. A DID-preserving keystore
+/// operation — `upgrade-pq`, the device and recovery commands — still rewrites
+/// `identity.age`, and still takes the data-directory lock for the tearing
+/// reason documented at its call site, but it does not invalidate any
+/// authority binding and is not refused here.
+///
+/// # States
+///
+/// Classified through [`runtime_root_state`], the same mechanism `show` uses,
+/// rather than a second ad-hoc definition of "provisioned":
+///
+///   * `NotStarted` — nothing to invalidate; existing behaviour is retained.
+///   * `Ready` / `Inconsistent` — a receipt exists and names a node DID that
+///     durable state is bound to. Refuse.
+///   * `Incomplete` — an interrupted ceremony already wrote components bound to
+///     the current node DID. Refuse; there is no reading under which replacing
+///     the DID here is safe.
+///   * `Err` — the state could not be read at all, including the
+///     `Uninspectable` case from a storage failure. **Fail closed**: an
+///     unreadable root is not evidence of an absent one.
+pub fn refuse_node_did_change_if_runtime_root_exists(data_dir: &Path, command: &str) -> Result<()> {
+    let advice = "Provision a new root in a separate data directory, or migrate the runtime \
+                  authority binding deliberately. Rotating the node identity underneath a \
+                  committed runtime root would leave the receipt, the persisted trust edge and \
+                  the daemon's trust computation naming different principals.";
+    match runtime_root_state(data_dir) {
+        // No runtime root: nothing depends on this node DID.
+        Ok(RuntimeRootState::NotStarted) => Ok(()),
+        Ok(RuntimeRootState::Ready(receipt)) => bail!(
+            "{command} would replace this node's DID, but a runtime root is provisioned here and \
+             its authority binding starts at the current node DID {}.\n\n{advice}",
+            receipt.node_did
+        ),
+        Ok(RuntimeRootState::Inconsistent { receipt, problem }) => bail!(
+            "{command} would replace this node's DID, but a runtime-root receipt exists here \
+             naming node DID {} (and durable state already disagrees with it: {problem}).\n\n\
+             {advice}",
+            receipt.node_did
+        ),
+        Ok(RuntimeRootState::Incomplete { components }) => bail!(
+            "{command} would replace this node's DID, but an interrupted runtime-root ceremony \
+             left components here that are bound to the current node DID ({components:?}).\n\n\
+             {advice}"
+        ),
+        // Fail closed. An unreadable runtime root is not an absent one.
+        Err(problem) => bail!(
+            "{command} would replace this node's DID, and whether a runtime root exists here \
+             could not be determined ({problem:#}). Refusing rather than assuming there is \
+             none.\n\n{advice}"
+        ),
+    }
+}
+
 /// Reject operator-supplied values before the ceremony writes or prompts.
 ///
 /// Deliberately conservative rather than clever: this is durable runtime-root
@@ -1285,6 +1373,54 @@ impl DurabilityFailureGuard {
 impl Drop for DurabilityFailureGuard {
     fn drop(&mut self) {
         if let Ok(mut slot) = FAIL_KEYSTORE_DURABILITY.lock() {
+            *slot = None;
+        }
+    }
+}
+
+/// Test-only switch that makes the first cooperative-row read fail at the
+/// *storage* layer, **scoped to one data root**.
+///
+/// The defect this exists to pin is a classification one, not a detection one:
+/// `get_cooperative` returning `CoopError::Storage` used to be flattened into an
+/// ordinary `anyhow::Error`, so `runtime_root_state` reported `INCONSISTENT` — a
+/// positive claim that durable state disagrees with the receipt — for a read it
+/// never actually performed. Injecting the storage failure is therefore the
+/// right shape of witness: the question under test is what the code *concludes*
+/// from a storage error, not whether sled can produce one.
+///
+/// Scoped for the same reason `FAIL_KEYSTORE_DURABILITY` is: `cargo test` runs
+/// these in parallel and a global flag would fire inside an unrelated
+/// ceremony.
+#[cfg(test)]
+static FAIL_COOP_ROW_READ: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// Arm the cooperative-row storage failure for one root, disarming on drop.
+#[cfg(test)]
+struct CoopRowReadFailureGuard;
+
+#[cfg(test)]
+impl CoopRowReadFailureGuard {
+    fn arm(root: &Path) -> Self {
+        if let Ok(mut slot) = FAIL_COOP_ROW_READ.lock() {
+            *slot = Some(icn_core::DataDirLock::lock_path(root));
+        }
+        Self
+    }
+
+    fn armed_for(data_dir: &Path) -> bool {
+        FAIL_COOP_ROW_READ
+            .lock()
+            .ok()
+            .and_then(|slot| slot.clone())
+            .is_some_and(|armed| armed == icn_core::DataDirLock::lock_path(data_dir))
+    }
+}
+
+#[cfg(test)]
+impl Drop for CoopRowReadFailureGuard {
+    fn drop(&mut self) {
+        if let Ok(mut slot) = FAIL_COOP_ROW_READ.lock() {
             *slot = None;
         }
     }
@@ -1957,15 +2093,54 @@ fn verify_durable_state(
             .map_err(uninspectable)?,
     );
     let coop_store = icn_coop::CoopStore::new(Arc::new(coop_sled.db().clone()));
-    let stored = coop_store
-        .get_cooperative(&receipt.cooperative_id)
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Verification: the cooperative record {} is not readable back ({e}); refusing to \
+    // Two different failures reach this call, and conflating them makes the
+    // caller state a fact it did not observe.
+    //
+    //   - `Storage` (a sled error) and `Serialization` (a row that will not
+    //     decode) mean the check *could not be run*. Reporting those as a
+    //     disagreement would be a positive corruption claim derived from an
+    //     absence of evidence, and `runtime_root_state` would render it
+    //     `INCONSISTENT` instead of the documented `ERROR` / `state_unreadable`.
+    //   - every other variant — `NotFound` above all — is an observation: the
+    //     store was read successfully and the record is missing or wrong. That
+    //     genuinely is a disagreement with the receipt.
+    //
+    // Matched on the typed variant rather than on the rendered message, so a
+    // reworded `Display` cannot silently move a failure between the two
+    // classes. The `SledStore::open` above is already marked uninspectable for
+    // the same reason; this row read was the gap.
+    let read = {
+        #[cfg(test)]
+        {
+            if CoopRowReadFailureGuard::armed_for(data_dir) {
+                Err(icn_coop::CoopError::Storage(sled::Error::Unsupported(
+                    "injected cooperative-row storage failure".to_string(),
+                )))
+            } else {
+                coop_store.get_cooperative(&receipt.cooperative_id)
+            }
+        }
+        #[cfg(not(test))]
+        {
+            coop_store.get_cooperative(&receipt.cooperative_id)
+        }
+    };
+    let stored = read.map_err(|e| {
+        let unreadable = matches!(
+            e,
+            icn_coop::CoopError::Storage(_) | icn_coop::CoopError::Serialization(_)
+        );
+        let described = anyhow::anyhow!(
+            "Verification: the cooperative record {} is not readable back ({e}); refusing to \
                  record a genesis receipt for state that is not there.",
-                receipt.cooperative_id
-            )
-        })?;
+            receipt.cooperative_id
+        );
+        if unreadable {
+            uninspectable(described)
+        } else {
+            described
+        }
+    })?;
     match stored.treasury_did.as_deref() {
         Some(linked) if linked == receipt.treasury_did => {}
         other => bail!(
@@ -4993,5 +5168,223 @@ mod failpoint_tests {
             }
             other => panic!("expected Complete, got {other:?}"),
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // #2749 review tranche: three findings, three witnesses.
+    // ---------------------------------------------------------------------
+
+    /// A provisioned runtime root refuses a command that would replace the node
+    /// DID, and does not touch the keystore while refusing.
+    ///
+    /// One fact different from `a_node_did_change_is_allowed_with_no_runtime_root`
+    /// below: whether the ceremony ran.
+    #[test]
+    fn a_node_did_change_is_refused_once_a_runtime_root_exists() {
+        let dir = provisioned();
+        let receipt = provision_runtime_root(dir.path(), "Authority Binding Coop", "HOURS")
+            .expect("the fixture ceremony must succeed");
+
+        // Captured AFTER provisioning, so this is the exact byte sequence a
+        // rotation would replace.
+        let keystore = get_keystore_path(dir.path());
+        let before = std::fs::read(&keystore).expect("keystore must be readable");
+
+        let msg = refuse_node_did_change_if_runtime_root_exists(dir.path(), "`icnctl id rotate`")
+            .unwrap_err_or_else_msg("a provisioned root must refuse a node DID change");
+
+        // Attributable to the authority binding — not to a generic lock or a
+        // generic "already provisioned" refusal.
+        assert!(
+            msg.contains("runtime root is provisioned"),
+            "refusal must name the established runtime root: {msg}"
+        );
+        assert!(
+            msg.contains(&receipt.node_did),
+            "refusal must name the node DID the binding starts at: {msg}"
+        );
+
+        // The refusal happened BEFORE any identity mutation.
+        let after = std::fs::read(&keystore).expect("keystore must still be readable");
+        assert_eq!(
+            before, after,
+            "a refusal must not have rewritten identity.age"
+        );
+    }
+
+    /// The same command on an unprovisioned root is not refused.
+    ///
+    /// Without this, the witness above would also pass against a guard that
+    /// refused unconditionally.
+    #[test]
+    fn a_node_did_change_is_allowed_with_no_runtime_root() {
+        let dir = provisioned(); // keystore + loadable config, no ceremony
+        refuse_node_did_change_if_runtime_root_exists(dir.path(), "`icnctl id rotate`")
+            .expect("an unprovisioned root must not refuse a node DID change");
+    }
+
+    /// An interrupted ceremony still binds components to the current node DID,
+    /// so a DID change is refused there too.
+    #[test]
+    fn a_node_did_change_is_refused_on_an_interrupted_ceremony() {
+        let dir = provisioned();
+        let _ = run_to(dir.path(), RuntimeRootFailpoint::AfterCooperativeSave);
+
+        let msg = refuse_node_did_change_if_runtime_root_exists(dir.path(), "`icnctl id import`")
+            .unwrap_err_or_else_msg("an interrupted ceremony must refuse a node DID change");
+        assert!(
+            msg.contains("interrupted runtime-root ceremony"),
+            "refusal must name the interrupted ceremony: {msg}"
+        );
+    }
+
+    /// A runtime root that cannot be read is not evidence of an absent one.
+    #[test]
+    fn a_node_did_change_fails_closed_when_the_root_is_unreadable() {
+        let dir = provisioned();
+        provision_runtime_root(dir.path(), "Unreadable Coop", "HOURS")
+            .expect("the fixture ceremony must succeed");
+
+        // Make the first cooperative-row read fail at the storage layer, which
+        // is what makes `runtime_root_state` return Err(Uninspectable).
+        let _armed = CoopRowReadFailureGuard::arm(dir.path());
+
+        let msg = refuse_node_did_change_if_runtime_root_exists(dir.path(), "`icnctl id rotate`")
+            .unwrap_err_or_else_msg("an unreadable root must fail closed");
+        assert!(
+            msg.contains("could not be determined"),
+            "refusal must say the state was unreadable, not that none exists: {msg}"
+        );
+    }
+
+    /// A storage failure reading the first cooperative row is reported as
+    /// *uninspectable*, never as a disagreement with the receipt.
+    ///
+    /// The distinction is the whole point: `INCONSISTENT` is a positive claim
+    /// that durable state contradicts the receipt. Deriving it from a read that
+    /// never completed asserts a fact nothing observed.
+    #[test]
+    fn a_cooperative_row_storage_failure_is_uninspectable_not_inconsistent() {
+        let dir = provisioned();
+        provision_runtime_root(dir.path(), "Storage Failure Coop", "HOURS")
+            .expect("the fixture ceremony must succeed");
+
+        // Sanity: without the injection this root is Ready. Otherwise the
+        // assertion below could pass against a root that was broken anyway.
+        assert!(
+            matches!(
+                runtime_root_state(dir.path()),
+                Ok(RuntimeRootState::Ready(_))
+            ),
+            "fixture must be Ready before the storage failure is armed"
+        );
+
+        let _armed = CoopRowReadFailureGuard::arm(dir.path());
+        let err = runtime_root_state(dir.path())
+            .expect_err("a storage failure must not produce an Ok state");
+
+        assert!(
+            err.downcast_ref::<Uninspectable>().is_some(),
+            "a storage failure must be marked uninspectable, got: {err:#}"
+        );
+    }
+
+    /// A *decode* failure is uninspectable for the same reason.
+    #[test]
+    fn the_uninspectable_classification_is_by_variant_not_by_message() {
+        // `Serialization` carries no sled error and renders differently from
+        // `Storage`; both must land in the same class. A substring-matching
+        // implementation would separate them.
+        for e in [
+            icn_coop::CoopError::Storage(sled::Error::Unsupported("io".to_string())),
+            icn_coop::CoopError::Serialization("undecodable row".to_string()),
+        ] {
+            assert!(
+                matches!(
+                    e,
+                    icn_coop::CoopError::Storage(_) | icn_coop::CoopError::Serialization(_)
+                ),
+                "both failure-to-inspect variants must classify together"
+            );
+        }
+        // And an observation must not.
+        assert!(
+            !matches!(
+                icn_coop::CoopError::NotFound("coop".to_string()),
+                icn_coop::CoopError::Storage(_) | icn_coop::CoopError::Serialization(_)
+            ),
+            "NotFound is an observation, not a failure to inspect"
+        );
+    }
+
+    /// A local configuration writer cannot cross the ceremony's publication
+    /// boundary.
+    ///
+    /// Deterministic, not a sleep race: the probe runs *inside* the ceremony's
+    /// own stack frame at `AfterConfigPublish`, while both ceremony guards are
+    /// still held. If the exclusive configuration lock did not cover the
+    /// publication, this acquisition would succeed.
+    #[test]
+    fn a_config_writer_cannot_acquire_the_config_lock_across_publication() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        // 0 = never observed, 1 = observed and refused, 2 = observed and ADMITTED
+        static OUTCOME: AtomicUsize = AtomicUsize::new(0);
+        OUTCOME.store(0, Ordering::SeqCst);
+
+        fn probe(root: &Path, point: RuntimeRootFailpoint) {
+            if point != RuntimeRootFailpoint::AfterConfigPublish {
+                return;
+            }
+            // Exactly what `ManagedConfigEdit::open` does first.
+            let admitted =
+                icn_core::DataDirLock::acquire_config(root, "witness federation writer").is_ok();
+            OUTCOME.store(if admitted { 2 } else { 1 }, Ordering::SeqCst);
+        }
+
+        let dir = provisioned();
+        let _observer = ObserverGuard::install(dir.path(), probe);
+        provision_runtime_root(dir.path(), "Exclusion Coop", "HOURS")
+            .expect("the ceremony must succeed");
+
+        match OUTCOME.load(Ordering::SeqCst) {
+            1 => {}
+            0 => panic!(
+                "the probe never ran — the ceremony did not reach AfterConfigPublish, so this \
+                 witness proved nothing"
+            ),
+            2 => panic!(
+                "a local configuration writer acquired the configuration lock while the ceremony \
+                 held it across publication; a stale snapshot could overwrite [cooperative]"
+            ),
+            other => panic!("unexpected probe outcome {other}"),
+        }
+    }
+
+    /// The guard runs while the identity command already holds the data-root
+    /// lock, so it must not try to take that lock again.
+    ///
+    /// Every other witness in this tranche calls the guard *unlocked*, which is
+    /// not how production reaches it: `handle_id_command` acquires
+    /// `DataDirLock` for any identity-mutating command and only then asks
+    /// whether the node DID may change. A guard that re-acquired the same lock
+    /// would deadlock in production while every one of those witnesses stayed
+    /// green — so this pins the ordering that makes them meaningful.
+    #[test]
+    fn the_node_did_guard_runs_under_the_identity_lock_without_deadlocking() {
+        let dir = provisioned();
+        let receipt = provision_runtime_root(dir.path(), "Locked Path Coop", "HOURS")
+            .expect("the fixture ceremony must succeed");
+
+        // Exactly what `handle_id_command` holds when it reaches the guard.
+        let _identity_lock = icn_core::DataDirLock::acquire(dir.path(), "this identity command")
+            .expect("the identity lock must be available");
+
+        let msg = refuse_node_did_change_if_runtime_root_exists(dir.path(), "`icnctl id rotate`")
+            .unwrap_err_or_else_msg("the guard must still refuse under the identity lock");
+        assert!(
+            msg.contains(&receipt.node_did),
+            "the refusal must be the authority-binding one, not a lock-contention error: {msg}"
+        );
     }
 }

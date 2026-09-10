@@ -66,6 +66,12 @@ icn-entity.workspace = true
 utoipa = { version = "5.4.0", features = ["yaml"] }
 
 [dev-dependencies]
+# Test-only: the cooperative-row inspection witness constructs a real
+# `sled::Error` so it can drive `CoopError::Storage` through the classification
+# under test. Already in the lock file via icn-store; never linked into the
+# shipped binary.
+sled.workspace = true
+
 # Test-only: the acceptance witness for #2744 drives the *production*
 # `TrustServiceImplTokio` and a real `Ledger` over the stores the genesis
 # ceremony wrote, so that the author-trust gate it crosses is the real one
