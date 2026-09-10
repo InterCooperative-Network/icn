@@ -3403,6 +3403,64 @@ async fn main() -> Result<()> {
 fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
 
+    // Subcommands that rewrite `identity.age` join the data-directory exclusion
+    // domain. Classified by what each actually writes, not by living under `id`.
+    //
+    // `id rotate` rewrites the keystore in place and took no lock at all.
+    // Runtime-root provisioning proves founding authority by unlocking that
+    // keystore early and commits its receipt at the very end, so a rotation
+    // landing anywhere in between made the ceremony commit a receipt naming a
+    // node DID the daemon no longer has — and the daemon roots its trust graph
+    // at the new one, so the treasury that receipt vouches for is unreachable.
+    // Re-reading the DID after the commit would not close that; the identity
+    // must not be able to change during the transaction.
+    //
+    // Two separate questions, because a command can answer no to the first and
+    // yes to the second:
+    //
+    //   1. can it change the DID, or replace the key material the receipt
+    //      names?  — `rotate` and `import` yes; `upgrade-pq`, recovery setup
+    //      and the device commands no, they preserve the DID.
+    //   2. can it rewrite `identity.age` while a ceremony is reading it?  —
+    //      all of them yes.
+    //
+    // The second is enough on its own, on this evidence: `AgeKeyStore`
+    // persists the *whole* file with a plain `std::fs::write` (truncate in
+    // place, no temp-and-rename), and provisioning re-opens and re-reads that
+    // keystore at its verification step, immediately before the receipt is
+    // committed. So a DID-preserving rewrite can still be observed torn there,
+    // and the transaction's outcome would depend on arrival order. That is why
+    // `upgrade-pq` is here, and why the recovery and device commands that call
+    // `update_did_document` take the same lock at their own handlers.
+    //
+    // `init` is deliberately **not** here. It refuses when a keystore already
+    // exists, so it cannot replace an established identity underneath a
+    // ceremony — and a ceremony requires that keystore to exist before it
+    // starts. Putting it behind a *creating* lock would also leave a retained
+    // `.icn-data-dir.lock` in every freshly initialised root, which is the
+    // inspection-poisoning property the previous commit just removed, moved
+    // into the setup path.
+    //
+    // Held for the whole subcommand and non-blocking, so a rotation during a
+    // ceremony refuses rather than interleaving, and a ceremony started while
+    // one of these holds the root refuses too.
+    let mutates_identity = match cmd {
+        IdCommands::Rotate { .. } | IdCommands::Import { .. } => true,
+        // Creates only when absent; read-only otherwise.
+        IdCommands::Init | IdCommands::Show | IdCommands::Export { .. } => false,
+        // Preserves the DID but rewrites the same file.
+        #[cfg(feature = "post-quantum")]
+        IdCommands::UpgradePq => true,
+    };
+    let _identity_lock = if mutates_identity {
+        Some(icn_core::DataDirLock::acquire(
+            data_dir,
+            "this identity command",
+        )?)
+    } else {
+        None
+    };
+
     match cmd {
         IdCommands::Init => {
             // Check if keystore already exists
@@ -3652,6 +3710,19 @@ async fn handle_recovery_command(
     endpoint: &str,
 ) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
+
+    // `Setup` calls `update_did_document`, which rewrites `identity.age` with a
+    // plain `fs::write`. A runtime-root ceremony reading that keystore for its
+    // authority proof can observe the write torn, so this joins the same
+    // exclusion domain. The rest of these commands talk to a running daemon
+    // over RPC and write nothing here.
+    let _identity_lock = match cmd {
+        RecoveryCommands::Setup { .. } => Some(icn_core::DataDirLock::acquire(
+            data_dir,
+            "this recovery command",
+        )?),
+        _ => None,
+    };
 
     match cmd {
         // Setup and Config are local-only operations (modify keystore's DID document)
@@ -6044,6 +6115,12 @@ struct DeviceAddRequest {
 
 fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
+
+    // Two of these call `update_did_document`, which rewrites `identity.age`
+    // with a plain `fs::write`. Taken for the whole handler rather than per
+    // arm: the lock is cheap, and a list-only invocation holding it briefly is
+    // a far smaller cost than a torn keystore under a ceremony.
+    let _identity_lock = icn_core::DataDirLock::acquire(data_dir, "this device command")?;
 
     match cmd {
         DeviceCommands::List => {

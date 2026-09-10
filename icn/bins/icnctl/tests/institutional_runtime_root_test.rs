@@ -3176,3 +3176,88 @@ fn a_configuration_that_cannot_be_read_is_an_error_not_a_mismatch() {
     );
     assert_eq!(doc["error"]["code"], "state_unreadable", "{doc}");
 }
+
+/// Identity rotation cannot land underneath a founding transaction.
+///
+/// Provisioning proves founding authority by unlocking the node keystore near
+/// the start and commits its receipt at the very end. `id rotate` rewrote
+/// `identity.age` in place and took no lock at all, so a rotation anywhere in
+/// that interval made the ceremony commit a receipt naming a node DID the
+/// daemon no longer has — and the daemon roots its trust graph at the new one,
+/// so the treasury the receipt vouches for is unreachable. Re-reading the DID
+/// after the commit would not close that; the identity must not be able to
+/// change during the transaction.
+///
+/// Driven through the real binary against a genuinely held root, which is what
+/// a ceremony in flight looks like from the outside.
+#[test]
+fn identity_rotation_is_refused_while_the_data_root_is_held() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+
+    let before = std::fs::read(data_dir.join("identity.age")).unwrap();
+
+    // Exactly what a ceremony holds for its whole run.
+    let held = icn_core::DataDirLock::acquire(data_dir, "runtime-root provisioning").unwrap();
+    let out = icnctl(data_dir)
+        .args(["id", "rotate", "--reason", "rotated"])
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    drop(held);
+
+    assert!(
+        !out.status.success(),
+        "rotation must not proceed while a ceremony owns the data root:\n{text}"
+    );
+    assert!(
+        text.contains("already holds"),
+        "and must refuse at the exclusion, not somewhere inside the keystore:\n{text}"
+    );
+    assert_eq!(
+        before,
+        std::fs::read(data_dir.join("identity.age")).unwrap(),
+        "the node identity must be byte-for-byte untouched by the refused rotation"
+    );
+
+    // One fact different: with the root free, the same command gets past the
+    // exclusion. It still needs a passphrase this fixture does not supply, so
+    // the discriminator is that it no longer refuses *for the lock*.
+    let after = combined(
+        &icnctl(data_dir)
+            .args(["id", "rotate", "--reason", "rotated"])
+            .output()
+            .unwrap(),
+    );
+    assert!(
+        !after.contains("already holds"),
+        "with the root free the refusal must not be the exclusion:\n{after}"
+    );
+}
+
+/// And the converse: a ceremony cannot start while a rotation owns the root.
+///
+/// One exclusion domain means both directions, or it is not exclusion.
+#[test]
+fn provisioning_is_refused_while_an_identity_command_holds_the_root() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let held = icn_core::DataDirLock::acquire(data_dir, "this identity command").unwrap();
+    let refused = combined(&provision_runtime_root(data_dir, "Rotating Coop"));
+    drop(held);
+
+    assert!(
+        refused.contains("already holds"),
+        "provisioning must refuse while an identity command owns the root:\n{refused}"
+    );
+    for artefact in ["genesis-trust-root.age", "treasury.age"] {
+        assert!(
+            !data_dir.join(artefact).exists(),
+            "{artefact} must not have been minted"
+        );
+    }
+}

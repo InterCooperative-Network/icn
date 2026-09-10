@@ -63,11 +63,34 @@ impl CooperativeConfig {
         &self,
         node_did: &icn_identity::Did,
     ) -> anyhow::Result<TreasuryDid> {
-        match self.treasury_did.as_ref() {
+        match self.parse_configured_treasury_did()? {
             None => Ok(TreasuryDid::NodeFallback(node_did.clone())),
+            Some(configured) => Ok(TreasuryDid::Configured(configured)),
+        }
+    }
+
+    /// The one rule for "is the configured treasury DID usable?".
+    ///
+    /// Both [`Self::resolve_treasury_did`] — the startup path — and
+    /// `Config::validate` — the `--validate-config` path — go through here, so
+    /// they cannot drift into two independently maintained definitions of the
+    /// same acceptance. `--validate-config` is documented as predicting whether
+    /// the daemon accepts a file; two parsers would make that prediction true
+    /// only until someone changed one of them.
+    ///
+    /// Structural only. This parses the string. It opens no store, needs no key
+    /// material, and does not ask whether that treasury exists or is
+    /// authorized — those are runtime questions, and validation is not a
+    /// deployment-readiness check.
+    ///
+    /// `None` means no treasury was configured, which is the legacy node-DID
+    /// fallback and not an error.
+    pub fn parse_configured_treasury_did(&self) -> anyhow::Result<Option<icn_identity::Did>> {
+        match self.treasury_did.as_ref() {
+            None => Ok(None),
             Some(configured) => configured
                 .parse::<icn_identity::Did>()
-                .map(TreasuryDid::Configured)
+                .map(Some)
                 .map_err(|e| {
                     anyhow::anyhow!(
                         "Configured [cooperative] treasury_did {configured:?} is not a usable \
