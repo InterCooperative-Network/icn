@@ -1399,6 +1399,28 @@ async fn get_bootstrap_gateway_token(
         .context("Failed to verify auth challenge")?;
 
     if !verify_resp.status().is_success() {
+        // A 403 here is the gateway working as designed, not a misconfiguration
+        // to hunt: `verify_challenge` fails closed on a caller-supplied
+        // `coop_id` unless a dev posture is enabled (icn#2075). Proving you own
+        // a DID does not authorize that DID to act for an arbitrary
+        // cooperative. Say so, rather than leaving an operator to infer it from
+        // a bare status code.
+        //
+        // Deliberately not a pre-flight refusal: this command cannot know the
+        // gateway's posture without asking it, and a dev/demo deployment where
+        // self-asserted coop authority *is* enabled must keep working.
+        if verify_resp.status().as_u16() == 403 && !local_mint {
+            bail!(
+                "The gateway refused this cooperative claim (403).\n\
+                 Proving this node owns its DID does not authorize it to act for cooperative \
+                 {coop_id}: production gateways fail closed on a self-asserted coop claim \
+                 (icn#2075), and nothing has issued this node a trusted grant for it.\n\
+                 Provisioning a runtime root does not issue one either — hosting a founding is \
+                 not membership in the cooperative founded.\n\
+                 Use trusted local issuance (`--local-mint`, which signs with this node's own \
+                 gateway secret) or obtain a token through a trusted issuance path."
+            );
+        }
         bail!(
             "Failed to get bootstrap auth token: {}",
             verify_resp.status()

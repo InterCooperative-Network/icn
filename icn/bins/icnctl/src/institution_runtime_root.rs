@@ -314,6 +314,16 @@
 //! * **daemon readability is not proven.** This process does not run under the
 //!   daemon's credentials, so a check it performs speaks only for its own. The
 //!   claim is that the original supported access metadata was preserved;
+//! * **the cooperative this provisions cannot obtain a gateway token through
+//!   the default `institution bootstrap apply` path.** Nothing here issues a
+//!   trusted issuance, membership or bootstrap grant binding the node to that
+//!   cooperative, so `/v1/auth/verify` refuses the self-asserted claim with a
+//!   403 (icn#2075) against any gateway without a dev posture. That refusal is
+//!   correct on both sides, and issuing such a grant from here would make the
+//!   machine a member of the institution it merely provisioned — the collapse
+//!   this scope exists to prevent. Trusted local issuance (`--local-mint`)
+//!   works; the missing first-grant path is icn#2757, which is a question of
+//!   *authorization* and distinct from icn#2755's *reachability*;
 //! * a **hard-linked** managed configuration is refused, not published. A
 //!   second directory entry for the same inode is a second configuration
 //!   identity in a different lock domain, so publication would leave a daemon
@@ -1106,10 +1116,7 @@ fn mint_principal(path: &Path, passphrase: &[u8], what: &str) -> Result<Did> {
     // The directory entry needs its own barrier, or the file can survive while
     // the name that reaches it does not.
     if let Some(parent) = path.parent() {
-        let dir = std::fs::File::open(parent)
-            .with_context(|| format!("Failed to open {} to sync", parent.display()))?;
-        dir.sync_all()
-            .with_context(|| format!("Failed to sync {}", parent.display()))?;
+        sync_directory_entries(parent)?;
     }
 
     Ok(did)
@@ -1595,15 +1602,29 @@ fn provision_runtime_root_inner(
 
     // `coop-<uuid>`, not `coop:<uuid>`. The gateway's `validate_coop_id`
     // (`icn-gateway/src/validation.rs`) permits only alphanumerics, hyphens and
-    // underscores, so a colon-bearing ID is rejected by `/v1/auth/verify` before
-    // authentication — and the default (non-`--local-mint`) path of
-    // `institution bootstrap apply` could then never obtain a token for the
-    // cooperative this ceremony just founded.
+    // underscores, so a colon-bearing ID is rejected by `/v1/auth/verify` on
+    // syntax alone, before any authorization is even considered.
+    //
+    // **That fix does not make the default remote bootstrap path work, and an
+    // earlier version of this comment implied it did.** A hyphenated ID now
+    // reaches the authorization check and is refused there: `verify_challenge`
+    // fails closed on a caller-supplied `coop_id` unless a dev posture is
+    // enabled (icn#2075), because proving DID ownership does not authorize that
+    // DID to act for an arbitrary cooperative. This ceremony establishes no
+    // trusted issuance, membership or bootstrap grant binding the node to the
+    // cooperative it provisions — deliberately: the node is the machine, and
+    // hosting a founding is not membership in the thing founded. So
+    // `institution bootstrap apply` without `--local-mint` gets a 403 against a
+    // production gateway, and that is correct behaviour on both sides.
+    //
+    // What the identifier fix buys is narrower and still worth having: the ID
+    // is one the rest of the system can *accept*, so trusted local issuance
+    // (`--local-mint`) and every later trusted path are not blocked by a
+    // spelling this repository's own validators reject.
     //
     // `Cooperative::new` still mints `coop:<uuid>`, so that inconsistency is
     // pre-existing and affects every cooperative created through it; it is filed
-    // separately. This ceremony chooses its own identifier, so it chooses one
-    // the rest of the system can actually use.
+    // separately.
     let coop_id = format!("coop-{}", uuid::Uuid::new_v4());
 
     // (7) Durable cooperative record, in the database the daemon opens.
@@ -1800,6 +1821,28 @@ fn provision_runtime_root_inner(
     // producible for durable state that disagrees with it.
     verify_durable_state(data_dir, &receipt, Some(&passphrase))?;
 
+    // (11b) Durably publish the directory entries the receipt depends on.
+    //
+    // Flushing a sled database makes its *contents* durable. It does not make
+    // the directory entry that names the database durable, and this ceremony
+    // may create two levels of them: `<data_dir>/store` if no store existed
+    // yet, and `store/{cooperative,ledger,trust}` beneath it. A crash could
+    // therefore leave the cooperative store and its receipt intact while the
+    // ledger directory entry — and with it the treasury registration the
+    // receipt vouches for — was never named on disk.
+    //
+    // `fsync` on a directory persists the names it contains, so both levels are
+    // needed: `store` to persist `ledger`/`trust`/`cooperative`, and `data_dir`
+    // to persist `store` itself. Syncing only the one the review named would
+    // leave the outer entry unpersisted, and a lost `store` takes the receipt
+    // with it — self-consistent, but not what "survives a restart" means.
+    //
+    // Ordering is the load-bearing part: create, flush contents, publish the
+    // names, and only then commit the marker that claims all of it. sled owns
+    // durability *inside* its own directory; nothing else does the outside.
+    sync_directory_entries(&icn_core::config::store_path(data_dir))?;
+    sync_directory_entries(data_dir)?;
+
     // (12) The completion marker, written last and only over verified state.
     {
         use icn_store::Store;
@@ -1807,6 +1850,8 @@ fn provision_runtime_root_inner(
         let coop_sled = icn_store::SledStore::open(&coop_db)
             .context("Failed to reopen the cooperative store to record the receipt")?;
         let key = format!("{RECEIPT_KEY_PREFIX}{coop_id}");
+        #[cfg(test)]
+        record_durability_event(DurabilityEvent::WroteReceipt);
         let value =
             serde_json::to_vec(&receipt).context("Failed to encode the runtime-root receipt")?;
         // Written into the same sled database as the `coop:` rows, so the
@@ -2353,6 +2398,86 @@ fn uninspectable(e: impl Into<anyhow::Error>) -> anyhow::Error {
     anyhow::Error::new(Uninspectable(e.into()))
 }
 
+/// Make a directory's *entries* durable.
+///
+/// `fsync` on a directory persists the names it contains, not the directory
+/// itself — so this is what a newly created child needs before anything may
+/// claim that child survives a crash. Flushing a file's or a database's
+/// contents is a different barrier and does not imply this one.
+///
+/// One helper rather than a fourth open-coded copy: the same three lines had
+/// already accumulated at the keystore-minting and configuration-publication
+/// sites, and persistence machinery that drifts between call sites is how a
+/// durability claim quietly stops being true at one of them.
+fn sync_directory_entries(dir: &Path) -> Result<()> {
+    let handle = std::fs::File::open(dir)
+        .with_context(|| format!("Failed to open {} to sync", dir.display()))?;
+    handle
+        .sync_all()
+        .with_context(|| format!("Failed to sync {}", dir.display()))?;
+    #[cfg(test)]
+    record_durability_event(DurabilityEvent::SyncedDirectory(dir.to_path_buf()));
+    Ok(())
+}
+
+/// Test-only ordering record for the durability witness.
+///
+/// A test cannot cut power, so it cannot observe crash survival. What it *can*
+/// observe is the ordering the claim rests on: that every namespace entry the
+/// receipt depends on was made durable before the receipt was written. This
+/// records that order rather than pretending to prove more.
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DurabilityEvent {
+    SyncedDirectory(PathBuf),
+    WroteReceipt,
+}
+
+#[cfg(test)]
+static DURABILITY_LOG: std::sync::Mutex<Option<(PathBuf, Vec<DurabilityEvent>)>> =
+    std::sync::Mutex::new(None);
+
+/// Record for one root only, removed on drop — `cargo test` runs these in
+/// parallel and an unscoped recorder would mix two ceremonies together.
+#[cfg(test)]
+struct DurabilityRecorder;
+
+#[cfg(test)]
+impl DurabilityRecorder {
+    fn install(root: &Path) -> Self {
+        if let Ok(mut slot) = DURABILITY_LOG.lock() {
+            *slot = Some((icn_core::DataDirLock::lock_path(root), Vec::new()));
+        }
+        Self
+    }
+
+    fn events() -> Vec<DurabilityEvent> {
+        DURABILITY_LOG
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().map(|(_, events)| events.clone()))
+            .unwrap_or_default()
+    }
+}
+
+#[cfg(test)]
+impl Drop for DurabilityRecorder {
+    fn drop(&mut self) {
+        if let Ok(mut slot) = DURABILITY_LOG.lock() {
+            *slot = None;
+        }
+    }
+}
+
+#[cfg(test)]
+fn record_durability_event(event: DurabilityEvent) {
+    if let Ok(mut slot) = DURABILITY_LOG.lock() {
+        if let Some((_, events)) = slot.as_mut() {
+            events.push(event);
+        }
+    }
+}
+
 /// Does this store directory exist, or could we not tell?
 ///
 /// `Path::exists()` answers `false` for *every* metadata error, including a
@@ -2828,10 +2953,7 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
     // the linkage has to outlive a power cut, not merely a process exit.
     let sync_parent = || -> Result<()> {
         if let Some(parent) = config_path.parent() {
-            let dir = std::fs::File::open(parent)
-                .with_context(|| format!("Failed to open {} to sync", parent.display()))?;
-            dir.sync_all()
-                .with_context(|| format!("Failed to sync {}", parent.display()))?;
+            sync_directory_entries(parent)?;
         }
         Ok(())
     };
@@ -4206,6 +4328,71 @@ mod failpoint_tests {
                 assert_eq!(receipt.treasury_did, ceremony.treasury_did);
             }
             other => panic!("a completed ceremony must leave a READY root, got {other:?}"),
+        }
+    }
+
+    /// Every namespace entry the receipt depends on is made durable before the
+    /// receipt is written.
+    ///
+    /// **What this proves and what it does not.** A test cannot cut power, so
+    /// it cannot observe crash survival, and this does not pretend to. What it
+    /// observes is the ordering the durability claim rests on: that both
+    /// directory levels this ceremony can create — `<data_dir>/store`, and
+    /// `store/{cooperative,ledger,trust}` beneath it — had their entries
+    /// `fsync`ed *before* the completion marker was committed. Flushing a sled
+    /// database makes its contents durable and says nothing about the entry
+    /// that names it; sled owns durability inside its own directory and cannot
+    /// own the outside.
+    ///
+    /// The failure this rules out is the forbidden one: a receipt surviving a
+    /// crash while the ledger directory that substantiates it does not.
+    #[test]
+    fn every_directory_the_receipt_depends_on_is_durable_before_the_receipt() {
+        let dir = provisioned();
+        let root = dir.path().to_path_buf();
+        let store = icn_core::config::store_path(&root);
+        assert!(
+            !store.exists(),
+            "fixture: the store must not exist yet, so the ceremony really creates it"
+        );
+
+        let recorder = DurabilityRecorder::install(&root);
+        provision_runtime_root_inner(&root, "Durable Coop", "HOURS", None)
+            .expect("provisioning must succeed");
+        let events = DurabilityRecorder::events();
+        drop(recorder);
+
+        let receipt_at = events
+            .iter()
+            .position(|e| *e == DurabilityEvent::WroteReceipt)
+            .expect("the receipt must have been written");
+
+        // Both levels, and both before the marker.
+        for required in [store.clone(), root.clone()] {
+            let synced_at = events
+                .iter()
+                .position(|e| matches!(e, DurabilityEvent::SyncedDirectory(p) if *p == required));
+            let synced_at = synced_at.unwrap_or_else(|| {
+                panic!(
+                    "{} was never synced; a newly created child of it would not survive a \
+                     crash that the receipt claims to have outlived.\nevents: {events:?}",
+                    required.display()
+                )
+            });
+            assert!(
+                synced_at < receipt_at,
+                "{} was synced only AFTER the receipt was written, so a crash between them \
+                 leaves a READY marker over a name that was never persisted.\nevents: {events:?}",
+                required.display()
+            );
+        }
+
+        // And the entries themselves are the ones that matter.
+        for db in ["cooperative", "ledger", "trust"] {
+            assert!(
+                store.join(db).exists(),
+                "fixture: {db} must be one of the entries under the synced directory"
+            );
         }
     }
 
