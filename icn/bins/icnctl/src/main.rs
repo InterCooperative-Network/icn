@@ -6116,11 +6116,38 @@ struct DeviceAddRequest {
 fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
 
-    // Two of these call `update_did_document`, which rewrites `identity.age`
-    // with a plain `fs::write`. Taken for the whole handler rather than per
-    // arm: the lock is cheap, and a list-only invocation holding it briefly is
-    // a far smaller cost than a torn keystore under a ceremony.
-    let _identity_lock = icn_core::DataDirLock::acquire(data_dir, "this device command")?;
+    // Only `Approve` and `Revoke` call `update_did_document`, which rewrites
+    // `identity.age` with a plain `fs::write`.
+    //
+    // An earlier version took the lock for the whole handler and justified it on
+    // cost -- "the lock is cheap". Cost was the wrong axis. `acquire` *creates*
+    // the lock file and it is retained after release, so a read-only
+    // `device list` run under `sudo` against a service-owned root leaves a
+    // root-owned 0600 `.icn-data-dir.lock` behind. The daemon's service account
+    // then cannot open it, and this crate's own fail-closed rule refuses to
+    // start rather than proceeding unlocked: a single mistaken inspection turns
+    // into a permanent startup failure. That is the same inspection-poisoning
+    // defect already removed from `id init`; a reader must never be able to lock
+    // a root out of running.
+    //
+    // `Add` writes a `device-add-*.json` request beside the keystore but never
+    // rewrites the keystore, so it does not need this lock either.
+    //
+    // Unlocked readers can therefore observe a keystore mid-rewrite. They fail
+    // rather than misreport: `identity.age` is authenticated, so a torn read
+    // does not decrypt. Do not "repair" that by relocking the read paths.
+    let mutates_identity = match cmd {
+        DeviceCommands::Approve { .. } | DeviceCommands::Revoke { .. } => true,
+        DeviceCommands::List | DeviceCommands::Add { .. } => false,
+    };
+    let _identity_lock = if mutates_identity {
+        Some(icn_core::DataDirLock::acquire(
+            data_dir,
+            "this device command",
+        )?)
+    } else {
+        None
+    };
 
     match cmd {
         DeviceCommands::List => {

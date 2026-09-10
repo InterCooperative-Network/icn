@@ -717,7 +717,26 @@ impl RuntimeRootComponents {
 pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents> {
     use icn_store::Store;
 
-    let exists = |p: PathBuf| std::fs::symlink_metadata(&p).is_ok();
+    // `symlink_metadata`, not `metadata`: a symlink where a keystore belongs is
+    // state to report, not to follow.
+    //
+    // `.is_ok()` here would report *could not look* as *is not there*, for the
+    // two artifacts that are exclusive to this ceremony -- the one wrong answer
+    // that invites an operator to run a second one. Reachability is narrower
+    // than it looks: every non-`NotFound` error `lstat` can raise at these flat
+    // paths is a property of `data_dir` itself, so the sibling store checks
+    // below refuse first. This is the shape the rest of the function keeps, not
+    // a repair for an observed misreport.
+    let exists = |p: PathBuf| -> Result<bool> {
+        match std::fs::symlink_metadata(&p) {
+            Ok(_) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(uninspectable(anyhow::Error::new(e).context(format!(
+                "Could not determine whether {} exists",
+                p.display()
+            )))),
+        }
+    };
 
     // Fail closed, like every other inspection in this file. An earlier version
     // answered `false` for any store that could not be opened or scanned — a
@@ -730,11 +749,12 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
             return Ok(false);
         }
         let store = icn_store::SledStore::open(&db)
-            .with_context(|| format!("Could not open {} to inspect it", db.display()))?;
+            .with_context(|| format!("Could not open {} to inspect it", db.display()))
+            .map_err(uninspectable)?;
         let found = store
             .scan(prefix)
             .map(|r| !r.is_empty())
-            .map_err(|e| anyhow::anyhow!("Could not scan {}: {e}", db.display()))?;
+            .map_err(|e| uninspectable(anyhow::anyhow!("Could not scan {}: {e}", db.display())))?;
         drop(store);
         Ok(found)
     };
@@ -743,28 +763,52 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
             return Ok(0);
         }
         let store = icn_store::SledStore::open(&db)
-            .with_context(|| format!("Could not open {} to inspect it", db.display()))?;
+            .with_context(|| format!("Could not open {} to inspect it", db.display()))
+            .map_err(uninspectable)?;
         let n = store
             .scan(prefix)
             .map(|r| r.len())
-            .map_err(|e| anyhow::anyhow!("Could not scan {}: {e}", db.display()))?;
+            .map_err(|e| uninspectable(anyhow::anyhow!("Could not scan {}: {e}", db.display())))?;
         drop(store);
         Ok(n)
     };
 
     let coop_db = coop_db_path(data_dir);
+    // Only absence may read as "no linkage".
+    //
+    // `.ok()` funnelled four different answers into one: absent, unreadable,
+    // and unparseable all became `config_linkage: false`. With no receipt to
+    // re-verify, that false is what renders the root INCOMPLETE -- telling an
+    // operator the ceremony never published a configuration, when a corrupt one
+    // is sitting right there. The repairs are opposites: finish the ceremony
+    // versus repair or remove the file that is already published. The daemon
+    // would reject the malformed one outright rather than treat it as missing,
+    // so reporting it as missing also breaks
+    // `configuration validation should predict structural daemon acceptance`.
     let config_linkage = {
         let path = data_dir.join("icn.toml");
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|t| toml::from_str::<toml::Value>(&t).ok())
-            .map(|v| v.get("cooperative").is_some())
-            .unwrap_or(false)
+        match std::fs::read_to_string(&path) {
+            Ok(text) => toml::from_str::<toml::Value>(&text)
+                .map(|v| v.get("cooperative").is_some())
+                .map_err(|e| {
+                    uninspectable(anyhow::Error::new(e).context(format!(
+                        "Could not parse {} to determine its cooperative linkage",
+                        path.display()
+                    )))
+                })?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+            Err(e) => {
+                return Err(uninspectable(anyhow::Error::new(e).context(format!(
+                    "Could not read {} to determine its cooperative linkage",
+                    path.display()
+                ))))
+            }
+        }
     };
 
     Ok(RuntimeRootComponents {
-        trust_root_key: exists(trust_root_keystore_path(data_dir)),
-        treasury_key: exists(treasury_keystore_path(data_dir)),
+        trust_root_key: exists(trust_root_keystore_path(data_dir))?,
+        treasury_key: exists(treasury_keystore_path(data_dir))?,
         cooperative_record: scan_any(coop_db.clone(), b"coop:")?,
         treasury_registration: scan_any(
             icn_core::config::ledger_store_path(data_dir),
@@ -2493,13 +2537,15 @@ fn store_directory_exists(db: &Path) -> Result<bool> {
     match std::fs::symlink_metadata(db) {
         Ok(_) => Ok(true),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(e) => Err(e).with_context(|| {
-            format!(
-                "Refusing to proceed: could not determine whether {} exists, so it cannot be \
-                 established that no institutional state is already there",
-                db.display()
-            )
-        }),
+        Err(e) => Err(e)
+            .with_context(|| {
+                format!(
+                    "Refusing to proceed: could not determine whether {} exists, so it cannot \
+                     be established that no institutional state is already there",
+                    db.display()
+                )
+            })
+            .map_err(uninspectable),
     }
 }
 
@@ -4420,6 +4466,91 @@ mod failpoint_tests {
         assert!(
             msg.contains(&trust_db.display().to_string()),
             "and must name the store it could not inspect: {msg}"
+        );
+        // Prose is not the contract. Without the marker, `show --json` falls
+        // back to guessing the code from the message text.
+        assert!(
+            err.downcast_ref::<Uninspectable>().is_some(),
+            "and must carry the marker that renders as state_unreadable: {msg}"
+        );
+    }
+
+    /// `unknown != absent`, at the configuration, with no receipt to re-verify.
+    ///
+    /// The receipt-*present* path already refuses an unreadable configuration:
+    /// `verify_durable_state` reads it and marks the failure. The receipt-absent
+    /// path did not. It read `icn.toml` through `.ok()`, so a configuration that
+    /// could not be parsed reported `config_linkage: false` and the root
+    /// rendered INCOMPLETE -- "no configuration was ever published" -- while a
+    /// corrupt one was published and sitting there.
+    ///
+    /// Deliberately malformed content rather than a mode change: `0o000` is
+    /// ignored when the suite runs as root, and a witness that silently stops
+    /// discriminating is worse than none.
+    #[test]
+    fn a_malformed_configuration_is_not_reported_as_an_absent_one() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join("icn.toml"), b"[cooperative\nid = ").unwrap();
+
+        let err = runtime_root_components(dir.path())
+            .expect_err("a configuration that cannot be parsed is not a missing one");
+        let msg = format!("{err:#}");
+        assert!(
+            err.downcast_ref::<Uninspectable>().is_some(),
+            "it must render as state_unreadable, not as an absent linkage: {msg}"
+        );
+        assert!(
+            msg.contains("cooperative linkage"),
+            "and must say which question went unanswered: {msg}"
+        );
+    }
+
+    /// The same rule for a read that fails before parsing can begin.
+    ///
+    /// A directory at `icn.toml` fails the read with `IsADirectory` rather than
+    /// `NotFound`, which is uid-independent -- unlike a permission bit.
+    #[test]
+    fn an_unreadable_configuration_is_not_reported_as_an_absent_one() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir(dir.path().join("icn.toml")).unwrap();
+
+        let err = runtime_root_components(dir.path())
+            .expect_err("a configuration that cannot be read is not a missing one");
+        let msg = format!("{err:#}");
+        assert!(
+            err.downcast_ref::<Uninspectable>().is_some(),
+            "it must render as state_unreadable: {msg}"
+        );
+    }
+
+    /// The control that keeps the two above from being satisfied by refusing
+    /// everything. Absence is a real answer, and it must survive.
+    #[test]
+    fn an_absent_configuration_still_reads_as_no_linkage() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let components = runtime_root_components(dir.path())
+            .expect("a directory with no configuration is inspectable, not unreadable");
+        assert!(
+            !components.config_linkage,
+            "a configuration that is genuinely not there is absent, not unknown"
+        );
+    }
+
+    /// And the control for the positive answer, so `config_linkage` cannot be
+    /// hard-wired to `false` while the two refusal witnesses still pass.
+    #[test]
+    fn a_configuration_carrying_the_cooperative_section_reads_as_linked() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("icn.toml"),
+            b"[cooperative]\nid = \"coop-example\"\n",
+        )
+        .unwrap();
+
+        let components = runtime_root_components(dir.path()).expect("a parseable configuration");
+        assert!(
+            components.config_linkage,
+            "a published `[cooperative]` section is the linkage this reports"
         );
     }
 

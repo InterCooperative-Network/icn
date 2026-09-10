@@ -3261,3 +3261,54 @@ fn provisioning_is_refused_while_an_identity_command_holds_the_root() {
         );
     }
 }
+
+/// `read-only inspection must not poison later operation`, at `icnctl device`.
+///
+/// `device list` never rewrites `identity.age`, but the handler took the
+/// *creating* identity lock for every arm. Run once under `sudo` against a
+/// service-owned root, that leaves a root-owned `.icn-data-dir.lock` the
+/// daemon's account cannot open -- and this crate fails closed on exactly that,
+/// so the node stops starting. The mistaken inspection is permanent.
+///
+/// Ownership is not simulated here: creating the file at all is the defect, and
+/// the account that creates it is whichever account ran the command.
+///
+/// The revoke arm is the discriminating control. Without it this test would
+/// still pass if identity locking were deleted outright.
+#[test]
+fn a_read_only_device_command_does_not_create_the_identity_lock() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    let lock = data_dir.join(".icn-data-dir.lock");
+
+    let init = init_identity(data_dir);
+    assert!(init.status.success(), "fixture: {}", combined(&init));
+    assert!(
+        !lock.exists(),
+        "fixture: `id init` must not leave the lock behind either"
+    );
+
+    let listed = icnctl(data_dir).args(["device", "list"]).output().unwrap();
+    assert!(
+        listed.status.success(),
+        "`device list` must work on a provisioned identity:\n{}",
+        combined(&listed)
+    );
+    assert!(
+        !lock.exists(),
+        "a read-only device command must not create {}",
+        lock.display()
+    );
+
+    // The control: an arm that does rewrite `identity.age` still takes it.
+    let revoked = icnctl(data_dir)
+        .args(["device", "revoke", "not-a-real-device"])
+        .output()
+        .unwrap();
+    assert!(
+        lock.exists(),
+        "a mutating device command must still take the identity lock, or this \
+         test proves nothing about `list`:\n{}",
+        combined(&revoked)
+    );
+}
