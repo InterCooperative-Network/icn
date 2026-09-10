@@ -1450,32 +1450,45 @@ struct ScopedObserver {
 }
 
 #[cfg(test)]
-static LATE_BOUNDARY_OBSERVER: std::sync::Mutex<Option<ScopedObserver>> =
-    std::sync::Mutex::new(None);
+static LATE_BOUNDARY_OBSERVERS: std::sync::Mutex<Vec<ScopedObserver>> =
+    std::sync::Mutex::new(Vec::new());
 
 /// Install an observer for one root, removing it again on drop so a panicking
 /// test cannot leave it installed for whatever runs next.
+///
+/// One entry per root rather than one slot in total. Dispatch was already
+/// root-scoped, but a single slot is not: `cargo test` runs these in parallel,
+/// so a second installing test replaced the first one's observer and the first
+/// one's callback then never ran — its ceremony reached the boundary and found
+/// somebody else's root recorded there. The drop was worse: whichever guard
+/// dropped first cleared the slot for every other live test. Both failures are
+/// scheduling-dependent, which is why they stayed invisible until a third
+/// observer test existed.
 #[cfg(test)]
-struct ObserverGuard;
+struct ObserverGuard {
+    expected_root: PathBuf,
+}
 
 #[cfg(test)]
 impl ObserverGuard {
     fn install(root: &Path, callback: BoundaryObserver) -> Self {
-        if let Ok(mut slot) = LATE_BOUNDARY_OBSERVER.lock() {
-            *slot = Some(ScopedObserver {
-                expected_root: icn_core::DataDirLock::lock_path(root),
+        let expected_root = icn_core::DataDirLock::lock_path(root);
+        if let Ok(mut observers) = LATE_BOUNDARY_OBSERVERS.lock() {
+            observers.retain(|o| o.expected_root != expected_root);
+            observers.push(ScopedObserver {
+                expected_root: expected_root.clone(),
                 callback,
             });
         }
-        Self
+        Self { expected_root }
     }
 }
 
 #[cfg(test)]
 impl Drop for ObserverGuard {
     fn drop(&mut self) {
-        if let Ok(mut slot) = LATE_BOUNDARY_OBSERVER.lock() {
-            *slot = None;
+        if let Ok(mut observers) = LATE_BOUNDARY_OBSERVERS.lock() {
+            observers.retain(|o| o.expected_root != self.expected_root);
         }
     }
 }
@@ -1597,13 +1610,12 @@ macro_rules! failpoint {
         {
             // Observation happens BEFORE the bail, so the ceremony guard is
             // still held when a test looks.
-            if let Ok(observer) = LATE_BOUNDARY_OBSERVER.lock() {
-                if let Some(o) = observer.as_ref() {
-                    // Compare canonical lock identities, not path spellings, and
-                    // ignore ceremonies this observer was not installed for.
-                    if o.expected_root == icn_core::DataDirLock::lock_path($root) {
-                        (o.callback)($root, $point);
-                    }
+            if let Ok(observers) = LATE_BOUNDARY_OBSERVERS.lock() {
+                let here = icn_core::DataDirLock::lock_path($root);
+                // Matched on canonical lock identity, not path spelling, so a
+                // ceremony only ever reaches the observer installed for it.
+                if let Some(o) = observers.iter().find(|o| o.expected_root == here) {
+                    (o.callback)($root, $point);
                 }
             }
             if $injected == Some($point) {
@@ -2056,7 +2068,7 @@ fn provision_runtime_root_inner(
             .context("Failed to reopen the cooperative store to record the receipt")?;
         let key = format!("{RECEIPT_KEY_PREFIX}{coop_id}");
         #[cfg(test)]
-        record_durability_event(DurabilityEvent::WroteReceipt);
+        record_durability_event(DurabilityEvent::WroteReceipt(data_dir.to_path_buf()));
         let value =
             serde_json::to_vec(&receipt).context("Failed to encode the runtime-root receipt")?;
         // Written into the same sled database as the `coop:` rows, so the
@@ -2674,32 +2686,52 @@ fn sync_directory_entries(dir: &Path) -> Result<()> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DurabilityEvent {
     SyncedDirectory(PathBuf),
-    WroteReceipt,
+    /// Carries the root it was written under. Without that this event could not
+    /// be attributed, so a concurrently running ceremony's receipt was read as
+    /// this one's — and an ordering assertion against it silently compared two
+    /// different ceremonies.
+    WroteReceipt(PathBuf),
 }
 
 #[cfg(test)]
-static DURABILITY_LOG: std::sync::Mutex<Option<(PathBuf, Vec<DurabilityEvent>)>> =
-    std::sync::Mutex::new(None);
+static DURABILITY_LOGS: std::sync::Mutex<Vec<(PathBuf, Vec<DurabilityEvent>)>> =
+    std::sync::Mutex::new(Vec::new());
 
-/// Record for one root only, removed on drop — `cargo test` runs these in
-/// parallel and an unscoped recorder would mix two ceremonies together.
+/// Record for one root only, removed on drop.
+///
+/// One log per root, not one slot in total. The earlier version stored the root
+/// and then never consulted it — `record_durability_event` destructured it as
+/// `_` — so the recorder captured every ceremony running anywhere in the
+/// process. `cargo test` runs these in parallel, so an unrelated ceremony's
+/// `WroteReceipt` could land in this log ahead of this root's own directory
+/// syncs, and the ordering assertion then compared two different ceremonies.
+/// The claim it exists to defend is an *ordering* one, so a log that can
+/// interleave two ceremonies is not evidence for it.
 #[cfg(test)]
-struct DurabilityRecorder;
+struct DurabilityRecorder {
+    root: PathBuf,
+}
 
 #[cfg(test)]
 impl DurabilityRecorder {
     fn install(root: &Path) -> Self {
-        if let Ok(mut slot) = DURABILITY_LOG.lock() {
-            *slot = Some((icn_core::DataDirLock::lock_path(root), Vec::new()));
+        let root = root.to_path_buf();
+        if let Ok(mut logs) = DURABILITY_LOGS.lock() {
+            logs.retain(|(recorded, _)| *recorded != root);
+            logs.push((root.clone(), Vec::new()));
         }
-        Self
+        Self { root }
     }
 
-    fn events() -> Vec<DurabilityEvent> {
-        DURABILITY_LOG
+    fn events(&self) -> Vec<DurabilityEvent> {
+        DURABILITY_LOGS
             .lock()
             .ok()
-            .and_then(|slot| slot.as_ref().map(|(_, events)| events.clone()))
+            .and_then(|logs| {
+                logs.iter()
+                    .find(|(recorded, _)| *recorded == self.root)
+                    .map(|(_, events)| events.clone())
+            })
             .unwrap_or_default()
     }
 }
@@ -2707,16 +2739,23 @@ impl DurabilityRecorder {
 #[cfg(test)]
 impl Drop for DurabilityRecorder {
     fn drop(&mut self) {
-        if let Ok(mut slot) = DURABILITY_LOG.lock() {
-            *slot = None;
+        if let Ok(mut logs) = DURABILITY_LOGS.lock() {
+            logs.retain(|(recorded, _)| *recorded != self.root);
         }
     }
 }
 
 #[cfg(test)]
 fn record_durability_event(event: DurabilityEvent) {
-    if let Ok(mut slot) = DURABILITY_LOG.lock() {
-        if let Some((_, events)) = slot.as_mut() {
+    let (DurabilityEvent::SyncedDirectory(where_) | DurabilityEvent::WroteReceipt(where_)) = &event;
+    let where_ = where_.clone();
+    if let Ok(mut logs) = DURABILITY_LOGS.lock() {
+        // Routed to the recorder that owns this path. `starts_with` compares
+        // whole components, so a sibling root with a longer name is not a match.
+        if let Some((_, events)) = logs
+            .iter_mut()
+            .find(|(recorded, _)| where_.starts_with(recorded))
+        {
             events.push(event);
         }
     }
@@ -4669,12 +4708,12 @@ mod failpoint_tests {
         let recorder = DurabilityRecorder::install(&root);
         provision_runtime_root_inner(&root, "Durable Coop", "HOURS", None)
             .expect("provisioning must succeed");
-        let events = DurabilityRecorder::events();
+        let events = recorder.events();
         drop(recorder);
 
         let receipt_at = events
             .iter()
-            .position(|e| *e == DurabilityEvent::WroteReceipt)
+            .position(|e| matches!(e, DurabilityEvent::WroteReceipt(_)))
             .expect("the receipt must have been written");
 
         // Both levels, and both before the marker.
@@ -4816,6 +4855,92 @@ mod failpoint_tests {
             components.config_linkage,
             "a published `[cooperative]` section is the linkage this reports"
         );
+    }
+
+    /// Two ceremonies observed at once must not see each other's events.
+    ///
+    /// Directly pins the defect that made
+    /// `every_directory_the_receipt_depends_on_is_durable_before_the_receipt`
+    /// fail under `cargo test`'s parallelism: the recorder stored a root and
+    /// then never consulted it, so one log captured every ceremony in the
+    /// process. Asserting on the routing rather than on a scheduling outcome,
+    /// because a flaky witness cannot pin a flakiness fix.
+    #[test]
+    fn a_durability_recorder_captures_only_its_own_root() {
+        let a = tempfile::TempDir::new().unwrap();
+        let b = tempfile::TempDir::new().unwrap();
+        let recorder_a = DurabilityRecorder::install(a.path());
+        let recorder_b = DurabilityRecorder::install(b.path());
+
+        record_durability_event(DurabilityEvent::SyncedDirectory(a.path().join("store")));
+        record_durability_event(DurabilityEvent::WroteReceipt(b.path().to_path_buf()));
+
+        let events_a = recorder_a.events();
+        let events_b = recorder_b.events();
+        assert_eq!(
+            events_a.len(),
+            1,
+            "a recorder must see its own event and nobody else's: {events_a:?}"
+        );
+        assert!(
+            matches!(&events_a[0], DurabilityEvent::SyncedDirectory(p) if *p == a.path().join("store")),
+            "and it must be the one recorded for this root: {events_a:?}"
+        );
+        assert_eq!(
+            events_b.len(),
+            1,
+            "the receipt must be attributed to the root it was written under: {events_b:?}"
+        );
+        assert!(
+            matches!(&events_b[0], DurabilityEvent::WroteReceipt(p) if p == b.path()),
+            "{events_b:?}"
+        );
+
+        drop(recorder_a);
+        assert_eq!(
+            recorder_b.events().len(),
+            1,
+            "dropping one recorder must not clear another's log"
+        );
+    }
+
+    /// Two observers installed at once must both survive.
+    ///
+    /// The single slot had two failure modes and this pins both: a second
+    /// install evicted the first, and the first drop cleared the slot for
+    /// everyone. Dispatch was already root-scoped and is unchanged.
+    #[test]
+    fn two_boundary_observers_for_different_roots_coexist() {
+        fn noop(_: &Path, _: RuntimeRootFailpoint) {}
+
+        let a = tempfile::TempDir::new().unwrap();
+        let b = tempfile::TempDir::new().unwrap();
+        let installed = |root: &Path| {
+            let here = icn_core::DataDirLock::lock_path(root);
+            LATE_BOUNDARY_OBSERVERS
+                .lock()
+                .map(|observers| observers.iter().any(|o| o.expected_root == here))
+                .unwrap_or(false)
+        };
+
+        let guard_a = ObserverGuard::install(a.path(), noop);
+        let guard_b = ObserverGuard::install(b.path(), noop);
+        assert!(
+            installed(a.path()),
+            "installing a second observer must not evict the first"
+        );
+        assert!(installed(b.path()), "and the second must be installed");
+
+        drop(guard_a);
+        assert!(
+            !installed(a.path()),
+            "dropping a guard must remove its own entry"
+        );
+        assert!(
+            installed(b.path()),
+            "and must not remove an observer another live test depends on"
+        );
+        drop(guard_b);
     }
 
     /// `refuse_if_foreign_institutional_state`'s own witness.
