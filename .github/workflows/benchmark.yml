@@ -35,6 +35,10 @@ jobs:
   benchmark:
     name: Save Benchmark Baseline
     runs-on: ubuntu-latest
+    # Above the 90-minute "Run benchmarks" step budget plus setup. A job
+    # deadline below its own step budget cancels the step before it can use
+    # the time it was given.
+    timeout-minutes: 105
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
@@ -66,12 +70,16 @@ jobs:
         with:
           name: benchmark-baseline-${{ github.sha }}
           path: icn/target/criterion
-          retention-days: 90
+          retention-days: 14
 
   # Compare PR benchmarks against base commit (only on PRs)
   compare:
     name: Compare Against Base
     runs-on: ubuntu-latest
+    # Two sequential 60-minute benchmark passes (baseline, then PR head)
+    # plus two checkouts and a toolchain install. 75 could not fit even a
+    # 40+40 run.
+    timeout-minutes: 140
     if: github.event_name == 'pull_request'
     steps:
       # Checkout PR base commit for baseline (deterministic - won't change during run)

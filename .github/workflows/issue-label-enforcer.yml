@@ -10,6 +10,7 @@ permissions:
 jobs:
   enforce-labels:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Enforce required labels
         uses: actions/github-script@v9
