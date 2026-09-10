@@ -101,7 +101,7 @@ ledger.append_entry(spend).await?;
 ## Verification
 
 ```bash
-cd icn/icn
+cd "$(git rev-parse --show-toplevel)/icn"
 cargo fmt --all --check
 cargo clippy -p icn-ledger --all-targets -- -D warnings
 cargo test -p icn-ledger --lib
