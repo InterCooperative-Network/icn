@@ -182,14 +182,85 @@ impl DataDirLock {
         Self::take(
             Self::lock_path(data_dir),
             Sharing::Exclusive,
-            &format!(
-                "Refusing to start {holder}: another ICN process already holds {}.\n\
-                 A running daemon and a maintenance ceremony must not share a data directory — \
-                 one would rewrite state the other has already read. Stop the other process and \
-                 retry; the lock is released automatically when it exits, so nothing needs \
-                 cleaning up by hand.",
-                data_dir.display()
+            &Self::storage_refusal(data_dir, holder),
+        )
+    }
+
+    fn storage_refusal(data_dir: &Path, holder: &str) -> String {
+        format!(
+            "Refusing to start {holder}: another ICN process already holds {}.\n\
+             A running daemon and a maintenance ceremony must not share a data directory — \
+             one would rewrite state the other has already read. Stop the other process and \
+             retry; the lock is released automatically when it exits, so nothing needs \
+             cleaning up by hand.",
+            data_dir.display()
+        )
+    }
+
+    /// Take the storage lock, but never create the file.
+    ///
+    /// For a caller that must join the exclusion domain and must not leave a
+    /// coordination artifact behind — inspection running under an account that
+    /// is not the one owning this data directory. Absence is a **refusal**, not
+    /// a licence to proceed: the caller has to hold the lock either way, and an
+    /// earlier design that returned "nothing to hold" here was measurably
+    /// outside the domain (a third party could take the root while an
+    /// inspection was in flight).
+    ///
+    /// There is no check-then-create window to lose, because this never
+    /// creates: if the file vanishes between the caller's decision and this
+    /// call, the open simply fails and the caller refuses.
+    pub fn acquire_without_creating(data_dir: &Path, holder: &str) -> Result<Self> {
+        let path = Self::lock_path(data_dir);
+
+        // Same containment as `take`: never open through a link, never treat a
+        // directory or device as the lock.
+        if let Ok(meta) = std::fs::symlink_metadata(&path) {
+            if meta.file_type().is_symlink() || !meta.is_file() {
+                bail!(
+                    "Refusing to take the lock: {} exists and is not a regular file.",
+                    path.display()
+                );
+            }
+        }
+
+        let file = match std::fs::OpenOptions::new()
+            .truncate(false)
+            .write(true)
+            .open(&path)
+        {
+            Ok(f) => f,
+            // `flock(2)` locks the descriptor irrespective of open mode.
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+                ) =>
+            {
+                std::fs::File::open(&path).with_context(|| {
+                    format!("Failed to open the lock {} even read-only", path.display())
+                })?
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
+                "Refusing to start {holder}: {} does not exist and this command will not \
+                 create it.\n\
+                 Creating it here would leave a coordination file owned by this account in a \
+                 data directory owned by another — the daemon's own account could then not \
+                 reopen it. Run this under the account that owns the data directory (the \
+                 deployment scripts use `runuser -u icn` / `sudo -u icn`).",
+                path.display()
             ),
+            Err(e) => {
+                return Err(e)
+                    .with_context(|| format!("Failed to open the lock {}", path.display()))
+            }
+        };
+
+        Self::lock(
+            file,
+            path,
+            Sharing::Exclusive,
+            &Self::storage_refusal(data_dir, holder),
         )
     }
 

@@ -2999,3 +2999,180 @@ fn show_refuses_rather_than_racing_a_holder_of_the_data_root() {
         combined(&after)
     );
 }
+
+/// The `--json` contract must hold when the *lock* is what fails.
+///
+/// Acquiring it above the renderer with `?` exited with empty stdout — which is
+/// exactly the promise this command exists to keep. A machine caller cannot
+/// distinguish "no output" from "crashed".
+#[test]
+fn show_json_emits_the_error_envelope_when_the_root_is_held() {
+    let dir = genesis_dir("Held Root Json Coop");
+
+    // A real holder: what a ceremony or a running daemon owns.
+    let held = icn_core::DataDirLock::acquire(dir.path(), "runtime-root provisioning").unwrap();
+    let out = icnctl(dir.path())
+        .args(["institution", "runtime-root", "show", "--json"])
+        .output()
+        .unwrap();
+    drop(held);
+
+    assert!(
+        !out.status.success(),
+        "inspection cannot proceed while the root is held"
+    );
+    assert!(
+        !out.stdout.is_empty(),
+        "stdout must not be empty: a machine caller cannot tell that from a crash.\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // The WHOLE of stdout, not an extracted fragment.
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+        panic!(
+            "stdout must be exactly one JSON document: {e}\n--- stdout ---\n{}",
+            String::from_utf8_lossy(&out.stdout)
+        )
+    });
+    assert_eq!(doc["state"], "ERROR", "{doc}");
+    assert_eq!(doc["error"]["code"], "root_in_use", "{doc}");
+    assert!(
+        doc["error"]["remediation"]
+            .as_str()
+            .is_some_and(|r| !r.is_empty()),
+        "the envelope must tell an operator what to do: {doc}"
+    );
+
+    // No prose leaked onto stdout beside the document.
+    let raw = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        raw.trim_start().starts_with('{') && raw.trim_end().ends_with('}'),
+        "stdout must carry the document and nothing else:\n{raw}"
+    );
+}
+
+/// Inspection must not mint a coordination file for a foreign account.
+///
+/// Two halves, because the invariant has two sides and only one of them is
+/// "creates nothing":
+///
+/// * under the account that owns the data directory, creating the lock is
+///   correct — that is how inspection joins the same exclusion domain as
+///   provisioning, and the file it leaves is the daemon's own;
+/// * under a *different* account it must not create one. Run via `sudo`
+///   against a service-owned root, that file would be root-owned `0600` and
+///   the daemon's account could not reopen it — a diagnostic that stops the
+///   service from starting. With nothing to join, inspection refuses rather
+///   than proceeding outside the domain.
+///
+/// The foreign half is exercised cross-*group*, which is the one on-disk
+/// identity change an unprivileged process can make. The cross-*user* case is
+/// the same policy function and is covered by
+/// `any_change_of_owner_or_group_is_refused_not_repaired`.
+#[cfg(unix)]
+#[test]
+fn inspection_does_not_mint_a_coordination_file_for_a_foreign_account() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    let lock = icn_core::DataDirLock::lock_path(data_dir);
+    assert!(
+        !lock.exists(),
+        "fixture: the root must start without a lock file"
+    );
+
+    // --- foreign account first, while the root is still pristine.
+    let Some(other_gid) = a_supplementary_group() else {
+        eprintln!(
+            "SKIPPED the foreign-account half of \
+             inspection_does_not_mint_a_coordination_file_for_a_foreign_account: this account \
+             has no supplementary group, so a differing on-disk identity cannot be built \
+             without privilege. Not evidence in this environment."
+        );
+        return;
+    };
+    chgrp(data_dir, other_gid);
+
+    let refused = combined(
+        &icnctl(data_dir)
+            .args(["institution", "runtime-root", "show"])
+            .output()
+            .unwrap(),
+    );
+    assert!(
+        !lock.exists(),
+        "inspection under a foreign account must not create the coordination file:\n{refused}"
+    );
+    assert!(
+        refused.contains("will not create it"),
+        "and must refuse rather than proceed outside the exclusion domain:\n{refused}"
+    );
+
+    // --- and under the owning account it joins the domain properly.
+    let own_gid = std::fs::symlink_metadata(std::env::temp_dir())
+        .map(|_| unsafe { libc::getegid() })
+        .unwrap();
+    chgrp(data_dir, own_gid);
+    let out = combined(
+        &icnctl(data_dir)
+            .args(["institution", "runtime-root", "show"])
+            .output()
+            .unwrap(),
+    );
+    // NOT_STARTED is the right answer for an unprovisioned root and exits
+    // non-zero; what matters here is that it was reached by *joining the
+    // domain* rather than refused for want of one.
+    assert!(
+        !out.contains("will not create it"),
+        "inspection under the owning account must not be refused:\n{out}"
+    );
+    assert!(
+        lock.exists(),
+        "and must join the exclusion domain by taking the ordinary lock:\n{out}"
+    );
+}
+
+/// A check that could not be *run* is not a mismatch that was *observed*.
+///
+/// `INCONSISTENT` is a positive claim about durable state. Losing read
+/// permission on the configuration establishes nothing of the kind — and it
+/// points an operator at the wrong repair.
+#[cfg(unix)]
+#[test]
+fn a_configuration_that_cannot_be_read_is_an_error_not_a_mismatch() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = genesis_dir("Unreadable Config Coop");
+    let cfg = dir.path().join("icn.toml");
+    std::fs::set_permissions(&cfg, std::fs::Permissions::from_mode(0o000)).unwrap();
+    if std::fs::read_to_string(&cfg).is_ok() {
+        std::fs::set_permissions(&cfg, std::fs::Permissions::from_mode(0o600)).unwrap();
+        eprintln!(
+            "SKIPPED a_configuration_that_cannot_be_read_is_an_error_not_a_mismatch: this \
+             process reads a 0000 file (running as root?). Not evidence in this environment."
+        );
+        return;
+    }
+
+    let out = icnctl(dir.path())
+        .args(["institution", "runtime-root", "show", "--json"])
+        .output()
+        .unwrap();
+    std::fs::set_permissions(&cfg, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+        panic!(
+            "stdout must be one JSON document: {e}\n{}",
+            String::from_utf8_lossy(&out.stdout)
+        )
+    });
+    assert_eq!(
+        doc["state"], "ERROR",
+        "an unreadable configuration is not observed corruption: {doc}"
+    );
+    assert_ne!(
+        doc["state"], "INCONSISTENT",
+        "reporting corruption here points at the wrong repair: {doc}"
+    );
+    assert_eq!(doc["error"]["code"], "state_unreadable", "{doc}");
+}

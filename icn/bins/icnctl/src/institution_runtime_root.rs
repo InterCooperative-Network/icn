@@ -787,13 +787,17 @@ pub fn runtime_root_state(data_dir: &Path) -> Result<RuntimeRootState> {
         // honest — a receipt written before the configuration was published
         // would surface here as inconsistent, not as a genesis.
         // `None`: a read-only inspection must not prompt for a passphrase.
-        return Ok(match verify_durable_state(data_dir, &receipt, None) {
-            Ok(()) => RuntimeRootState::Ready(Box::new(receipt)),
-            Err(problem) => RuntimeRootState::Inconsistent {
+        return match verify_durable_state(data_dir, &receipt, None) {
+            Ok(()) => Ok(RuntimeRootState::Ready(Box::new(receipt))),
+            // Could not be inspected: propagate, so `show` reports ERROR /
+            // `state_unreadable` rather than claiming corruption it never saw.
+            Err(problem) if problem.downcast_ref::<Uninspectable>().is_some() => Err(problem),
+            // Observed, and it disagreed. That is INCONSISTENT.
+            Err(problem) => Ok(RuntimeRootState::Inconsistent {
                 receipt: Box::new(receipt),
                 problem: format!("{problem:#}"),
-            },
-        });
+            }),
+        };
     }
     // No receipt: report which components a partial ceremony left behind.
     //
@@ -1289,6 +1293,95 @@ impl Drop for ObserverGuard {
     }
 }
 
+/// May inspection create this root's coordination file, or must it only join
+/// an existing one?
+///
+/// The same account policy the ceremony applies, asked about a different file.
+/// Creating `.icn-data-dir.lock` is a durable act: the file is retained after
+/// release, so an inspection run under `sudo` against a service-owned data
+/// directory would leave a root-owned `0600` file the daemon's own account
+/// cannot reopen — a diagnostic that stops the service from starting.
+///
+/// The reference is the data directory itself: whoever owns it is the account
+/// whose daemon reads this state. If new files here would be owned by somebody
+/// else, inspection may join an existing lock but must not mint one.
+///
+/// This is a question about *creation*, not about permission to look. When the
+/// answer is no and no lock exists, inspection refuses rather than proceeding
+/// unlocked — being outside the exclusion domain is the failure this whole
+/// mechanism exists to prevent.
+#[cfg(unix)]
+fn inspection_may_create_the_lock(data_dir: &Path) -> Result<bool> {
+    let owner = std::fs::symlink_metadata(data_dir)
+        .map(|m| AccessIdentity::of(&m))
+        .with_context(|| format!("Failed to inspect {}", data_dir.display()))?;
+    Ok(matches!(
+        classify_ownership_transfer(owner, identity_new_files_receive(data_dir)?),
+        OwnershipTransfer::Preserved
+    ))
+}
+
+#[cfg(not(unix))]
+fn inspection_may_create_the_lock(_data_dir: &Path) -> Result<bool> {
+    Ok(true)
+}
+
+/// A test-only barrier inside `show`, between deciding about the lock and
+/// touching any durable state.
+///
+/// This exists to make one specific interleaving deterministic rather than
+/// timing-dependent: `show` decides it may proceed, provisioning then starts
+/// and takes the real lock, and `show` walks into the stores anyway. A sleep
+/// would prove nothing repeatable; this pauses exactly there.
+///
+/// Scoped to one canonical root and removed on drop, for the same reason
+/// [`ScopedObserver`] is: `cargo test` runs these in parallel, and an unscoped
+/// barrier would stall an unrelated inspection.
+#[cfg(test)]
+type InspectionBarrier = fn(&Path);
+
+#[cfg(test)]
+static INSPECTION_BARRIER: std::sync::Mutex<Option<(PathBuf, InspectionBarrier)>> =
+    std::sync::Mutex::new(None);
+
+#[cfg(test)]
+struct BarrierGuard;
+
+#[cfg(test)]
+impl BarrierGuard {
+    fn install(root: &Path, callback: InspectionBarrier) -> Self {
+        if let Ok(mut slot) = INSPECTION_BARRIER.lock() {
+            *slot = Some((icn_core::DataDirLock::lock_path(root), callback));
+        }
+        Self
+    }
+}
+
+#[cfg(test)]
+impl Drop for BarrierGuard {
+    fn drop(&mut self) {
+        if let Ok(mut slot) = INSPECTION_BARRIER.lock() {
+            *slot = None;
+        }
+    }
+}
+
+/// Run the installed barrier, if this is the root it was installed for.
+#[cfg(test)]
+fn inspection_barrier(root: &Path) {
+    // The callback is copied out before the guard is released: holding the
+    // registry lock across a blocking callback would deadlock the test that
+    // installed it.
+    let hit = INSPECTION_BARRIER.lock().ok().and_then(|slot| {
+        slot.as_ref()
+            .filter(|(expected, _)| *expected == icn_core::DataDirLock::lock_path(root))
+            .map(|(_, cb)| *cb)
+    });
+    if let Some(cb) = hit {
+        cb(root);
+    }
+}
+
 /// Stop the ceremony at `point` when the test asked for it.
 macro_rules! failpoint {
     ($injected:expr, $root:expr, $point:expr) => {
@@ -1746,7 +1839,8 @@ fn verify_durable_state(
     let coop_db = coop_db_path(data_dir);
     let coop_sled = Arc::new(
         icn_store::SledStore::open(&coop_db)
-            .context("Verification: failed to reopen the cooperative store")?,
+            .context("Verification: failed to reopen the cooperative store")
+            .map_err(uninspectable)?,
     );
     let coop_store = icn_coop::CoopStore::new(Arc::new(coop_sled.db().clone()));
     let stored = coop_store
@@ -1782,10 +1876,12 @@ fn verify_durable_state(
     // ceremony wrote badly is caught here rather than at the daemon's next start.
     let ledger_store: Arc<dyn icn_store::Store> = Arc::new(
         icn_store::SledStore::open(icn_core::config::ledger_store_path(data_dir))
-            .context("Verification: failed to reopen the ledger store")?,
+            .context("Verification: failed to reopen the ledger store")
+            .map_err(uninspectable)?,
     );
     let manager = icn_ledger::TreasuryManager::with_store(ledger_store)
-        .context("Verification: the treasury store did not rehydrate")?;
+        .context("Verification: the treasury store did not rehydrate")
+        .map_err(uninspectable)?;
     let treasury_did: Did = receipt
         .treasury_did
         .parse()
@@ -1849,7 +1945,8 @@ fn verify_durable_state(
     // Both trust facts, read through a fresh handle.
     let trust_store: Arc<dyn icn_store::Store> = Arc::new(
         icn_store::SledStore::open(icn_core::config::trust_store_path(data_dir))
-            .context("Verification: failed to reopen the trust store")?,
+            .context("Verification: failed to reopen the trust store")
+            .map_err(uninspectable)?,
     );
     let node_did: Did = receipt
         .node_did
@@ -1874,7 +1971,11 @@ fn verify_durable_state(
     ] {
         let present = graph
             .get_edge(source, target)
-            .map_err(|e| anyhow::anyhow!("Verification: could not read a trust edge ({e})"))?
+            .map_err(|e| {
+                uninspectable(anyhow::anyhow!(
+                    "Verification: could not read a trust edge ({e})"
+                ))
+            })?
             .is_some();
         if !present {
             bail!("Verification: {what} is not readable back from the trust store.");
@@ -1906,7 +2007,9 @@ fn verify_durable_state(
     // are *sufficient*, not that a long-running daemon will still honour them —
     // that is exactly what icn#2750 blocks, and it is not papered over here.
     let scored = graph.compute_trust_score(&treasury_did).map_err(|e| {
-        anyhow::anyhow!("Verification: could not score the treasury as the ledger would ({e})")
+        uninspectable(anyhow::anyhow!(
+            "Verification: could not score the treasury as the ledger would ({e})"
+        ))
     })?;
     if scored < icn_ledger::DEFAULT_MIN_TRUST_FOR_ENTRY {
         bail!(
@@ -1922,7 +2025,8 @@ fn verify_durable_state(
     // owner of that rule rather than by re-reading the key here.
     let config_path = data_dir.join("icn.toml");
     let text = std::fs::read_to_string(&config_path)
-        .with_context(|| format!("Verification: failed to read {}", config_path.display()))?;
+        .with_context(|| format!("Verification: failed to read {}", config_path.display()))
+        .map_err(uninspectable)?;
     // The key material itself. Without this, deleting `treasury.age` after a
     // completed ceremony would still report COMPLETE, and the claim that every
     // component is re-read would be narrower than stated.
@@ -1998,13 +2102,15 @@ fn verify_durable_state(
         }
         if let Some(passphrase) = passphrase {
             let mut keystore = AgeKeyStore::open(&path)
-                .with_context(|| format!("Verification: failed to open {}", path.display()))?;
+                .with_context(|| format!("Verification: failed to open {}", path.display()))
+                .map_err(uninspectable)?;
             keystore
                 .unlock(passphrase)
                 .with_context(|| format!("Verification: failed to unlock {}", path.display()))?;
             let actual = keystore
                 .get_keypair()
-                .with_context(|| format!("Verification: failed to read the {what} keypair"))?
+                .with_context(|| format!("Verification: failed to read the {what} keypair"))
+                .map_err(uninspectable)?
                 .did()
                 .clone();
             if actual.as_str() != expected {
@@ -2217,6 +2323,34 @@ fn refuse_ownership_change(
          scripts use `runuser -u icn` / `sudo -u icn`).",
         path.display()
     )
+}
+
+/// A verification step that could not be *performed*, as distinct from one that
+/// was performed and disagreed.
+///
+/// `runtime_root_state` used to collapse both into `INCONSISTENT`, which is a
+/// positive claim of durable-state corruption. Losing read permission on
+/// `icn.toml`, or a transient I/O error opening the ledger store, is not that
+/// claim — nothing was observed to mismatch. Reporting it as corruption is the
+/// same boolean-for-unknown mistake this command refuses everywhere else, and
+/// it points an operator at the wrong repair.
+///
+/// Errors carrying this marker propagate to `classify_for_show`, which renders
+/// them as the documented `ERROR` / `state_unreadable` outcome.
+#[derive(Debug)]
+struct Uninspectable(anyhow::Error);
+
+impl std::fmt::Display for Uninspectable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#}", self.0)
+    }
+}
+
+impl std::error::Error for Uninspectable {}
+
+/// Mark a failure as "the check could not be run", not "the check failed".
+fn uninspectable(e: impl Into<anyhow::Error>) -> anyhow::Error {
+    anyhow::Error::new(Uninspectable(e.into()))
 }
 
 /// Does this store directory exist, or could we not tell?
@@ -2765,11 +2899,64 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
 /// enough for a caller to tell state classes apart, and anything finer would be
 /// inventing categories no consumer has asked for.
 fn classify_for_show(data_dir: &Path, json: bool) -> Result<RuntimeRootState> {
-    match runtime_root_state(data_dir) {
+    // The lock is taken *here*, not at the call site, for one reason: a failure
+    // to acquire it is an inspection outcome like any other, and `--json`
+    // promises exactly one document for every outcome. Acquiring it above this
+    // function with `?` skipped the renderer and exited with empty stdout —
+    // which is precisely the contract this command exists to keep.
+    //
+    // `acquire_existing`, not `acquire`: observing a directory must not create
+    // a persistent lock file in it. See `DataDirLock::acquire_existing`.
+    //
+    // The guard is dropped at the end of this function rather than held across
+    // printing: everything below reads from the state already classified, and
+    // holding it longer would block a ceremony for the duration of an operator
+    // reading output.
+    // Policy first, then a real lock — and a real lock either way.
+    //
+    // If new files here would belong to this account, inspection creates and
+    // holds the ordinary storage lock, so it and provisioning are in one
+    // exclusion domain. If they would not, it may still *join* an existing lock
+    // but must not mint one; and if there is none to join it refuses, because
+    // proceeding unlocked is the failure this mechanism exists to prevent.
+    //
+    // An earlier attempt let the absent-lock case proceed without holding
+    // anything, reasoning that absence proved no holder. It proved that only at
+    // the instant of the check: a witness parked `show` past that decision and
+    // watched a third party take the root while the inspection was in flight.
+    let inspection = inspection_may_create_the_lock(data_dir).and_then(|may_create| {
+        if may_create {
+            icn_core::DataDirLock::acquire(data_dir, "runtime-root inspection")
+        } else {
+            icn_core::DataDirLock::acquire_without_creating(data_dir, "runtime-root inspection")
+        }
+    });
+    let state = inspection.and_then(|_guard| {
+        // Test-only: pause here, between the lock decision and the first store
+        // open, so the dangerous interleaving can be exercised deterministically.
+        #[cfg(test)]
+        inspection_barrier(data_dir);
+        runtime_root_state(data_dir)
+    });
+    match state {
         Ok(state) => Ok(state),
         Err(e) if json => {
             let message = format!("{e:#}");
-            let (code, remediation) = classify_show_error(&message);
+            // Prefer the marker over the prose. `classify_show_error` guesses
+            // from message text, which is fine for failures that predate this
+            // distinction — but where the code already *knows* the check could
+            // not be run, guessing can only get it wrong. It did: a
+            // permission-denied configuration read landed in
+            // `classification_failed` for want of a matching substring.
+            let (code, remediation) = if e.downcast_ref::<Uninspectable>().is_some() {
+                (
+                    "state_unreadable",
+                    "Durable state could not be inspected. If the daemon is running, stop it \
+                     first — this command opens the same stores.",
+                )
+            } else {
+                classify_show_error(&message)
+            };
             println!(
                 "{}",
                 serde_json::to_string_pretty(&serde_json::json!({
@@ -2807,6 +2994,12 @@ fn classify_show_error(message: &str) -> (&'static str, &'static str) {
             "receipt_unreadable",
             "The receipt is present but cannot be decoded. Do not guess what it said; treat \
              the root as unverified.",
+        )
+    } else if message.contains("already holds") {
+        (
+            "root_in_use",
+            "Another ICN process holds this data directory. Inspection opens the same stores, \
+             so stop the daemon or wait for the ceremony to finish, then retry.",
         )
     } else if message.contains("could not be opened")
         || message.contains("could not be scanned")
@@ -2933,24 +3126,19 @@ pub fn handle_institution_runtime_root_command(
             print_receipt(data_dir, &receipt, true);
         }
         InstitutionRuntimeRootCommands::Show { json } => {
-            // `show` joins the exclusion protocol rather than racing it.
+            // `show` joins the exclusion protocol rather than racing it, but
+            // the acquisition itself lives in `classify_for_show` so that a
+            // refusal is rendered as JSON like every other outcome.
             //
-            // Classification is not read-only: `runtime_root_state` opens the
-            // stores, and `SledStore::open` is a *creating* open that takes
-            // sled's own exclusive directory lock. The ceremony deliberately
-            // closes its handles before verifying through fresh ones, and a
-            // `show` that won a sled lock inside that window would make the
-            // ceremony's own re-open fail — after the keys, rows and
-            // configuration were written but before the receipt was committed.
-            // The result is an INCOMPLETE runtime root that every later `create`
-            // refuses, produced by a diagnostic command. Completion must not
-            // depend on process arrival order.
-            //
-            // Taking the storage lock turns that race into an honest refusal:
-            // non-blocking, so a `show` during a ceremony (or against a running
-            // daemon, which holds this lock and whose sled databases `show`
-            // could not open anyway) says so instead of interfering.
-            let _inspection = icn_core::DataDirLock::acquire(data_dir, "runtime-root inspection")?;
+            // Why it needs one at all: classification is not read-only.
+            // `runtime_root_state` opens the stores, and `SledStore::open` is a
+            // *creating* open that takes sled's own exclusive directory lock.
+            // The ceremony deliberately closes its handles before verifying
+            // through fresh ones, so a `show` that won a sled lock inside that
+            // window made the ceremony's own re-open fail — after the keys,
+            // rows and configuration were written but before the receipt was
+            // committed, leaving an INCOMPLETE root that every later `create`
+            // refuses. Completion must not depend on process arrival order.
             match classify_for_show(data_dir, json)? {
                 RuntimeRootState::Ready(receipt) => {
                     if json {
@@ -3903,6 +4091,122 @@ mod failpoint_tests {
             msg.contains("could not determine whether"),
             "the refusal must say the question could not be answered: {msg}"
         );
+    }
+
+    /// Two-party gate for the concurrency witness below.
+    ///
+    /// `(reached, released)`. No sleeps anywhere: `show` signals that it has
+    /// arrived, and is released by the ceremony's own boundary observer, so the
+    /// interleaving is the same on every run and on every machine.
+    #[cfg(unix)]
+    fn overlap_gate() -> &'static (std::sync::Mutex<(bool, bool)>, std::sync::Condvar) {
+        static G: std::sync::OnceLock<(std::sync::Mutex<(bool, bool)>, std::sync::Condvar)> =
+            std::sync::OnceLock::new();
+        G.get_or_init(|| {
+            (
+                std::sync::Mutex::new((false, false)),
+                std::sync::Condvar::new(),
+            )
+        })
+    }
+
+    /// `show`'s side: announce arrival, then block until the ceremony releases.
+    #[cfg(unix)]
+    fn inspection_waits_at_the_gate(_root: &Path) {
+        let (m, cv) = overlap_gate();
+        let mut st = m.lock().unwrap();
+        st.0 = true;
+        cv.notify_all();
+        while !st.1 {
+            st = cv.wait(st).unwrap();
+        }
+    }
+
+    /// Release `show` from the test thread.
+    #[cfg(unix)]
+    fn release_inspection() {
+        let (m, cv) = overlap_gate();
+        let mut st = m.lock().unwrap();
+        st.1 = true;
+        cv.notify_all();
+    }
+
+    /// **The concurrency witness.** Is inspection inside the exclusion domain?
+    ///
+    /// Deterministic, with no sleeps:
+    ///
+    /// 1. `show` runs on a root with no lock file, decides about the lock, and
+    ///    parks before opening any durable state;
+    /// 2. the test asks whether a third party can now take the data root.
+    ///
+    /// That question *is* the property. If a third party can, `show` holds
+    /// nothing and only the scheduler stands between an inspection and a
+    /// ceremony's close/reopen window — which is not an exclusion protocol.
+    /// Racing for the harm instead would be weaker and flakier: it would pass
+    /// whenever the two threads happened not to collide.
+    ///
+    /// Measured: an earlier design that returned "nothing to hold" when the
+    /// lock file was absent failed this outright — the third party took the
+    /// root while the inspection was in flight.
+    ///
+    /// `show` is then released, and provisioning must still complete and leave
+    /// a root that classifies READY from a fresh look — so the exclusion is not
+    /// bought by breaking the ceremony.
+    #[cfg(unix)]
+    #[test]
+    fn inspection_holds_the_exclusion_domain_it_inspects_under() {
+        let dir = provisioned();
+        let root = dir.path().to_path_buf();
+        assert!(
+            !icn_core::DataDirLock::lock_path(&root).exists(),
+            "fixture: the root must start with no lock file — the case at issue"
+        );
+        {
+            // These statics outlive one test; start from a known state.
+            let (m, _) = overlap_gate();
+            *m.lock().unwrap() = (false, false);
+        }
+
+        let _barrier = BarrierGuard::install(&root, inspection_waits_at_the_gate);
+        let inspecting = {
+            let root = root.clone();
+            std::thread::spawn(move || classify_for_show(&root, false).is_ok())
+        };
+
+        {
+            let (m, cv) = overlap_gate();
+            let mut st = m.lock().unwrap();
+            while !st.0 {
+                st = cv.wait(st).unwrap();
+            }
+        }
+
+        // THE PROPERTY, asserted rather than raced for.
+        let intruder = icn_core::DataDirLock::acquire(&root, "a third party");
+        let inside = intruder.is_err();
+        drop(intruder);
+
+        release_inspection();
+        let _ = inspecting.join();
+        drop(_barrier);
+
+        assert!(
+            inside,
+            "`show` was past its lock decision and holding nothing: a third party took the \
+             data root while an inspection was in flight. Inspection is outside the exclusion \
+             domain, so nothing but scheduling prevents it from entering the stores during a \
+             ceremony's close/reopen window."
+        );
+
+        // And the exclusion is not bought by breaking provisioning.
+        let ceremony = provision_runtime_root_inner(&root, "Overlap Coop", "HOURS", None)
+            .expect("provisioning must succeed once the inspection has finished");
+        match runtime_root_state(&root).expect("the finished root must classify") {
+            RuntimeRootState::Ready(receipt) => {
+                assert_eq!(receipt.treasury_did, ceremony.treasury_did);
+            }
+            other => panic!("a completed ceremony must leave a READY root, got {other:?}"),
+        }
     }
 
     /// The component scan's own witness: the trust store.
