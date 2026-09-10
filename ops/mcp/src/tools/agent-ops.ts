@@ -14,6 +14,7 @@ import { buildStateIndex } from "../diagnostics/state-index.js";
 import { buildNextStepsReport } from "../diagnostics/next-steps.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
+import { describeSourceRevision } from "../diagnostics/source-revision.js";
 import {
   buildAgentContextSpineView,
   buildPathBrief,
@@ -24,6 +25,33 @@ export function registerAgentOpsTools(
   db?: Database.Database
 ): void {
   const repoRoot = resolveMonorepoRoot();
+
+  // Every repository-DERIVED answer carries the provenance of the tree it was read from, so a
+  // stale or dirty source is visible in the answer instead of looking identical to a current
+  // one. Statically compiled catalogs (agent_brief, command_catalog, verification_plan) are
+  // deliberately NOT stamped: they are baked into the build and are not reads of the checkout,
+  // so tying them to its revision would assert a relationship that does not exist.
+  //
+  // `root` is the tree the payload was actually read from, which is not always repoRoot —
+  // icn_ops_agent_runtime deliberately reads the CALLER's lane instead.
+  //
+  // This is distinct from a generated artifact's own `source_commit` (the Agent Context Spine
+  // carries one): that records the revision the artifact was generated FROM, while `source`
+  // records the checkout this answer was read OUT OF. When the two disagree, the artifact is
+  // stale relative to the tree holding it — precisely the condition worth surfacing.
+  // `payload` is deliberately an object type rather than `unknown`: spreading a string or an
+  // array would silently produce an index-keyed object ({"0":"a"}) instead of failing, so the
+  // shape is constrained at the call site where it can still be checked.
+  async function repoDerived(
+    payload: Record<string, unknown>,
+    root: string = repoRoot
+  ): Promise<{ content: { type: "text"; text: string }[] }> {
+    const source = await describeSourceRevision(root);
+    const body = { ...payload, source };
+    return {
+      content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+    };
+  }
 
   server.tool(
     "icn_ops_agent_runtime",
@@ -133,7 +161,7 @@ export function registerAgentOpsTools(
             : { [section]: manifest[section] ?? [], session };
       if (manifestError) payload["manifest_error"] = manifestError;
 
-      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+      return await repoDerived(payload, manifestRoot);
     }
   );
 
@@ -143,9 +171,7 @@ export function registerAgentOpsTools(
     {},
     async () => {
       const report = await buildEnvironmentReport(repoRoot);
-      return {
-        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
-      };
+      return await repoDerived(report);
     }
   );
 
@@ -155,9 +181,7 @@ export function registerAgentOpsTools(
     {},
     async () => {
       const report = await buildDoctorReport(repoRoot);
-      return {
-        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
-      };
+      return await repoDerived(report);
     }
   );
 
@@ -198,9 +222,7 @@ export function registerAgentOpsTools(
       const filtered = wantAbsent
         ? entries
         : entries.filter((e) => e.present);
-      return {
-        content: [{ type: "text", text: JSON.stringify({ entries: filtered }, null, 2) }],
-      };
+      return await repoDerived({ entries: filtered });
     }
   );
 
@@ -210,9 +232,7 @@ export function registerAgentOpsTools(
     {},
     async () => {
       const report = await buildNextStepsReport(repoRoot);
-      return {
-        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
-      };
+      return await repoDerived(report);
     }
   );
 
@@ -242,9 +262,7 @@ export function registerAgentOpsTools(
     {},
     async () => {
       const map = buildRepoMap(repoRoot);
-      return {
-        content: [{ type: "text", text: JSON.stringify(map, null, 2) }],
-      };
+      return await repoDerived(map);
     }
   );
 
@@ -269,9 +287,7 @@ export function registerAgentOpsTools(
         paths && paths.length > 0
           ? buildPathBrief(repoRoot, paths)
           : buildAgentContextSpineView(repoRoot, { node, type, subsystem, path });
-      return {
-        content: [{ type: "text", text: JSON.stringify(view, null, 2) }],
-      };
+      return await repoDerived(view);
     }
   );
 }
