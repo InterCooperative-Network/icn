@@ -1361,10 +1361,31 @@ impl Drop for ObserverGuard {
 /// answer is no and no lock exists, inspection refuses rather than proceeding
 /// unlocked — being outside the exclusion domain is the failure this whole
 /// mechanism exists to prevent.
+/// Who owns the directory state actually lands in.
+///
+/// `metadata`, not `symlink_metadata`: the data root is the one ownership
+/// question in this file that must **follow** a link. Every file-level check
+/// deliberately does not — a symlink where a keystore or a configuration
+/// belongs is state to report, not to follow.
+///
+/// A data root is different. `--data-dir` naming a symlink is an ordinary
+/// deployment (`/var/lib/icn` pointing at a storage volume), and a symlink
+/// carries its own uid/gid, usually the account that created it. Reading the
+/// link would compare the *link's* owner against files created in the
+/// *target* — so a root-owned link to an `icn`-owned directory would refuse
+/// the very account that should be running the ceremony.
+///
+/// Deliberately shared by both callers, and deliberately raw: the follow
+/// decision is the part that must never diverge, while each caller keeps its
+/// own error policy for a root that is missing or unreadable.
+#[cfg(unix)]
+fn data_root_account(data_dir: &Path) -> std::io::Result<AccessIdentity> {
+    std::fs::metadata(data_dir).map(|m| AccessIdentity::of(&m))
+}
+
 #[cfg(unix)]
 fn inspection_may_create_the_lock(data_dir: &Path) -> Result<bool> {
-    let owner = std::fs::symlink_metadata(data_dir)
-        .map(|m| AccessIdentity::of(&m))
+    let owner = data_root_account(data_dir)
         .with_context(|| format!("Failed to inspect {}", data_dir.display()))?;
     Ok(matches!(
         classify_ownership_transfer(owner, identity_new_files_receive(data_dir)?),
@@ -2642,8 +2663,8 @@ fn refuse_if_the_configuration_is_hard_linked(_data_dir: &Path) -> Result<()> {
 /// which, until this guard, it was.
 #[cfg(unix)]
 fn refuse_if_new_files_would_not_belong_to_the_data_root_account(data_dir: &Path) -> Result<()> {
-    let root_owner = match std::fs::symlink_metadata(data_dir) {
-        Ok(meta) => AccessIdentity::of(&meta),
+    let root_owner = match data_root_account(data_dir) {
+        Ok(identity) => identity,
         // A root that is not there yet is refused with its own message by
         // `check_config_linkable`; do not pre-empt it with an ownership answer
         // about a directory that does not exist.

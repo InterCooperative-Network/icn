@@ -3388,3 +3388,72 @@ fn provisioning_refuses_when_new_files_would_not_belong_to_the_data_root_account
         );
     }
 }
+
+/// A symlinked data root is judged by its target, not by the link.
+///
+/// `/var/lib/icn` pointing at a storage volume is an ordinary deployment, and a
+/// symlink carries its own uid/gid — usually whichever account created it. The
+/// account guard compares the data root's owner against the identity files
+/// created inside it actually receive, and that probe necessarily lands in the
+/// *target*. Reading the link instead compares two different directories, so a
+/// root-owned link to an `icn`-owned volume refuses the very account that
+/// should be running the ceremony.
+///
+/// The fixture proves the divergence it depends on rather than assuming it:
+/// the link belongs to another group and the target does not, so reading the
+/// link and following it cannot give the same answer.
+#[cfg(unix)]
+#[test]
+fn a_symlinked_data_root_is_judged_by_its_target_not_the_link() {
+    let Some(other_gid) = a_supplementary_group() else {
+        eprintln!(
+            "SKIPPED a_symlinked_data_root_is_judged_by_its_target_not_the_link: \
+             this account has no supplementary group."
+        );
+        return;
+    };
+
+    let dir = TempDir::new().unwrap();
+    let target = dir.path().join("real");
+    std::fs::create_dir(&target).unwrap();
+    let link = dir.path().join("link");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    lchgrp(&link, other_gid);
+
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        assert_eq!(
+            std::fs::symlink_metadata(&link).unwrap().gid(),
+            other_gid,
+            "fixture: the link itself must belong to the other group"
+        );
+        assert_ne!(
+            std::fs::metadata(&link).unwrap().gid(),
+            other_gid,
+            "fixture: the target must NOT, or following the link changes nothing"
+        );
+    }
+
+    assert!(init_identity(&link).status.success());
+    assert!(run_init_coop(&link).status.success());
+
+    let out = combined(&provision_runtime_root(&link, "Symlinked Root Coop"));
+    assert!(
+        !out.contains("that the account owning it cannot use"),
+        "the account guard must follow the link to the directory state lands in:\n{out}"
+    );
+}
+
+/// `chown` on the link itself. `libc::chown` would follow it and change the
+/// target, which is the opposite of what this fixture needs.
+#[cfg(unix)]
+fn lchgrp(path: &Path, gid: u32) {
+    let c = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()).unwrap();
+    let rc = unsafe { libc::lchown(c.as_ptr(), u32::MAX, gid) };
+    assert_eq!(
+        rc,
+        0,
+        "fixture: lchown failed: {}",
+        std::io::Error::last_os_error()
+    );
+}
