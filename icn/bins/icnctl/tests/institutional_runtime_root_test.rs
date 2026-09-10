@@ -3312,3 +3312,79 @@ fn a_read_only_device_command_does_not_create_the_identity_lock() {
         combined(&revoked)
     );
 }
+
+/// The data root, not the configuration file, is the account reference.
+///
+/// `inspection_may_create_the_lock` already used this rule: whoever owns the
+/// data directory is the account whose daemon reads the state, so read-only
+/// `show` refuses to mint a lock when new files here would belong to someone
+/// else. Provisioning did not apply it. It checked only whether *publication*
+/// would change who owns `icn.toml` — which is `Preserved` when a root-owned
+/// config is replaced by another root-owned one — so a `sudo` ceremony inside a
+/// service-owned root passed, then created the keystores, the sled databases and
+/// the receipt as the wrong account. Inspection was stricter than provisioning.
+///
+/// Attribution is the whole point of the fixture: the configuration keeps this
+/// account's identity, so the file-ownership guard is satisfied and cannot be
+/// what refuses. Only the data root differs, and the assertions name which
+/// message must appear and which must not.
+#[cfg(unix)]
+#[test]
+fn provisioning_refuses_when_new_files_would_not_belong_to_the_data_root_account() {
+    let Some(other_gid) = a_supplementary_group() else {
+        eprintln!(
+            "SKIPPED provisioning_refuses_when_new_files_would_not_belong_to_the_data_root_account: \
+             this account has no supplementary group, so a differing on-disk identity cannot be \
+             constructed without privilege."
+        );
+        return;
+    };
+
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let cfg_gid = {
+        use std::os::unix::fs::MetadataExt as _;
+        std::fs::symlink_metadata(data_dir.join("icn.toml"))
+            .unwrap()
+            .gid()
+    };
+    chgrp(data_dir, other_gid);
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        assert_eq!(
+            std::fs::symlink_metadata(data_dir).unwrap().gid(),
+            other_gid,
+            "fixture: the data root must actually belong to the other group"
+        );
+        assert_ne!(
+            cfg_gid, other_gid,
+            "fixture: the configuration must NOT, or the file guard would be what refuses"
+        );
+    }
+
+    let refused = combined(&provision_runtime_root(data_dir, "Wrong Root Account Coop"));
+    assert!(
+        refused.contains("that the account owning it cannot use"),
+        "the data-root account guard must be what refuses:\n{refused}"
+    );
+    assert!(
+        !refused.contains("would change which account owns it"),
+        "and it must not be the configuration-file guard standing in for it:\n{refused}"
+    );
+
+    // Refused before anything durable exists, including the retained lock files.
+    for artefact in [
+        "genesis-trust-root.age",
+        "treasury.age",
+        ".icn-config.lock",
+        ".icn-data-dir.lock",
+    ] {
+        assert!(
+            !data_dir.join(artefact).exists(),
+            "{artefact} must not exist after the refusal"
+        );
+    }
+}

@@ -1521,7 +1521,11 @@ fn provision_runtime_root_inner(
     // (1a) Refuse an account mismatch BEFORE anything is created — including the
     // coordination lock files below, which are retained after release and which
     // a wrong-account run would otherwise leave behind for the daemon to trip
-    // over. See `refuse_if_the_configuration_belongs_to_another_account`.
+    // over.
+    //
+    // Two different questions, and the data root is asked first because it
+    // governs everything this ceremony writes, not just the one file.
+    refuse_if_new_files_would_not_belong_to_the_data_root_account(data_dir)?;
     refuse_if_the_configuration_belongs_to_another_account(data_dir)?;
     refuse_if_the_configuration_is_hard_linked(data_dir)?;
 
@@ -2613,6 +2617,70 @@ fn refuse_if_the_configuration_is_hard_linked(data_dir: &Path) -> Result<()> {
 
 #[cfg(not(unix))]
 fn refuse_if_the_configuration_is_hard_linked(_data_dir: &Path) -> Result<()> {
+    Ok(())
+}
+
+/// Refuse when this account would create files the daemon cannot use.
+///
+/// The reference is the data directory itself, exactly as in
+/// [`inspection_may_create_the_lock`]: whoever owns it is the account whose
+/// daemon reads this state.
+///
+/// [`refuse_if_the_configuration_belongs_to_another_account`] asks a narrower
+/// question — would *publication* change who owns `icn.toml` — and answers it
+/// correctly. It cannot answer this one. When `icn.toml` is root-owned inside a
+/// service-owned root (mode `0644` in a service directory, say), a `sudo`
+/// ceremony preserves that file's ownership and passes, then mints the
+/// keystores, creates the cooperative and ledger databases and commits a
+/// receipt — all owned by `root`. The service account cannot write those sled
+/// directories, so the receipt would claim a provisioned root over state the
+/// daemon cannot use, and the retained coordination files would stop it
+/// starting at all.
+///
+/// Read-only inspection already refuses to *mint a lock* under this mismatch.
+/// Provisioning writes incomparably more, so it must not be the laxer path —
+/// which, until this guard, it was.
+#[cfg(unix)]
+fn refuse_if_new_files_would_not_belong_to_the_data_root_account(data_dir: &Path) -> Result<()> {
+    let root_owner = match std::fs::symlink_metadata(data_dir) {
+        Ok(meta) => AccessIdentity::of(&meta),
+        // A root that is not there yet is refused with its own message by
+        // `check_config_linkable`; do not pre-empt it with an ownership answer
+        // about a directory that does not exist.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => {
+            return Err(e).with_context(|| format!("Failed to inspect {}", data_dir.display()))
+        }
+    };
+    if let OwnershipTransfer::WouldChange {
+        existing,
+        replacement,
+    } = classify_ownership_transfer(root_owner, identity_new_files_receive(data_dir)?)
+    {
+        bail!(
+            "Refusing institutional runtime-root provisioning: this account would create files \
+             in {} that the account owning it cannot use.\n\
+             The directory belongs to uid {} / gid {}, but new files in it are created as \
+             uid {} / gid {}.\n\
+             Whoever owns the data root is the account whose daemon reads this state, so \
+             provisioning under a different one would mint the keystores, create the \
+             cooperative and ledger databases and commit the completion receipt where that \
+             daemon cannot write them — and the coordination files, which are retained after \
+             release, would stop it starting at all.\n\
+             Re-run as the owning account (`sudo -u <owner> icnctl ...`), or hand the \
+             directory to this account deliberately first.",
+            data_dir.display(),
+            existing.uid,
+            existing.gid,
+            replacement.uid,
+            replacement.gid
+        );
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn refuse_if_new_files_would_not_belong_to_the_data_root_account(_data_dir: &Path) -> Result<()> {
     Ok(())
 }
 
