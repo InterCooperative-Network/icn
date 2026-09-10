@@ -17,6 +17,10 @@ env:
   RUST_BACKTRACE: 1
   # Use environment variable for duration to avoid injection risk
   FUZZ_DURATION: ${{ github.event.inputs.duration || '300' }}
+  # 3 x 900s = 45 minutes of fuzzing, leaving ~15 minutes of the 60-minute job
+  # budget for checkout, cargo-fuzz install and the workspace build.
+  FUZZ_MAX_DURATION: '900'
+  FUZZ_TARGET_COUNT: '3'
 
 permissions:
   contents: read
@@ -32,9 +36,27 @@ jobs:
 
       - name: Validate duration input
         run: |
-          # Ensure duration is a positive integer to prevent injection
+          # Two separate constraints.
+          #
+          # 1. Shape, to prevent injection. Note '^[0-9]+$' alone also accepts 0,
+          #    which the message below claims is invalid, so the lower bound is
+          #    checked explicitly rather than implied.
+          # 2. Budget. Three fuzz targets run SEQUENTIALLY, each for the full
+          #    duration, after a cargo-fuzz install and a workspace build. A
+          #    dispatch of 3600 would need three hours inside a 60-minute job and
+          #    would be cancelled mid-run, reporting a timeout rather than a
+          #    refusal. Refuse up front instead: a request the job cannot honour
+          #    is a bad request, not a failure.
           if ! echo "$FUZZ_DURATION" | grep -qE '^[0-9]+$'; then
             echo "::error::Invalid duration: must be a positive integer"
+            exit 1
+          fi
+          if [ "$FUZZ_DURATION" -lt 1 ]; then
+            echo "::error::Invalid duration: must be a positive integer"
+            exit 1
+          fi
+          if [ "$FUZZ_DURATION" -gt "$FUZZ_MAX_DURATION" ]; then
+            echo "::error::duration ${FUZZ_DURATION}s exceeds the per-target maximum ${FUZZ_MAX_DURATION}s. ${FUZZ_TARGET_COUNT} targets run sequentially inside this job's timeout-minutes budget; raise the job budget first if a longer run is genuinely needed."
             exit 1
           fi
 
