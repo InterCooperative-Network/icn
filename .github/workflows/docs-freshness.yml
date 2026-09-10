@@ -2,6 +2,7 @@ name: Documentation Maintenance
 
 on:
   push:
+    branches: [main]
     paths:
       - 'docs/**'
       - 'ARCHITECTURE.md'
@@ -91,10 +92,18 @@ permissions:
   pull-requests: write
   issues: write
 
+# `push:` previously had no branches filter, so every push to a feature branch
+# ran these jobs AND the pull_request trigger ran them again. Now push covers
+# main only; PRs are covered by pull_request.
+concurrency:
+  group: docs-freshness-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   doc_control:
     name: Documentation Control Plane
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -123,6 +132,7 @@ jobs:
   lint:
     name: Lint Architecture Doc
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -139,6 +149,7 @@ jobs:
   freshness:
     name: Check Documentation Freshness
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
@@ -188,6 +199,7 @@ jobs:
   index:
     name: Generate Documentation Index
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -232,6 +244,7 @@ jobs:
   fixture_bundle:
     name: Rehearsal Fixture Bundle
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -267,6 +280,7 @@ jobs:
   bridge_conformance:
     name: Governed Bridge Conformance Fixtures
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -297,6 +311,7 @@ jobs:
   route_inventory:
     name: Check Generated Route Inventory
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -327,6 +342,7 @@ jobs:
   icnctl_inventory:
     name: Check Generated icnctl Command Inventory
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -359,6 +375,7 @@ jobs:
     name: Documentation CI Summary
     needs: [doc_control, lint, freshness, index, fixture_bundle, bridge_conformance, route_inventory, icnctl_inventory]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: always()
     steps:
       - name: Check results

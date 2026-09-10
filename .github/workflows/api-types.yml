@@ -11,10 +11,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: api-types-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check-api-types:
     name: Check API Types Drift
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
 
@@ -25,6 +30,11 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: 1.95.0
+          # The Cargo workspace is icn/, not the repo root. The action's default
+          # cache-workspaces is ".", so the cached path (./target) was never the
+          # built path (icn/target) and this job cold-built icnctl --release on
+          # every run. Matches the `workspaces:` used elsewhere in the repo.
+          cache-workspaces: "icn -> target"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

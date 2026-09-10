@@ -145,7 +145,7 @@ jobs:
       # machine-readable form of the rendered findings.
       - name: Upload reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-reports
           path: |
@@ -230,7 +230,7 @@ jobs:
       # Artifacts first, so a red result never costs anyone the evidence.
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-drift-watch
           path: |

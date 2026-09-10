@@ -35,6 +35,7 @@ jobs:
   benchmark:
     name: Save Benchmark Baseline
     runs-on: ubuntu-latest
+    timeout-minutes: 75
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
@@ -66,12 +67,13 @@ jobs:
         with:
           name: benchmark-baseline-${{ github.sha }}
           path: icn/target/criterion
-          retention-days: 90
+          retention-days: 14
 
   # Compare PR benchmarks against base commit (only on PRs)
   compare:
     name: Compare Against Base
     runs-on: ubuntu-latest
+    timeout-minutes: 75
     if: github.event_name == 'pull_request'
     steps:
       # Checkout PR base commit for baseline (deterministic - won't change during run)

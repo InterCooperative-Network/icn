@@ -9,6 +9,7 @@ name: Evaluator Package (static)
 
 on:
   push:
+    branches: [main]
     paths:
       - 'deploy/appliance/evaluator/**'
       - '.github/workflows/evaluator-package.yml'
@@ -20,11 +21,19 @@ on:
 permissions:
   contents: read
 
+# `push:` previously had no branches filter, so every push to a feature branch
+# ran these jobs AND the pull_request trigger ran them again. Now push covers
+# main only; PRs are covered by pull_request.
+concurrency:
+  group: evaluator-package-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   static:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install ShellCheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck

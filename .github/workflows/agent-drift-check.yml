@@ -57,10 +57,17 @@ on:
 permissions:
   contents: read
 
+# A superseded push to a PR branch should not keep burning a required check.
+# Never cancels on push to main.
+concurrency:
+  group: agent-drift-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   drift-check:
     name: Agent Tooling Drift Check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
 

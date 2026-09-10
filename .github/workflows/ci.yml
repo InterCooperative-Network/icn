@@ -35,6 +35,7 @@ jobs:
   changes:
     name: Change Scope
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     # Job-level elevation: dorny/paths-filter uses the PR API in pull_request
     # mode and documents a pull-requests:read requirement. Kept here so the
     # workflow's top-level contents:read default stays minimal for other jobs.
@@ -101,8 +102,8 @@ jobs:
 
   secrets-check:
     name: Secrets Placeholder Check
-    needs: [changes]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -144,6 +145,7 @@ jobs:
   fmt:
     name: Format Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -161,8 +163,8 @@ jobs:
 
   meaning-firewall:
     name: Meaning Firewall Check
-    needs: [changes]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -191,8 +193,8 @@ jobs:
 
   kernel-deps:
     name: Kernel Forbidden Dependencies
-    needs: [changes]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -281,8 +283,8 @@ jobs:
 
   firewall-contract:
     name: Firewall Contract Enforcement
-    needs: [changes]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -316,8 +318,8 @@ jobs:
 
   compliance-linter:
     name: Regulatory Compliance Linter
-    needs: [changes]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -346,8 +348,8 @@ jobs:
 
   readiness-overclaim:
     name: Readiness Overclaim Check
-    needs: [changes]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -493,6 +495,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
 
@@ -586,6 +589,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
@@ -653,6 +657,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: icn-binaries
+          # Uploaded on every PR and every push. At the repo default of 90 days
+          # this is the largest artifact producer in CI; 5 days is well past the
+          # life of a PR review.
+          retention-days: 5
           path: |
             icn/target/release/icnd
             icn/target/release/icnctl
@@ -662,6 +670,7 @@ jobs:
     name: TypeScript SDK
     needs: [changes]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./sdk/typescript
@@ -723,6 +732,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./web/pilot-ui
@@ -748,6 +758,7 @@ jobs:
     name: Accessibility Tests
     needs: [changes]
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: ./web/pilot-ui
@@ -785,6 +796,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: accessibility-report
+          retention-days: 7
           path: web/pilot-ui/test-results/
 
   # Member Shell (web/member-shell) is the CURRENT member/organizer rehearsal
@@ -865,6 +877,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: member-shell-a11y-report
+          retention-days: 7
           path: member-shell-a11y-out/
           if-no-files-found: ignore
 
