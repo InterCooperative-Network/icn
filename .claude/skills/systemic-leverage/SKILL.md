@@ -68,19 +68,30 @@ If none matches, that is informative. Either the class is new, or there is no cl
 
 ## Classify, then continue
 
-Every candidate gets exactly one disposition from `dispositions`:
+Every candidate gets exactly one disposition. **Do not classify from memory or from this file** —
+the meanings and their applicability tests are data, and a copy of them here would go stale
+silently while still reading plausibly:
 
-- **NOW** — the structural correction is necessary for the defect to be *correctly* fixed, or is
-  tiny, obviously safe and squarely inside the current acceptance contract.
-- **FOLLOW_UP** — the local repair is complete and provable on its own; the mechanism is separate
-  work. Record it in the pull request's follow-up ledger.
-- **ARCHITECTURAL** — it changes a subsystem boundary, state model, authority model, storage model
-  or lifecycle. Record it. Do not smuggle it into the current pull request.
-- **NONE** — genuinely local, no useful class.
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+python3 -c "
+import json
+d=json.load(open('${REPO_ROOT}/ops/state/truth/engineering-leverage.json'))
+for name, spec in d['dispositions'].items():
+    print(name)
+    print('  means:', spec['meaning'])
+    print('  test :', spec['test'])
+for a in d['anti_patterns']:
+    print('  avoid:', a)
+"
+```
 
-**NONE is a first-class answer.** If you cannot name a second real occurrence, NONE is very likely
-correct. Manufacturing architecture work to satisfy this framework is itself a defect, and
-`anti_patterns` in the canonical source names it as one.
+Apply each disposition's own `test` field — that is what makes the choice reproducible between
+agents rather than a matter of taste. Where a disposition carries a `recorded_in` or a
+`constraint`, honour it.
+
+`NONE` is a legitimate outcome and its `test` tells you when it applies. The `anti_patterns` list
+in the same file names manufacturing architecture work as a failure mode of this framework itself.
 
 ## The boundary that is not negotiable
 

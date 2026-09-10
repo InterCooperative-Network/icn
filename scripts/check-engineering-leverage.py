@@ -106,10 +106,27 @@ def main() -> int:
     )
 
     # ---- 4. every pattern is evidence-backed ------------------------------
+    #
+    # "Resolvable" has to mean resolved. An earlier version of this check
+    # accepted any string containing "/", ".md", ".json" or "#", which let the
+    # absent path `definitely/missing.md` pass as evidence while the gate
+    # reported "clean" — the checker asserting a fact it had not observed, which
+    # is the observational-falsehood pattern this very file catalogues.
+    #
+    # Two reference kinds are accepted, and each is actually checked:
+    #
+    #   #NNNN        an issue or pull request. Validated by FORM only: resolving
+    #                it needs the GitHub API, and a drift gate that fails when
+    #                the network does is a worse gate. The number is not
+    #                verified to exist.
+    #   a repo path  Validated by EXISTENCE, under the repository root. Absolute
+    #                paths and parent traversal are rejected outright: both
+    #                escape the repository, so neither can be durable evidence
+    #                a future reader can follow.
     patterns = doc.get("patterns", [])
     c.ok(len(patterns) >= 5, f"pattern catalogue is too thin to be useful: {len(patterns)}")
     seen: set[str] = set()
-    ref = re.compile(r"(#\d+|/|\.md|\.json)")
+    issue_ref = re.compile(r"^#\d+$")
     for p in patterns:
         pid = p.get("id", "<unnamed>")
         c.ok(pid not in seen, f"duplicate pattern id: {pid}")
@@ -119,10 +136,24 @@ def main() -> int:
         ex = p.get("examples", [])
         c.ok(bool(ex), f"pattern {pid} has no examples — speculative patterns are not allowed here")
         for e in ex:
-            c.ok(
-                bool(ref.search(str(e.get("reference", "")))),
-                f"pattern {pid} example has no resolvable reference (issue/PR/path): {e.get('reference')!r}",
-            )
+            raw = str(e.get("reference", "")).strip()
+            if issue_ref.match(raw):
+                c.ok(True, "")
+            elif raw:
+                bad_shape = raw.startswith("/") or ".." in Path(raw).parts
+                c.ok(
+                    not bad_shape,
+                    f"pattern {pid} reference {raw!r} is absolute or escapes the repository root; "
+                    "evidence must live inside the repository",
+                )
+                if not bad_shape:
+                    c.ok(
+                        (root / raw).exists(),
+                        f"pattern {pid} cites {raw!r}, which does not exist in the repository — "
+                        "a reference that cannot be followed is not evidence",
+                    )
+            else:
+                c.fail(f"pattern {pid} example has no reference at all")
             c.ok(bool(e.get("fact")), f"pattern {pid} example has no fact")
 
     # ---- 5. delivery.json stays the lifecycle owner -----------------------
@@ -178,8 +209,27 @@ def main() -> int:
                 "delivery.json" in body,
                 "the skill must state the delivery boundary it may not cross",
             )
-            for d in DISPOSITIONS:
-                c.ok(d in body, f"the skill must name disposition {d}")
+            # By reference, not by copy. A projection that RESTATES a canonical
+            # meaning goes stale silently: the owner changes, the copy still
+            # reads plausibly, and a check that only asserted each disposition
+            # NAME appeared would keep passing while agents applied outdated
+            # classifications. So the canonical prose must not appear verbatim
+            # in a projection, and the projection must load it instead.
+            for name, spec in doc.get("dispositions", {}).items():
+                for field in ("meaning", "test"):
+                    text = str(spec.get(field, "")).strip()
+                    if len(text) < 24:
+                        continue
+                    c.ok(
+                        text not in body,
+                        f"{entry['canonical_path']} restates the canonical {name}.{field} verbatim "
+                        "— projections must load the meanings, not copy them",
+                    )
+            c.ok(
+                "dispositions" in body and "engineering-leverage.json" in body,
+                "the skill must load dispositions from the canonical owner rather than "
+                "carrying its own list",
+            )
         for m in entry.get("provider_mirrors", []):
             mp = root / m["path"]
             c.ok(mp.is_file(), f"provider mirror missing: {m['path']}")

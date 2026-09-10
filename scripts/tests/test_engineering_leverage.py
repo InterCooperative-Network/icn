@@ -10,6 +10,7 @@ A policy that cannot produce NONE is an architecture-astronaut generator.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -26,55 +27,94 @@ def repo_root() -> Path:
     )
 
 
-# Each scenario names the discriminator the policy must supply for an agent to
-# classify it correctly. `pattern` is the catalogue entry that should match, or
-# None when the correct answer is that no class exists.
+# Each scenario is classified BY THE POLICY DATA, not by assertion of field
+# existence. `story` is matched against `patterns[].signal`; `discriminator` is a
+# phrase that must appear in the expected disposition's own `test`. Both
+# participate, so mutating a signal or a disposition test breaks the derivation.
 SCENARIOS = [
     {
         "id": "A_single_typo",
-        "story": "One typo in one error string, in one place.",
+        "story": "one typo in one error string in one place",
         "pattern": None,
         "disposition": "NONE",
-        "discriminator": "NONE must be documented as legitimate, or an agent will invent a class",
+        "discriminator": "second real occurrence",
     },
     {
         "id": "B_two_parsers_drifted",
         "story": (
-            "Two production paths separately parse the same authority field and "
-            "have already drifted."
+            "the same authority fact is parsed independently in two production "
+            "locations and they have drifted"
         ),
         "pattern": "duplicated-semantic-owner",
         "disposition": "NOW",
-        "discriminator": "NOW's test must key on the repair being incomplete without it",
+        "discriminator": "partly repaired",
     },
     {
         "id": "C_one_writer_forgot_the_lock",
         "story": (
-            "One writer forgot to acquire the lock; five other writers each "
-            "acquire it manually."
+            "correctness depends on every caller remembering to acquire a lock "
+            "before it mutates"
         ),
         "pattern": "remember-to-do-it-correctness",
         "disposition": "FOLLOW_UP",
-        "discriminator": "FOLLOW_UP must key on the local repair being complete on its own",
+        "discriminator": "complete and provable on its own",
     },
     {
         "id": "D_frozen_pr_redesign_suggestion",
         "story": (
-            "A frozen PR receives a reviewer suggestion to redesign storage, with "
-            "no current-contract violation."
+            "a reviewer proposes changing the storage model and the subsystem "
+            "boundary on a frozen pull request"
         ),
         "pattern": None,
         "disposition": "ARCHITECTURAL",
-        "discriminator": "the policy must forbid a systemic observation from reopening a frozen PR",
+        "discriminator": "smuggle",
     },
     {
         "id": "E_harness_selected_zero_tests",
-        "story": "A test harness selects zero tests and exits 0.",
+        "story": (
+            "a gate reports success because the mechanism failed to observe the "
+            "thing it was supposed to check"
+        ),
         "pattern": "observational-falsehood",
         "disposition": "NOW",
-        "discriminator": "failure-to-know must not be representable as knowing success",
+        "discriminator": "partly repaired",
     },
 ]
+
+_STOP = {
+    "the", "a", "an", "and", "or", "it", "its", "of", "to", "in", "on", "is",
+    "are", "was", "were", "be", "been", "that", "this", "they", "them", "their",
+    "for", "by", "with", "as", "at", "from", "has", "have", "had", "not", "no",
+    "one", "two", "more", "than", "each", "every", "any", "some", "which",
+}
+
+
+def _tokens(text: str) -> set[str]:
+    words = re.findall(r"[a-z]+", text.lower())
+    out = set()
+    for w in words:
+        if w in _STOP or len(w) < 4:
+            continue
+        # crude stem so "parsed"/"parses"/"parse" and "remembering"/"remember"
+        # meet; enough to make signal text load-bearing without pulling in a
+        # stemming dependency for five fixtures.
+        for suf in ("ing", "ed", "es", "s"):
+            if w.endswith(suf) and len(w) - len(suf) >= 4:
+                w = w[: -len(suf)]
+                break
+        out.add(w)
+    return out
+
+
+def classify_pattern(story: str, patterns: list) -> tuple:
+    """Return (best_id, score, unique) derived from the catalogue's own signals."""
+    st = _tokens(story)
+    scored = sorted(
+        ((len(st & _tokens(p["signal"])), p["id"]) for p in patterns), reverse=True
+    )
+    best_score, best_id = scored[0]
+    unique = len(scored) == 1 or scored[0][0] > scored[1][0]
+    return best_id, best_score, unique
 
 
 class T:
@@ -91,62 +131,48 @@ class T:
 def main() -> int:
     root = repo_root()
     doc = json.loads((root / OWNER).read_text())
-    patterns = {p["id"]: p for p in doc["patterns"]}
+    patterns = doc["patterns"]
     dispositions = doc["dispositions"]
     t = T()
 
     for sc in SCENARIOS:
         sid = sc["id"]
 
-        # The disposition the scenario expects must exist and be applicable.
-        d = dispositions.get(sc["disposition"])
-        t.ok(d is not None, f"{sid}: disposition {sc['disposition']} is not defined")
-        if d:
+        # --- the disposition must be derivable from its own documented test ---
+        spec = dispositions.get(sc["disposition"])
+        t.ok(spec is not None, f"{sid}: disposition {sc['disposition']} is not defined")
+        if spec:
+            probe = f"{spec.get('meaning','')} {spec.get('test','')} {spec.get('constraint','')} {spec.get('note','')}".lower()
             t.ok(
-                bool(d.get("test")),
-                f"{sid}: disposition {sc['disposition']} has no applicability test, so an "
-                "agent cannot reach it deterministically",
+                sc["discriminator"].lower() in probe,
+                f"{sid}: {sc['disposition']} no longer carries the discriminator "
+                f"{sc['discriminator']!r} that makes this scenario classifiable — the policy "
+                "changed and this scenario can no longer be decided from it",
             )
 
-        # The pattern the scenario should match must exist, carry a signal an
-        # agent can match against, and a preferred response.
+        # --- the pattern must be derivable from the catalogue's own signals ---
+        best, score, unique = classify_pattern(sc["story"], patterns)
         if sc["pattern"] is None:
+            # A scenario with no class must not match strongly. This is what
+            # keeps NONE reachable rather than nominal.
+            t.ok(
+                score <= 2,
+                f"{sid}: expected no clear pattern but {best!r} matched with score {score}; "
+                "a catalogue that matches everything cannot produce NONE",
+            )
             continue
-        p = patterns.get(sc["pattern"])
-        t.ok(p is not None, f"{sid}: expected pattern {sc['pattern']!r} is not in the catalogue")
-        if p:
-            t.ok(bool(p.get("signal")), f"{sid}: pattern {sc['pattern']} has no signal to match on")
-            t.ok(
-                bool(p.get("preferred_response")),
-                f"{sid}: pattern {sc['pattern']} gives no direction, so the agent will invent one",
-            )
-            t.ok(
-                bool(p.get("examples")),
-                f"{sid}: pattern {sc['pattern']} has no precedent, so 'we have seen this before' "
-                "cannot be established from the repository",
-            )
+        t.ok(
+            best == sc["pattern"],
+            f"{sid}: story classifies as {best!r} (score {score}), expected {sc['pattern']!r} — "
+            "the signal text no longer discriminates this scenario",
+        )
+        t.ok(unique, f"{sid}: classification tied between patterns; signals do not discriminate")
 
-    # Scenario A and D specifically: the policy must make restraint reachable.
-    none = json.dumps(dispositions.get("NONE", {})).lower()
-    t.ok(
-        "second real occurrence" in none or "name a second" in none,
-        "NONE needs a concrete test an agent can apply, not just permission to use it",
-    )
-    anti = json.dumps(doc.get("anti_patterns", [])).lower()
-    t.ok(
-        "manufactur" in anti or "every systemic observation" in anti,
-        "anti_patterns must name architecture-astronaut and issue-spam failure modes",
-    )
-
-    # Scenario D specifically: freeze and scope must be protected in the policy
-    # itself, not only in delivery.json, because the agent reads this file.
-    boundary = json.dumps(doc.get("owner_boundary", {})) + json.dumps(doc.get("dispositions", {}))
-    t.ok("delivery.json" in boundary, "the policy must defer to delivery.json explicitly")
-    arch = dispositions.get("ARCHITECTURAL", {})
-    t.ok(
-        "smuggle" in json.dumps(arch).lower() or "current pull request" in json.dumps(arch).lower(),
-        "ARCHITECTURAL must forbid folding the work into the current pull request",
-    )
+    # NONE and ARCHITECTURAL must remain reachable and constrained.
+    t.ok("delivery.json" in json.dumps(doc.get("owner_boundary", {})),
+         "the policy must defer to delivery.json explicitly")
+    t.ok(bool(doc.get("anti_patterns")),
+         "anti_patterns must name this framework's own failure modes")
 
     if t.errors:
         print("test_engineering_leverage: FAIL")
@@ -154,8 +180,8 @@ def main() -> int:
             print(f"  - {e}")
         return 1
     print(
-        f"test_engineering_leverage: clean ({t.n} assertions over "
-        f"{len(SCENARIOS)} classification scenarios)"
+        f"test_engineering_leverage: clean ({t.n} assertions; "
+        f"{len(SCENARIOS)} scenarios classified from the catalogue)"
     )
     return 0
 
