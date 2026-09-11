@@ -128,7 +128,13 @@ async function gitProbe(
   cwd: string,
   args: readonly string[]
 ): Promise<GitProbe> {
-  const r = await runCommand("git", [...GIT_SAFE_FLAGS, ...args], {
+  // `--work-tree` pins the probe to the directory being described. `core.worktree` in the
+  // probed repository would otherwise redirect it: a modified checkout whose config points at a
+  // clean copy reports an empty status, so locally modified payload data would be stamped
+  // clean. Verified with git 2.43. This completes the family the sanitised environment,
+  // `core.fsmonitor` and `--untracked-files` belong to — a repository must not get to decide
+  // how, or where, it is inspected.
+  const r = await runCommand("git", ["--work-tree", cwd, ...GIT_SAFE_FLAGS, ...args], {
     cwd,
     timeoutMs: GIT_TIMEOUT_MS,
     maxStdoutBytes: 256 * 1024,

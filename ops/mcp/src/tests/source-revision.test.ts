@@ -308,6 +308,25 @@ describe("describeSourceRevision — repository config cannot suppress the clean
     expect(s.dirty_paths).toBe(1);
     expect(s.trustworthy).toBe(false);
   });
+
+  it("sees local modifications even when core.worktree points elsewhere", async () => {
+    const { clone } = originWithClone();
+    const decoy = tempDir("decoy-worktree");
+    writeFileSync(path.join(decoy, "README.md"), "seed\n");
+    writeFileSync(path.join(clone, "README.md"), "locally modified\n");
+    git(clone, "config", "core.worktree", decoy);
+
+    // Control: honouring the repository's own setting inspects the decoy and sees nothing.
+    const redirected = execFileSync("git", ["status", "--porcelain"], {
+      cwd: clone,
+      encoding: "utf-8",
+    }).trim();
+    expect(redirected, "control: core.worktree must actually redirect").toBe("");
+
+    const s = await describeSourceRevision(clone);
+    expect(s.dirty).toBe(true);
+    expect(s.trustworthy).toBe(false);
+  });
 });
 
 // Guarding a read with HEAD alone misses a tree that was dirty during the read and cleaned

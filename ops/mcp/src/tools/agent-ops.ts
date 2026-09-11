@@ -189,7 +189,10 @@ export function registerAgentOpsTools(
             : { [section]: manifest[section] ?? [], session };
       if (manifestError) payload["manifest_error"] = manifestError;
       return payload;
-      }, manifestRoot);
+      // Pass the lane only when discovery actually found one. When it falls back to repoRoot,
+      // the root was NOT explicitly chosen — it came from ICN_ROOT or the server's location, and
+      // the stamp should say so rather than claiming this call site picked it.
+      }, identity?.worktree_path);
     }
   );
 
