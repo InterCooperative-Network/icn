@@ -40,11 +40,33 @@ import { runCommand } from "../utils/commands.js";
 /** How the repository root the answer came from was chosen. */
 export type SourceResolution = "explicit_root" | "ICN_ROOT" | "server_location";
 
+/**
+ * Whether the checkout being described was chosen by the operator or by the caller.
+ *
+ * This is a trust boundary, not a configuration list. Inspecting a working tree makes git apply
+ * repository-controlled behaviour to its contents — `.gitattributes` plus a `filter.<driver>.clean`
+ * command is executed by `git status` (verified with git 2.43), and it is not the only such
+ * mechanism, nor a bounded set. Reading refs and objects does not: `rev-parse` and `rev-list`
+ * touch no working-tree content and run no filters.
+ *
+ * So a caller-selected checkout gets ref and object reads only. Its cleanliness is reported as
+ * indeterminate rather than probed, because the probe is the exposure. Enumerating individual git
+ * knobs was tried and abandoned as the wrong abstraction; removing the dependence on caller
+ * working trees altogether is R1-B's job, and this is the bounded bridge until then.
+ */
+export type SourceProvenance = "controlled" | "caller_selected";
+
 export type SourceRevision = {
   /** Absolute path of the checkout this answer was produced from. */
   source_checkout: string;
   /** How that path was chosen. An explicitly supplied root outranks the environment. */
   resolved_from: SourceResolution;
+  /**
+   * Whether the operator or the caller chose this checkout. A `caller_selected` source is never
+   * inspected through its working tree, so its cleanliness fields are null by design rather than
+   * by failure — see SourceProvenance.
+   */
+  source_provenance: SourceProvenance;
   /** Full commit SHA of that checkout's HEAD; null when it is not a git tree. */
   source_revision: string | null;
   /** Branch name, or "HEAD" when detached; null when unknown. */
@@ -194,10 +216,17 @@ export async function headRevision(checkout: string): Promise<string | null> {
  * `null` means the state could not be determined, which never compares equal to anything.
  */
 export async function worktreeFingerprint(
-  checkout: string
+  checkout: string,
+  provenance: SourceProvenance = "controlled"
 ): Promise<string | null> {
   const head = await headRevision(checkout);
   if (head === null) return null;
+  if (provenance === "caller_selected") {
+    // The working tree of a caller-selected checkout is never read, so the guard degrades to the
+    // commit alone. Nothing is certified from such a source anyway — `trustworthy` is already
+    // false — so this weakens no claim that was being made.
+    return `${head}:worktree-not-inspected`;
+  }
   const status = await gitProbe(checkout, STATUS_ARGS);
   if (!status.ok) return null;
   return `${head}:${createHash("sha256").update(status.out).digest("hex")}`;
@@ -221,7 +250,8 @@ async function upstreamObservedAt(checkout: string): Promise<Date | null> {
  * describes the tree that actually produced the payload rather than a separately resolved one.
  */
 export async function describeSourceRevision(
-  root?: string
+  root?: string,
+  provenance: SourceProvenance = "controlled"
 ): Promise<SourceRevision> {
   // An explicitly supplied root is how it was chosen, regardless of what the environment says.
   // icn_ops_agent_runtime deliberately overrides ICN_ROOT with the caller's lane; reporting
@@ -242,6 +272,7 @@ export async function describeSourceRevision(
     return {
       source_checkout: checkout,
       resolved_from: resolvedFrom,
+      source_provenance: provenance,
       source_revision: null,
       source_ref: null,
       upstream: null,
@@ -268,9 +299,24 @@ export async function describeSourceRevision(
   // `git status --porcelain` prints one line per changed path and nothing when clean. A failed
   // probe is "unknown", never "clean" — reporting an undetermined tree as clean is the exact
   // failure this stamp exists to remove.
-  const status = await gitProbe(checkout, STATUS_ARGS);
+  // THE BRIDGE. A caller-selected checkout is never inspected through its working tree: doing so
+  // is what lets the repository run code (see SourceProvenance). Cleanliness is therefore
+  // reported as indeterminate — null, not false — and nothing is certified from it. The revision
+  // identity established above came from ref reads and remains valid.
+  const inspectWorkingTree = provenance === "controlled";
+
   let dirty: boolean | null = null;
   let dirtyPaths: number | null = null;
+  let indexHidden: number | null = null;
+
+  if (!inspectWorkingTree) {
+    warnings.push(
+      "cleanliness was not probed: this checkout was selected by the caller, and inspecting a " +
+        "working tree can execute repository-defined behaviour. Revision identity is reported; " +
+        "cleanliness is indeterminate and this source cannot be certified"
+    );
+  } else {
+  const status = await gitProbe(checkout, STATUS_ARGS);
   if (!status.ok) {
     const cause = status.timedOut ? ` (git status exceeded ${GIT_TIMEOUT_MS}ms)` : "";
     warnings.push(
@@ -292,7 +338,6 @@ export async function describeSourceRevision(
   // skip-worktree. This is the fifth mechanism by which the probed repository could hide its
   // own state from the probe; like the others, the answer is to look anyway.
   const lsFiles = await gitProbe(checkout, ["ls-files", "-v"]);
-  let indexHidden: number | null = null;
   if (!lsFiles.ok) {
     const why = lsFiles.truncated
       ? " (the index listing was too large to read in full)"
@@ -313,6 +358,7 @@ export async function describeSourceRevision(
         `${indexHidden} tracked path(s) carry assume-unchanged or skip-worktree, so git omits them from status; this checkout may hold modifications that cannot be seen`
       );
     }
+  }
   }
 
   let behind: number | null = null;
@@ -369,12 +415,20 @@ export async function describeSourceRevision(
   }
 
   // Local faithfulness only. Remote currency is deliberately excluded: see `remote_currency`.
+  // `inspectWorkingTree` is not redundant with the null checks: it states the intent directly, so
+  // a future change that gives these fields a non-null default cannot quietly re-certify an
+  // uninspected source.
   const trustworthy =
-    dirty === false && indexHidden === 0 && behind === 0 && ahead === 0;
+    inspectWorkingTree &&
+    dirty === false &&
+    indexHidden === 0 &&
+    behind === 0 &&
+    ahead === 0;
 
   return {
     source_checkout: checkout,
     resolved_from: resolvedFrom,
+    source_provenance: provenance,
     source_revision: revision,
     source_ref: ref,
     upstream,

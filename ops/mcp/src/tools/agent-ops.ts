@@ -17,6 +17,7 @@ import { buildRepoMap } from "../diagnostics/repo-map.js";
 import {
   describeSourceRevision,
   worktreeFingerprint,
+  type SourceProvenance,
 } from "../diagnostics/source-revision.js";
 import {
   buildAgentContextSpineView,
@@ -57,17 +58,18 @@ export function registerAgentOpsTools(
   // stale relative to the tree holding it — precisely the condition worth surfacing.
   async function repoDerived(
     build: () => Record<string, unknown> | Promise<Record<string, unknown>>,
-    root?: string
+    root?: string,
+    provenance: SourceProvenance = "controlled"
   ): Promise<{ content: { type: "text"; text: string }[] }> {
     // `root` stays undefined for the ordinary case so describeSourceRevision resolves it the
     // way it actually was — ICN_ROOT or the server's location. Defaulting it to repoRoot here
     // and passing that on would make every response claim `explicit_root`, which is only true
     // of the caller-lane case.
     const target = root ?? repoRoot;
-    const before = await worktreeFingerprint(target);
+    const before = await worktreeFingerprint(target, provenance);
     const payload = await build();
-    const source = await describeSourceRevision(root);
-    const after = await worktreeFingerprint(target);
+    const source = await describeSourceRevision(root, provenance);
+    const after = await worktreeFingerprint(target, provenance);
     if (before === null || after === null || before !== after) {
       source.trustworthy = false;
       source.warnings.push(
@@ -192,7 +194,15 @@ export function registerAgentOpsTools(
       // Pass the lane only when discovery actually found one. When it falls back to repoRoot,
       // the root was NOT explicitly chosen — it came from ICN_ROOT or the server's location, and
       // the stamp should say so rather than claiming this call site picked it.
-      }, identity?.worktree_path);
+      //
+      // This is the ONLY tool that resolves its root from client input, which makes it the only
+      // one whose checkout is untrusted. `cwd` is what the caller supplied; when they supplied
+      // it and it resolved to a lane, the resulting tree is theirs to configure, so its working
+      // tree is never inspected (see SourceProvenance). Falling back to repoRoot, or resolving
+      // from the server's own cwd, is operator-controlled and keeps full inspection.
+      },
+      identity?.worktree_path,
+      cwd !== undefined && identity ? "caller_selected" : "controlled");
     }
   );
 

@@ -316,6 +316,106 @@ describe("wasTruncated — a shortened probe result is not a smaller result", ()
   });
 });
 
+// THE SAFETY BRIDGE (R1-A). Inspecting a working tree makes git apply repository-controlled
+// behaviour to its contents: `.gitattributes` plus `filter.<driver>.clean` is executed by
+// `git status`. That is not a bounded set of knobs, so the bridge does not try to disable them
+// one by one — it declines to inspect the working tree of a checkout the caller chose.
+// Removing the dependence on caller working trees entirely is R1-B.
+describe("the safety bridge — a caller-selected checkout is not inspected", () => {
+  /** A repo whose clean filter writes a sentinel file when git runs it. */
+  function repoWithSideEffectingCleanFilter(): { repo: string; sentinel: string } {
+    const repo = tempDir("evil-filter");
+    git(repo, "init", ".");
+    writeFileSync(path.join(repo, "payload.txt"), "original\n");
+    git(repo, "add", "payload.txt");
+    git(repo, "commit", "-m", "init");
+    writeFileSync(path.join(repo, ".gitattributes"), "* filter=evil\n");
+    git(repo, "add", ".gitattributes");
+    git(repo, "commit", "-m", "attrs");
+
+    const sentinel = path.join(repo, "FILTER_EXECUTED");
+    git(repo, "config", "filter.evil.clean", `sh -c 'echo ran > "${sentinel}"; cat'`);
+    // Modify the file so a cleanliness probe has to convert its contents.
+    writeFileSync(path.join(repo, "payload.txt"), "modified\n");
+    return { repo, sentinel };
+  }
+
+  it("control: git really does execute the clean filter during a status probe", () => {
+    const { repo, sentinel } = repoWithSideEffectingCleanFilter();
+    execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], {
+      cwd: repo,
+      stdio: "ignore",
+    });
+    // Without this, the assertions below could pass on a git that never ran the filter at all.
+    expect(existsSync(sentinel), "control: the filter must be executable via status").toBe(true);
+  });
+
+  it("does not execute a repository-defined clean filter for a caller-selected root", async () => {
+    const { repo, sentinel } = repoWithSideEffectingCleanFilter();
+
+    const s = await describeSourceRevision(repo, "caller_selected");
+
+    expect(existsSync(sentinel), "no repository-defined code may run for a caller-selected root")
+      .toBe(false);
+    // Revision identity survives: it came from ref reads, which execute nothing.
+    expect(s.source_revision).toBe(git(repo, "rev-parse", "HEAD"));
+    expect(s.source_provenance).toBe("caller_selected");
+    // Cleanliness is indeterminate — null, not false — and nothing is certified from it.
+    expect(s.dirty).toBeNull();
+    expect(s.dirty_paths).toBeNull();
+    expect(s.index_hidden_paths).toBeNull();
+    expect(s.trustworthy).toBe(false);
+    expect(s.warnings.join(" ")).toMatch(/cleanliness was not probed/);
+  });
+
+  it("still inspects an operator-controlled root, so the gate is what does the work", async () => {
+    const { repo, sentinel } = repoWithSideEffectingCleanFilter();
+    const s = await describeSourceRevision(repo, "controlled");
+    // The contrast matters: if nothing inspected the tree in either mode, the assertion above
+    // would hold for the wrong reason. Controlled sources ARE inspected.
+    expect(existsSync(sentinel)).toBe(true);
+    expect(s.dirty).not.toBeNull();
+  });
+
+  // End-to-end through the only tool that resolves its root from client input. The unit test
+  // above proves the primitive declines; this proves the tool actually asks it to.
+  it("icn_ops_agent_runtime does not execute the filter for a cwd the caller supplied", async () => {
+    const { repo, sentinel } = repoWithSideEffectingCleanFilter();
+    const savedRoot = process.env["ICN_ROOT"];
+    const host = originWithClone().clone;
+    process.env["ICN_ROOT"] = host;
+    try {
+      const server = new McpServer({ name: "icn-ops-test", version: "0.0.0" });
+      registerAgentOpsTools(server);
+      const [ct, st] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "test-client", version: "0.0.0" });
+      await Promise.all([server.connect(st), client.connect(ct)]);
+
+      const res = (await client.callTool({
+        name: "icn_ops_agent_runtime",
+        arguments: { cwd: repo, section: "session" },
+      })) as { content: Array<{ type: string; text: string }> };
+      const body = JSON.parse(res.content[0]?.text ?? "{}") as Record<string, unknown>;
+      const source = body["source"] as Record<string, unknown>;
+
+      expect(existsSync(sentinel), "the tool must not execute caller-repo code").toBe(false);
+      expect(source?.["source_provenance"]).toBe("caller_selected");
+      expect(source?.["dirty"]).toBeNull();
+      expect(source?.["trustworthy"]).toBe(false);
+    } finally {
+      if (savedRoot === undefined) delete process.env["ICN_ROOT"];
+      else process.env["ICN_ROOT"] = savedRoot;
+    }
+  });
+
+  it("a caller-selected fingerprint covers the commit without reading the tree", async () => {
+    const { repo, sentinel } = repoWithSideEffectingCleanFilter();
+    const fp = await worktreeFingerprint(repo, "caller_selected");
+    expect(existsSync(sentinel)).toBe(false);
+    expect(fp).toBe(`${git(repo, "rev-parse", "HEAD")}:worktree-not-inspected`);
+  });
+});
+
 // Repository config must not be able to decide how thoroughly the repository is inspected.
 describe("describeSourceRevision — repository config cannot suppress the cleanliness check", () => {
   it("sees untracked files even when status.showUntrackedFiles=no", async () => {
