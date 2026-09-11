@@ -36,7 +36,12 @@ pub use apps::{
     Reducer, Request, Response, RuntimeError, Service, StateDelta, StateSnapshot,
 };
 pub mod data_dir_lock;
+pub use data_dir_lock::refuse_if_new_files_would_not_belong_to_the_data_root_account;
 pub use data_dir_lock::DataDirLock;
+#[cfg(unix)]
+pub use data_dir_lock::{classify_ownership_transfer, AccessIdentity, OwnershipTransfer};
+#[cfg(unix)]
+pub use data_dir_lock::{data_root_account, identity_new_files_receive};
 
 pub use config::{Config, GenesisBundle, InitialContract, InitialCoop, GENESIS_SCHEMA_VERSION};
 pub use dead_letter::{DeadLetterQueue, EntryStatus, FailedOperation, FailureType};

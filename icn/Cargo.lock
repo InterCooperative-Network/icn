@@ -4058,6 +4058,7 @@ dependencies = [
  "icn-store",
  "icn-trust",
  "icn-trust-app",
+ "libc",
  "rpassword",
  "rustls",
  "serde_json",

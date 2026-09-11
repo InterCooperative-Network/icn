@@ -616,6 +616,171 @@ impl Drop for DataDirLock {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Who new files in a directory actually belong to.
+//
+// This lives here, beside the lock, because it is the lock's own invariant: the
+// coordination files are created on acquisition, retained after release, and
+// mode 0600, so creating one under an account that does not own the directory
+// leaves a file the owning account cannot reopen — and this crate fails closed
+// on exactly that, so the daemon then refuses to start.
+//
+// Defined once. It was previously an `icnctl` detail, which left `icnd` — the
+// other party to this very exclusion domain — creating both of its locks with
+// no such check.
+// ---------------------------------------------------------------------------
+
+/// The access identity a file carries: the owner and group that, together with
+/// the mode bits, decide which accounts may read it.
+///
+/// Captured from the inode rather than from the process, deliberately. A file
+/// created in a setgid directory takes the *directory's* group, not the
+/// creator's, so asking "what does a new file here actually get?" answers a
+/// question `geteuid`/`getegid` cannot.
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AccessIdentity {
+    pub uid: u32,
+    pub gid: u32,
+}
+
+#[cfg(unix)]
+impl AccessIdentity {
+    pub fn of(meta: &std::fs::Metadata) -> Self {
+        use std::os::unix::fs::MetadataExt as _;
+        Self {
+            uid: meta.uid(),
+            gid: meta.gid(),
+        }
+    }
+}
+
+#[cfg(unix)]
+impl std::fmt::Display for AccessIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "uid {} gid {}", self.uid, self.gid)
+    }
+}
+
+/// What replacing a file with a newly created one would do to its access
+/// identity.
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OwnershipTransfer {
+    /// The replacement carries the same owner and group. Who may read the file
+    /// is unchanged.
+    Preserved,
+    /// The replacement would be owned by a different account, so accounts that
+    /// could read the file may no longer be able to.
+    WouldChange {
+        existing: AccessIdentity,
+        replacement: AccessIdentity,
+    },
+}
+
+/// The policy, as a pure function.
+///
+/// Separated from every filesystem call on purpose: an unprivileged test
+/// process cannot create a file owned by another account, but it can — and
+/// does — drive this with identities it could never construct on disk.
+#[cfg(unix)]
+pub fn classify_ownership_transfer(
+    existing: AccessIdentity,
+    replacement: AccessIdentity,
+) -> OwnershipTransfer {
+    if existing == replacement {
+        OwnershipTransfer::Preserved
+    } else {
+        OwnershipTransfer::WouldChange {
+            existing,
+            replacement,
+        }
+    }
+}
+
+/// Who owns the directory state actually lands in.
+///
+/// `metadata`, not `symlink_metadata`: a data root is the one ownership
+/// question that must **follow** a link, because `--data-dir` naming a symlink
+/// is an ordinary deployment and a symlink carries its own uid/gid. Reading the
+/// link would compare the link's owner against files created in the target.
+#[cfg(unix)]
+pub fn data_root_account(dir: &Path) -> std::io::Result<AccessIdentity> {
+    std::fs::metadata(dir).map(|m| AccessIdentity::of(&m))
+}
+
+/// What accounts new files in this directory are actually created with.
+///
+/// A transient probe rather than a computation: it costs one `create_new` and
+/// one unlink, and it observes the same thing an acquisition will experience,
+/// including the setgid case a `getegid` answer would get wrong.
+#[cfg(unix)]
+pub fn identity_new_files_receive(dir: &Path) -> Result<AccessIdentity> {
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let probe = dir.join(format!(
+        ".icn-runtime-root-identity-probe.{}",
+        std::process::id()
+    ));
+    // Cleared first, then created with `create_new` — which is `O_CREAT|O_EXCL`
+    // and so refuses to follow a symlink, dangling or not, if one is planted
+    // between the two.
+    let _ = std::fs::remove_file(&probe);
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&probe)
+        .with_context(|| {
+            format!(
+                "Refusing to proceed: could not create {} to determine which account new files \
+                 in this directory are owned by",
+                probe.display()
+            )
+        })?;
+    let identity = std::fs::symlink_metadata(&probe)
+        .map(|m| AccessIdentity::of(&m))
+        .with_context(|| format!("Failed to inspect {}", probe.display()));
+    let _ = std::fs::remove_file(&probe);
+    identity
+}
+
+/// Refuse when this account would create files the owning account cannot use.
+///
+/// Call before any *creating* acquisition. A root that does not exist yet is
+/// passed through, so a caller that creates its own directory keeps its own
+/// clearer error.
+#[cfg(unix)]
+pub fn refuse_if_new_files_would_not_belong_to_the_data_root_account(dir: &Path) -> Result<()> {
+    let root_owner = match data_root_account(dir) {
+        Ok(identity) => identity,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e).with_context(|| format!("Failed to inspect {}", dir.display())),
+    };
+    if let OwnershipTransfer::WouldChange {
+        existing,
+        replacement,
+    } = classify_ownership_transfer(root_owner, identity_new_files_receive(dir)?)
+    {
+        bail!(
+            "Refusing to proceed: this account would create files in {} that the account \
+             owning it cannot use.\n\
+             The directory belongs to {existing}, but new files in it are created as \
+             {replacement}.\n\
+             The coordination files this takes are retained after release and mode 0600, so \
+             the owning account could not reopen them and the daemon would refuse to start. \
+             Re-run as the owning account (`sudo -u <owner>` / `runuser -u <owner>`), or hand \
+             the directory to this account deliberately first.",
+            dir.display()
+        );
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+pub fn refuse_if_new_files_would_not_belong_to_the_data_root_account(_dir: &Path) -> Result<()> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

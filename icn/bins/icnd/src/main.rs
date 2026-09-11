@@ -594,12 +594,50 @@ async fn main() -> Result<()> {
     let pre_config_lock = match &args.config {
         // `--validate-config` parses, prints a verdict and exits: it starts no
         // daemon and retains no interpretation of these bytes, so there is
-        // nothing for a ceremony to invalidate and nothing to exclude. Taking
-        // the lock here made the documented validation-only command unusable
-        // wherever the account can read a configuration directory it may not
-        // write — a root-owned `/etc/icn` inspected by a service or CI account,
-        // which is an ordinary layout.
-        Some(_) if args.validate_config => None,
+        // nothing for a ceremony to invalidate.
+        //
+        // It does still *read* the file, though, and `Config::to_file` rewrites
+        // it with a plain `fs::write`. Overlapping a `federation add`/`remove`/
+        // `set` it could read inside the truncate window and reject a perfectly
+        // valid configuration on timing alone — so it joins the reader domain
+        // rather than skipping it.
+        //
+        // Joining only, never creating. The original exemption existed because
+        // taking a creating lock made this command unusable wherever the
+        // account can read a configuration directory it may not write — a
+        // root-owned `/etc/icn` inspected by a service or CI account, which is
+        // an ordinary layout. That case is preserved: with no lock file to
+        // join, validation proceeds exactly as it did before this domain
+        // existed, rather than refusing a read it is entitled to make.
+        Some(config_path) if args.validate_config => {
+            let resolved =
+                std::fs::canonicalize(config_path).unwrap_or_else(|_| config_path.clone());
+            let root = resolved
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            let lock_path = icn_core::DataDirLock::config_lock_path(&root);
+            // Only absence means "nothing to join"; an unreadable answer is not
+            // evidence that no lock exists.
+            match std::fs::symlink_metadata(&lock_path) {
+                Ok(_) => Some(
+                    icn_core::DataDirLock::acquire_config_shared_without_creating(
+                        &root,
+                        "the daemon validating a configuration",
+                    )?,
+                ),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => {
+                    return Err(e).with_context(|| {
+                        format!(
+                            "Could not determine whether the configuration lock {} exists",
+                            lock_path.display()
+                        )
+                    })
+                }
+            }
+        }
         Some(config_path) => {
             // Canonicalize the FILE first, then take its parent.
             //
@@ -819,6 +857,17 @@ async fn main() -> Result<()> {
     // daemons taking these roots in opposite orders get an immediate refusal on
     // one side rather than a hang.
     let _config_root_lock = pre_config_lock;
+    // The daemon is the other party to this exclusion domain, and its
+    // acquisition creates the lock: retained after release, mode 0600. Launched
+    // as `root` against a service-owned root whose lock is absent — including a
+    // start that then fails opening stores — it would leave a file the `icn`
+    // account cannot reopen, and this crate fails closed on exactly that, so
+    // the service would refuse to start until an operator repaired it.
+    //
+    // `icnctl`'s creating acquisitions have asked this question for several
+    // commits; the daemon's did not, because the rule lived in `icnctl`. It now
+    // lives beside the lock and both binaries ask it.
+    icn_core::refuse_if_new_files_would_not_belong_to_the_data_root_account(&config.data_dir)?;
     let _data_dir_lock = icn_core::DataDirLock::acquire(&config.data_dir, "the daemon")?;
 
     // N2-A startup gate (#2627). `Did` equality now names the principal, not

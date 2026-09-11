@@ -351,7 +351,16 @@
 //! are not the same claim.
 
 use anyhow::{bail, Context, Result};
+// The ownership policy and its probe live beside the lock they protect, so
+// `icnd` — the other party to this exclusion domain — asks the same question.
+// Only the ceremony-specific *wording* stays here: the rule is one definition,
+// the diagnosis is the caller's.
 use clap::Subcommand;
+#[cfg(unix)]
+use icn_core::{
+    classify_ownership_transfer, data_root_account, identity_new_files_receive, AccessIdentity,
+    OwnershipTransfer,
+};
 use icn_identity::{AgeKeyStore, Did, KeyStore};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -1521,28 +1530,6 @@ impl Drop for ObserverGuard {
 /// answer is no and no lock exists, inspection refuses rather than proceeding
 /// unlocked — being outside the exclusion domain is the failure this whole
 /// mechanism exists to prevent.
-/// Who owns the directory state actually lands in.
-///
-/// `metadata`, not `symlink_metadata`: the data root is the one ownership
-/// question in this file that must **follow** a link. Every file-level check
-/// deliberately does not — a symlink where a keystore or a configuration
-/// belongs is state to report, not to follow.
-///
-/// A data root is different. `--data-dir` naming a symlink is an ordinary
-/// deployment (`/var/lib/icn` pointing at a storage volume), and a symlink
-/// carries its own uid/gid, usually the account that created it. Reading the
-/// link would compare the *link's* owner against files created in the
-/// *target* — so a root-owned link to an `icn`-owned directory would refuse
-/// the very account that should be running the ceremony.
-///
-/// Deliberately shared by both callers, and deliberately raw: the follow
-/// decision is the part that must never diverge, while each caller keeps its
-/// own error policy for a root that is missing or unreadable.
-#[cfg(unix)]
-fn data_root_account(data_dir: &Path) -> std::io::Result<AccessIdentity> {
-    std::fs::metadata(data_dir).map(|m| AccessIdentity::of(&m))
-}
-
 #[cfg(unix)]
 fn inspection_may_create_the_lock(data_dir: &Path) -> Result<bool> {
     let owner = data_root_account(data_dir)
@@ -2558,74 +2545,6 @@ fn verify_durable_state(
     Ok(())
 }
 
-/// The access identity a file carries: the owner and group that, together with
-/// the mode bits, decide which accounts may read it.
-///
-/// Captured from the inode rather than from the process, deliberately. A file
-/// created in a setgid directory takes the *directory's* group, not the
-/// creator's, so asking "what does a new file here actually get?" answers a
-/// question `geteuid`/`getegid` cannot.
-#[cfg(unix)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct AccessIdentity {
-    uid: u32,
-    gid: u32,
-}
-
-#[cfg(unix)]
-impl AccessIdentity {
-    fn of(meta: &std::fs::Metadata) -> Self {
-        use std::os::unix::fs::MetadataExt as _;
-        Self {
-            uid: meta.uid(),
-            gid: meta.gid(),
-        }
-    }
-}
-
-#[cfg(unix)]
-impl std::fmt::Display for AccessIdentity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "uid {} gid {}", self.uid, self.gid)
-    }
-}
-
-/// What replacing a file with a newly created one would do to its access
-/// identity.
-#[cfg(unix)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OwnershipTransfer {
-    /// The replacement carries the same owner and group. Who may read the file
-    /// is unchanged.
-    Preserved,
-    /// The replacement would be owned by a different account, so accounts that
-    /// could read the file may no longer be able to.
-    WouldChange {
-        existing: AccessIdentity,
-        replacement: AccessIdentity,
-    },
-}
-
-/// The policy, as a pure function.
-///
-/// Separated from every filesystem call on purpose: an unprivileged test
-/// process cannot create a file owned by another account, but it can — and
-/// does — drive this with identities it could never construct on disk.
-#[cfg(unix)]
-fn classify_ownership_transfer(
-    existing: AccessIdentity,
-    replacement: AccessIdentity,
-) -> OwnershipTransfer {
-    if existing == replacement {
-        OwnershipTransfer::Preserved
-    } else {
-        OwnershipTransfer::WouldChange {
-            existing,
-            replacement,
-        }
-    }
-}
-
 /// Why this refuses rather than restoring the ownership itself.
 ///
 /// Atomic publication replaces the inode, so the new file's owner and group
@@ -3132,43 +3051,6 @@ fn refuse_if_the_configuration_belongs_to_another_account(data_dir: &Path) -> Re
 #[cfg(not(unix))]
 fn refuse_if_the_configuration_belongs_to_another_account(_data_dir: &Path) -> Result<()> {
     Ok(())
-}
-
-/// What accounts new files in this directory are actually created with.
-///
-/// A transient probe rather than a computation: it costs one `create_new` and
-/// one unlink, and it observes the same thing publication will experience,
-/// including the setgid case a `getegid` answer would get wrong. It runs during
-/// preflight so an account mismatch is refused *before* key material is minted,
-/// rather than at publication with a half-provisioned directory left behind.
-#[cfg(unix)]
-fn identity_new_files_receive(dir: &Path) -> Result<AccessIdentity> {
-    use std::os::unix::fs::OpenOptionsExt as _;
-    let probe = dir.join(format!(
-        ".icn-runtime-root-identity-probe.{}",
-        std::process::id()
-    ));
-    // Cleared first, then created with `create_new` — which is `O_CREAT|O_EXCL`
-    // and so refuses to follow a symlink, dangling or not, if one is planted
-    // between the two.
-    let _ = std::fs::remove_file(&probe);
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(&probe)
-        .with_context(|| {
-            format!(
-                "Refusing to proceed: could not create {} to determine which account new files \
-                 in this directory are owned by",
-                probe.display()
-            )
-        })?;
-    let identity = std::fs::symlink_metadata(&probe)
-        .map(|m| AccessIdentity::of(&m))
-        .with_context(|| format!("Failed to inspect {}", probe.display()));
-    let _ = std::fs::remove_file(&probe);
-    identity
 }
 
 /// Link the treasury identity into the configuration the daemon will read.
