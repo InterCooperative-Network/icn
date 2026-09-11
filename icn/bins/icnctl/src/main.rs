@@ -2284,7 +2284,7 @@ fn is_root_coordination_file(relative: &Path) -> bool {
 /// changes is membership of the domain a holder can be in **without** holding
 /// sled handles — the ceremony between its phases, and `restore`.
 enum StorageDomain {
-    /// The root exists and this process holds its storage lock.
+    /// The root exists, is a directory, and this process holds its storage lock.
     Held {
         /// Held for the whole command. Never read; dropping it is the release.
         _storage: icn_core::DataDirLock,
@@ -2295,20 +2295,57 @@ enum StorageDomain {
         /// containment has to be judged against.
         canonical_root: PathBuf,
     },
-    /// The root did not exist when the command started.
+    /// There is no directory here to hold, so nothing is held — and, critically,
+    /// nothing may be opened either.
     ///
-    /// There is no state to open and no holder to exclude, and these commands
-    /// are contracted to report an empty result rather than materialize
-    /// anything — `report_on_missing_ledger_store_reports_empty` pins that, and
-    /// creating a root merely to hold a lock in it would be the retained-file
-    /// poisoning this whole mechanism exists to avoid.
+    /// Two shapes reach this, and both are cases where taking a lock would be
+    /// the wrong answer rather than a missing one:
     ///
-    /// The window that leaves — a ceremony creating the root immediately
-    /// afterwards — is closed at the only place it could matter:
-    /// [`Self::open_store`] refuses here rather than opening unlocked. So an
-    /// absent root can never become a way *into* the stores; it can only be a
-    /// way to report that there are none.
-    AbsentRoot { data_dir: PathBuf },
+    /// * **the root does not exist.** These commands are contracted to report an
+    ///   empty result rather than materialize anything —
+    ///   `report_on_missing_ledger_store_reports_empty` pins that — and creating
+    ///   a root merely to hold a lock in it would be the retained-file poisoning
+    ///   this whole mechanism exists to avoid.
+    /// * **the path is not a directory.** A misconfigured `--data-dir` is the
+    ///   N2-A gate's refusal to make, and it makes it by name
+    ///   (`a_data_dir_that_is_not_a_directory_is_refused_not_skipped`). Probing
+    ///   the account of a regular file would report `ENOTDIR` from a probe file
+    ///   instead, burying the actual operator error under a coordination detail.
+    ///
+    /// The window either shape leaves — something creating a real directory at
+    /// that path immediately afterwards — is closed at [`Self::open_store`],
+    /// which refuses here rather than opening unlocked. Nothing to hold can
+    /// never become a way *into* the stores.
+    Unheld {
+        data_dir: PathBuf,
+        why: &'static str,
+    },
+}
+
+/// What is actually at a `--data-dir` path.
+///
+/// Classified explicitly rather than through `Path::is_dir`, which reports a
+/// permission or traversal error as "not a directory" — and being unable to tell
+/// what is there is not evidence about what is there.
+enum RootShape {
+    Directory,
+    Absent,
+    NotADirectory,
+}
+
+fn classify_root(data_dir: &Path, holder: &str) -> Result<RootShape> {
+    match std::fs::metadata(data_dir) {
+        Ok(meta) if meta.is_dir() => Ok(RootShape::Directory),
+        Ok(_) => Ok(RootShape::NotADirectory),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(RootShape::Absent),
+        Err(e) => Err(e).with_context(|| {
+            format!(
+                "Refusing to run {holder}: could not determine what is at the data directory \
+                 {}, so it cannot be established that no other ICN process holds it",
+                data_dir.display()
+            )
+        }),
+    }
 }
 
 impl StorageDomain {
@@ -2322,29 +2359,25 @@ impl StorageDomain {
     /// outcomes — create, join, refuse — are the primitive's, not this
     /// caller's.
     fn join(data_dir: &Path, holder: &str) -> Result<Self> {
-        // Classified explicitly rather than through `Path::exists`, which
-        // reports a permission or traversal error as absence — and "I could not
-        // tell whether this root exists" is not evidence that it does not.
-        match std::fs::metadata(data_dir) {
-            Ok(_) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(Self::AbsentRoot {
-                    data_dir: data_dir.to_path_buf(),
-                })
+        let unheld = |why| {
+            Ok(Self::Unheld {
+                data_dir: data_dir.to_path_buf(),
+                why,
+            })
+        };
+        match classify_root(data_dir, holder)? {
+            RootShape::Directory => {
+                let storage = icn_core::DataDirLock::acquire_joining_or_creating(data_dir, holder)?;
+                Self::held(storage, data_dir)
             }
-            Err(e) => {
-                return Err(e).with_context(|| {
-                    format!(
-                        "Refusing to run {holder}: could not determine whether the data \
-                         directory {} exists, so it cannot be established that no other ICN \
-                         process holds it",
-                        data_dir.display()
-                    )
-                })
+            RootShape::Absent => {
+                unheld("the data directory did not exist when this command started")
             }
+            // Left to the N2-A gate on the next line, which refuses a
+            // misconfigured `--data-dir` by name. Probing this path's account
+            // first would replace that refusal with `ENOTDIR` from a probe file.
+            RootShape::NotADirectory => unheld("the --data-dir path is not a directory"),
         }
-        let storage = icn_core::DataDirLock::acquire_joining_or_creating(data_dir, holder)?;
-        Self::held(storage, data_dir)
     }
 
     /// Take the domain for a command that provisions the root itself.
@@ -2355,6 +2388,15 @@ impl StorageDomain {
     /// legitimately creates the directory, so there is no owning account to
     /// defer to yet.
     fn create(data_dir: &Path, holder: &str) -> Result<Self> {
+        // A non-directory path is the gate's refusal here too. `create`
+        // legitimately makes the root when it is absent, so only that one shape
+        // is diverted.
+        if matches!(classify_root(data_dir, holder)?, RootShape::NotADirectory) {
+            return Ok(Self::Unheld {
+                data_dir: data_dir.to_path_buf(),
+                why: "the --data-dir path is not a directory",
+            });
+        }
         institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
             data_dir,
         )?;
@@ -2380,7 +2422,7 @@ impl StorageDomain {
     /// The data directory as the caller spelled it.
     fn data_dir(&self) -> &Path {
         match self {
-            Self::Held { data_dir, .. } | Self::AbsentRoot { data_dir } => data_dir,
+            Self::Held { data_dir, .. } | Self::Unheld { data_dir, .. } => data_dir,
         }
     }
 
@@ -2397,11 +2439,15 @@ impl StorageDomain {
     /// not addressed here.
     fn open_store(&self, db: &Path) -> Result<SledStore> {
         let Self::Held { canonical_root, .. } = self else {
+            let why = match self {
+                Self::Unheld { why, .. } => *why,
+                Self::Held { .. } => unreachable!(),
+            };
             bail!(
-                "Refusing to open the store at {}: the data directory {} did not exist when \
-                 this command started, so no exclusion was taken over it. Something has \
-                 created it since — a provisioning ceremony, most likely — and opening it now \
-                 would proceed with no exclusion at all. Re-run once that has finished.",
+                "Refusing to open the store at {}: no exclusion was taken over the data \
+                 directory {}, because {why}. Opening it now would proceed with no exclusion \
+                 at all — something has put a real directory there since this command \
+                 started, a provisioning ceremony most likely. Re-run once that has finished.",
                 db.display(),
                 self.data_dir().display()
             );
@@ -14421,9 +14467,40 @@ mod exclusion_domain_tests {
             Err(e) => e,
         };
         assert!(
-            format!("{err:#}").contains("no exclusion was taken"),
+            format!("{err:#}").contains("no exclusion was taken over the data directory"),
             "the refusal must say why: {err:#}"
         );
+    }
+
+    /// A misconfigured `--data-dir` stays the N2-A gate's refusal to make.
+    ///
+    /// Joining the domain happens before the gate, so the join must not be what
+    /// speaks for a path that is not a directory. It did: probing the account of
+    /// a regular file reported `ENOTDIR` from a probe filename, burying the
+    /// operator's actual mistake under a coordination detail and breaking
+    /// `a_data_dir_that_is_not_a_directory_is_refused_not_skipped`. Holding
+    /// nothing here is correct; opening anything is not.
+    #[test]
+    fn a_data_dir_that_is_not_a_directory_holds_nothing_and_opens_nothing() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let not_a_dir = scratch.path().join("data-dir-is-a-file");
+        std::fs::write(&not_a_dir, b"oops").unwrap();
+
+        // The join itself must succeed and hold nothing, so the gate that runs
+        // next is what reports the misconfiguration.
+        let domain = StorageDomain::join(&not_a_dir, "coop maintenance")
+            .expect("a non-directory root must be left to the gate, not refused here");
+        let err = match domain.open_store(&not_a_dir.join("store").join("cooperative")) {
+            Ok(_) => panic!("a store under a non-directory root must not be opened"),
+            Err(e) => e,
+        };
+        assert!(
+            format!("{err:#}").contains("not a directory"),
+            "the refusal must name the shape it found: {err:#}"
+        );
+        // Nothing was minted beside it, and the file itself is untouched.
+        assert_eq!(std::fs::read(&not_a_dir).unwrap(), b"oops");
+        assert!(!scratch.path().join(".icn-data-dir.lock").exists());
     }
 
     /// The lock names a directory, so an open outside it is unprotected.
