@@ -3,6 +3,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { registerAgentOpsTools } from "../tools/agent-ops.js";
 import {
   readFileAtRevision,
   resolveCanonicalRepository,
@@ -277,5 +281,130 @@ describe("canonical reads — failure is explicit, never a workspace fallback", 
     const { repo, rev } = await canonical(f);
     const read = await readFileAtRevision(repo, rev, "../../../etc/passwd");
     expect(read.ok).toBe(false);
+  });
+});
+
+describe("canonical reads — content is returned exactly as committed", () => {
+  it("preserves leading and trailing whitespace", async () => {
+    const f = fixture("fidelity");
+    const body = "\n  {\"schema\":\"spaced\",\"nodes\":[],\"edges\":[]}  \n\n";
+    writeFileSync(path.join(f.work, ARTIFACT), body);
+    git(f.work, "add", ARTIFACT);
+    git(f.work, "commit", "-m", "whitespace");
+    git(f.work, "push", f.bare, "main");
+
+    process.env["ICN_ROOT"] = f.icnRoot;
+    const repo = await resolveCanonicalRepository();
+    expect(repo.ok).toBe(true);
+    if (!repo.ok) return;
+    const rev = await resolveRevision(repo.value, "refs/heads/main");
+    expect(rev.ok).toBe(true);
+    if (!rev.ok) return;
+
+    const read = await readFileAtRevision(repo.value, rev.value, ARTIFACT);
+    expect(read.ok).toBe(true);
+    // Trimming would silently change the committed bytes; content is not an identifier.
+    if (read.ok) expect(read.value).toBe(body);
+  });
+
+  it("refuses a blob too large to return intact rather than returning a shortened one", async () => {
+    const f = fixture("oversize");
+    // runCommand truncates oversized output and still reports success. For file content that
+    // makes a corrupted answer look like a smaller one, which is the fail-open shape this
+    // whole line of work keeps meeting.
+    //
+    // The size is chosen deliberately. runCommand sets execFile's maxBuffer to
+    // maxStdoutBytes + maxStderrBytes + 64 KiB, so a blob far above the limit makes the
+    // subprocess fail outright and never reaches the truncation branch at all — a test using
+    // one passed while the guard was mutated away. This sits in the window ABOVE the 8 MiB
+    // output cap but BELOW maxBuffer, which is where truncation-reported-as-success actually
+    // happens.
+    const big = "x".repeat(8 * 1024 * 1024 + 32 * 1024);
+    writeFileSync(path.join(f.work, "big.txt"), big);
+    git(f.work, "add", "big.txt");
+    git(f.work, "commit", "-m", "oversize");
+    git(f.work, "push", f.bare, "main");
+
+    process.env["ICN_ROOT"] = f.icnRoot;
+    const repo = await resolveCanonicalRepository();
+    expect(repo.ok).toBe(true);
+    if (!repo.ok) return;
+    const rev = await resolveRevision(repo.value, "refs/heads/main");
+    expect(rev.ok).toBe(true);
+    if (!rev.ok) return;
+
+    const read = await readFileAtRevision(repo.value, rev.value, "big.txt");
+    expect(read.ok).toBe(false);
+    if (!read.ok) expect(read.error.code).toBe("read_failed");
+  });
+
+  it("reports a storage failure as read_failed, not as an absent path", async () => {
+    const f = fixture("classify");
+    const { repo, rev } = await canonical(f);
+    // Destroy the object store: the path still exists in the tree, the bytes do not.
+    rmSync(path.join(f.bare, "objects"), { recursive: true, force: true });
+
+    const read = await readFileAtRevision(repo, rev, ARTIFACT);
+    expect(read.ok).toBe(false);
+    // Calling this "missing_path" would send an operator looking for a file that is committed.
+    if (!read.ok) expect(read.error.code).toBe("read_failed");
+  });
+});
+
+// End-to-end through the MCP handler. The unit tests above resolve `refs/heads/main`, but the
+// handler resolves `refs/remotes/origin/main` — so a wrong production ref could pass every unit
+// test while every real call failed. This fixture provides ONLY the production ref.
+describe("icn_ops_agent_context_spine — the production path", () => {
+  async function clientFor(icnRoot: string): Promise<Client> {
+    process.env["ICN_ROOT"] = icnRoot;
+    const server = new McpServer({ name: "icn-ops-test", version: "0.0.0" });
+    registerAgentOpsTools(server);
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([server.connect(st), client.connect(ct)]);
+    return client;
+  }
+
+  it("serves the spine from canonical storage at the production ref", async () => {
+    const f = fixture("e2e");
+    const head = git(f.work, "rev-parse", "HEAD");
+    // Only refs/remotes/origin/main resolves: refs/heads/main is removed, so a handler reading
+    // any other ref cannot succeed here.
+    git(f.bare, "update-ref", "refs/remotes/origin/main", head);
+    git(f.bare, "update-ref", "-d", "refs/heads/main");
+
+    const client = await clientFor(f.icnRoot);
+    const res = (await client.callTool({
+      name: "icn_ops_agent_context_spine",
+      arguments: {},
+    })) as { isError?: boolean; content: Array<{ type: string; text: string }> };
+
+    expect(res.isError).toBeFalsy();
+    const body = JSON.parse(res.content[0]?.text ?? "{}") as Record<string, unknown>;
+    const source = body["source"] as Record<string, unknown>;
+    expect(source?.["source_revision"]).toBe(head);
+    expect(source?.["worktree_consulted"]).toBe(false);
+    expect(source?.["ref"]).toBe("refs/remotes/origin/main");
+    expect(body["artifact"]).toBe(ARTIFACT);
+  });
+
+  it("fails closed as an MCP error when canonical storage is not configured", async () => {
+    const f = fixture("e2e-unconfigured");
+    writeFileSync(
+      path.join(f.icnRoot, "ops", "state", "config", "repo-map.json"),
+      JSON.stringify({ repos: { icn: { local: "." } } })
+    );
+
+    const client = await clientFor(f.icnRoot);
+    const res = (await client.callTool({
+      name: "icn_ops_agent_context_spine",
+      arguments: {},
+    })) as { isError?: boolean; content: Array<{ type: string; text: string }> };
+
+    // A refusal delivered as a successful call is an absent answer arriving as a passing one.
+    expect(res.isError).toBe(true);
+    const body = JSON.parse(res.content[0]?.text ?? "{}") as Record<string, unknown>;
+    expect(body["code"]).toBe("not_configured");
+    expect(body["worktree_consulted"]).toBe(false);
   });
 });

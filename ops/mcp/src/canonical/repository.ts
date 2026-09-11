@@ -43,6 +43,7 @@ import path from "node:path";
 import { resolveMonorepoRoot } from "../paths.js";
 import { GIT_SANITISED_ENV } from "../runtime/worktree-identity.js";
 import { runCommand } from "../utils/commands.js";
+import { wasTruncated } from "../diagnostics/source-revision.js";
 
 /**
  * A repository ICN controls, suitable for revision-addressed reads.
@@ -88,21 +89,42 @@ export type CanonicalResult<T> =
 const GIT_TIMEOUT_MS = 15_000;
 
 /**
+ * Output budget for one canonical read. Exceeding it is a FAILURE, not a shorter answer:
+ * runCommand truncates and still reports success, and a silently shortened file is a corrupted
+ * file, not a smaller one.
+ */
+const MAX_BLOB_BYTES = 8 * 1024 * 1024;
+
+/**
  * Canonical storage is read with the same hardening as every other git call, plus
  * GIT_NO_LAZY_FETCH: a store configured with a promisor remote could otherwise turn a missing
  * object into a network call to a helper. Canonical storage is ours, so this should never fire
  * — which is exactly why it costs nothing to assert.
  */
+type CanonicalProbe = {
+  ok: boolean;
+  /** Trimmed output, for reading identifiers such as a commit id. */
+  out: string;
+  /** Untrimmed output, for reading file CONTENT, where whitespace is part of the value. */
+  raw: string;
+  err: string;
+  timedOut: boolean;
+  truncated: boolean;
+};
+
 async function canonicalGit(
   gitDir: string,
-  args: readonly string[]
-): Promise<{ ok: boolean; out: string; err: string }> {
+  args: readonly string[],
+  /** Content reads must not be trimmed: committed whitespace is part of the file. */
+  opts: { raw?: boolean } = {}
+): Promise<CanonicalProbe> {
   const r = await runCommand(
     "git",
     ["--git-dir", gitDir, "-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null", ...args],
     {
+      trimStdout: opts.raw !== true,
       timeoutMs: GIT_TIMEOUT_MS,
-      maxStdoutBytes: 8 * 1024 * 1024,
+      maxStdoutBytes: MAX_BLOB_BYTES,
       maxStderrBytes: 16 * 1024,
       env: {
         ...GIT_SANITISED_ENV,
@@ -111,7 +133,14 @@ async function canonicalGit(
       },
     }
   );
-  return { ok: r.ok, out: r.stdout.trim(), err: r.stderr.trim() };
+  return {
+    ok: r.ok,
+    out: r.stdout.trim(),
+    raw: r.stdout,
+    err: r.stderr.trim(),
+    timedOut: r.timedOut,
+    truncated: wasTruncated(r.stdout),
+  };
 }
 
 /** Where canonical storage is declared, in the config ICN already owns. */
@@ -246,19 +275,52 @@ export async function readFileAtRevision(
     };
   }
 
-  const r = await canonicalGit(repo.gitDir, [
-    "cat-file",
-    "blob",
-    `${revision}:${normalised}`,
-  ]);
+  const r = await canonicalGit(
+    repo.gitDir,
+    ["cat-file", "blob", `${revision}:${normalised}`],
+    { raw: true }
+  );
+
   if (!r.ok) {
+    // "absent" and "could not be read" are different answers and lead to different repairs.
+    // Reporting a timeout or an unreadable object database as a missing path would send a
+    // caller looking for a file that is in fact right there.
+    const absent =
+      !r.timedOut &&
+      /does not exist|Not a valid object name|exists on disk, but not in/i.test(r.err);
+    if (absent) {
+      return {
+        ok: false,
+        error: {
+          code: "missing_path",
+          message: `${normalised} is not present at ${revision.slice(0, 12)} in canonical storage`,
+        },
+      };
+    }
     return {
       ok: false,
       error: {
-        code: "missing_path",
-        message: `${normalised} is not present at ${revision.slice(0, 12)} in canonical storage`,
+        code: "read_failed",
+        message:
+          `canonical store could not read ${normalised} at ${revision.slice(0, 12)}` +
+          (r.timedOut ? ` (timed out after ${GIT_TIMEOUT_MS}ms)` : r.err ? `: ${r.err}` : ""),
       },
     };
   }
-  return { ok: true, value: r.out };
+
+  // A truncated blob is a corrupted answer. Returning it as `ok` would hand a caller a
+  // silently shortened file — the same fail-open shape as reporting an unprobed tree clean.
+  if (r.truncated) {
+    return {
+      ok: false,
+      error: {
+        code: "read_failed",
+        message: `${normalised} at ${revision.slice(0, 12)} exceeds ${MAX_BLOB_BYTES} bytes and cannot be returned intact`,
+      },
+    };
+  }
+
+  // Untrimmed on purpose: this returns file CONTENT, and leading or trailing whitespace is part
+  // of the committed bytes. Only identifier reads above use the trimmed form.
+  return { ok: true, value: r.raw };
 }

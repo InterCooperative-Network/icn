@@ -82,8 +82,13 @@ export function registerAgentOpsTools(
   function canonicalUnavailable(error: {
     code: string;
     message: string;
-  }): { content: { type: "text"; text: string }[] } {
+  }): { content: { type: "text"; text: string }[]; isError: true } {
     return {
+      // MCP-level error, not just an `error` key in a successful payload. A client that relies
+      // on protocol error handling would otherwise read a fail-closed refusal as a successful
+      // call — an absent answer arriving as a passing one, which is the failure mode this
+      // whole line of work exists to remove.
+      isError: true,
       content: [
         {
           type: "text",
@@ -361,7 +366,7 @@ export function registerAgentOpsTools(
 
   server.tool(
     "icn_ops_agent_context_spine",
-    "Read-only view of the generated Agent Context Spine (docs/reference/project-index/generated/agent-context-spine.json): a non-canonical, evidence-grounded orientation map of crates, subsystems, docs, routes, invariants, claim surfaces, truth sources, skills/agents and MCP tools. Pass paths=[...] for a CODE-QUALITY BRIEF on changed files (subsystem, invariants, docs, verification commands, claim/API risk, recommended ICN skills/agents, review focus) — query this before editing or reviewing a change. Otherwise: no filter returns a summary; node=<id> returns one node + its incident edges (or a contains-match list); type/subsystem/path filter the node list. Never executes commands or mutates files. Structure is not runtime liveness; asserts no production/live/pilot readiness.",
+    "Read-only view of the generated Agent Context Spine (docs/reference/project-index/generated/agent-context-spine.json): a non-canonical, evidence-grounded orientation map of crates, subsystems, docs, routes, invariants, claim surfaces, truth sources, skills/agents and MCP tools. Pass paths=[...] for a CODE-QUALITY BRIEF on changed files (subsystem, invariants, docs, verification commands, claim/API risk, recommended ICN skills/agents, review focus) — query this before editing or reviewing a change. Otherwise: no filter returns a summary; node=<id> returns one node + its incident edges (or a contains-match list); type/subsystem/path filter the node list. Runs only bounded, non-mutating Git object reads against ICN-controlled canonical storage; never executes caller-supplied commands and never mutates files. Structure is not runtime liveness; asserts no production/live/pilot readiness.",
     {
       paths: z
         .array(z.string())
