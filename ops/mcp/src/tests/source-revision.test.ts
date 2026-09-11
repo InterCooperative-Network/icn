@@ -13,7 +13,10 @@ import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { describeSourceRevision } from "../diagnostics/source-revision.js";
+import {
+  describeSourceRevision,
+  worktreeFingerprint,
+} from "../diagnostics/source-revision.js";
 import { registerAgentOpsTools } from "../tools/agent-ops.js";
 
 // These tests build real git repositories in a temp directory rather than mocking git.
@@ -286,6 +289,51 @@ describe("describeSourceRevision — the environment cannot redirect the probe",
   });
 });
 
+// Repository config must not be able to decide how thoroughly the repository is inspected.
+describe("describeSourceRevision — repository config cannot suppress the cleanliness check", () => {
+  it("sees untracked files even when status.showUntrackedFiles=no", async () => {
+    const { clone } = originWithClone();
+    git(clone, "config", "status.showUntrackedFiles", "no");
+    writeFileSync(path.join(clone, "untracked-manifest.json"), "{}\n");
+
+    // Control: with the repository's own setting honoured, git reports nothing.
+    const suppressed = execFileSync("git", ["status", "--porcelain"], {
+      cwd: clone,
+      encoding: "utf-8",
+    }).trim();
+    expect(suppressed, "control: the config must actually suppress").toBe("");
+
+    const s = await describeSourceRevision(clone);
+    expect(s.dirty).toBe(true);
+    expect(s.dirty_paths).toBe(1);
+    expect(s.trustworthy).toBe(false);
+  });
+});
+
+// Guarding a read with HEAD alone misses a tree that was dirty during the read and cleaned
+// afterwards: the commit never moves, so two HEAD probes agree while the payload describes
+// content that no longer exists.
+describe("worktreeFingerprint — working-tree state is part of the guarded state", () => {
+  it("changes when the tree is dirtied and again when it is cleaned, with HEAD fixed", async () => {
+    const { clone } = originWithClone();
+    const head = git(clone, "rev-parse", "HEAD");
+
+    const clean = await worktreeFingerprint(clone);
+    writeFileSync(path.join(clone, "README.md"), "edited during the read\n");
+    const dirty = await worktreeFingerprint(clone);
+    execFileSync("git", ["restore", "README.md"], { cwd: clone, stdio: "ignore" });
+    const restored = await worktreeFingerprint(clone);
+
+    expect(git(clone, "rev-parse", "HEAD")).toBe(head); // HEAD never moved
+    expect(dirty).not.toBe(clean);
+    expect(restored).toBe(clean);
+  });
+
+  it("is null for a tree whose state cannot be determined", async () => {
+    expect(await worktreeFingerprint(tempDir("nonrepo"))).toBeNull();
+  });
+});
+
 // `git status` honours core.fsmonitor, which may name an executable. Callers supply the path
 // probed by icn_ops_agent_runtime, so an unguarded read-only diagnostic would run a binary of
 // the repository's choosing with the server's authority. This asserts the behaviour, not the
@@ -349,6 +397,10 @@ describe("icn_ops tools — the stamping policy", () => {
       expect(source?.["source_revision"]).toBe(git(repo, "rev-parse", "HEAD"));
       expect(source?.["source_checkout"]).toBe(repo);
       expect(source?.["trustworthy"]).toBe(true);
+      // Through the tool path the root is NOT explicitly supplied, so the stamp must report how
+      // it was really chosen. Defaulting the wrapper's root would make this claim explicit_root
+      // on every response and leave the other two values unreachable in practice.
+      expect(source?.["resolved_from"]).toBe("ICN_ROOT");
       // The payload itself must survive the stamp.
       expect(body["entries"]).toBeDefined();
     }

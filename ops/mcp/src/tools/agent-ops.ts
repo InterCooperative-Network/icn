@@ -16,7 +16,7 @@ import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
 import {
   describeSourceRevision,
-  headRevision,
+  worktreeFingerprint,
 } from "../diagnostics/source-revision.js";
 import {
   buildAgentContextSpineView,
@@ -57,16 +57,22 @@ export function registerAgentOpsTools(
   // stale relative to the tree holding it — precisely the condition worth surfacing.
   async function repoDerived(
     build: () => Record<string, unknown> | Promise<Record<string, unknown>>,
-    root: string = repoRoot
+    root?: string
   ): Promise<{ content: { type: "text"; text: string }[] }> {
-    const before = await headRevision(root);
+    // `root` stays undefined for the ordinary case so describeSourceRevision resolves it the
+    // way it actually was — ICN_ROOT or the server's location. Defaulting it to repoRoot here
+    // and passing that on would make every response claim `explicit_root`, which is only true
+    // of the caller-lane case.
+    const target = root ?? repoRoot;
+    const before = await worktreeFingerprint(target);
     const payload = await build();
     const source = await describeSourceRevision(root);
-    if (before !== source.source_revision) {
+    const after = await worktreeFingerprint(target);
+    if (before === null || after === null || before !== after) {
       source.trustworthy = false;
       source.warnings.push(
-        `HEAD moved from ${before ?? "unknown"} to ${source.source_revision ?? "unknown"} while ` +
-          "this answer was being read; the payload may describe a different revision than the stamp"
+        "the checkout's commit or working tree changed while this answer was being read, or " +
+          "could not be determined; the payload may describe state the stamp does not"
       );
     }
     return {

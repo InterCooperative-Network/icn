@@ -31,6 +31,7 @@
  *     not write to a tree it is only supposed to observe.
  */
 
+import { createHash } from "node:crypto";
 import { statSync } from "node:fs";
 import { resolveMonorepoRoot } from "../paths.js";
 import { GIT_SANITISED_ENV } from "../runtime/worktree-identity.js";
@@ -113,6 +114,14 @@ const UPSTREAM_STALE_AFTER_MS = 60 * 60 * 1000;
 // caller's git config being benign.
 const GIT_SAFE_FLAGS = ["-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null"] as const;
 
+/**
+ * `status.showUntrackedFiles=no` in the probed repository would hide untracked files, letting a
+ * tree holding uncommitted content report clean. The mode is passed explicitly so repository
+ * config cannot suppress the check — the same reasoning as disabling core.fsmonitor: a probe
+ * must not let the thing it is inspecting decide how thoroughly it is inspected.
+ */
+const STATUS_ARGS = ["status", "--porcelain", "--untracked-files=normal"] as const;
+
 type GitProbe = { ok: true; out: string } | { ok: false; timedOut: boolean };
 
 async function gitProbe(
@@ -139,6 +148,27 @@ async function git(cwd: string, args: readonly string[]): Promise<string | null>
 /** Resolve the current HEAD of a checkout, or null when it is not a readable git tree. */
 export async function headRevision(checkout: string): Promise<string | null> {
   return git(checkout, ["rev-parse", "HEAD"]);
+}
+
+/**
+ * A snapshot of everything a repository-derived payload could have been read from: the commit
+ * AND the working tree on top of it.
+ *
+ * Guarding a read with HEAD alone is not enough. A dirty tree can shape a payload and then be
+ * cleaned — `git restore`, `git reset --hard HEAD` — without HEAD ever moving, so the two
+ * revision probes agree while the payload describes content that no longer exists. Comparing
+ * this across the read closes that whole class rather than the commit-shaped instance of it.
+ *
+ * `null` means the state could not be determined, which never compares equal to anything.
+ */
+export async function worktreeFingerprint(
+  checkout: string
+): Promise<string | null> {
+  const head = await headRevision(checkout);
+  if (head === null) return null;
+  const status = await gitProbe(checkout, STATUS_ARGS);
+  if (!status.ok) return null;
+  return `${head}:${createHash("sha256").update(status.out).digest("hex")}`;
 }
 
 /** When the tracking refs were last updated from the remote, via FETCH_HEAD's mtime. */
@@ -205,7 +235,7 @@ export async function describeSourceRevision(
   // `git status --porcelain` prints one line per changed path and nothing when clean. A failed
   // probe is "unknown", never "clean" — reporting an undetermined tree as clean is the exact
   // failure this stamp exists to remove.
-  const status = await gitProbe(checkout, ["status", "--porcelain"]);
+  const status = await gitProbe(checkout, STATUS_ARGS);
   let dirty: boolean | null = null;
   let dirtyPaths: number | null = null;
   if (!status.ok) {
