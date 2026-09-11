@@ -1530,19 +1530,13 @@ impl Drop for ObserverGuard {
 /// answer is no and no lock exists, inspection refuses rather than proceeding
 /// unlocked — being outside the exclusion domain is the failure this whole
 /// mechanism exists to prevent.
-#[cfg(unix)]
+///
+/// One definition, in `icn-core` beside the lock whose invariant it is. It was
+/// written here first; the maintenance commands then needed the same question
+/// answered (icn#2759) and a second spelling of an ownership rule is how the
+/// first one comes to be applied at five sites out of six.
 fn inspection_may_create_the_lock(data_dir: &Path) -> Result<bool> {
-    let owner = data_root_account(data_dir)
-        .with_context(|| format!("Failed to inspect {}", data_dir.display()))?;
-    Ok(matches!(
-        classify_ownership_transfer(owner, identity_new_files_receive(data_dir)?),
-        OwnershipTransfer::Preserved
-    ))
-}
-
-#[cfg(not(unix))]
-fn inspection_may_create_the_lock(_data_dir: &Path) -> Result<bool> {
-    Ok(true)
+    icn_core::new_files_here_belong_to_the_directory_account(data_dir)
 }
 
 /// A test-only barrier inside `show`, between deciding about the lock and
@@ -1711,9 +1705,11 @@ fn provision_runtime_root_inner(
     // all — republishing its configuration without the first lock would leave
     // it running on bytes that no longer exist. Taken in the same order the
     // daemon takes them, and non-blocking, so neither ordering can hang.
-    let _ceremony_config =
+    // Named rather than `_`-prefixed: both guards are read again at (11c),
+    // where the ceremony asks whether its exclusion still covers this root.
+    let ceremony_config =
         icn_core::DataDirLock::acquire_config(data_dir, "runtime-root provisioning")?;
-    let _ceremony = icn_core::DataDirLock::acquire(data_dir, "runtime-root provisioning")?;
+    let ceremony_storage = icn_core::DataDirLock::acquire(data_dir, "runtime-root provisioning")?;
 
     // (2) Before anything opens or writes a store. The gate takes exclusive
     // locks while it audits, so this also fails fast when the daemon is running
@@ -2070,6 +2066,28 @@ fn provision_runtime_root_inner(
     // durability *inside* its own directory; nothing else does the outside.
     sync_directory_entries(&icn_core::config::store_path(data_dir))?;
     sync_directory_entries(data_dir)?;
+
+    // (11c) The exclusion that has covered every step above must still cover
+    // this root.
+    //
+    // `flock(2)` attaches to an open file description while this domain's
+    // identity is a pathname, so a `rename(2)` of the data root separates the
+    // two: these guards would travel into the renamed directory while a fresh,
+    // unlocked lock file appeared at `<data_dir>`, and a second ceremony or
+    // daemon could take it without ever contending (icn#2758). The consequence
+    // is specific to this point in the ceremony — handle-based state (the open
+    // sled stores, the cooperative row, the treasury registration) follows the
+    // renamed inode, while pathname-based work (configuration publication, the
+    // keystores) resolves to the replacement — so the receipt about to be
+    // committed could certify state living in a different directory from the
+    // configuration linkage it re-verifies.
+    //
+    // Restore no longer renames a data root, which is where that sequence came
+    // from. This is the check that says so rather than assuming it: a marker
+    // claiming verified durable state must not be written by a process whose
+    // exclusion has stopped covering the root it names.
+    ceremony_storage.assert_still_anchored("this provisioning ceremony")?;
+    ceremony_config.assert_still_anchored("this provisioning ceremony")?;
 
     // (12) The completion marker, written last and only over verified state.
     {
@@ -5341,6 +5359,133 @@ mod failpoint_tests {
         drop(daemon_side);
         provision_runtime_root_inner(dir.path(), "Unblocked", "HOURS", None)
             .expect("the ceremony must proceed once the holder releases");
+    }
+
+    /// A restore cannot split a ceremony that is in flight (icn#2758).
+    ///
+    /// This is the witness icn#2758 was filed without. Its empirical evidence
+    /// showed a *daemon-shaped* holder losing its anchor to `restore --force`,
+    /// and recorded that the ceremony-overlap consequence — a receipt committed
+    /// into one directory while the configuration linkage it re-verifies lands
+    /// in another — remained reasoned from mechanism rather than executed.
+    ///
+    /// It runs here because it cannot be driven any other way: the interleaving
+    /// has to be observed from *inside* the ceremony's own stack frame, while
+    /// its guards are alive. Timing would prove nothing repeatable, and the
+    /// shipped binary has no failpoint to park on.
+    ///
+    /// Two things are asserted, and they are separate claims:
+    ///
+    /// * the restore is refused — the ceremony's exclusion now reaches it;
+    /// * the ceremony's anchor is unchanged across the attempt — so even a
+    ///   restore that got further could not have moved the root out from under
+    ///   the receipt this ceremony is about to write.
+    #[cfg(unix)]
+    #[test]
+    fn a_restore_cannot_split_a_ceremony_in_flight() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Mutex;
+
+        static OBSERVED: AtomicBool = AtomicBool::new(false);
+        static RESTORE_REFUSED: AtomicBool = AtomicBool::new(false);
+        static MAINTENANCE_REFUSED: AtomicBool = AtomicBool::new(false);
+        static ANCHOR_INTACT: AtomicBool = AtomicBool::new(false);
+        static ARCHIVE: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+        fn inode_at(path: &Path) -> Option<(u64, u64)> {
+            use std::os::unix::fs::MetadataExt as _;
+            std::fs::symlink_metadata(path)
+                .ok()
+                .map(|m| (m.dev(), m.ino()))
+        }
+
+        fn observe(data_dir: &Path, point: RuntimeRootFailpoint) {
+            // The latest boundary: every store handle dropped, the
+            // configuration published, the receipt not yet written. Exactly the
+            // window in which handle-based and pathname-based state would part
+            // company under a root rename.
+            if point != RuntimeRootFailpoint::AfterConfigPublish {
+                return;
+            }
+            OBSERVED.store(true, Ordering::SeqCst);
+
+            let lock_path = icn_core::DataDirLock::lock_path(data_dir);
+            let before = inode_at(&lock_path);
+
+            let archive = ARCHIVE
+                .lock()
+                .ok()
+                .and_then(|slot| slot.clone())
+                .expect("the witness archive must be registered");
+            // The real handler the dispatch calls, not a stand-in for it.
+            RESTORE_REFUSED.store(
+                crate::handle_restore_command(data_dir, &archive, true).is_err(),
+                Ordering::SeqCst,
+            );
+            // And the maintenance participation from the same dispatch
+            // (icn#2759): the ceremony holds no sled handles right here, so
+            // sled's own lock is not what refuses this.
+            MAINTENANCE_REFUSED.store(
+                crate::StorageDomain::join(data_dir, "coop maintenance").is_err(),
+                Ordering::SeqCst,
+            );
+
+            ANCHOR_INTACT.store(
+                before.is_some() && inode_at(&lock_path) == before,
+                Ordering::SeqCst,
+            );
+        }
+
+        let dir = provisioned();
+
+        // A real archive, produced by the real backup command, so the refusal
+        // cannot be an artefact of an unreadable input.
+        let source = dir.path().join("witness-source");
+        std::fs::create_dir_all(source.join("store")).unwrap();
+        std::fs::write(source.join("store").join("marker"), b"other root\n").unwrap();
+        let archive = dir.path().join("witness-backup.tar");
+        crate::handle_backup_command(&source, &archive).unwrap();
+        *ARCHIVE.lock().unwrap() = Some(archive);
+
+        OBSERVED.store(false, Ordering::SeqCst);
+        RESTORE_REFUSED.store(false, Ordering::SeqCst);
+        MAINTENANCE_REFUSED.store(false, Ordering::SeqCst);
+        ANCHOR_INTACT.store(false, Ordering::SeqCst);
+
+        let _observer = ObserverGuard::install(dir.path(), observe);
+        let outcome = provision_runtime_root_inner(
+            dir.path(),
+            "Uninterruptible Coop",
+            "HOURS",
+            Some(RuntimeRootFailpoint::AfterConfigPublish),
+        );
+        drop(_observer);
+
+        assert!(
+            OBSERVED.load(Ordering::SeqCst),
+            "the ceremony must have reached the boundary; otherwise this proves nothing"
+        );
+        assert!(
+            RESTORE_REFUSED.load(Ordering::SeqCst),
+            "a restore must not be able to replace the root a ceremony is provisioning"
+        );
+        assert!(
+            MAINTENANCE_REFUSED.load(Ordering::SeqCst),
+            "a maintenance command must not be able to open the stores mid-ceremony"
+        );
+        assert!(
+            ANCHOR_INTACT.load(Ordering::SeqCst),
+            "the ceremony's exclusion anchor must be the same file after the attempt"
+        );
+        // The failpoint is what ends this ceremony, not the restore.
+        let err = format!(
+            "{:#}",
+            outcome.expect_err("the failpoint stops the ceremony")
+        );
+        assert!(
+            err.contains("injected runtime-root fault"),
+            "the ceremony must have failed at its failpoint, not somewhere else: {err}"
+        );
     }
 
     /// The ceremony still owns the root at its LATEST boundary — after every
