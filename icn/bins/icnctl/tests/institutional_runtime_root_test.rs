@@ -3728,3 +3728,117 @@ fn show_contends_with_a_configuration_writer_rather_than_reading_a_torn_file() {
         "classification must contend with a configuration writer, not read past it: {doc}"
     );
 }
+
+/// Inspection must not mint the *configuration* lock either.
+///
+/// The storage side already got this right: when new files here would belong to
+/// somebody else, `show` joins an existing lock but never creates one, because
+/// a retained root-owned 0600 file stops the daemon starting.
+///
+/// The configuration lock was added to that same read path and did not inherit
+/// the rule. `acquire_config_shared_if_manageable` creates when the file is
+/// absent — `_if_manageable` is about the filesystem being writable, not about
+/// who would own the result — so a read-only `show` left one behind. The
+/// fixture reproduces the reported shape exactly: the storage lock already
+/// exists (so inspection has something to join and does not refuse), and the
+/// configuration lock does not.
+#[cfg(unix)]
+#[test]
+fn inspection_does_not_mint_the_configuration_lock_under_the_wrong_account() {
+    let Some(other_gid) = a_supplementary_group() else {
+        eprintln!(
+            "SKIPPED inspection_does_not_mint_the_configuration_lock_under_the_wrong_account: \
+             this account has no supplementary group."
+        );
+        return;
+    };
+
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    // The storage lock exists; the configuration lock does not.
+    let storage = data_dir.join(".icn-data-dir.lock");
+    std::fs::write(&storage, b"").unwrap();
+    let config = data_dir.join(".icn-config.lock");
+    let _ = std::fs::remove_file(&config);
+
+    chgrp(data_dir, other_gid);
+
+    let out = icnctl(data_dir)
+        .args(["institution", "runtime-root", "show", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        !config.exists(),
+        "a read-only inspection must not create {} — the owning account could not reopen \
+         it, and the file is retained:\n{}",
+        config.display(),
+        combined(&out)
+    );
+}
+
+/// A linked store path must be refused before sled opens it.
+///
+/// `SledStore::open` follows symlinks and writes on open (recovery), while the
+/// data-directory lock covers this root only. A `store/ledger` symlink would
+/// therefore let a diagnostic `show` modify a database outside the exclusion
+/// domain, and verify rows this root does not contain.
+///
+/// The assertion is about the *target*: the refusal must name the link, and the
+/// database it points at must be untouched afterwards. Checking only for an
+/// error message would pass even if sled had already opened and recovered it.
+#[cfg(unix)]
+#[test]
+fn a_linked_store_path_is_refused_before_it_is_opened() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+    assert!(provision_runtime_root(data_dir, "Linked Store Coop")
+        .status
+        .success());
+
+    let ledger = icn_core::config::ledger_store_path(data_dir);
+    let elsewhere = TempDir::new().unwrap();
+    let foreign = elsewhere.path().join("someone-elses-ledger");
+    std::fs::create_dir_all(&foreign).unwrap();
+    let sentinel = foreign.join("do-not-touch");
+    std::fs::write(&sentinel, b"untouched").unwrap();
+
+    std::fs::remove_dir_all(&ledger).unwrap();
+    std::os::unix::fs::symlink(&foreign, &ledger).unwrap();
+
+    let before: Vec<_> = std::fs::read_dir(&foreign)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+
+    let out = combined(
+        &icnctl(data_dir)
+            .args(["institution", "runtime-root", "show", "--json"])
+            .output()
+            .unwrap(),
+    );
+    assert!(
+        out.contains("symbolic link"),
+        "a linked store path must be refused by name:\n{out}"
+    );
+
+    let after: Vec<_> = std::fs::read_dir(&foreign)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(
+        before.len(),
+        after.len(),
+        "sled must never have opened the linked database — it writes on open"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&sentinel).unwrap(),
+        "untouched",
+        "the database outside this root must be untouched"
+    );
+}

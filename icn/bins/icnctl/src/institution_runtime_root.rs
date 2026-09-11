@@ -748,7 +748,7 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
         if !store_directory_exists(&db)? {
             return Ok(false);
         }
-        let store = icn_store::SledStore::open(&db)
+        let store = open_store_refusing_links(&db)
             .with_context(|| format!("Could not open {} to inspect it", db.display()))
             .map_err(uninspectable)?;
         let found = store
@@ -762,7 +762,7 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
         if !store_directory_exists(&db)? {
             return Ok(0);
         }
-        let store = icn_store::SledStore::open(&db)
+        let store = open_store_refusing_links(&db)
             .with_context(|| format!("Could not open {} to inspect it", db.display()))
             .map_err(uninspectable)?;
         let n = store
@@ -1064,7 +1064,7 @@ fn refuse_if_foreign_institutional_state(data_dir: &Path) -> Result<()> {
         if !store_directory_exists(&db)? {
             return Ok(Vec::new());
         }
-        let store = icn_store::SledStore::open(&db).with_context(|| {
+        let store = open_store_refusing_links(&db).with_context(|| {
             format!(
                 "Refusing institutional runtime-root provisioning: {} exists but could not be opened to check for \
                  existing institutional state (if the daemon is running, stop it first). \
@@ -1260,7 +1260,7 @@ pub fn load_receipt(data_dir: &Path) -> Result<Option<RuntimeRootReceipt>> {
     if !store_directory_exists(&coop_db)? {
         return Ok(None);
     }
-    let store = icn_store::SledStore::open(&coop_db).with_context(|| {
+    let store = open_store_refusing_links(&coop_db).with_context(|| {
         format!(
             "Failed to open the cooperative store at {} (stop the daemon first; \
              it holds an exclusive lock)",
@@ -1861,7 +1861,7 @@ fn provision_runtime_root_inner(
 
     // (7) Durable cooperative record, in the database the daemon opens.
     let coop_db = coop_db_path(data_dir);
-    let coop_sled = Arc::new(icn_store::SledStore::open(&coop_db).with_context(|| {
+    let coop_sled = Arc::new(open_store_refusing_links(&coop_db).with_context(|| {
         format!(
             "Failed to open the cooperative store at {} (stop the daemon first; \
              it holds an exclusive lock)",
@@ -1900,15 +1900,13 @@ fn provision_runtime_root_inner(
     // `TreasuryManager::new()` keeps its maps in memory only, and a treasury
     // that vanishes on restart is not institutional state.
     let ledger_db_path = icn_core::config::ledger_store_path(data_dir);
-    let ledger_sled = Arc::new(
-        icn_store::SledStore::open(&ledger_db_path).with_context(|| {
-            format!(
-                "Failed to open the ledger store at {} (stop the daemon first; \
+    let ledger_sled = Arc::new(open_store_refusing_links(&ledger_db_path).with_context(|| {
+        format!(
+            "Failed to open the ledger store at {} (stop the daemon first; \
                  it holds an exclusive lock)",
-                ledger_db_path.display()
-            )
-        })?,
-    );
+            ledger_db_path.display()
+        )
+    })?);
     let ledger_store: Arc<dyn icn_store::Store> = ledger_sled.clone();
     let mut treasury_manager = icn_ledger::TreasuryManager::with_store(ledger_store)
         .context("Failed to open the treasury manager over the ledger store")?;
@@ -1959,7 +1957,7 @@ fn provision_runtime_root_inner(
     // Genesis never writes the `node -> node` self-edge that ICN_DEV_SELF_TRUST
     // writes.
     let trust_db_path = icn_core::config::trust_store_path(data_dir);
-    let trust_sled = Arc::new(icn_store::SledStore::open(&trust_db_path).with_context(|| {
+    let trust_sled = Arc::new(open_store_refusing_links(&trust_db_path).with_context(|| {
         format!(
             "Failed to open the trust store at {} (stop the daemon first; \
              it holds an exclusive lock)",
@@ -2079,7 +2077,7 @@ fn provision_runtime_root_inner(
     {
         use icn_store::Store;
         let coop_db = coop_db_path(data_dir);
-        let coop_sled = icn_store::SledStore::open(&coop_db)
+        let coop_sled = open_store_refusing_links(&coop_db)
             .context("Failed to reopen the cooperative store to record the receipt")?;
         let key = format!("{RECEIPT_KEY_PREFIX}{coop_id}");
         #[cfg(test)]
@@ -2115,7 +2113,7 @@ fn verify_durable_state(
     // The cooperative record, and its link to the treasury.
     let coop_db = coop_db_path(data_dir);
     let coop_sled = Arc::new(
-        icn_store::SledStore::open(&coop_db)
+        open_store_refusing_links(&coop_db)
             .context("Verification: failed to reopen the cooperative store")
             .map_err(uninspectable)?,
     );
@@ -2191,7 +2189,7 @@ fn verify_durable_state(
     // it — `with_store` runs the fail-closed hydration path, so a row this
     // ceremony wrote badly is caught here rather than at the daemon's next start.
     let ledger_store: Arc<dyn icn_store::Store> = Arc::new(
-        icn_store::SledStore::open(icn_core::config::ledger_store_path(data_dir))
+        open_store_refusing_links(&icn_core::config::ledger_store_path(data_dir))
             .context("Verification: failed to reopen the ledger store")
             .map_err(uninspectable)?,
     );
@@ -2260,7 +2258,7 @@ fn verify_durable_state(
 
     // Both trust facts, read through a fresh handle.
     let trust_store: Arc<dyn icn_store::Store> = Arc::new(
-        icn_store::SledStore::open(icn_core::config::trust_store_path(data_dir))
+        open_store_refusing_links(&icn_core::config::trust_store_path(data_dir))
             .context("Verification: failed to reopen the trust store")
             .map_err(uninspectable)?,
     );
@@ -2878,6 +2876,79 @@ fn refuse_if_the_configuration_is_hard_linked(data_dir: &Path) -> Result<()> {
 #[cfg(not(unix))]
 fn refuse_if_the_configuration_is_hard_linked(_data_dir: &Path) -> Result<()> {
     Ok(())
+}
+
+/// Open a sled store, refusing a linked path first.
+///
+/// `SledStore::open` follows symlinks, and it is a *writing* open: sled can
+/// perform recovery writes on open. The data-directory lock covers this root
+/// only, so a `store/ledger` symlink pointing at another database would let a
+/// supposedly diagnostic `runtime-root show` modify a database outside this
+/// exclusion domain entirely — and verify rows this root does not contain,
+/// which is a receipt certifying somebody else's state.
+///
+/// A function rather than a rule to remember. There are ten opens in this file,
+/// and the recent history of this lane is that per-call-site rules get missed:
+/// the account guard was added to three lock sites and missed a fourth, twice.
+/// A caller that does not reach `SledStore::open` directly cannot forget.
+///
+/// The path itself and its immediate entries are both checked, matching the
+/// backup verifier's shape — a link *inside* the directory redirects exactly as
+/// a linked directory would. An absent path is fine: sled creates it, and
+/// nothing can be linked yet. A non-directory is left to sled's own open, which
+/// already reports it better than this could.
+fn open_store_refusing_links(db: &Path) -> Result<icn_store::SledStore> {
+    match std::fs::symlink_metadata(db) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            return Err(uninspectable(anyhow::Error::new(e).context(format!(
+                "Could not determine what is at the store path {}",
+                db.display()
+            ))))
+        }
+        Ok(meta) if meta.file_type().is_symlink() => bail!(
+            "Refusing to open the store at {}: it is a symbolic link. Opening it would \
+             follow the link out of this data directory, and sled writes on open — so an \
+             inspection of this root could modify a database the root's lock does not \
+             cover.",
+            db.display()
+        ),
+        Ok(meta) if meta.is_dir() => {
+            for entry in std::fs::read_dir(db).with_context(|| {
+                format!(
+                    "Could not read the store directory {} to check it",
+                    db.display()
+                )
+            })? {
+                let entry = entry.with_context(|| {
+                    format!(
+                        "Could not read an entry of the store directory {}",
+                        db.display()
+                    )
+                })?;
+                let linked = entry
+                    .file_type()
+                    .with_context(|| {
+                        format!(
+                            "Could not inspect {} inside {}",
+                            entry.path().display(),
+                            db.display()
+                        )
+                    })?
+                    .is_symlink();
+                if linked {
+                    bail!(
+                        "Refusing to open the store at {}: {} inside it is a symbolic link, \
+                         which redirects reads and writes exactly as a linked directory would.",
+                        db.display(),
+                        entry.path().display()
+                    );
+                }
+            }
+        }
+        Ok(_) => {}
+    }
+    icn_store::SledStore::open(db)
 }
 
 /// Where publication stages the new configuration before renaming it into place.
@@ -3538,14 +3609,14 @@ fn classify_for_show(data_dir: &Path, json: bool) -> Result<RuntimeRootState> {
     // anything, reasoning that absence proved no holder. It proved that only at
     // the instant of the check: a witness parked `show` past that decision and
     // watched a third party take the root while the inspection was in flight.
-    let inspection = inspection_may_create_the_lock(data_dir).and_then(|may_create| {
-        if may_create {
-            icn_core::DataDirLock::acquire(data_dir, "runtime-root inspection")
+    let state = (|| -> Result<RuntimeRootState> {
+        let may_create = inspection_may_create_the_lock(data_dir)?;
+        let _storage = if may_create {
+            icn_core::DataDirLock::acquire(data_dir, "runtime-root inspection")?
         } else {
-            icn_core::DataDirLock::acquire_without_creating(data_dir, "runtime-root inspection")
-        }
-    });
-    let state = inspection.and_then(|_guard| {
+            icn_core::DataDirLock::acquire_without_creating(data_dir, "runtime-root inspection")?
+        };
+
         // The storage lock does not exclude a configuration writer: they are
         // deliberately separate files, so `show` and `ManagedConfigEdit` never
         // contend. `Config::to_file` rewrites `icn.toml` with a plain
@@ -3555,21 +3626,42 @@ fn classify_for_show(data_dir: &Path, json: bool) -> Result<RuntimeRootState> {
         // so it joins that domain too — shared, because inspection is a reader
         // and several may look at once.
         //
-        // `_if_manageable` for the same reason inspection does not always mint
-        // the storage lock: a reader must not create a coordination file it
-        // would leave behind under the wrong account. When it cannot be taken,
-        // classification proceeds — the read was already no worse off than
-        // before this lock existed.
-        let _config = icn_core::DataDirLock::acquire_config_shared_if_manageable(
-            data_dir,
-            "runtime-root inspection",
-        )?;
+        // The *same* create-or-join decision as the storage lock above, spelled
+        // out rather than delegated. `acquire_config_shared_if_manageable`
+        // creates the file when it is absent — `_if_manageable` is about the
+        // filesystem being writable, not about who would own the result — so
+        // relying on the name to mean "will not mint one" made a read-only
+        // `show` leave a root-owned `.icn-config.lock` behind under `sudo`,
+        // which is the poisoning this command already refuses to do with the
+        // storage lock. There is no `acquire_config_without_creating` to pair
+        // with, so absence plus "may not create" means proceeding without it,
+        // exactly as this read did before the configuration lock existed.
+        let config_lock = icn_core::DataDirLock::config_lock_path(data_dir);
+        let config_lock_exists = match std::fs::symlink_metadata(&config_lock) {
+            Ok(_) => true,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+            Err(e) => {
+                return Err(uninspectable(anyhow::Error::new(e).context(format!(
+                    "Could not determine whether the configuration lock {} exists",
+                    config_lock.display()
+                ))))
+            }
+        };
+        let _config = if config_lock_exists || may_create {
+            icn_core::DataDirLock::acquire_config_shared_if_manageable(
+                data_dir,
+                "runtime-root inspection",
+            )?
+        } else {
+            None
+        };
+
         // Test-only: pause here, between the lock decision and the first store
         // open, so the dangerous interleaving can be exercised deterministically.
         #[cfg(test)]
         inspection_barrier(data_dir);
         runtime_root_state(data_dir)
-    });
+    })();
     match state {
         Ok(state) => Ok(state),
         Err(e) if json => {
@@ -4458,7 +4550,7 @@ mod failpoint_tests {
         // not this ceremony.
         let coop_db = icn_core::config::store_path(dir.path()).join("cooperative");
         {
-            let sled = std::sync::Arc::new(icn_store::SledStore::open(&coop_db).unwrap());
+            let sled = std::sync::Arc::new(open_store_refusing_links(&coop_db).unwrap());
             let store = icn_coop::CoopStore::new(std::sync::Arc::new(sled.db().clone()));
             let coop = icn_coop::Cooperative::new_with_domain(
                 "coop:pre-existing".to_string(),
