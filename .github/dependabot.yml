@@ -1,5 +1,22 @@
 # Dependabot Configuration
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# ─── Two things this file has to get right ───────────────────────────────────
+#
+# 1. COVERAGE. Dependabot *security* updates run against every manifest it can
+#    find, whatever this file says. Dependabot *version* updates run only
+#    against the directories listed below. A lockfile that appears here only via
+#    a security alert is therefore a lockfile that never receives routine
+#    maintenance — it drifts until an advisory forces a jump. Every npm
+#    lockfile in the repository must have an entry here.
+#
+# 2. GROUPING. `main` is a strict-protected branch with no merge queue, so every
+#    merge marks every other open PR out-of-date. A queue of N ungrouped
+#    dependency PRs therefore costs N branch updates and N full CI runs, and in
+#    practice never drains — it just accumulates. Grouping is what keeps the
+#    queue drainable: production minor/patch updates arrive as ONE pull request
+#    per workspace. Majors are deliberately left ungrouped, because a major
+#    needs to be reviewed and verified on its own.
 
 version: 2
 updates:
@@ -20,7 +37,6 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
-    # Group minor and patch updates
     groups:
       tokio:
         patterns:
@@ -34,6 +50,16 @@ updates:
           - "*dalek"
           - "chacha*"
           - "pqcrypto*"
+      # Catch-all for everything not matched above. Without this, each
+      # remaining crate opened its own PR: axum, proptest, getrandom,
+      # futures-util, hyper, hyper-util and opentelemetry_sdk were seven
+      # separate pull requests, none of which ever merged.
+      cargo-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
       dev-dependencies:
         dependency-type: "development"
         update-types:
@@ -60,6 +86,11 @@ updates:
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
     groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
       dev-dependencies:
         dependency-type: "development"
         update-types:
@@ -84,6 +115,11 @@ updates:
         patterns:
           - "react-native*"
           - "@react-native*"
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
       dev-dependencies:
         dependency-type: "development"
 
@@ -100,8 +136,117 @@ updates:
     commit-message:
       prefix: "deps(pilot-ui)"
     groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
       dev-dependencies:
         dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Public website. Previously absent: it received security PRs only, so the
+  # Astro toolchain drifted far enough that the outstanding advisory now needs a
+  # major upgrade rather than a patch.
+  - package-ecosystem: "npm"
+    directory: "/website"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "website"
+    commit-message:
+      prefix: "deps(website)"
+    groups:
+      astro:
+        patterns:
+          - "astro"
+          - "@astrojs/*"
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Agent-facing MCP server. Previously absent from version updates.
+  - package-ecosystem: "npm"
+    directory: "/ops/mcp"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ops"
+    commit-message:
+      prefix: "deps(mcp)"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Example apps. Both are Expo projects and both were absent from version
+  # updates. Grouped tightly and rate-limited: they are demonstrations, so they
+  # should receive routine maintenance without generating review load.
+  - package-ecosystem: "npm"
+    directory: "/examples/mobile-app"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "examples"
+    commit-message:
+      prefix: "deps(mobile-example)"
+    groups:
+      expo:
+        patterns:
+          - "expo*"
+          - "@expo/*"
+      all-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "npm"
+    directory: "/sdk/react-native/examples/CoopWallet"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "examples"
+    commit-message:
+      prefix: "deps(coopwallet)"
+    groups:
+      expo:
+        patterns:
+          - "expo*"
+          - "@expo/*"
+      all-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -113,3 +258,10 @@ updates:
       - "ci"
     commit-message:
       prefix: "ci"
+    groups:
+      # actions/checkout, actions/setup-node, actions/setup-python,
+      # codecov/codecov-action and docker/build-push-action were five separate
+      # open PRs. Action bumps are near-always reviewed together; group them.
+      github-actions:
+        patterns:
+          - "*"
