@@ -30,8 +30,20 @@ for p in d['patterns']: print(f\"{p['id']:<32} {p['signal'][:96]}\")
 Only after a defect is **established** — you reproduced it. A suspicion is not a defect, and a
 suspicion does not earn a systemic candidate.
 
-Skip it entirely for non-engineering work. Writing, research and documentation tasks do not
-perform a defect analysis.
+**Evidence decides, not artifact type.** The trigger is an established defect, not whether you are
+editing code:
+
+- **No defect established** → do not run the loop. Ordinary writing, research, documentation and
+  routine implementation work do not perform a defect analysis merely because work occurred.
+  Ceremonial analysis produces the manufactured architecture work `anti_patterns` warns about.
+- **A defect established** → run the loop, whatever the artifact. A generated projection silently
+  drifting from its registered owner, a policy document contradicting the semantics it projects,
+  an agent surface naming a path that does not exist — these are engineering defects that happen
+  to live in documentation, and they have the same enabling mechanisms as defects in code.
+
+An earlier version of this section exempted writing, research and documentation by task type. That
+was too broad: it would have told an agent to skip the loop on exactly the drift defects this
+policy's own delivery surfaced.
 
 ## The two questions
 

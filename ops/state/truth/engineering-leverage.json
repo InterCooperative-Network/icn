@@ -86,7 +86,6 @@
       "predicate": {
         "all_of": {
           "changes_subsystem_boundary": false,
-          "recurring_class_established": true,
           "structural_change_required_or_in_contract": true
         }
       }
@@ -110,8 +109,7 @@
       "constraint": "Record it. Never smuggle it into the current pull request.",
       "predicate": {
         "all_of": {
-          "changes_subsystem_boundary": true,
-          "recurring_class_established": true
+          "changes_subsystem_boundary": true
         }
       }
     },
@@ -121,7 +119,9 @@
       "note": "NONE is a first-class, expected answer. Manufacturing architecture work to satisfy this framework is itself a defect.",
       "predicate": {
         "all_of": {
-          "recurring_class_established": false
+          "changes_subsystem_boundary": false,
+          "recurring_class_established": false,
+          "structural_change_required_or_in_contract": false
         }
       }
     }
@@ -290,6 +290,7 @@
       "changes_subsystem_boundary": "The correction would change a subsystem boundary, state model, authority model, storage model or lifecycle.",
       "structural_change_required_or_in_contract": "The structural correction is necessary for the defect to be CORRECTLY fixed, or it is tiny, obviously safe and squarely inside the current acceptance contract."
     },
-    "rule": "Evaluate every disposition predicate against the facts. Exactly one match is a classification. Zero matches or more than one match is ambiguity and must fail closed \u2014 never resolve it by preferring an expected answer."
+    "rule": "Evaluate every disposition predicate against the facts. Exactly one match is a classification. Zero matches or more than one match is ambiguity and must fail closed \u2014 never resolve it by preferring an expected answer. The three facts partition the input space completely: all eight combinations resolve to exactly one disposition.",
+    "ordering": "The facts are evaluated boundary-first, then required-now, then recurrence, and that order carries the meaning. `changes_subsystem_boundary` decides ARCHITECTURAL on its own, because a change to a subsystem boundary is architectural whether or not it has happened before. `structural_change_required_or_in_contract` then decides NOW, because a correction already necessary for THIS defect to be correctly fixed does not become optional for want of a second occurrence. Recurrence enters last and decides only between FOLLOW_UP and NONE \u2014 it distinguishes systemic follow-up from a one-off, and must never suppress a correction that is already required. An earlier model made recurrence a prerequisite for every non-NONE disposition, so a first-occurrence defect whose structural repair was necessary classified as NONE, contradicting NOW.meaning."
   }
 }

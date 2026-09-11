@@ -226,6 +226,65 @@ def main() -> int:
              f"{sid}: story classifies as {best!r}, expected {sc['pattern']!r}")
         t.ok(unique, f"{sid}: classification tied; signals do not discriminate")
 
+    # ---- exhaustive partition over the whole fact space ---------------------
+    #
+    # Three booleans is eight combinations, so "exactly one disposition matches"
+    # can be proven rather than sampled. An earlier model made recurrence a
+    # prerequisite for every non-NONE disposition, so a first-occurrence defect
+    # whose structural repair was necessary classified as NONE — contradicting
+    # NOW.meaning, and telling an agent a required correction was merely local.
+    import itertools
+
+    PINNED = {
+        # (boundary, structural_required, recurring): disposition
+        (False, True,  False): ("NOW",
+            "first occurrence whose structural repair is already required must not be "
+            "suppressed for want of a second occurrence"),
+        (True,  False, False): ("ARCHITECTURAL",
+            "a subsystem-boundary change is architectural whether or not it has happened before"),
+        (False, False, False): ("NONE",
+            "first occurrence with no required repair is genuinely local"),
+        (False, False, True):  ("FOLLOW_UP",
+            "recurrence distinguishes systemic follow-up from a one-off, and only that"),
+    }
+
+    seen_combinations = 0
+    for b, sreq, rec in itertools.product([True, False], repeat=3):
+        facts = {
+            "changes_subsystem_boundary": b,
+            "structural_change_required_or_in_contract": sreq,
+            "recurring_class_established": rec,
+        }
+        seen_combinations += 1
+        matched = [
+            n for n, spec in dispositions.items()
+            if all(facts.get(k) == v for k, v in spec["predicate"]["all_of"].items())
+        ]
+        t.ok(
+            len(matched) == 1,
+            f"partition: facts boundary={b} required={sreq} recurring={rec} matched "
+            f"{len(matched)} dispositions {sorted(matched)} — the three facts must partition "
+            "the input space completely, with no gap and no overlap",
+        )
+        if (b, sreq, rec) in PINNED and len(matched) == 1:
+            want, why = PINNED[(b, sreq, rec)]
+            t.ok(
+                matched[0] == want,
+                f"partition: boundary={b} required={sreq} recurring={rec} derived "
+                f"{matched[0]!r}, expected {want!r} — {why}",
+            )
+    t.ok(seen_combinations == 8, f"expected 8 fact combinations, evaluated {seen_combinations}")
+
+    # Recurrence must never be a prerequisite for NOW or ARCHITECTURAL. Asserted
+    # structurally, so the regression cannot come back by predicate edit.
+    for name in ("NOW", "ARCHITECTURAL"):
+        t.ok(
+            "recurring_class_established" not in dispositions[name]["predicate"]["all_of"],
+            f"{name}'s predicate constrains recurring_class_established; a correction that is "
+            "already required, or that changes a subsystem boundary, does not become optional "
+            "because the class has only been seen once",
+        )
+
     # ---- adversarial witnesses ----------------------------------------------
     # (1) Magic wording retained, predicate meaning changed -> must NOT pass.
     import copy
@@ -274,35 +333,38 @@ def main() -> int:
     except Ambiguous:
         t.ok(True, "")
 
-    # (4) Prose can read affirmative for two dispositions where the predicates
-    #     match exactly one. This is review's counterexample, carried as a
-    #     witness: no recurring class, but a boundary-changing correction. The
-    #     ARCHITECTURAL description ("changes a subsystem boundary, state model,
-    #     authority model, storage model or lifecycle") reads TRUE, and the NONE
-    #     description reads TRUE as well — an agent classifying by prose could
-    #     land on either. The predicates are unambiguous because
-    #     recurring_class_established is false.
+    # (4) Prose can point one way where the predicates point another. Review's
+    #     counterexample, corrected: no recurring class, but a boundary-changing
+    #     correction. An agent reading prose can anchor on "no second occurrence,
+    #     so there is no class" and land on NONE. The predicates say
+    #     ARCHITECTURAL, because a subsystem-boundary change is architectural
+    #     whether or not it has happened before.
+    #
+    #     This witness previously asserted NONE here. That expectation encoded
+    #     the very defect review reported — recurrence suppressing a
+    #     classification it should never have governed — and the exhaustive
+    #     partition above is what exposed it.
     prose_trap = {
         "recurring_class_established": False,
         "changes_subsystem_boundary": True,
         "structural_change_required_or_in_contract": False,
     }
-    arch_prose = json.dumps(dispositions["ARCHITECTURAL"]).lower()
+    none_prose = json.dumps(dispositions["NONE"]).lower()
     t.ok(
-        "subsystem boundary" in arch_prose,
-        "the ARCHITECTURAL prose no longer describes a boundary change, so this witness no "
-        "longer demonstrates the trap it was written for",
+        "second real occurrence" in none_prose or "second" in none_prose,
+        "the NONE prose no longer appeals to a second occurrence, so this witness no longer "
+        "demonstrates the pull it was written for",
     )
     try:
         trapped = classify(prose_trap, dispositions)
     except Ambiguous as exc:
         trapped = f"<ambiguous: {exc}>"
     t.ok(
-        trapped == "NONE",
-        f"prose-trap witness: facts with no recurring class but a boundary-changing correction "
-        f"derived {trapped!r}. The predicates must yield NONE here even though the ARCHITECTURAL "
-        "description reads affirmative — otherwise an agent following prose and an agent "
-        "following predicates disagree.",
+        trapped == "ARCHITECTURAL",
+        f"prose-trap witness: first occurrence with a boundary-changing correction derived "
+        f"{trapped!r}, expected 'ARCHITECTURAL'. Prose reading can suggest NONE because no "
+        "second occurrence exists; the predicates must not let recurrence suppress an "
+        "architectural classification.",
     )
 
     # (5) The expected label is not reachable by the classifier.

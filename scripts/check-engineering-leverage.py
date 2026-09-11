@@ -287,6 +287,32 @@ def main() -> int:
                     f"{entry['canonical_path']} must route the agent through "
                     "classification.facts rather than intuition",
                 )
+
+            # Applicability must key on evidence, not artifact type. A blanket
+            # exemption for "documentation tasks" would have told an agent to
+            # skip the loop on exactly the generated-projection drift defects
+            # this policy's own delivery produced.
+            lowered = body.lower()
+            for phrase in (
+                "writing, research and documentation tasks do not",
+                "skip it entirely for non-engineering work",
+            ):
+                c.ok(
+                    phrase not in lowered,
+                    f"{entry['canonical_path']} exempts work by artifact TYPE ({phrase!r}). "
+                    "The precondition is an established defect; a documentation or "
+                    "generated-projection task can establish one.",
+                )
+            c.ok(
+                "no defect established" in lowered,
+                f"{entry['canonical_path']} must state the no-defect case explicitly, or "
+                "ordinary work will attract ceremonial defect analysis",
+            )
+            c.ok(
+                "whatever the artifact" in lowered or "not artifact type" in lowered,
+                f"{entry['canonical_path']} must state that an established defect triggers the "
+                "loop regardless of artifact type",
+            )
         for m in entry.get("provider_mirrors", []):
             mp = root / m["path"]
             c.ok(mp.is_file(), f"provider mirror missing: {m['path']}")
