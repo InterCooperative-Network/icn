@@ -128,7 +128,25 @@ const GIT_SAFE_FLAGS = ["-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null
  */
 const STATUS_ARGS = ["status", "--porcelain", "--untracked-files=normal"] as const;
 
-type GitProbe = { ok: true; out: string } | { ok: false; timedOut: boolean };
+type GitProbe =
+  | { ok: true; out: string }
+  | { ok: false; timedOut: boolean; truncated?: boolean };
+
+/**
+ * Output budget for a single probe. `ls-files -v` scales with the size of the repository, so a
+ * small budget is a correctness problem and not merely a display one.
+ */
+const GIT_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+
+/**
+ * runCommand truncates oversized output and still reports success, appending a marker. For a
+ * probe that COUNTS things, a silently shortened list reads as "fewer findings" rather than
+ * "incomplete answer" — a flagged file past the cutoff would simply not be seen. Truncation is
+ * therefore a probe failure here, which fails closed like any other unknown.
+ */
+export function wasTruncated(out: string): boolean {
+  return /\n… \[truncated \d+ chars\]$/.test(out);
+}
 
 async function gitProbe(
   cwd: string,
@@ -143,13 +161,15 @@ async function gitProbe(
   const r = await runCommand("git", ["--work-tree", cwd, ...GIT_SAFE_FLAGS, ...args], {
     cwd,
     timeoutMs: GIT_TIMEOUT_MS,
-    maxStdoutBytes: 256 * 1024,
+    maxStdoutBytes: GIT_MAX_OUTPUT_BYTES,
     maxStderrBytes: 16 * 1024,
     // GIT_OPTIONAL_LOCKS=0 keeps `git status` from refreshing/writing the index of a tree this
     // probe is only observing — a diagnostic must not mutate another lane's working state.
     env: { ...GIT_SANITISED_ENV, GIT_OPTIONAL_LOCKS: "0" },
   });
-  return r.ok ? { ok: true, out: r.stdout.trim() } : { ok: false, timedOut: r.timedOut };
+  if (!r.ok) return { ok: false, timedOut: r.timedOut };
+  if (wasTruncated(r.stdout)) return { ok: false, timedOut: false, truncated: true };
+  return { ok: true, out: r.stdout.trim() };
 }
 
 async function git(cwd: string, args: readonly string[]): Promise<string | null> {
@@ -274,8 +294,11 @@ export async function describeSourceRevision(
   const lsFiles = await gitProbe(checkout, ["ls-files", "-v"]);
   let indexHidden: number | null = null;
   if (!lsFiles.ok) {
+    const why = lsFiles.truncated
+      ? " (the index listing was too large to read in full)"
+      : "";
     warnings.push(
-      "could not check for index flags that hide tracked files from status; treating cleanliness as incomplete"
+      `could not check for index flags that hide tracked files from status${why}; treating cleanliness as incomplete`
     );
   } else {
     indexHidden = lsFiles.out

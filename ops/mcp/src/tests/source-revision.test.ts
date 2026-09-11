@@ -15,8 +15,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
   describeSourceRevision,
+  wasTruncated,
   worktreeFingerprint,
 } from "../diagnostics/source-revision.js";
+import { runCommand } from "../utils/commands.js";
 import { registerAgentOpsTools } from "../tools/agent-ops.js";
 
 // These tests build real git repositories in a temp directory rather than mocking git.
@@ -286,6 +288,31 @@ describe("describeSourceRevision — the environment cannot redirect the probe",
     expect(s.source_checkout).toBe(target);
     expect(s.source_revision).toBe(targetHead);
     expect(s.source_revision).not.toBe(decoyHead);
+  });
+});
+
+// runCommand truncates oversized output and still reports success. A probe that COUNTS things
+// would read a shortened list as "fewer findings" rather than "incomplete answer", so a flagged
+// file past the cutoff would simply not be seen. The marker is produced by runCommand here
+// rather than hand-written, so the test fails if the two modules ever drift apart on its shape.
+describe("wasTruncated — a shortened probe result is not a smaller result", () => {
+  it("recognises the marker runCommand actually emits", async () => {
+    const r = await runCommand("node", ["-e", "console.log('x'.repeat(5000))"], {
+      timeoutMs: 10_000,
+      maxStdoutBytes: 100,
+    });
+    expect(r.ok, "the command itself must succeed — truncation is not a failure there").toBe(true);
+    expect(r.stdout.length).toBeLessThan(5000);
+    expect(wasTruncated(r.stdout)).toBe(true);
+  });
+
+  it("does not flag output that fit within the budget", async () => {
+    const r = await runCommand("node", ["-e", "console.log('short')"], {
+      timeoutMs: 10_000,
+      maxStdoutBytes: 4096,
+    });
+    expect(r.ok).toBe(true);
+    expect(wasTruncated(r.stdout)).toBe(false);
   });
 });
 
