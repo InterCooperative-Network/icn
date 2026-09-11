@@ -36,12 +36,26 @@ SOURCES = "ops/state/truth/sources.json"
 
 
 def repo_root() -> Path:
-    return Path(
-        subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
-    )
+    """Resolve the repository from THIS FILE, not from the caller's cwd.
+
+    `git rev-parse` run in the caller's working directory answers a different
+    question: it reports whatever repository the caller happens to be standing
+    in. `ops/scripts/drift-check.sh` deliberately derives its own REPO_ROOT and
+    is safe to invoke from anywhere, so a checker it calls must be too —
+    otherwise `cd /tmp && bash .../drift-check.sh` fails on a healthy tree, or,
+    worse, inspects a different checkout. Same resolution as
+    scripts/check-agent-context-spine.py.
+    """
+    try:
+        return Path(
+            subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=Path(__file__).resolve().parent,
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return Path(__file__).resolve().parents[2]
 
 
 def run_checker(root: Path) -> int:

@@ -19,12 +19,26 @@ OWNER = "ops/state/truth/engineering-leverage.json"
 
 
 def repo_root() -> Path:
-    return Path(
-        subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
-    )
+    """Resolve the repository from THIS FILE, not from the caller's cwd.
+
+    `git rev-parse` run in the caller's working directory answers a different
+    question: it reports whatever repository the caller happens to be standing
+    in. `ops/scripts/drift-check.sh` deliberately derives its own REPO_ROOT and
+    is safe to invoke from anywhere, so a checker it calls must be too —
+    otherwise `cd /tmp && bash .../drift-check.sh` fails on a healthy tree, or,
+    worse, inspects a different checkout. Same resolution as
+    scripts/check-agent-context-spine.py.
+    """
+    try:
+        return Path(
+            subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=Path(__file__).resolve().parent,
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return Path(__file__).resolve().parents[2]
 
 
 # Each scenario carries structured FACTS. The classifier evaluates the policy's
@@ -300,6 +314,22 @@ def main() -> int:
         "expected label or the scenario identity",
     )
 
+    # (7) The gate must be invocable from anywhere. drift-check.sh derives its
+    #     own REPO_ROOT and is safe to run from any cwd; a checker it calls that
+    #     resolves via `git rev-parse` in the CALLER's directory breaks that,
+    #     failing on a healthy tree or inspecting a different checkout entirely.
+    import tempfile
+    checker = root / "scripts" / "check-engineering-leverage.py"
+    with tempfile.TemporaryDirectory() as foreign:
+        rc = subprocess.run(
+            [sys.executable, str(checker)], cwd=foreign, capture_output=True, text=True
+        ).returncode
+    t.ok(
+        rc == 0,
+        f"cwd-independence witness: the checker exits {rc} when run from a foreign directory; "
+        "it must resolve the repository from its own path, as check-agent-context-spine.py does",
+    )
+
     t.ok("delivery.json" in json.dumps(doc.get("owner_boundary", {})),
          "the policy must defer to delivery.json explicitly")
     t.ok(bool(doc.get("anti_patterns")),
@@ -312,7 +342,7 @@ def main() -> int:
         return 1
     print(
         f"test_engineering_leverage: clean ({t.n} assertions; {len(SCENARIOS)} scenarios "
-        "derived from policy predicates; 6 adversarial witnesses)"
+        "derived from policy predicates; 7 adversarial witnesses)"
     )
     return 0
 
