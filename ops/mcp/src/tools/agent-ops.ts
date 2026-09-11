@@ -237,12 +237,13 @@ export function registerAgentOpsTools(
         .describe("If true, list absent entries explicitly (default true)."),
     },
     async ({ include_absent }) => {
-      const { entries } = buildStateIndex(repoRoot);
-      const wantAbsent = include_absent !== false;
-      const filtered = wantAbsent
-        ? entries
-        : entries.filter((e) => e.present);
-      return await repoDerived(() => ({ entries: filtered }));
+      // The read itself must sit inside the thunk: closing over an already-built value would
+      // let both revision probes observe a new HEAD while `entries` came from the old tree.
+      return await repoDerived(() => {
+        const { entries } = buildStateIndex(repoRoot);
+        const wantAbsent = include_absent !== false;
+        return { entries: wantAbsent ? entries : entries.filter((e) => e.present) };
+      });
     }
   );
 

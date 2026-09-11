@@ -57,18 +57,40 @@ export type SourceRevision = {
   /**
    * Commits behind the LOCAL tracking ref. No fetch is performed, so this is a LOWER BOUND on
    * staleness and never an overestimate — a checkout that has not fetched since the remote moved
-   * reports 0 while being arbitrarily far behind. Read it together with `upstream_observed_at`.
+   * reports 0 while being arbitrarily far behind. Read it together with `remote_currency`.
    */
   behind_upstream: number | null;
-  /** ISO time the tracking refs were last updated from the remote; null when never/unknown. */
+  /**
+   * Commits the checkout holds that its tracking ref does not. `HEAD..upstream` counts only one
+   * direction, so a clean branch carrying an unpushed commit is "0 behind" while containing
+   * work that exists nowhere else — not level, and not something an orientation answer should
+   * present as canonical.
+   */
+  ahead_of_upstream: number | null;
+  /**
+   * ISO mtime of FETCH_HEAD: evidence that SOME fetch happened. It is repository-wide and
+   * refspec-dependent — `git fetch origin somebranch` refreshes it without touching this
+   * upstream — so it is an upper bound on this ref's freshness and never proof about it.
+   */
   upstream_observed_at: string | null;
   /**
-   * True only when the revision is known, the tree is known-clean, it is level with its tracking
-   * ref, AND that tracking ref was refreshed recently enough to mean anything. Any unknown makes
-   * this false.
+   * Always "unverified" here. Git records no per-ref "when was this last checked against the
+   * remote" (remote-tracking refs carry no reflog in this configuration), so no local evidence
+   * can establish currency. Only an actual fetch can, which is R1-B's job.
+   */
+  remote_currency: "unverified";
+  /**
+   * True when the revision is known, the tree is known-clean, and it is exactly level with its
+   * tracking ref in BOTH directions. Any unknown makes it false. This is a statement about
+   * local faithfulness only — it deliberately does not claim the remote has not moved, because
+   * nothing available here could prove that.
    */
   trustworthy: boolean;
-  /** Human-readable reasons `trustworthy` is false. Empty when it is true. */
+  /**
+   * Conditions a reader must account for, including staleness risk. A non-empty list does not
+   * by itself mean `trustworthy` is false: a checkout can be perfectly faithful to a tracking
+   * ref that is itself old.
+   */
   warnings: string[];
 };
 
@@ -79,13 +101,13 @@ export type SourceRevision = {
 const GIT_TIMEOUT_MS = 15_000;
 
 /**
- * How recently the tracking refs must have been refreshed for `behind_upstream == 0` to support
- * a claim of currency. `@{u}` is a LOCAL ref: a host that never fetches shows 0 behind forever,
- * which is exactly the stale-but-confident state this module exists to expose. An hour is short
- * enough that a host syncing on any normal cadence stays certified, and long enough that the
- * flag is not permanently false on a healthy machine.
+ * Age beyond which fetch evidence is reported as too old to reason about. `@{u}` is a LOCAL
+ * ref: a host that never fetches shows 0 behind forever, which is the stale-but-confident state
+ * this module exists to expose. This drives a WARNING, not the `trustworthy` flag — see
+ * `remote_currency`: the available evidence (repository-wide FETCH_HEAD) cannot be tied to a
+ * particular tracking ref, so it can raise suspicion but must not be used to certify.
  */
-const UPSTREAM_FRESHNESS_WINDOW_MS = 60 * 60 * 1000;
+const UPSTREAM_STALE_AFTER_MS = 60 * 60 * 1000;
 
 // Repository-configured executables are disabled per invocation rather than relying on the
 // caller's git config being benign.
@@ -164,7 +186,9 @@ export async function describeSourceRevision(
       dirty: null,
       dirty_paths: null,
       behind_upstream: null,
+      ahead_of_upstream: null,
       upstream_observed_at: null,
+      remote_currency: "unverified",
       trustworthy: false,
       warnings,
     };
@@ -200,31 +224,50 @@ export async function describeSourceRevision(
   }
 
   let behind: number | null = null;
+  let ahead: number | null = null;
   let observedAt: Date | null = null;
   if (upstream) {
-    const raw = await git(checkout, ["rev-list", "--count", `HEAD..${upstream}`]);
-    const n = raw === null ? NaN : Number.parseInt(raw, 10);
-    behind = Number.isFinite(n) ? n : null;
-    if (behind === null) {
+    // Symmetric difference. `HEAD..upstream` counts one direction only, so a clean branch with
+    // an unpushed commit would read as "0 behind" and pass for level while holding work that
+    // exists nowhere else.
+    const raw = await git(checkout, [
+      "rev-list",
+      "--left-right",
+      "--count",
+      `HEAD...${upstream}`,
+    ]);
+    const parts = raw === null ? [] : raw.split(/\s+/).filter(Boolean);
+    const a = parts.length === 2 ? Number.parseInt(parts[0] as string, 10) : NaN;
+    const b = parts.length === 2 ? Number.parseInt(parts[1] as string, 10) : NaN;
+    ahead = Number.isFinite(a) ? a : null;
+    behind = Number.isFinite(b) ? b : null;
+    if (ahead === null || behind === null) {
       warnings.push(
-        `could not measure distance from ${upstream}; treating staleness as unknown`
+        `could not measure divergence from ${upstream}; treating staleness as unknown`
       );
-    } else if (behind > 0) {
-      warnings.push(
-        `source checkout is ${behind} commit(s) behind ${upstream}; this answer describes an older revision`
-      );
+    } else {
+      if (behind > 0) {
+        warnings.push(
+          `source checkout is ${behind} commit(s) behind ${upstream}; this answer describes an older revision`
+        );
+      }
+      if (ahead > 0) {
+        warnings.push(
+          `source checkout holds ${ahead} commit(s) not in ${upstream}; this answer includes work that exists nowhere else`
+        );
+      }
     }
 
     observedAt = await upstreamObservedAt(checkout);
     const age = observedAt === null ? null : Date.now() - observedAt.getTime();
     if (age === null) {
       warnings.push(
-        `no record of ${upstream} ever being fetched, so distance from the remote is a lower bound only and currency cannot be established`
+        `no record of any fetch in this checkout, so distance from ${upstream} is a lower bound and the remote may have moved`
       );
-    } else if (age > UPSTREAM_FRESHNESS_WINDOW_MS) {
+    } else if (age > UPSTREAM_STALE_AFTER_MS) {
       const hours = Math.floor(age / 3_600_000);
       warnings.push(
-        `${upstream} was last fetched ${hours}h ago, so "${behind ?? "?"} behind" is a lower bound; the remote may have moved since`
+        `last fetch in this checkout was ${hours}h ago, so distance from ${upstream} is a lower bound; the remote may have moved since`
       );
     }
   } else {
@@ -233,10 +276,8 @@ export async function describeSourceRevision(
     );
   }
 
-  const upstreamFresh =
-    observedAt !== null &&
-    Date.now() - observedAt.getTime() <= UPSTREAM_FRESHNESS_WINDOW_MS;
-  const trustworthy = dirty === false && behind === 0 && upstreamFresh;
+  // Local faithfulness only. Remote currency is deliberately excluded: see `remote_currency`.
+  const trustworthy = dirty === false && behind === 0 && ahead === 0;
 
   return {
     source_checkout: checkout,
@@ -247,7 +288,9 @@ export async function describeSourceRevision(
     dirty,
     dirty_paths: dirtyPaths,
     behind_upstream: behind,
+    ahead_of_upstream: ahead,
     upstream_observed_at: observedAt === null ? null : observedAt.toISOString(),
+    remote_currency: "unverified",
     trustworthy,
     warnings,
   };

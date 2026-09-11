@@ -103,6 +103,23 @@ describe("describeSourceRevision — an untrustworthy source is detected", () =>
     expect(s.warnings.join(" ")).toMatch(/uncommitted/);
   });
 
+  it("flags a clean tree holding commits its upstream does not have", async () => {
+    const { clone } = originWithClone();
+    writeFileSync(path.join(clone, "unpushed.md"), "local only\n");
+    git(clone, "add", "unpushed.md");
+    git(clone, "commit", "-m", "unpushed");
+
+    const s = await describeSourceRevision(clone);
+    // The working tree is spotless and nothing is behind — the one-directional check that
+    // `HEAD..upstream` performs would call this level and certify it.
+    expect(s.dirty).toBe(false);
+    expect(s.behind_upstream).toBe(0);
+    // But it holds a commit that exists nowhere else, so it is not level.
+    expect(s.ahead_of_upstream).toBe(1);
+    expect(s.trustworthy).toBe(false);
+    expect(s.warnings.join(" ")).toMatch(/exists nowhere else/);
+  });
+
   it("flags a tree that is behind its upstream", async () => {
     const { origin, clone } = originWithClone();
 
@@ -206,27 +223,31 @@ describe("describeSourceRevision — how the root was chosen is reported", () =>
 // moves away from it — stale and confident, which is the exact state this module exists to
 // expose. Currency therefore requires evidence that the tracking refs were actually refreshed.
 describe("describeSourceRevision — a stale tracking ref cannot certify currency", () => {
-  it("refuses to certify when the upstream has not been fetched recently", async () => {
+  it("warns that distance is a lower bound when the last fetch is old", async () => {
     const { clone } = originWithClone();
     const fetchHead = path.join(clone, ".git", "FETCH_HEAD");
     const longAgo = new Date(Date.now() - 72 * 3600 * 1000);
     utimesSync(fetchHead, longAgo, longAgo);
 
     const s = await describeSourceRevision(clone);
-    // Locally everything looks perfect: clean, and level with the tracking ref.
+    // Locally everything is faithful: clean, and exactly level with the tracking ref.
     expect(s.dirty).toBe(false);
     expect(s.behind_upstream).toBe(0);
-    // But "0 behind" is only a lower bound against a three-day-old view of the remote.
-    expect(s.trustworthy).toBe(false);
+    expect(s.ahead_of_upstream).toBe(0);
+    // So `trustworthy` — a claim about local faithfulness — stays true...
+    expect(s.trustworthy).toBe(true);
+    // ...while the staleness risk is carried explicitly, never silently folded away.
+    expect(s.remote_currency).toBe("unverified");
     expect(s.warnings.join(" ")).toMatch(/lower bound/);
-    expect(s.upstream_observed_at).not.toBeNull();
   });
 
-  it("records when the tracking refs were last observed", async () => {
+  it("never claims verified remote currency, because nothing local could prove it", async () => {
     const { clone } = originWithClone();
     const s = await describeSourceRevision(clone);
     expect(s.upstream_observed_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(s.trustworthy).toBe(true);
+    // FETCH_HEAD is repository-wide: `git fetch origin otherbranch` refreshes it without
+    // touching this upstream, so it can raise suspicion but must never certify.
+    expect(s.remote_currency).toBe("unverified");
   });
 });
 
