@@ -4492,6 +4492,28 @@ impl ManagedConfigEdit {
         // Acquired BEFORE the load. This ordering is the entire guarantee.
         let lock = icn_core::DataDirLock::acquire_config(config_root, holder)?;
         let path = config_root.join("icn.toml");
+        // The lock names a *directory*; `from_file` and `to_file` follow a
+        // link. A symlinked `icn.toml` therefore puts the bytes being edited
+        // under one directory's lock while this holds another's, so a daemon or
+        // an inspection holding the target's lock does not contend and the file
+        // can be truncated underneath it. Refused rather than resolved: the
+        // ceremony already refuses a hard-linked configuration for the same
+        // reason — a second name for the bytes is a second identity outside
+        // this exclusion domain — and resolving instead would silently move
+        // which directory this command coordinates on.
+        #[cfg(unix)]
+        if let Ok(meta) = std::fs::symlink_metadata(&path) {
+            if meta.file_type().is_symlink() {
+                bail!(
+                    "Refusing to edit {}: it is a symbolic link. The configuration lock is \
+                     taken on the directory holding this name, but reads and writes would \
+                     follow the link elsewhere — so this edit would not contend with a daemon \
+                     or an inspection coordinating on the target. Edit the configuration where \
+                     it actually lives, or replace the link with a regular file.",
+                    path.display()
+                );
+            }
+        }
         let config = if path.exists() {
             icn_core::config::Config::from_file(&path)?
         } else {

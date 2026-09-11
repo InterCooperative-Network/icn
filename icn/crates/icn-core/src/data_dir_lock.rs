@@ -264,6 +264,87 @@ impl DataDirLock {
         )
     }
 
+    /// Join the configuration domain as a reader, but never create the file.
+    ///
+    /// The configuration counterpart of [`Self::acquire_without_creating`], and
+    /// it exists because its absence was a defect. Inspection needs three
+    /// outcomes from a coordination file — create it, join it, or refuse — and
+    /// the storage side has had all three since it was written. The
+    /// configuration side had only `acquire_config_shared_if_manageable`, which
+    /// *creates*; so a caller that must not create had nothing to call and
+    /// proceeded unlocked instead. That is outside the exclusion domain, which
+    /// is the failure the domain exists to prevent: a writer can create the
+    /// lock and rewrite `icn.toml` while the reader is still classifying it.
+    ///
+    /// Absence is therefore a **refusal**, exactly as it is for storage, and
+    /// for the same reason: the caller has to hold the lock either way.
+    ///
+    /// Shared rather than exclusive because readers do not exclude each other —
+    /// only a writer, which takes this file exclusively.
+    pub fn acquire_config_shared_without_creating(
+        config_root: &Path,
+        holder: &str,
+    ) -> Result<Self> {
+        let path = Self::config_lock_path(config_root);
+
+        // Same containment as `take`: never open through a link, never treat a
+        // directory or device as the lock.
+        if let Ok(meta) = std::fs::symlink_metadata(&path) {
+            if meta.file_type().is_symlink() || !meta.is_file() {
+                bail!(
+                    "Refusing to take the configuration lock: {} exists and is not a regular \
+                     file.",
+                    path.display()
+                );
+            }
+        }
+
+        let file = match std::fs::OpenOptions::new()
+            .truncate(false)
+            .write(true)
+            .open(&path)
+        {
+            Ok(f) => f,
+            // `flock(2)` locks the descriptor irrespective of open mode.
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+                ) =>
+            {
+                std::fs::File::open(&path).with_context(|| {
+                    format!(
+                        "Failed to open the configuration lock {} even read-only",
+                        path.display()
+                    )
+                })?
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
+                "Refusing to start {holder}: {} does not exist and this command will not \
+                 create it.\n\
+                 Creating it here would leave a coordination file owned by this account in a \
+                 directory owned by another — the daemon's own account could then not reopen \
+                 it. Proceeding without it would put this read outside the exclusion domain, \
+                 where a configuration writer could rewrite the file while it is being read. \
+                 Run this under the account that owns the directory (the deployment scripts \
+                 use `runuser -u icn` / `sudo -u icn`).",
+                path.display()
+            ),
+            Err(e) => {
+                return Err(e).with_context(|| {
+                    format!("Failed to open the configuration lock {}", path.display())
+                })
+            }
+        };
+
+        Self::lock(
+            file,
+            path,
+            Sharing::Shared,
+            &Self::config_refusal(config_root, holder),
+        )
+    }
+
     /// Take exclusive ownership of a directory's configuration, as a writer.
     ///
     /// This is the ceremony's side: it publishes `<data_dir>/icn.toml`, so it

@@ -3778,6 +3778,18 @@ fn inspection_does_not_mint_the_configuration_lock_under_the_wrong_account() {
         config.display(),
         combined(&out)
     );
+
+    // Not minting is only half the rule, and on its own it is satisfied by
+    // proceeding unlocked — which is worse, because a `ManagedConfigEdit` can
+    // then create that lock and rewrite `icn.toml` mid-classification. Join it
+    // or refuse; never read outside the domain.
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|e| panic!("stdout must be one JSON document: {e}"));
+    assert_eq!(
+        doc["state"], "ERROR",
+        "with no configuration lock to join and no licence to create one, classification must \
+         refuse rather than read unlocked: {doc}"
+    );
 }
 
 /// A linked store path must be refused before sled opens it.
@@ -3840,5 +3852,50 @@ fn a_linked_store_path_is_refused_before_it_is_opened() {
         std::fs::read_to_string(&sentinel).unwrap(),
         "untouched",
         "the database outside this root must be untouched"
+    );
+}
+
+/// A configuration writer must refuse a linked `icn.toml`.
+///
+/// The configuration lock names a *directory*, while `Config::from_file` and
+/// `to_file` follow a link. A symlinked `icn.toml` therefore puts the bytes
+/// being edited under one directory's lock while the writer holds another's, so
+/// a daemon or an inspection coordinating on the target never contends and the
+/// file can be truncated underneath it.
+///
+/// Refused rather than resolved: the ceremony already refuses a *hard*-linked
+/// configuration for the same reason, and resolving would silently change which
+/// directory this command coordinates on.
+#[cfg(unix)]
+#[test]
+fn a_configuration_writer_refuses_a_linked_configuration() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+    let did = node_did(data_dir);
+
+    // Move the real configuration aside and leave a link in its place.
+    let cfg = data_dir.join("icn.toml");
+    let elsewhere = TempDir::new().unwrap();
+    let real = elsewhere.path().join("icn.toml");
+    std::fs::rename(&cfg, &real).unwrap();
+    std::os::unix::fs::symlink(&real, &cfg).unwrap();
+    let before = std::fs::read_to_string(&real).unwrap();
+
+    let out = combined(
+        &icnctl(data_dir)
+            .args(["federation", "add", &format!("icn://{did}@127.0.0.1:9999")])
+            .output()
+            .unwrap(),
+    );
+    assert!(
+        out.contains("symbolic link"),
+        "a linked managed configuration must be refused by name:\n{out}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&real).unwrap(),
+        before,
+        "and the target must not have been rewritten through the link"
     );
 }

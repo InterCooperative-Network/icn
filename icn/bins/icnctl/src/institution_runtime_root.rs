@@ -789,7 +789,18 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
         let path = data_dir.join("icn.toml");
         match std::fs::read_to_string(&path) {
             Ok(text) => toml::from_str::<toml::Value>(&text)
-                .map(|v| v.get("cooperative").is_some())
+                // A `[cooperative]` table is not a linkage; a `treasury_did` is.
+                // `Config::cooperative` is not an `Option`, so any file that has
+                // been round-tripped through `Config::to_file` carries an empty
+                // table — and reporting that as linkage told an operator staring
+                // at an INCOMPLETE root that the configuration step had
+                // completed when nothing had been published. The component
+                // report exists to say which recovery step is outstanding.
+                .map(|v| {
+                    v.get("cooperative")
+                        .and_then(|section| section.get("treasury_did"))
+                        .is_some()
+                })
                 .map_err(|e| {
                     uninspectable(anyhow::Error::new(e).context(format!(
                         "Could not parse {} to determine its cooperative linkage",
@@ -3636,24 +3647,29 @@ fn classify_for_show(data_dir: &Path, json: bool) -> Result<RuntimeRootState> {
         // storage lock. There is no `acquire_config_without_creating` to pair
         // with, so absence plus "may not create" means proceeding without it,
         // exactly as this read did before the configuration lock existed.
-        let config_lock = icn_core::DataDirLock::config_lock_path(data_dir);
-        let config_lock_exists = match std::fs::symlink_metadata(&config_lock) {
-            Ok(_) => true,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
-            Err(e) => {
-                return Err(uninspectable(anyhow::Error::new(e).context(format!(
-                    "Could not determine whether the configuration lock {} exists",
-                    config_lock.display()
-                ))))
-            }
-        };
-        let _config = if config_lock_exists || may_create {
+        let _config = if may_create {
             icn_core::DataDirLock::acquire_config_shared_if_manageable(
                 data_dir,
                 "runtime-root inspection",
             )?
         } else {
-            None
+            // Join it, or refuse — never proceed unlocked. The previous version
+            // treated an absent lock this account may not create as licence to
+            // classify anyway, which put the read outside the domain: a
+            // `ManagedConfigEdit` can create that very lock and rewrite
+            // `icn.toml` while this is still reading it, so the outcome would
+            // depend on whether the read landed in the truncate window.
+            //
+            // This is the same three-outcome shape the storage lock above has
+            // had all along — create, join, refuse. The configuration side
+            // proceeded unlocked only because the non-creating acquire did not
+            // exist to call; it does now.
+            Some(
+                icn_core::DataDirLock::acquire_config_shared_without_creating(
+                    data_dir,
+                    "runtime-root inspection",
+                )?,
+            )
         };
 
         // Test-only: pause here, between the lock decision and the first store
@@ -5094,19 +5110,48 @@ mod failpoint_tests {
 
     /// And the control for the positive answer, so `config_linkage` cannot be
     /// hard-wired to `false` while the two refusal witnesses still pass.
+    ///
+    /// This asserted a weaker fact when it was written — that a `[cooperative]`
+    /// *section* reads as linkage — and its fixture did not even carry a
+    /// treasury. That definition was wrong rather than merely loose: every file
+    /// round-tripped through `Config::to_file` has an empty `[cooperative]`
+    /// table, so presence reported linkage for a root where nothing had been
+    /// published, telling an operator reading an INCOMPLETE report that the
+    /// configuration step was done. The linkage this ceremony publishes is a
+    /// `treasury_did`, so that is what the control now asserts.
     #[test]
-    fn a_configuration_carrying_the_cooperative_section_reads_as_linked() {
+    fn a_configuration_carrying_a_treasury_reads_as_linked() {
         let dir = tempfile::TempDir::new().unwrap();
         std::fs::write(
             dir.path().join("icn.toml"),
-            b"[cooperative]\nid = \"coop-example\"\n",
+            b"[cooperative]\ntreasury_did = \"did:icn:zExampleTreasury\"\n",
         )
         .unwrap();
 
         let components = runtime_root_components(dir.path()).expect("a parseable configuration");
         assert!(
             components.config_linkage,
-            "a published `[cooperative]` section is the linkage this reports"
+            "a published `treasury_did` is the linkage this reports"
+        );
+    }
+
+    /// The discriminating half of the same rule: a table without a treasury is
+    /// not linkage. Without this, requiring the treasury could be reverted to a
+    /// presence test and the positive control above would still pass.
+    #[test]
+    fn a_cooperative_section_without_a_treasury_is_not_linkage() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("icn.toml"),
+            b"[cooperative]\nname = \"Round-tripped, never provisioned\"\n",
+        )
+        .unwrap();
+
+        let components = runtime_root_components(dir.path()).expect("a parseable configuration");
+        assert!(
+            !components.config_linkage,
+            "a section with no treasury is what `Config::to_file` leaves behind, not evidence \
+             that provisioning published anything"
         );
     }
 
