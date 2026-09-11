@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { buildEnvironmentReport } from "./environment-report.js";
 import { buildStateIndex } from "./state-index.js";
+import { describeSourceRevision } from "./source-revision.js";
 import { runCommand } from "../utils/commands.js";
 
 export type DoctorCheck = {
@@ -290,7 +291,19 @@ export async function buildDoctorReport(repoRoot: string): Promise<DoctorReport>
     checks.push({ id: "gh", severity: "ok", message: "gh CLI available." });
   }
 
-  const cleanliness = classifyTreeCleanliness(env.git.branch, env.git.porcelainLines);
+  // The cleanliness verdict is fed by the HARDENED probe, not by buildEnvironmentReport's plain
+  // `git status --porcelain`. That plain probe honours the inspected repository's own settings,
+  // so `status.showUntrackedFiles=no` or a redirected `core.worktree` makes it report zero lines
+  // for a tree that is not clean — and a classifier cannot be more trustworthy than the
+  // measurement it is handed. describeSourceRevision pins --work-tree, forces
+  // --untracked-files=normal, sanitises the environment, and returns null rather than a number
+  // when it could not establish the answer, which is the "unknown" this classifier already
+  // treats as not-healthy.
+  //
+  // Deliberately not duplicating the hardening here: one hardened probe feeding every
+  // orientation verdict is the point, and a second copy would be a second thing to get wrong.
+  const source = await describeSourceRevision(repoRoot);
+  const cleanliness = classifyTreeCleanliness(env.git.branch, source.dirty_paths);
   // `env.git.dirtySummary` is "dirty (N paths)" rather than a file list, so appending it would
   // only restate the count this message already carries.
   checks.push({

@@ -153,3 +153,62 @@ describe("buildDoctorReport — the classifier is actually wired into the verdic
     expect(check?.severity).toBe("ok");
   });
 });
+
+// The classifier can only be as trustworthy as the measurement it is handed. buildEnvironmentReport
+// runs a PLAIN `git status --porcelain`, which honours the inspected repository's own settings —
+// so a repo can hide its dirt from it. These assert the doctor is fed the hardened probe instead.
+describe("buildDoctorReport — a repository cannot hide its dirt from the verdict", () => {
+  const temps: string[] = [];
+  function repo(configure: (git: (...a: string[]) => void, dir: string) => void): string {
+    const d = mkdtempSync(path.join(tmpdir(), "icn-doctor-adv-"));
+    temps.push(d);
+    const git = (...a: string[]): void => {
+      execFileSync("git", [
+        "-c", "user.email=t@e.invalid", "-c", "user.name=T",
+        "-c", "init.defaultBranch=main", "-c", "commit.gpgsign=false", ...a,
+      ], { cwd: d, stdio: "ignore" });
+    };
+    git("init", ".");
+    writeFileSync(path.join(d, "README.md"), "seed\n");
+    git("add", "README.md");
+    git("commit", "-m", "seed");
+    configure(git, d);
+    return d;
+  }
+  afterAll(() => {
+    for (const d of temps) rmSync(d, { recursive: true, force: true });
+  });
+
+  it("sees untracked content a repo configured to hide it", async () => {
+    const d = repo((git, dir) => {
+      git("config", "status.showUntrackedFiles", "no");
+      writeFileSync(path.join(dir, "smuggled.json"), "{}\n");
+    });
+
+    // Control: the plain probe the doctor USED to depend on reports nothing.
+    const plain = execFileSync("git", ["status", "--porcelain"], { cwd: d, encoding: "utf-8" }).trim();
+    expect(plain, "control: the config must actually hide it from a plain probe").toBe("");
+
+    const report = await buildDoctorReport(d);
+    const check = report.checks.find((c) => c.id === "dirty_tree");
+    // On main with hidden-but-real dirt, the verdict must not be "clean".
+    expect(check?.severity).toBe("error");
+  });
+
+  it("sees modifications a redirected core.worktree would conceal", async () => {
+    const decoy = mkdtempSync(path.join(tmpdir(), "icn-doctor-decoy-"));
+    temps.push(decoy);
+    writeFileSync(path.join(decoy, "README.md"), "seed\n");
+    const d = repo((git, dir) => {
+      writeFileSync(path.join(dir, "README.md"), "locally modified\n");
+      git("config", "core.worktree", decoy);
+    });
+
+    const plain = execFileSync("git", ["status", "--porcelain"], { cwd: d, encoding: "utf-8" }).trim();
+    expect(plain, "control: core.worktree must actually redirect the plain probe").toBe("");
+
+    const report = await buildDoctorReport(d);
+    const check = report.checks.find((c) => c.id === "dirty_tree");
+    expect(check?.severity).toBe("error");
+  });
+});
