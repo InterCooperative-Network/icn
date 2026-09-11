@@ -3550,3 +3550,181 @@ fn a_blocked_publication_temp_path_is_refused_before_anything_is_minted() {
         );
     }
 }
+
+/// An empty `[cooperative]` table is unconfigured, not a conflict.
+///
+/// `Config::cooperative` is not an `Option`, so every configuration that has
+/// ever been round-tripped through `Config::to_file` carries an empty
+/// `[cooperative]` table — including one written by `federation add`, `remove`
+/// or `set`. Refusing on mere presence therefore refused a root whose only sin
+/// was that an unrelated command had rewritten its configuration once, with no
+/// treasury named to protect.
+///
+/// The second assertion is the half that is easy to miss: publication appends a
+/// `[cooperative]` section, and two of them are a duplicate table that `toml`
+/// rejects outright — so accepting the empty table without populating it in
+/// place would just move the failure to publication, after everything else was
+/// already durable.
+#[test]
+fn an_empty_cooperative_section_is_unconfigured_not_a_conflict() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let cfg = data_dir.join("icn.toml");
+    let mut text = std::fs::read_to_string(&cfg).unwrap();
+    text.push_str("\n[cooperative]\n");
+    std::fs::write(&cfg, &text).unwrap();
+
+    let out = combined(&provision_runtime_root(data_dir, "Empty Section Coop"));
+    assert!(
+        !out.contains("already has a [cooperative]"),
+        "an empty table names no treasury and is not a conflict:\n{out}"
+    );
+
+    let after = std::fs::read_to_string(&cfg).unwrap();
+    let headers = after
+        .lines()
+        .filter(|line| line.trim() == "[cooperative]")
+        .count();
+    assert_eq!(
+        headers, 1,
+        "publication must populate the table that is there, not append a second one:\n{after}"
+    );
+    assert!(
+        after.contains("treasury_did"),
+        "and the section must actually carry the treasury:\n{after}"
+    );
+    toml::from_str::<toml::Value>(&after)
+        .expect("the published configuration must still be valid TOML");
+}
+
+/// The control: a section that really does name state is still refused.
+///
+/// Without this, relaxing the presence check to a content check could be
+/// satisfied by removing the refusal altogether.
+///
+/// The DID has to be a *real* one, minted in a throwaway root. A made-up
+/// spelling is rejected earlier by `Config::validate` as unparseable, and the
+/// test would then pass on a refusal from the wrong guard entirely — proving
+/// the ceremony rejects malformed DIDs, which is not what this is about.
+#[test]
+fn a_cooperative_section_naming_state_is_still_refused() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    let elsewhere = TempDir::new().unwrap();
+    assert!(init_identity(elsewhere.path()).status.success());
+    let foreign_did = node_did(elsewhere.path());
+
+    let cfg = data_dir.join("icn.toml");
+    let mut text = std::fs::read_to_string(&cfg).unwrap();
+    text.push_str(&format!(
+        "\n[cooperative]\ntreasury_did = \"{foreign_did}\"\n"
+    ));
+    std::fs::write(&cfg, &text).unwrap();
+
+    let refused = combined(&provision_runtime_root(data_dir, "Occupied Section Coop"));
+    assert!(
+        refused.contains("names cooperative state"),
+        "repointing an institution's spend source stays an operator decision:\n{refused}"
+    );
+    for artefact in ["genesis-trust-root.age", "treasury.age"] {
+        assert!(
+            !data_dir.join(artefact).exists(),
+            "{artefact} must not have been minted before the refusal"
+        );
+    }
+}
+
+/// A configuration writer must ask the account question before creating its lock.
+///
+/// `.icn-config.lock` is the same kind of durable coordination artifact as the
+/// storage lock: created here, retained after release, mode 0600. The audit that
+/// added this guard to the identity, recovery and device writers swept
+/// `DataDirLock::acquire` and missed `acquire_config`.
+#[cfg(unix)]
+#[test]
+fn a_configuration_writer_refuses_to_create_its_lock_under_the_wrong_account() {
+    let Some(other_gid) = a_supplementary_group() else {
+        eprintln!(
+            "SKIPPED a_configuration_writer_refuses_to_create_its_lock_under_the_wrong_account: \
+             this account has no supplementary group."
+        );
+        return;
+    };
+
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+    let did = node_did(data_dir);
+
+    let lock = data_dir.join(".icn-config.lock");
+    let _ = std::fs::remove_file(&lock);
+    chgrp(data_dir, other_gid);
+
+    let out = combined(
+        &icnctl(data_dir)
+            .args(["federation", "add", &format!("icn://{did}@127.0.0.1:9999")])
+            .output()
+            .unwrap(),
+    );
+    assert!(
+        out.contains("that the account owning it cannot use"),
+        "a creating configuration-lock acquisition must refuse under the wrong account:\n{out}"
+    );
+    assert!(
+        !lock.exists(),
+        "and must not have created {} — the owning account could not reopen it",
+        lock.display()
+    );
+}
+
+/// `show` joins the configuration exclusion domain instead of racing it.
+///
+/// The storage lock does not exclude a configuration writer — they are
+/// deliberately separate files — and `Config::to_file` rewrites `icn.toml` with
+/// a plain `fs::write`. A classification read overlapping one could therefore
+/// observe a truncated file and report `state_unreadable` for a perfectly good
+/// root, purely on arrival order.
+///
+/// Deterministic: the writer's lock is held by this test process for the whole
+/// invocation, so there is no sleep and no race to lose.
+#[cfg(unix)]
+#[test]
+fn show_contends_with_a_configuration_writer_rather_than_reading_a_torn_file() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path();
+    assert!(init_identity(data_dir).status.success());
+    assert!(run_init_coop(data_dir).status.success());
+
+    // Control first: with nobody writing, classification is admitted.
+    let free = icnctl(data_dir)
+        .args(["institution", "runtime-root", "show", "--json"])
+        .output()
+        .unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&free.stdout)
+        .unwrap_or_else(|e| panic!("stdout must be one JSON document: {e}"));
+    assert_ne!(
+        doc["state"], "ERROR",
+        "fixture: an unprovisioned root with nobody writing must classify: {doc}"
+    );
+
+    let _writer =
+        icn_core::DataDirLock::acquire_config(data_dir, "witness configuration writer").unwrap();
+
+    let held = icnctl(data_dir)
+        .args(["institution", "runtime-root", "show", "--json"])
+        .output()
+        .unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&held.stdout)
+        .unwrap_or_else(|e| panic!("stdout must be one JSON document: {e}"));
+    assert_eq!(
+        doc["state"], "ERROR",
+        "classification must contend with a configuration writer, not read past it: {doc}"
+    );
+}

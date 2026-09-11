@@ -3186,11 +3186,26 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
     }
     let parsed: toml::Value = toml::from_str(&text)
         .with_context(|| format!("Failed to parse {}", config_path.display()))?;
-    if parsed.get("cooperative").is_some() {
+    // Presence is not the question — content is. `Config::cooperative` is not an
+    // `Option`, so every configuration that has ever been round-tripped through
+    // `Config::to_file` carries an *empty* `[cooperative]` table, including one
+    // written by `federation add`/`remove`/`set`. Refusing on presence therefore
+    // refused a root whose only sin was that an unrelated command had rewritten
+    // its configuration once, and no treasury was named to protect.
+    //
+    // What the refusal exists for is stated right above: a section that may
+    // already name a different treasury. An empty table names nothing.
+    let names_cooperative_state = match parsed.get("cooperative") {
+        None => false,
+        // A non-table `cooperative` is state this does not understand, and
+        // guessing is not better than refusing.
+        Some(existing) => existing.as_table().is_none_or(|table| !table.is_empty()),
+    };
+    if names_cooperative_state {
         bail!(
             "Refusing institutional runtime-root provisioning: {} already has a [cooperative] \
-             section. It may already name a different treasury; repointing an \
-             institution's spend source is an explicit operator decision.",
+             section that names cooperative state. It may already name a different treasury; \
+             repointing an institution's spend source is an explicit operator decision.",
             config_path.display()
         );
     }
@@ -3245,14 +3260,44 @@ fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -
     let body = toml::to_string(&toml::Value::Table(table))
         .context("Failed to serialize the [cooperative] section")?;
 
-    out.push_str(
-        "\n# Written by `icnctl institution runtime-root create` (#2744).\n\
-         # `treasury_did` is a keypair-backed DID whose key material lives in\n\
-         # `treasury.age`. Without this section the daemon falls back to the\n\
-         # node's own DID for governance-authored ledger entries.\n\
-         [cooperative]\n",
-    );
-    out.push_str(&body);
+    // An empty `[cooperative]` table may already be there — see the linkable
+    // check. Populate it where it stands rather than appending a second one:
+    // two `[cooperative]` tables are a duplicate key and `toml` rejects the
+    // whole file, so appending would turn an accepted root into a failed
+    // publication after the ceremony had already written everything else.
+    //
+    // Matched on the trimmed line so an unusual spelling does not silently
+    // append a duplicate; if no header is found the append path runs and the
+    // whole-`Config` parse below refuses, which is the fail-closed direction.
+    let mut header_end = None;
+    let mut cursor = 0usize;
+    for line in out.split_inclusive('\n') {
+        if line.trim() == "[cooperative]" {
+            header_end = Some((cursor + line.len(), line.ends_with('\n')));
+            break;
+        }
+        cursor += line.len();
+    }
+    match header_end {
+        Some((at, newline_terminated)) => {
+            let insertion = if newline_terminated {
+                body.clone()
+            } else {
+                format!("\n{body}")
+            };
+            out.insert_str(at, &insertion);
+        }
+        None => {
+            out.push_str(
+                "\n# Written by `icnctl institution runtime-root create` (#2744).\n\
+                 # `treasury_did` is a keypair-backed DID whose key material lives in\n\
+                 # `treasury.age`. Without this section the daemon falls back to the\n\
+                 # node's own DID for governance-authored ledger entries.\n\
+                 [cooperative]\n",
+            );
+            out.push_str(&body);
+        }
+    }
 
     // Validate the candidate the way the daemon loads it — a whole-`Config`
     // parse, not just the `[cooperative]` table — before the rename, so a
@@ -3501,6 +3546,24 @@ fn classify_for_show(data_dir: &Path, json: bool) -> Result<RuntimeRootState> {
         }
     });
     let state = inspection.and_then(|_guard| {
+        // The storage lock does not exclude a configuration writer: they are
+        // deliberately separate files, so `show` and `ManagedConfigEdit` never
+        // contend. `Config::to_file` rewrites `icn.toml` with a plain
+        // `fs::write`, so a classification read overlapping one can observe a
+        // truncated file and report `state_unreadable` for a perfectly good
+        // root, purely on arrival order. Classification reads the configuration,
+        // so it joins that domain too — shared, because inspection is a reader
+        // and several may look at once.
+        //
+        // `_if_manageable` for the same reason inspection does not always mint
+        // the storage lock: a reader must not create a coordination file it
+        // would leave behind under the wrong account. When it cannot be taken,
+        // classification proceeds — the read was already no worse off than
+        // before this lock existed.
+        let _config = icn_core::DataDirLock::acquire_config_shared_if_manageable(
+            data_dir,
+            "runtime-root inspection",
+        )?;
         // Test-only: pause here, between the lock decision and the first store
         // open, so the dangerous interleaving can be exercised deterministically.
         #[cfg(test)]

@@ -4478,6 +4478,17 @@ impl ManagedConfigEdit {
     /// `missing` decides what an absent configuration means for this caller:
     /// `federation add` starts from defaults, `remove` and `set` refuse.
     fn open(config_root: &Path, holder: &str, missing: MissingConfig) -> Result<Self> {
+        // `.icn-config.lock` is created here, retained after release, and mode
+        // 0600 — the same durable coordination artifact as the storage lock, so
+        // it needs the same question asked first. A federation edit run through
+        // `sudo` against a service-owned root would otherwise leave a file the
+        // daemon's account cannot reopen even read-only, and the service stops
+        // starting. The audit that added this guard to the identity, recovery
+        // and device writers swept `DataDirLock::acquire` and missed
+        // `acquire_config`; both create.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            config_root,
+        )?;
         // Acquired BEFORE the load. This ordering is the entire guarantee.
         let lock = icn_core::DataDirLock::acquire_config(config_root, holder)?;
         let path = config_root.join("icn.toml");
