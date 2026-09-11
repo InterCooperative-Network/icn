@@ -159,7 +159,7 @@ const GIT_SAFE_FLAGS = ["-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null
  */
 const STATUS_ARGS = ["status", "--porcelain", "--untracked-files=normal"] as const;
 
-type GitProbe =
+export type GitProbe =
   | { ok: true; out: string }
   | { ok: false; timedOut: boolean; truncated?: boolean };
 
@@ -230,21 +230,43 @@ export async function headRevision(checkout: string): Promise<string | null> {
  *
  * `null` means the state could not be determined, which never compares equal to anything.
  */
-export async function worktreeFingerprint(
+/**
+ * A snapshot of the guarded state, plus the raw probe that produced it.
+ *
+ * The probe is carried out so the caller can reuse it. `git status` is the expensive part of
+ * this module, and the before/after guard already requires two of them; describing the source
+ * from a third scan of the same tree bought nothing but latency.
+ */
+export type WorktreeSnapshot = {
+  fingerprint: string | null;
+  status: GitProbe | null;
+};
+
+export async function snapshotWorktree(
   checkout: string,
   provenance: SourceProvenance = "controlled"
-): Promise<string | null> {
+): Promise<WorktreeSnapshot> {
   const head = await headRevision(checkout);
-  if (head === null) return null;
+  if (head === null) return { fingerprint: null, status: null };
   if (provenance === "caller_selected") {
     // The working tree of a caller-selected checkout is never read, so the guard degrades to the
     // commit alone. Nothing is certified from such a source anyway — `trustworthy` is already
     // false — so this weakens no claim that was being made.
-    return `${head}:worktree-not-inspected`;
+    return { fingerprint: `${head}:worktree-not-inspected`, status: null };
   }
   const status = await gitProbe(checkout, STATUS_ARGS);
-  if (!status.ok) return null;
-  return `${head}:${createHash("sha256").update(status.out).digest("hex")}`;
+  if (!status.ok) return { fingerprint: null, status };
+  return {
+    fingerprint: `${head}:${createHash("sha256").update(status.out).digest("hex")}`,
+    status,
+  };
+}
+
+export async function worktreeFingerprint(
+  checkout: string,
+  provenance: SourceProvenance = "controlled"
+): Promise<string | null> {
+  return (await snapshotWorktree(checkout, provenance)).fingerprint;
 }
 
 /** When the tracking refs were last updated from the remote, via FETCH_HEAD's mtime. */
@@ -266,7 +288,13 @@ async function upstreamObservedAt(checkout: string): Promise<Date | null> {
  */
 export async function describeSourceRevision(
   root?: string,
-  provenance: SourceProvenance = "controlled"
+  provenance: SourceProvenance = "controlled",
+  /**
+   * An already-taken snapshot of the same checkout, reused instead of re-probing. The caller is
+   * responsible for it describing this checkout; passing a stale or foreign one would misreport
+   * cleanliness, so the only caller that supplies it is the one that just took it.
+   */
+  snapshot?: WorktreeSnapshot
 ): Promise<SourceRevision> {
   // An explicitly supplied root is how it was chosen, regardless of what the environment says.
   // icn_ops_agent_runtime deliberately overrides ICN_ROOT with the caller's lane; reporting
@@ -331,7 +359,7 @@ export async function describeSourceRevision(
         "cleanliness is indeterminate and this source cannot be certified"
     );
   } else {
-  const status = await gitProbe(checkout, STATUS_ARGS);
+  const status = snapshot?.status ?? (await gitProbe(checkout, STATUS_ARGS));
   if (!status.ok) {
     const cause = status.timedOut ? ` (git status exceeded ${GIT_TIMEOUT_MS}ms)` : "";
     warnings.push(

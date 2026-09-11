@@ -4,6 +4,7 @@ import {
   chmodSync,
   existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   utimesSync,
   writeFileSync,
@@ -555,6 +556,41 @@ describe("describeSourceRevision — a read-only probe executes no repository-co
 
     await describeSourceRevision(clone);
     expect(existsSync(sentinel), "probe must not execute core.fsmonitor").toBe(false);
+  });
+});
+
+// The cost fix is that the source description REUSES the guard's second scan instead of taking
+// a third of the same tree. Witnessed by its observable consequence: when a snapshot is supplied,
+// the description must come from it.
+//
+// An earlier version of this test counted real scans with an appending clean filter. That was
+// flaky: `git status` refreshes the index stat cache, so whether a later scan re-invokes the
+// filter depends on filesystem timestamp granularity — it passed alone and failed in the full
+// suite, intermittently. A flaky witness is worse than none, so it was replaced with this one.
+describe("describeSourceRevision — a supplied snapshot is reused, not re-probed", () => {
+  it("describes cleanliness from the snapshot it was given", async () => {
+    const { clone } = originWithClone();
+    // The tree on disk is spotless...
+    expect(git(clone, "status", "--porcelain")).toBe("");
+
+    // ...but the caller hands over a snapshot taken a moment earlier, which saw two changes.
+    const s = await describeSourceRevision(clone, "controlled", {
+      fingerprint: "irrelevant-for-this-assertion",
+      status: { ok: true, out: " M README.md\n?? scratch.txt" },
+    });
+
+    // If the probe had been re-run, this would read 0/false from the real tree.
+    expect(s.dirty_paths).toBe(2);
+    expect(s.dirty).toBe(true);
+    expect(s.trustworthy).toBe(false);
+  });
+
+  it("still probes for itself when no snapshot is supplied", async () => {
+    const { clone } = originWithClone();
+    writeFileSync(path.join(clone, "README.md"), "changed\n");
+    const s = await describeSourceRevision(clone, "controlled");
+    expect(s.dirty).toBe(true);
+    expect(s.dirty_paths).toBe(1);
   });
 });
 

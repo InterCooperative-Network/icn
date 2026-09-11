@@ -16,7 +16,7 @@ import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
 import {
   describeSourceRevision,
-  worktreeFingerprint,
+  snapshotWorktree,
   type SourceProvenance,
 } from "../diagnostics/source-revision.js";
 import {
@@ -66,11 +66,17 @@ export function registerAgentOpsTools(
     // and passing that on would make every response claim `explicit_root`, which is only true
     // of the caller-lane case.
     const target = root ?? repoRoot;
-    const before = await worktreeFingerprint(target, provenance);
+    // Two working-tree scans, not three: the before/after guard needs both, and the source
+    // description reuses the second rather than taking a third of the same tree.
+    const before = await snapshotWorktree(target, provenance);
     const payload = await build();
-    const source = await describeSourceRevision(root, provenance);
-    const after = await worktreeFingerprint(target, provenance);
-    if (before === null || after === null || before !== after) {
+    const after = await snapshotWorktree(target, provenance);
+    const source = await describeSourceRevision(root, provenance, after);
+    if (
+      before.fingerprint === null ||
+      after.fingerprint === null ||
+      before.fingerprint !== after.fingerprint
+    ) {
       source.trustworthy = false;
       source.warnings.push(
         "the checkout's commit or working tree changed while this answer was being read, or " +
