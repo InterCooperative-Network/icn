@@ -2388,15 +2388,26 @@ impl StorageDomain {
     /// legitimately creates the directory, so there is no owning account to
     /// defer to yet.
     fn create(data_dir: &Path, holder: &str) -> Result<Self> {
-        // A non-directory path is the gate's refusal here too. `create`
-        // legitimately makes the root when it is absent, so only that one shape
-        // is diverted.
+        // Classified before anything is created, including by the account guard
+        // below. Every step from here on makes something *inside* this path — an
+        // ownership probe, a coordination file — and creating inside a regular
+        // file reports `ENOTDIR` named after whichever artefact happened to go
+        // first, burying the operator's actual mistake. The N2-A gate refuses a
+        // misconfigured `--data-dir` by name, so it is what speaks here.
+        //
+        // The `bail!` after it is a fail-closed net, not dead code: it is what
+        // happens if the gate ever stops refusing this shape.
         if matches!(classify_root(data_dir, holder)?, RootShape::NotADirectory) {
-            return Ok(Self::Unheld {
-                data_dir: data_dir.to_path_buf(),
-                why: "the --data-dir path is not a directory",
-            });
+            enforce_n2a_gate(data_dir, holder)?;
+            bail!(
+                "Refusing to run {holder}: {} exists but is not a directory.",
+                data_dir.display()
+            );
         }
+        // The account guard belongs here rather than at the call site: it is
+        // part of what taking a creating acquisition *means*, and leaving it
+        // outside let it run before the classification above and produce the
+        // very error that classification exists to prevent.
         institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
             data_dir,
         )?;
@@ -3591,11 +3602,17 @@ async fn main() -> Result<()> {
             // The creating shape, not the joining one: this command
             // legitimately creates the data root on a fresh machine, so there
             // is no owning account to defer to yet.
-            institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
-                &data_dir,
-            )?;
-            let _init_coop_config = icn_core::DataDirLock::acquire_config(&data_dir, "init-coop")?;
+            //
+            // Storage before configuration here, which is the opposite of the
+            // order elsewhere. `DataDirLock`'s own documentation states that the
+            // ordering is for readability rather than safety — every acquisition
+            // is non-blocking, so a crossed pair gets an immediate refusal and a
+            // deadlock is not reachable. What the swap buys is that
+            // `StorageDomain::create` classifies the path *before* anything is
+            // created inside it, so a misconfigured `--data-dir` is still the
+            // gate's refusal to make rather than a coordination-file `ENOTDIR`.
             let domain = StorageDomain::create(&data_dir, "init-coop")?;
+            let _init_coop_config = icn_core::DataDirLock::acquire_config(&data_dir, "init-coop")?;
             // Inside the lock, so nothing can open these stores between the
             // gate's verdict and the work it clears.
             enforce_n2a_gate(&data_dir, "init-coop")?;

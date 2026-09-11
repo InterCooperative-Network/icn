@@ -376,6 +376,62 @@ fn init_coop_is_refused_by_a_configuration_holder_alone() {
     drop(publisher);
 }
 
+/// A misconfigured `--data-dir` is the N2-A gate's refusal to make, for every
+/// command that now joins the domain.
+///
+/// Joining happens before the gate — deliberately, so nothing can open these
+/// stores between the gate's verdict and the work it clears. That ordering made
+/// the join speak for a path that is not a directory: the ownership probe
+/// creates a file, and creating a file *inside* a regular file reports `ENOTDIR`
+/// named after the probe, burying the operator's actual mistake.
+///
+/// Both entry points are covered because they were wrong for different reasons
+/// and were fixed at different places: `join` classified too late, and
+/// `init-coop` ran the account guard at the call site *before* the classifying
+/// constructor, which left that constructor's own guard unreachable.
+#[test]
+fn a_data_dir_that_is_not_a_directory_is_refused_by_the_gate_not_by_a_probe() {
+    for args in [
+        vec!["coop", "entity-report"],
+        vec!["treasury", "entity-backfill-report"],
+        vec!["init-coop", "--name", "X", "--yes", "--no-start"],
+    ] {
+        let scratch = TempDir::new().unwrap();
+        let not_a_dir = scratch.path().join("data-dir-is-a-file");
+        std::fs::write(&not_a_dir, b"oops").unwrap();
+
+        let out = icnctl(&not_a_dir).args(&args).output().unwrap();
+        let text = combined(&out);
+        assert!(
+            !out.status.success(),
+            "`icnctl {}` must refuse a --data-dir that is not a directory:\n{text}",
+            args.join(" ")
+        );
+        assert!(
+            text.contains("N2-A startup gate refused"),
+            "`icnctl {}` must be refused BY THE GATE, not by a coordination probe:\n{text}",
+            args.join(" ")
+        );
+        assert!(
+            !text.contains("identity-probe"),
+            "`icnctl {}` must not report the ownership probe's ENOTDIR instead:\n{text}",
+            args.join(" ")
+        );
+        // Nothing was created beside it, and the file itself is untouched.
+        assert_eq!(std::fs::read(&not_a_dir).unwrap(), b"oops");
+        let left: Vec<_> = std::fs::read_dir(scratch.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name())
+            .collect();
+        assert_eq!(
+            left.len(),
+            1,
+            "a refused command must not have minted anything beside the path: {left:?}"
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The boundary: what deliberately stays outside the domain
 // ---------------------------------------------------------------------------
