@@ -2,6 +2,7 @@
   "repos": {
     "icn": {
       "local": ".",
+      "local_store": "~/icn-dev/repos/icn.git",
       "remote": "git@github.com:InterCooperative-Network/icn.git",
       "cargo_workspace": "icn",
       "primary_branch": "main",
@@ -28,14 +29,17 @@
     }
   },
   "org_repos": {
-    "description": "InterCooperative-Network org repos and adjacent private layers, seen from icn: repo discovery / coordination metadata for the ecosystem control plane. NOT architectural truth — ops/state/truth/sources.json wins on any truth-ownership conflict, and docs/ATLAS.md + ops/state/ecosystem.json remain the role/boundary index. Fields record CURRENT state only (a null lock/envelope means none exists yet; planned is not done). stack_stage = cross-repo merge order per ops/coordination/PR_STACK_PROTOCOL.md (1=icn canonical first; 6=org profile mirror last; null=not part of PR stacks). dashboard (present only on the ecosystem dashboard-home repo, icn-infra) points at a static coordination-snapshot artifact (schema icn-ecosystem-dashboard/v1, runtime_health:false) — it is a dated snapshot, NOT a status envelope, a claim-lint caller, or a live-health source.",
+    "description": "InterCooperative-Network org repos and adjacent private layers, seen from icn: repo discovery / coordination metadata for the ecosystem control plane. NOT architectural truth \u2014 ops/state/truth/sources.json wins on any truth-ownership conflict, and docs/ATLAS.md + ops/state/ecosystem.json remain the role/boundary index. Fields record CURRENT state only (a null lock/envelope means none exists yet; planned is not done). stack_stage = cross-repo merge order per ops/coordination/PR_STACK_PROTOCOL.md (1=icn canonical first; 6=org profile mirror last; null=not part of PR stacks). dashboard (present only on the ecosystem dashboard-home repo, icn-infra) points at a static coordination-snapshot artifact (schema icn-ecosystem-dashboard/v1, runtime_health:false) \u2014 it is a dated snapshot, NOT a status envelope, a claim-lint caller, or a live-health source.",
     "repos": {
       "nycn": {
         "remote": "InterCooperative-Network/nycn",
         "visibility": "private",
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/nycn.git",
-        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1" },
+        "lock": {
+          "path": "ops/upstream/icn.lock.yaml",
+          "format": "icn-upstream-lock/v1"
+        },
         "status_envelope": "ops/status-envelope.json",
         "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 3,
@@ -57,14 +61,18 @@
           "runtime_health": false
         },
         "stack_stage": 2,
-        "role_note": "Org operating contracts: cross-repo boundary, public-claims gates, source classification. Ecosystem dashboard home (control-plane-v1 stage 2): a static coordination snapshot of the downstream status envelopes landed via icn-infra#4 (see `dashboard`). icn-infra is the dashboard home, NOT a claim-lint caller — it has no upstream lock or status envelope of its own (lock/status_envelope stay null, claim_enforcement none). The dashboard is a dated snapshot, not a live health check or readiness claim."
+        "role_note": "Org operating contracts: cross-repo boundary, public-claims gates, source classification. Ecosystem dashboard home (control-plane-v1 stage 2): a static coordination snapshot of the downstream status envelopes landed via icn-infra#4 (see `dashboard`). icn-infra is the dashboard home, NOT a claim-lint caller \u2014 it has no upstream lock or status envelope of its own (lock/status_envelope stay null, claim_enforcement none). The dashboard is a dated snapshot, not a live health check or readiness claim."
       },
       "icn-learn": {
         "remote": "InterCooperative-Network/icn-learn",
         "visibility": "private",
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/icn-learn.git",
-        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1", "review_status": "pending-human-signoff" },
+        "lock": {
+          "path": "ops/upstream/icn.lock.yaml",
+          "format": "icn-upstream-lock/v1",
+          "review_status": "pending-human-signoff"
+        },
         "status_envelope": "ops/status-envelope.json",
         "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 4,
@@ -75,7 +83,11 @@
         "visibility": "private",
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/icn-community-bridge.git",
-        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1", "review_status": "pending-human-signoff" },
+        "lock": {
+          "path": "ops/upstream/icn.lock.yaml",
+          "format": "icn-upstream-lock/v1",
+          "review_status": "pending-human-signoff"
+        },
         "status_envelope": "ops/status-envelope.json",
         "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 5,
@@ -112,7 +124,7 @@
         "status_envelope": null,
         "claim_enforcement": "none",
         "stack_stage": null,
-        "role_note": "role: none — GitHub-generated demo noise per docs/reference/project-index/repository-map.md; archive-or-ignore decision pending"
+        "role_note": "role: none \u2014 GitHub-generated demo noise per docs/reference/project-index/repository-map.md; archive-or-ignore decision pending"
       }
     }
   },
@@ -137,7 +149,10 @@
       "type": "deployment",
       "direction": "push",
       "cluster_control": "role:k3s-control-plane (private:network-ops)",
-      "workers": ["role:k3s-worker (private:network-ops)", "role:k3s-worker (private:network-ops)"]
+      "workers": [
+        "role:k3s-worker (private:network-ops)",
+        "role:k3s-worker (private:network-ops)"
+      ]
     },
     {
       "from": "homelab-inventory",
@@ -148,10 +163,13 @@
     }
   ],
   "infrastructure": {
-    "note": "Public map: ROLES ONLY. Concrete node/service addresses are private operational values (docs/ATLAS.md §5) held in the private network-ops repo; extraction requires the icn-infra scrub gate (ADR-0005). Never add host addresses, IPs, or provider values to this public map.",
+    "note": "Public map: ROLES ONLY. Concrete node/service addresses are private operational values (docs/ATLAS.md \u00a75) held in the private network-ops repo; extraction requires the icn-infra scrub gate (ADR-0005). Never add host addresses, IPs, or provider values to this public map.",
     "k3s": {
       "control": "role:k3s-control-plane (private:network-ops)",
-      "workers": ["role:k3s-worker (private:network-ops)", "role:k3s-worker (private:network-ops)"],
+      "workers": [
+        "role:k3s-worker (private:network-ops)",
+        "role:k3s-worker (private:network-ops)"
+      ],
       "icn_dev": "role:icn-dev-vm (private:network-ops)",
       "ci_runner": "role:ci-runner (private:network-ops)",
       "services": {

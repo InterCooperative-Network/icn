@@ -134,6 +134,20 @@ function loadSpine(
       hint: `Regenerate with: ${REGENERATE}`,
     };
   }
+  return parseSpine(text);
+}
+
+/**
+ * Turn spine CONTENT into a spine, with no notion of where the content came from.
+ *
+ * Separated from the disk read so the same artifact can be supplied by canonical, revision-
+ * addressed storage instead of a working tree. The view logic below is identical either way —
+ * what changes is whether the bytes are authoritative.
+ */
+function parseSpine(
+  text: string
+): { ok: true; spine: Spine; artifact: string } | (SpineView & { ok: false }) {
+  const artifact = SPINE_REL;
   const parsed = safeJsonParse(text, SPINE_REL);
   if (!parsed.ok) {
     return {
@@ -184,7 +198,29 @@ export function buildAgentContextSpineView(
 ): SpineView {
   const loaded = loadSpine(repoRoot);
   if (!loaded.ok) return loaded;
-  const { spine, artifact } = loaded;
+  return buildViewFromSpine(loaded.spine, loaded.artifact, filter);
+}
+
+/**
+ * Same view, built from content supplied by the caller rather than read from a checkout.
+ *
+ * This is the entry point used for revision-addressed reads: the content comes from canonical
+ * storage at an exact revision, so the answer cannot be changed by editing a working tree.
+ */
+export function buildAgentContextSpineViewFromText(
+  text: string,
+  filter: SpineFilter = {}
+): SpineView {
+  const parsed = parseSpine(text);
+  if (!parsed.ok) return parsed;
+  return buildViewFromSpine(parsed.spine, parsed.artifact, filter);
+}
+
+function buildViewFromSpine(
+  spine: Spine,
+  artifact: string,
+  filter: SpineFilter
+): SpineView {
   const nodes = spine.nodes;
   const edges = spine.edges;
 
@@ -315,7 +351,21 @@ type BriefEntry = {
 export function buildPathBrief(repoRoot: string, paths: string[]): SpineView {
   const loaded = loadSpine(repoRoot);
   if (!loaded.ok) return loaded;
-  const { spine, artifact } = loaded;
+  return buildPathBriefFromSpine(loaded.spine, loaded.artifact, paths);
+}
+
+/** Same brief, built from content supplied by the caller — see buildAgentContextSpineViewFromText. */
+export function buildPathBriefFromText(text: string, paths: string[]): SpineView {
+  const parsed = parseSpine(text);
+  if (!parsed.ok) return parsed;
+  return buildPathBriefFromSpine(parsed.spine, parsed.artifact, paths);
+}
+
+function buildPathBriefFromSpine(
+  spine: Spine,
+  artifact: string,
+  paths: string[]
+): SpineView {
   const nodes = spine.nodes;
   const edges = spine.edges;
   const byId = new Map(nodes.map((n) => [n.id, n]));
