@@ -238,8 +238,18 @@ export async function headRevision(checkout: string): Promise<string | null> {
  * from a third scan of the same tree bought nothing but latency.
  */
 export type WorktreeSnapshot = {
+  /** Commit + working-tree + index-flag state, hashed. Null when it could not be determined. */
   fingerprint: string | null;
+  /** The commit this snapshot was taken at. */
+  head: string | null;
+  /** The raw `status` probe, carried so a description can reuse it rather than re-scanning. */
   status: GitProbe | null;
+  /**
+   * The raw `ls-files -v` probe. Part of the fingerprint because `status` omits files flagged
+   * `assume-unchanged` or `skip-worktree`: without it, a tracked file modified under a flag and
+   * then restored AND unflagged across the read leaves both fingerprints identical.
+   */
+  indexFlags: GitProbe | null;
 };
 
 export async function snapshotWorktree(
@@ -247,19 +257,31 @@ export async function snapshotWorktree(
   provenance: SourceProvenance = "controlled"
 ): Promise<WorktreeSnapshot> {
   const head = await headRevision(checkout);
-  if (head === null) return { fingerprint: null, status: null };
+  if (head === null) {
+    return { fingerprint: null, head: null, status: null, indexFlags: null };
+  }
   if (provenance === "caller_selected") {
     // The working tree of a caller-selected checkout is never read, so the guard degrades to the
     // commit alone. Nothing is certified from such a source anyway — `trustworthy` is already
     // false — so this weakens no claim that was being made.
-    return { fingerprint: `${head}:worktree-not-inspected`, status: null };
+    return {
+      fingerprint: `${head}:worktree-not-inspected`,
+      head,
+      status: null,
+      indexFlags: null,
+    };
   }
   const status = await gitProbe(checkout, STATUS_ARGS);
-  if (!status.ok) return { fingerprint: null, status };
-  return {
-    fingerprint: `${head}:${createHash("sha256").update(status.out).digest("hex")}`,
-    status,
-  };
+  const indexFlags = await gitProbe(checkout, ["ls-files", "-v"]);
+  if (!status.ok || !indexFlags.ok) {
+    return { fingerprint: null, head, status, indexFlags };
+  }
+  const digest = createHash("sha256")
+    .update(status.out)
+    .update("\u0000")
+    .update(indexFlags.out)
+    .digest("hex");
+  return { fingerprint: `${head}:${digest}`, head, status, indexFlags };
 }
 
 export async function worktreeFingerprint(
@@ -307,7 +329,11 @@ export async function describeSourceRevision(
   const checkout = root ?? resolveMonorepoRoot();
   const warnings: string[] = [];
 
-  const revision = await headRevision(checkout);
+  // When a snapshot is supplied, its commit is authoritative. Re-reading HEAD here would place
+  // the revision OUTSIDE the interval the before/after fingerprints guard: a checkout
+  // fast-forwarded after the snapshot would leave both fingerprints equal while this described
+  // the newer tree.
+  const revision = snapshot ? snapshot.head : await headRevision(checkout);
   if (!revision) {
     warnings.push(
       `source checkout is not a readable git tree (${checkout}); this answer cannot be tied to a revision`
@@ -380,7 +406,7 @@ export async function describeSourceRevision(
   // per-path status letter, where a lowercase letter means assume-unchanged and "S" means
   // skip-worktree. This is the fifth mechanism by which the probed repository could hide its
   // own state from the probe; like the others, the answer is to look anyway.
-  const lsFiles = await gitProbe(checkout, ["ls-files", "-v"]);
+  const lsFiles = snapshot?.indexFlags ?? (await gitProbe(checkout, ["ls-files", "-v"]));
   if (!lsFiles.ok) {
     const why = lsFiles.truncated
       ? " (the index listing was too large to read in full)"
@@ -421,7 +447,7 @@ export async function describeSourceRevision(
       "rev-list",
       "--left-right",
       "--count",
-      `HEAD...${upstream}`,
+      `${revision}...${upstream}`,
     ]);
     const parts = raw === null ? [] : raw.split(/\s+/).filter(Boolean);
     const a = parts.length === 2 ? Number.parseInt(parts[0] as string, 10) : NaN;

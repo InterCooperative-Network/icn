@@ -4,7 +4,6 @@ import {
   chmodSync,
   existsSync,
   mkdtempSync,
-  readFileSync,
   rmSync,
   utimesSync,
   writeFileSync,
@@ -16,6 +15,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
   describeSourceRevision,
+  snapshotWorktree,
   wasTruncated,
   worktreeFingerprint,
 } from "../diagnostics/source-revision.js";
@@ -576,7 +576,9 @@ describe("describeSourceRevision — a supplied snapshot is reused, not re-probe
     // ...but the caller hands over a snapshot taken a moment earlier, which saw two changes.
     const s = await describeSourceRevision(clone, "controlled", {
       fingerprint: "irrelevant-for-this-assertion",
+      head: git(clone, "rev-parse", "HEAD"),
       status: { ok: true, out: " M README.md\n?? scratch.txt" },
+      indexFlags: { ok: true, out: "H README.md" },
     });
 
     // If the probe had been re-run, this would read 0/false from the real tree.
@@ -591,6 +593,47 @@ describe("describeSourceRevision — a supplied snapshot is reused, not re-probe
     const s = await describeSourceRevision(clone, "controlled");
     expect(s.dirty).toBe(true);
     expect(s.dirty_paths).toBe(1);
+  });
+});
+
+// The before/after fingerprints guard an interval. Anything the description reads for itself
+// sits OUTSIDE that interval and can therefore disagree with what the payload saw.
+describe("the read guard covers the commit and the index, not just status output", () => {
+  it("describes the snapshot's commit, not whatever HEAD became afterwards", async () => {
+    const { clone } = originWithClone();
+    const captured = git(clone, "rev-parse", "HEAD");
+    const snapshot = await snapshotWorktree(clone, "controlled");
+    expect(snapshot.head).toBe(captured);
+
+    // The checkout moves after the snapshot — exactly the fast-forward this feature exists for.
+    writeFileSync(path.join(clone, "later.md"), "later\n");
+    git(clone, "add", "later.md");
+    git(clone, "commit", "-m", "later");
+    expect(git(clone, "rev-parse", "HEAD")).not.toBe(captured);
+
+    const s = await describeSourceRevision(clone, "controlled", snapshot);
+    // Re-reading HEAD here would attribute the payload to a commit it never saw.
+    expect(s.source_revision).toBe(captured);
+  });
+
+  it("notices a tracked file edited under an index flag and then restored and unflagged", async () => {
+    const { clone } = originWithClone();
+
+    // Before: the file is modified but hidden from status by skip-worktree.
+    git(clone, "update-index", "--skip-worktree", "README.md");
+    writeFileSync(path.join(clone, "README.md"), "transient edit\n");
+    const before = await snapshotWorktree(clone, "controlled");
+    // status alone sees a spotless tree, which is the whole problem.
+    expect(before.status?.ok === true ? before.status.out : "x").toBe("");
+
+    // After: restored and unflagged, so status is clean and no flag remains either.
+    git(clone, "update-index", "--no-skip-worktree", "README.md");
+    writeFileSync(path.join(clone, "README.md"), "seed\n");
+    const after = await snapshotWorktree(clone, "controlled");
+    expect(after.status?.ok === true ? after.status.out : "x").toBe("");
+
+    // Hashing status alone would make these identical and certify the transient edit away.
+    expect(after.fingerprint).not.toBe(before.fingerprint);
   });
 });
 
