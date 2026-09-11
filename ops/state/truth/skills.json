@@ -116,6 +116,16 @@
     ],
     "icn_level": [
       {
+        "name": "systemic-leverage",
+        "canonical_path": ".agents/skills/systemic-leverage/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/systemic-leverage/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
         "name": "bench",
         "canonical_path": ".agents/skills/bench/SKILL.md",
         "provider_mirrors": [

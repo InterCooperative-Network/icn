@@ -335,6 +335,12 @@
       "summary": ""
     },
     {
+      "name": "systemic-leverage",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/systemic-leverage/SKILL.md",
+      "summary": ""
+    },
+    {
       "name": "verify",
       "group": "icn_level",
       "canonical_path": ".agents/skills/verify/SKILL.md",
@@ -536,6 +542,10 @@
     {
       "domain": "ecosystem_index",
       "owner": "docs/ATLAS.md"
+    },
+    {
+      "domain": "engineering_leverage",
+      "owner": "ops/state/truth/engineering-leverage.json"
     },
     {
       "domain": "identity_semantics",

@@ -78,6 +78,7 @@ The source-linked invariant catalog is `docs/reference/project-index/invariants-
 - Do not silently upgrade toolchains or dependencies.
 - Do not perform deployment, release, migration/cutover, branch-protection changes, destructive infrastructure actions, or merges without the authorization appropriate to that action.
 - When a selected implementation slice appears to require changing a settled contract, stop and report the contract conflict instead of widening the implementation quietly.
+- After **establishing** a defect — reproduced, not suspected — separate its immediate cause from the mechanism that made it possible to write, and classify the structural opportunity `NOW` / `FOLLOW_UP` / `ARCHITECTURAL` / `NONE`. `ops/state/truth/engineering-leverage.json` owns that loop and the catalogue of recurring classes; the `systemic-leverage` skill is its working surface. A systemic observation is an *observation*: it never widens the active scope, never satisfies the blocker predicate, and never reopens a frozen PR. `NONE` is a legitimate answer and is the correct one for a genuinely local defect.
 
 ## 5. Verification is path- and claim-specific
 
