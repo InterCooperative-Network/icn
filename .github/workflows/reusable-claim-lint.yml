@@ -37,10 +37,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout caller repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Checkout icn linter (sparse)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: InterCooperative-Network/icn
           ref: ${{ inputs.icn-ref }}
