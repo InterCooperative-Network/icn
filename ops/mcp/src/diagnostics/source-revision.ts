@@ -56,6 +56,12 @@ export type SourceRevision = {
   /** Number of paths reported by `git status --porcelain`; null when unknown. */
   dirty_paths: number | null;
   /**
+   * Tracked paths carrying `assume-unchanged` or `skip-worktree`. Git omits these from `status`
+   * entirely, so a modified file marked either way leaves a checkout looking spotless. A
+   * non-zero count means `dirty` is not a complete answer, however clean it looks.
+   */
+  index_hidden_paths: number | null;
+  /**
    * Commits behind the LOCAL tracking ref. No fetch is performed, so this is a LOWER BOUND on
    * staleness and never an overestimate — a checkout that has not fetched since the remote moved
    * reports 0 while being arbitrarily far behind. Read it together with `remote_currency`.
@@ -221,6 +227,7 @@ export async function describeSourceRevision(
       upstream: null,
       dirty: null,
       dirty_paths: null,
+      index_hidden_paths: null,
       behind_upstream: null,
       ahead_of_upstream: null,
       upstream_observed_at: null,
@@ -255,6 +262,32 @@ export async function describeSourceRevision(
     if (dirty) {
       warnings.push(
         `source checkout has ${dirtyPaths} uncommitted path(s); this answer may describe unreviewed local edits`
+      );
+    }
+  }
+
+  // `status` is not the whole story: `git update-index --assume-unchanged` and `--skip-worktree`
+  // make git omit a tracked file from status even when it is modified. `ls-files -v` reports a
+  // per-path status letter, where a lowercase letter means assume-unchanged and "S" means
+  // skip-worktree. This is the fifth mechanism by which the probed repository could hide its
+  // own state from the probe; like the others, the answer is to look anyway.
+  const lsFiles = await gitProbe(checkout, ["ls-files", "-v"]);
+  let indexHidden: number | null = null;
+  if (!lsFiles.ok) {
+    warnings.push(
+      "could not check for index flags that hide tracked files from status; treating cleanliness as incomplete"
+    );
+  } else {
+    indexHidden = lsFiles.out
+      .split("\n")
+      .filter((l) => l.length > 0)
+      .filter((l) => {
+        const c = l[0] as string;
+        return c === "S" || (c >= "a" && c <= "z");
+      }).length;
+    if (indexHidden > 0) {
+      warnings.push(
+        `${indexHidden} tracked path(s) carry assume-unchanged or skip-worktree, so git omits them from status; this checkout may hold modifications that cannot be seen`
       );
     }
   }
@@ -313,7 +346,8 @@ export async function describeSourceRevision(
   }
 
   // Local faithfulness only. Remote currency is deliberately excluded: see `remote_currency`.
-  const trustworthy = dirty === false && behind === 0 && ahead === 0;
+  const trustworthy =
+    dirty === false && indexHidden === 0 && behind === 0 && ahead === 0;
 
   return {
     source_checkout: checkout,
@@ -323,6 +357,7 @@ export async function describeSourceRevision(
     upstream,
     dirty,
     dirty_paths: dirtyPaths,
+    index_hidden_paths: indexHidden,
     behind_upstream: behind,
     ahead_of_upstream: ahead,
     upstream_observed_at: observedAt === null ? null : observedAt.toISOString(),

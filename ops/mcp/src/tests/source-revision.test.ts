@@ -309,6 +309,31 @@ describe("describeSourceRevision — repository config cannot suppress the clean
     expect(s.trustworthy).toBe(false);
   });
 
+  it.each([["assume-unchanged"], ["skip-worktree"]])(
+    "refuses to report clean when a tracked file is hidden by --%s",
+    async (flag) => {
+      const { clone } = originWithClone();
+      git(clone, "update-index", `--${flag}`, "README.md");
+      writeFileSync(path.join(clone, "README.md"), "modified but hidden\n");
+
+      // Control: git really does omit it, so status alone says the tree is spotless.
+      const hidden = execFileSync(
+        "git",
+        ["status", "--porcelain", "--untracked-files=normal"],
+        { cwd: clone, encoding: "utf-8" }
+      ).trim();
+      expect(hidden, `control: --${flag} must actually hide it`).toBe("");
+
+      const s = await describeSourceRevision(clone);
+      // `dirty` honestly reports what status said...
+      expect(s.dirty).toBe(false);
+      // ...but status was not the whole answer, and the stamp must not certify on it.
+      expect(s.index_hidden_paths).toBe(1);
+      expect(s.trustworthy).toBe(false);
+      expect(s.warnings.join(" ")).toMatch(/omits them from status/);
+    }
+  );
+
   it("sees local modifications even when core.worktree points elsewhere", async () => {
     const { clone } = originWithClone();
     const decoy = tempDir("decoy-worktree");
