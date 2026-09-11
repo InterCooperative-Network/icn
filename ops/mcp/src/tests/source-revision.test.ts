@@ -408,6 +408,35 @@ describe("the safety bridge — a caller-selected checkout is not inspected", ()
     }
   });
 
+  // The bridge's earlier premise was "ref and object reads are inert". Object traversal is not:
+  // on a partial clone it can lazily fetch from a promisor remote, whose URL may be `ext::<cmd>`.
+  // That was not reproducible on this fixture, so this asserts the NARROWING rather than an
+  // exploit — the probe set for a caller-selected source is ref resolution only.
+  it("withholds divergence measurement for a caller-selected root", async () => {
+    const { origin, clone } = originWithClone();
+    const pusher = tempDir("pusher-cs");
+    git(pusher, "clone", origin, ".");
+    writeFileSync(path.join(pusher, "next.md"), "next\n");
+    git(pusher, "add", "next.md");
+    git(pusher, "commit", "-m", "next");
+    git(pusher, "push", "origin", "main");
+    git(clone, "fetch", "origin");
+
+    // Controlled: the traversal runs and the checkout is measurably behind.
+    const controlled = await describeSourceRevision(clone, "controlled");
+    expect(controlled.behind_upstream).toBe(1);
+
+    // Caller-selected: identity survives, divergence is not measured at all.
+    const s = await describeSourceRevision(clone, "caller_selected");
+    expect(s.source_revision).toBe(git(clone, "rev-parse", "HEAD"));
+    expect(s.source_ref).toBe("main");
+    expect(s.upstream).toBe("origin/main");
+    expect(s.behind_upstream).toBeNull();
+    expect(s.ahead_of_upstream).toBeNull();
+    expect(s.trustworthy).toBe(false);
+    expect(s.warnings.join(" ")).toMatch(/was not measured/);
+  });
+
   it("a caller-selected fingerprint covers the commit without reading the tree", async () => {
     const { repo, sentinel } = repoWithSideEffectingCleanFilter();
     const fp = await worktreeFingerprint(repo, "caller_selected");

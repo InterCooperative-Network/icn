@@ -46,13 +46,22 @@ export type SourceResolution = "explicit_root" | "ICN_ROOT" | "server_location";
  * This is a trust boundary, not a configuration list. Inspecting a working tree makes git apply
  * repository-controlled behaviour to its contents — `.gitattributes` plus a `filter.<driver>.clean`
  * command is executed by `git status` (verified with git 2.43), and it is not the only such
- * mechanism, nor a bounded set. Reading refs and objects does not: `rev-parse` and `rev-list`
- * touch no working-tree content and run no filters.
+ * mechanism, nor a bounded set.
  *
- * So a caller-selected checkout gets ref and object reads only. Its cleanliness is reported as
- * indeterminate rather than probed, because the probe is the exposure. Enumerating individual git
- * knobs was tried and abandoned as the wrong abstraction; removing the dependence on caller
- * working trees altogether is R1-B's job, and this is the bounded bridge until then.
+ * An earlier version of this bridge drew the line at "ref and object reads are inert". That
+ * premise is NOT safe to assert: on a partial clone, traversing objects can trigger a lazy fetch
+ * from a promisor remote, and a remote URL may be `ext::<command>`, which runs a command. Both are
+ * documented git behaviours. Rather than defend a premise that cannot be proven, the line is drawn
+ * where it can be:
+ *
+ *   a caller-selected checkout gets REF RESOLUTION ONLY — no working-tree inspection and no
+ *   object traversal.
+ *
+ * Identity (`HEAD`, its ref name, the upstream's name) survives; cleanliness and divergence are
+ * reported as indeterminate, because the probes that would establish them are the exposure.
+ * Enumerating individual git knobs was tried and abandoned as the wrong abstraction; removing the
+ * dependence on caller working trees altogether is R1-B's job, and this is the bounded bridge
+ * until then.
  */
 export type SourceProvenance = "controlled" | "caller_selected";
 
@@ -185,9 +194,15 @@ async function gitProbe(
     timeoutMs: GIT_TIMEOUT_MS,
     maxStdoutBytes: GIT_MAX_OUTPUT_BYTES,
     maxStderrBytes: 16 * 1024,
-    // GIT_OPTIONAL_LOCKS=0 keeps `git status` from refreshing/writing the index of a tree this
-    // probe is only observing — a diagnostic must not mutate another lane's working state.
-    env: { ...GIT_SANITISED_ENV, GIT_OPTIONAL_LOCKS: "0" },
+    // GIT_OPTIONAL_LOCKS=0 keeps a probe from writing to a tree it only observes.
+    // GIT_NO_LAZY_FETCH=1 keeps a missing object from reaching out to a promisor remote, which
+    // could be an `ext::` URL and therefore a command. Defence in depth: caller-selected sources
+    // no longer traverse objects at all.
+    env: {
+      ...GIT_SANITISED_ENV,
+      GIT_OPTIONAL_LOCKS: "0",
+      GIT_NO_LAZY_FETCH: "1",
+    },
   });
   if (!r.ok) return { ok: false, timedOut: r.timedOut };
   if (wasTruncated(r.stdout)) return { ok: false, timedOut: false, truncated: true };
@@ -364,7 +379,13 @@ export async function describeSourceRevision(
   let behind: number | null = null;
   let ahead: number | null = null;
   let observedAt: Date | null = null;
-  if (upstream) {
+  if (upstream && !inspectWorkingTree) {
+    // Object traversal is withheld for the same reason the working tree is: see SourceProvenance.
+    warnings.push(
+      `divergence from ${upstream} was not measured: doing so traverses objects, which a ` +
+        "caller-selected repository can turn into a fetch from a remote it controls"
+    );
+  } else if (upstream) {
     // Symmetric difference. `HEAD..upstream` counts one direction only, so a clean branch with
     // an unpushed commit would read as "0 behind" and pass for level while holding work that
     // exists nowhere else.
