@@ -15,6 +15,11 @@ import { buildNextStepsReport } from "../diagnostics/next-steps.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
 import {
+  describeSourceRevision,
+  snapshotWorktree,
+  type SourceProvenance,
+} from "../diagnostics/source-revision.js";
+import {
   buildAgentContextSpineView,
   buildPathBrief,
 } from "../diagnostics/agent-context-spine.js";
@@ -24,6 +29,64 @@ export function registerAgentOpsTools(
   db?: Database.Database
 ): void {
   const repoRoot = resolveMonorepoRoot();
+
+  // Every repository-DERIVED answer carries the provenance of the tree it was read from, so a
+  // stale or dirty source is visible in the answer instead of looking identical to a current one.
+  // Statically compiled catalogs (agent_brief, command_catalog, verification_plan) are
+  // deliberately NOT stamped: they are baked into the build and are not reads of the checkout, so
+  // tying them to its revision would assert a relationship that does not exist.
+  //
+  // `build` is a thunk rather than an already-computed value so that HEAD is captured BEFORE the
+  // payload is read. Otherwise a checkout fast-forwarded mid-call would return data read from the
+  // old tree under a stamp naming the new one — a revision-attribution bug in the very feature
+  // that exists to prevent them, and one made likelier by the host-synchronisation work this is
+  // a step towards. A revision that moves across the read fails closed.
+  //
+  // `root` is the tree the payload is read from, which is not always repoRoot —
+  // icn_ops_agent_runtime deliberately reads the CALLER's lane instead.
+  //
+  // SCOPE. This covers answers whose CONTENT is read out of one checkout, where the reader
+  // cannot otherwise tell which. It does not cover `repo_status` / `worktree_status` in
+  // tools/repos.ts: those report ON a set of trees and already name each one per row, so the
+  // provenance is intrinsic rather than missing — and `repo_status` returns an array, which this
+  // object-shaped stamp cannot carry without changing its contract. Giving those surfaces
+  // staleness semantics is a separate change, tracked with the bare-store work (R1-B).
+  //
+  // This is distinct from a generated artifact's own `source_commit` (the Agent Context Spine
+  // carries one): that records the revision the artifact was generated FROM, while `source`
+  // records the checkout this answer was read OUT OF. When the two disagree, the artifact is
+  // stale relative to the tree holding it — precisely the condition worth surfacing.
+  async function repoDerived(
+    build: () => Record<string, unknown> | Promise<Record<string, unknown>>,
+    root?: string,
+    provenance: SourceProvenance = "controlled"
+  ): Promise<{ content: { type: "text"; text: string }[] }> {
+    // `root` stays undefined for the ordinary case so describeSourceRevision resolves it the
+    // way it actually was — ICN_ROOT or the server's location. Defaulting it to repoRoot here
+    // and passing that on would make every response claim `explicit_root`, which is only true
+    // of the caller-lane case.
+    const target = root ?? repoRoot;
+    // Two working-tree scans, not three: the before/after guard needs both, and the source
+    // description reuses the second rather than taking a third of the same tree.
+    const before = await snapshotWorktree(target, provenance);
+    const payload = await build();
+    const after = await snapshotWorktree(target, provenance);
+    const source = await describeSourceRevision(root, provenance, after);
+    if (
+      before.fingerprint === null ||
+      after.fingerprint === null ||
+      before.fingerprint !== after.fingerprint
+    ) {
+      source.trustworthy = false;
+      source.warnings.push(
+        "the checkout's commit or working tree changed while this answer was being read, or " +
+          "could not be determined; the payload may describe state the stamp does not"
+      );
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify({ ...payload, source }, null, 2) }],
+    };
+  }
 
   server.tool(
     "icn_ops_agent_runtime",
@@ -58,6 +121,7 @@ export function registerAgentOpsTools(
       // fallback for callers that supply no cwd.
       const identity = discoverWorktree(cwd ?? process.cwd(), null);
       const manifestRoot = identity?.worktree_path ?? repoRoot;
+      return await repoDerived(async () => {
       const manifestPath = join(
         manifestRoot,
         "docs/reference/project-index/generated/agent-capabilities.json"
@@ -132,8 +196,19 @@ export function registerAgentOpsTools(
             ? { ...manifest, session }
             : { [section]: manifest[section] ?? [], session };
       if (manifestError) payload["manifest_error"] = manifestError;
-
-      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+      return payload;
+      // Pass the lane only when discovery actually found one. When it falls back to repoRoot,
+      // the root was NOT explicitly chosen — it came from ICN_ROOT or the server's location, and
+      // the stamp should say so rather than claiming this call site picked it.
+      //
+      // This is the ONLY tool that resolves its root from client input, which makes it the only
+      // one whose checkout is untrusted. `cwd` is what the caller supplied; when they supplied
+      // it and it resolved to a lane, the resulting tree is theirs to configure, so its working
+      // tree is never inspected (see SourceProvenance). Falling back to repoRoot, or resolving
+      // from the server's own cwd, is operator-controlled and keeps full inspection.
+      },
+      identity?.worktree_path,
+      cwd !== undefined && identity ? "caller_selected" : "controlled");
     }
   );
 
@@ -142,10 +217,7 @@ export function registerAgentOpsTools(
     "Structured environment snapshot (git, Node/npm, optional gh/kubectl, MCP config parity hints). Never fails on missing optional tools; see warnings array.",
     {},
     async () => {
-      const report = await buildEnvironmentReport(repoRoot);
-      return {
-        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
-      };
+      return await repoDerived(() => buildEnvironmentReport(repoRoot));
     }
   );
 
@@ -154,10 +226,7 @@ export function registerAgentOpsTools(
     "Read-only diagnosis: MCP wiring, native sqlite module, portability script, dirty tree, optional CLIs. Returns severity, checks, and suggested repair commands (not executed).",
     {},
     async () => {
-      const report = await buildDoctorReport(repoRoot);
-      return {
-        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
-      };
+      return await repoDerived(() => buildDoctorReport(repoRoot));
     }
   );
 
@@ -193,14 +262,13 @@ export function registerAgentOpsTools(
         .describe("If true, list absent entries explicitly (default true)."),
     },
     async ({ include_absent }) => {
-      const { entries } = buildStateIndex(repoRoot);
-      const wantAbsent = include_absent !== false;
-      const filtered = wantAbsent
-        ? entries
-        : entries.filter((e) => e.present);
-      return {
-        content: [{ type: "text", text: JSON.stringify({ entries: filtered }, null, 2) }],
-      };
+      // The read itself must sit inside the thunk: closing over an already-built value would
+      // let both revision probes observe a new HEAD while `entries` came from the old tree.
+      return await repoDerived(() => {
+        const { entries } = buildStateIndex(repoRoot);
+        const wantAbsent = include_absent !== false;
+        return { entries: wantAbsent ? entries : entries.filter((e) => e.present) };
+      });
     }
   );
 
@@ -209,10 +277,7 @@ export function registerAgentOpsTools(
     "Read-only workflow guidance: severity, short summary, and recommended next verification or setup steps (commands are strings only; never executed by MCP). Uses environment, doctor, state index, MCP parity, and worktree hints without echoing full raw diagnostics.",
     {},
     async () => {
-      const report = await buildNextStepsReport(repoRoot);
-      return {
-        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
-      };
+      return await repoDerived(() => buildNextStepsReport(repoRoot));
     }
   );
 
@@ -241,10 +306,7 @@ export function registerAgentOpsTools(
     "Compact repo layout map for agents: key directories with present flag, one-line description, agent_use, and optional caution. Paths are checked on disk; absent paths are present:false.",
     {},
     async () => {
-      const map = buildRepoMap(repoRoot);
-      return {
-        content: [{ type: "text", text: JSON.stringify(map, null, 2) }],
-      };
+      return await repoDerived(() => buildRepoMap(repoRoot));
     }
   );
 
@@ -265,13 +327,11 @@ export function registerAgentOpsTools(
       path: z.string().optional().describe("Filter nodes whose path contains this substring (e.g. icn-gateway)."),
     },
     async ({ paths, node, type, subsystem, path }) => {
-      const view =
+      return await repoDerived(() =>
         paths && paths.length > 0
           ? buildPathBrief(repoRoot, paths)
-          : buildAgentContextSpineView(repoRoot, { node, type, subsystem, path });
-      return {
-        content: [{ type: "text", text: JSON.stringify(view, null, 2) }],
-      };
+          : buildAgentContextSpineView(repoRoot, { node, type, subsystem, path })
+      );
     }
   );
 }
