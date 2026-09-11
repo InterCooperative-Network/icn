@@ -215,16 +215,31 @@ def main() -> int:
             # NAME appeared would keep passing while agents applied outdated
             # classifications. So the canonical prose must not appear verbatim
             # in a projection, and the projection must load it instead.
+            canonical_prose: list = []
             for name, spec in doc.get("dispositions", {}).items():
                 for field in ("meaning", "test"):
-                    text = str(spec.get(field, "")).strip()
-                    if len(text) < 24:
-                        continue
-                    c.ok(
-                        text not in body,
-                        f"{entry['canonical_path']} restates the canonical {name}.{field} verbatim "
-                        "— projections must load the meanings, not copy them",
+                    canonical_prose.append((f"{name}.{field}", str(spec.get(field, ""))))
+            # Same rule for the loop distinctions. These were copied as a table
+            # while only dispositions were checked, so an owner change would have
+            # left a competing loop definition in an agent-facing projection with
+            # every gate still passing.
+            for st in doc.get("loop", {}).get("stages", []):
+                for field in ("asks", "must_not_be"):
+                    canonical_prose.append(
+                        (f"loop.stages[{st.get('id')}].{field}", str(st.get(field, "")))
                     )
+            cs = doc.get("loop", {}).get("claim_separation", {})
+            canonical_prose.append(("loop.claim_separation.rule", str(cs.get("rule", ""))))
+
+            for label, text in canonical_prose:
+                text = text.strip()
+                if len(text) < 24:
+                    continue
+                c.ok(
+                    text not in body,
+                    f"{entry['canonical_path']} restates the canonical {label} verbatim "
+                    "— projections must render the owner, not copy it",
+                )
             c.ok(
                 "dispositions" in body and "engineering-leverage.json" in body,
                 "the skill must load dispositions from the canonical owner rather than "

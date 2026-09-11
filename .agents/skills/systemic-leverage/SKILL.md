@@ -47,16 +47,26 @@ Tests remain necessary. Prevention is usually higher leverage.
 Work the stages in `loop.stages`. Four of them are distinct claims and collapsing them is the
 most common failure:
 
-| stage | is not |
-|---|---|
-| `symptom` | an inferred cause |
-| `immediate_cause` | a category of mechanism |
-| `enabling_mechanism` | a restatement of the immediate cause |
-| `regression_witness` | proof the *class* is prevented |
+Render the distinctions rather than reading them from here — a copy in this file would go stale
+while still reading plausibly:
 
-That last row is the one to guard. Proving the instance is fixed is not proving the class is
-prevented. Claim the second only when a mechanism makes the defect unrepresentable or a gate
-rejects it — and say which.
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+python3 -c "
+import json
+d=json.load(open('${REPO_ROOT}/ops/state/truth/engineering-leverage.json'))
+for s in d['loop']['stages']:
+    if s.get('must_not_be'):
+        print(f\"{s['id']:<20} asks: {s['asks']}\")
+        print(f\"{'':<20} is NOT: {s['must_not_be']}\")
+print()
+print('claim separation:', d['loop']['claim_separation']['rule'])
+"
+```
+
+The `claim_separation` rule is the one to guard. Proving the instance is fixed is not proving the
+class is prevented; claim the second only when a mechanism makes the defect unrepresentable or a
+gate rejects it, and say which.
 
 ## Matching a pattern
 

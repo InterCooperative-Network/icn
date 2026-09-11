@@ -1,7 +1,6 @@
 {
   "schema": "icn.engineering-leverage.v1",
   "description": "Canonical owner of ICN's systemic-leverage behaviour: the causal escalation an engineering agent performs after establishing a real defect, the closed set of dispositions for a systemic candidate, and the evidence-backed catalogue of recurring defect classes. This file owns HOW an agent reasons from a defect to a structural opportunity. It does NOT own the delivery lifecycle.",
-
   "owner_boundary": {
     "owns": [
       "the stages an agent must distinguish after establishing a defect",
@@ -25,50 +24,108 @@
     ],
     "conflict_rule": "If this file and ops/state/truth/delivery.json disagree, delivery.json wins. A systemic-leverage finding is never itself authority to reopen a frozen pull request, to widen an acceptance contract, or to satisfy the blocker predicate."
   },
-
   "loop": {
-    "description": "Performed only after a defect is ESTABLISHED — reproduced, not suspected. The first four stages are distinct claims and must not be collapsed into one another.",
+    "description": "Performed only after a defect is ESTABLISHED \u2014 reproduced, not suspected. The first four stages are distinct claims and must not be collapsed into one another.",
     "stages": [
-      { "id": "symptom", "asks": "What was observed?", "must_not_be": "an inferred cause" },
-      { "id": "reproduction", "asks": "What sequence reproduces it?", "must_not_be": "a plausible story" },
-      { "id": "immediate_cause", "asks": "Which specific mechanism failed here?", "must_not_be": "a category of mechanism" },
-      { "id": "enabling_mechanism", "asks": "What made this defect POSSIBLE TO WRITE?", "must_not_be": "a restatement of the immediate cause" },
-      { "id": "local_remediation", "asks": "What is the smallest correct repair?", "must_not_be": "the structural correction, unless that IS the smallest correct repair" },
-      { "id": "regression_witness", "asks": "What evidence proves the instance is fixed?", "must_not_be": "a claim that the class is prevented" },
-      { "id": "recurring_class", "asks": "Has this class occurred before, with evidence?", "must_not_be": "a guess that it might recur" },
-      { "id": "structural_options", "asks": "What mechanism would make this class hard or impossible to write?", "must_not_be": "a redesign of an unrelated subsystem" },
-      { "id": "disposition", "asks": "NOW, FOLLOW_UP, ARCHITECTURAL or NONE?", "must_not_be": "omitted" }
+      {
+        "id": "symptom",
+        "asks": "What was observed?",
+        "must_not_be": "an inferred cause"
+      },
+      {
+        "id": "reproduction",
+        "asks": "What sequence reproduces it?",
+        "must_not_be": "a plausible story"
+      },
+      {
+        "id": "immediate_cause",
+        "asks": "Which specific mechanism failed here?",
+        "must_not_be": "a category of mechanism"
+      },
+      {
+        "id": "enabling_mechanism",
+        "asks": "What made this defect POSSIBLE TO WRITE?",
+        "must_not_be": "a restatement of the immediate cause"
+      },
+      {
+        "id": "local_remediation",
+        "asks": "What is the smallest correct repair?",
+        "must_not_be": "the structural correction, unless that IS the smallest correct repair"
+      },
+      {
+        "id": "regression_witness",
+        "asks": "What evidence proves the instance is fixed?",
+        "must_not_be": "a claim that the class is prevented"
+      },
+      {
+        "id": "recurring_class",
+        "asks": "Has this class occurred before, with evidence?",
+        "must_not_be": "a guess that it might recur"
+      },
+      {
+        "id": "structural_options",
+        "asks": "What mechanism would make this class hard or impossible to write?",
+        "must_not_be": "a redesign of an unrelated subsystem"
+      },
+      {
+        "id": "disposition",
+        "asks": "NOW, FOLLOW_UP, ARCHITECTURAL or NONE?",
+        "must_not_be": "omitted"
+      }
     ],
     "claim_separation": {
       "rule": "Proof that an instance is fixed is not proof that a class is prevented. An agent may claim the second only when a mechanism makes the defect unrepresentable or a gate rejects it, and must show which.",
       "why": "Overclaiming prevention retires attention from a class that is still live."
     }
   },
-
   "dispositions": {
     "NOW": {
       "meaning": "The structural correction is necessary for the defect to be CORRECTLY fixed, or it is tiny, obviously safe, and squarely inside the current acceptance contract.",
       "test": "Would a reviewer regard omitting it as leaving the reported defect only partly repaired?",
-      "example": "Two production call sites parse the same fact differently; factoring the already-existing canonical parser is the smallest correct repair."
+      "example": "Two production call sites parse the same fact differently; factoring the already-existing canonical parser is the smallest correct repair.",
+      "predicate": {
+        "all_of": {
+          "changes_subsystem_boundary": false,
+          "recurring_class_established": true,
+          "structural_change_required_or_in_contract": true
+        }
+      }
     },
     "FOLLOW_UP": {
       "meaning": "The defect is correctly fixable locally, but it reveals a broader mechanism worth addressing separately.",
       "test": "Is the local repair complete and provable on its own?",
       "recorded_in": "the pull request's follow-up ledger, owned by ops/state/truth/delivery.json",
-      "example": "One CLI writer forgot the exclusion lock; the local fix joins the lock domain, while the observation that every writer must remember lock policy is separate work."
+      "example": "One CLI writer forgot the exclusion lock; the local fix joins the lock domain, while the observation that every writer must remember lock policy is separate work.",
+      "predicate": {
+        "all_of": {
+          "changes_subsystem_boundary": false,
+          "recurring_class_established": true,
+          "structural_change_required_or_in_contract": false
+        }
+      }
     },
     "ARCHITECTURAL": {
       "meaning": "The opportunity changes a subsystem boundary, state model, authority model, storage model or lifecycle.",
       "test": "Would this change what other subsystems may assume?",
-      "constraint": "Record it. Never smuggle it into the current pull request."
+      "constraint": "Record it. Never smuggle it into the current pull request.",
+      "predicate": {
+        "all_of": {
+          "changes_subsystem_boundary": true,
+          "recurring_class_established": true
+        }
+      }
     },
     "NONE": {
       "meaning": "The defect is genuinely local and establishes no useful recurring class.",
       "test": "Can you name a second real occurrence? If not, NONE is very likely correct.",
-      "note": "NONE is a first-class, expected answer. Manufacturing architecture work to satisfy this framework is itself a defect."
+      "note": "NONE is a first-class, expected answer. Manufacturing architecture work to satisfy this framework is itself a defect.",
+      "predicate": {
+        "all_of": {
+          "recurring_class_established": false
+        }
+      }
     }
   },
-
   "anti_patterns": [
     "Creating an issue for every systemic observation. Search for an existing owner first; a follow-up ledger entry is often sufficient.",
     "Treating an automated reviewer's severity label as authority. Severity is advisory; the blocker predicate in delivery.json decides.",
@@ -76,7 +133,6 @@
     "Answering ARCHITECTURAL to avoid doing a small NOW correction.",
     "Answering NOW to justify a redesign the acceptance contract does not cover."
   ],
-
   "patterns": [
     {
       "id": "duplicated-semantic-owner",
@@ -84,8 +140,14 @@
       "question": "Can there be exactly one authoritative mechanism for deciding whether this fact is true?",
       "preferred_response": "A canonical parser, resolver or state machine that every caller delegates to.",
       "examples": [
-        { "reference": "#2749", "fact": "Treasury DID acceptance existed separately in ceremony validation and in daemon startup parsing, and the two could disagree." },
-        { "reference": "#2768", "fact": "The Cargo workspace root was spelled independently in four agent-facing surfaces; three had drifted to a path that does not exist." }
+        {
+          "reference": "#2749",
+          "fact": "Treasury DID acceptance existed separately in ceremony validation and in daemon startup parsing, and the two could disagree."
+        },
+        {
+          "reference": "#2768",
+          "fact": "The Cargo workspace root was spelled independently in four agent-facing surfaces; three had drifted to a path that does not exist."
+        }
       ]
     },
     {
@@ -94,8 +156,14 @@
       "question": "Can the API make omission impossible rather than merely discouraged?",
       "preferred_response": "A guard or capability token, a typed constructor, an RAII guard, a sealed mutation interface, or a single entrypoint that cannot be bypassed.",
       "examples": [
-        { "reference": "#2749", "fact": "federation add/remove/set performed a read-modify-write of managed configuration without joining the configuration-lock domain; the repair introduced a guard type so loading outside the lock cannot reach the write." },
-        { "reference": "#2759", "fact": "Local maintenance commands opened ceremony stores outside the exclusion domain." }
+        {
+          "reference": "#2749",
+          "fact": "federation add/remove/set performed a read-modify-write of managed configuration without joining the configuration-lock domain; the repair introduced a guard type so loading outside the lock cannot reach the write."
+        },
+        {
+          "reference": "#2759",
+          "fact": "Local maintenance commands opened ceremony stores outside the exclusion domain."
+        }
       ]
     },
     {
@@ -104,7 +172,10 @@
       "question": "Can the policy move behind one typed or executable boundary?",
       "preferred_response": "One boundary that owns the policy, especially for state mutation, identity mutation, configuration mutation, authorisation, durability and exclusion.",
       "examples": [
-        { "reference": "#2749", "fact": "Exclusion policy for managed configuration lived in each CLI branch rather than in one mutation entrypoint." }
+        {
+          "reference": "#2749",
+          "fact": "Exclusion policy for managed configuration lived in each CLI branch rather than in one mutation entrypoint."
+        }
       ]
     },
     {
@@ -113,9 +184,18 @@
       "question": "Is there a test that crosses the persist-and-reopen boundary, rather than two unit tests that agree with themselves?",
       "preferred_response": "A producer -> persist -> reopen -> consumer contract test, and a shared semantic owner for the format.",
       "examples": [
-        { "reference": "#2747", "fact": "init-coop generated an icn.toml that icnd could not load." },
-        { "reference": "#2755", "fact": "The native icnd service never consumed the runtime-root configuration it was provisioned with." },
-        { "reference": "#2750", "fact": "The reachability filter scored persisted trust edges as 0.0 after reopen." }
+        {
+          "reference": "#2747",
+          "fact": "init-coop generated an icn.toml that icnd could not load."
+        },
+        {
+          "reference": "#2755",
+          "fact": "The native icnd service never consumed the runtime-root configuration it was provisioned with."
+        },
+        {
+          "reference": "#2750",
+          "fact": "The reachability filter scored persisted trust edges as 0.0 after reopen."
+        }
       ]
     },
     {
@@ -124,9 +204,18 @@
       "question": "Does this path distinguish 'observed and fine' from 'could not observe'?",
       "preferred_response": "Failure to know must be representable and must never render as knowing success, nor as a knowing contradiction. Fail closed on the unknown.",
       "examples": [
-        { "reference": "#2760", "fact": "A failing cargo-audit step ended the job, so both cargo-deny gates were reported as not-run rather than passing or failing, for five consecutive weeks." },
-        { "reference": "#2749", "fact": "A storage failure reading the cooperative row was rendered as INCONSISTENT — a positive corruption claim — instead of ERROR / state_unreadable." },
-        { "reference": "#2733", "fact": "The generated-index drift check detects drift correctly and then reports it as a warning that cannot fail the job, so the drift persisted and grew." }
+        {
+          "reference": "#2760",
+          "fact": "A failing cargo-audit step ended the job, so both cargo-deny gates were reported as not-run rather than passing or failing, for five consecutive weeks."
+        },
+        {
+          "reference": "#2749",
+          "fact": "A storage failure reading the cooperative row was rendered as INCONSISTENT \u2014 a positive corruption claim \u2014 instead of ERROR / state_unreadable."
+        },
+        {
+          "reference": "#2733",
+          "fact": "The generated-index drift check detects drift correctly and then reports it as a warning that cannot fail the job, so the drift persisted and grew."
+        }
       ]
     },
     {
@@ -135,7 +224,10 @@
       "question": "Should this become an executable, repository-owned harness?",
       "preferred_response": "One harness that owns the sequence and its known traps, rather than a paragraph describing them.",
       "examples": [
-        { "reference": "docs/architecture/protocol-state-migration-mutation-controls.md", "fact": "The mtime-preserving-restore trap was discovered, documented in prose, and then had to be rediscovered, because no code carried it forward." }
+        {
+          "reference": "docs/architecture/protocol-state-migration-mutation-controls.md",
+          "fact": "The mtime-preserving-restore trap was discovered, documented in prose, and then had to be rediscovered, because no code carried it forward."
+        }
       ]
     },
     {
@@ -144,7 +236,10 @@
       "question": "What should happen automatically at creation, at merge, at agent exit and on a periodic health check?",
       "preferred_response": "Lifecycle automation plus safe visibility plus explicit ownership. Never delete dirty, unmerged or process-pinned resources for cleanliness.",
       "examples": [
-        { "reference": "#2652", "fact": "Per-worktree Cargo target directories reached 380 GB across 19 worktrees and filled the development volume; nothing reclaimed them and the remedy documented in agent surfaces was a single-tree cargo clean, which cannot bound a per-worktree total." }
+        {
+          "reference": "#2652",
+          "fact": "Per-worktree Cargo target directories reached 380 GB across 19 worktrees and filled the development volume; nothing reclaimed them and the remedy documented in agent surfaces was a single-tree cargo clean, which cannot bound a per-worktree total."
+        }
       ]
     },
     {
@@ -153,7 +248,10 @@
       "question": "Which actors can reach this, and what does it hold when they do?",
       "preferred_response": "Gate the trigger on repository membership, pin third-party code to an immutable reference, and grant the narrowest scope the job needs.",
       "examples": [
-        { "reference": "#2761", "fact": "Two workflows triggered on issue_comment with no author check, handing repository secrets to any commenter; one also ran a third-party action from a mutable tag." }
+        {
+          "reference": "#2761",
+          "fact": "Two workflows triggered on issue_comment with no author check, handing repository secrets to any commenter; one also ran a third-party action from a mutable tag."
+        }
       ]
     },
     {
@@ -162,8 +260,14 @@
       "question": "What identity must survive replacement of this substrate?",
       "preferred_response": "Name the logical identity separately from its substrate, and make the binding between them explicit and migratable.",
       "examples": [
-        { "reference": "#2772", "fact": "A committed runtime root's authority was bound to the node DID that happened to provision it, so replacing the node identity silently invalidated the authority relationship." },
-        { "reference": "#2758", "fact": "Exclusion identity was tied to a filesystem inode, so renaming the data root moved the lock out from under a holder." }
+        {
+          "reference": "#2772",
+          "fact": "A committed runtime root's authority was bound to the node DID that happened to provision it, so replacing the node identity silently invalidated the authority relationship."
+        },
+        {
+          "reference": "#2758",
+          "fact": "Exclusion identity was tied to a filesystem inode, so renaming the data root moved the lock out from under a holder."
+        }
       ]
     },
     {
@@ -172,8 +276,20 @@
       "question": "Does a canonical owner declare this toolchain, and does every execution path select it?",
       "preferred_response": "One declared toolchain version with every execution path selecting it, as icn/rust-toolchain.toml already does for Rust.",
       "examples": [
-        { "reference": "#2770", "fact": "npm 10.9.8 cannot perform any tree-mutating operation in ops/mcp while npm 11 can; no repository surface pins an npm version, so which behaviour applies is an accident of the environment." }
+        {
+          "reference": "#2770",
+          "fact": "npm 10.9.8 cannot perform any tree-mutating operation in ops/mcp while npm 11 can; no repository surface pins an npm version, so which behaviour applies is an accident of the environment."
+        }
       ]
     }
-  ]
+  ],
+  "classification": {
+    "description": "A disposition is DERIVED from facts about the defect, not chosen and then justified. Each disposition carries a predicate over these facts; exactly one must match, or the classification fails closed. The prose in `meaning` and `test` explains the predicate to a human \u2014 it is not what decides.",
+    "facts": {
+      "recurring_class_established": "A second real occurrence can be named. If it cannot, there is no class.",
+      "changes_subsystem_boundary": "The correction would change a subsystem boundary, state model, authority model, storage model or lifecycle.",
+      "structural_change_required_or_in_contract": "The structural correction is necessary for the defect to be CORRECTLY fixed, or it is tiny, obviously safe and squarely inside the current acceptance contract."
+    },
+    "rule": "Evaluate every disposition predicate against the facts. Exactly one match is a classification. Zero matches or more than one match is ambiguity and must fail closed \u2014 never resolve it by preferring an expected answer."
+  }
 }
