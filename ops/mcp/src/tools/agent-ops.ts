@@ -15,6 +15,16 @@ import { buildNextStepsReport } from "../diagnostics/next-steps.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
 import {
+  readFileAtRevision,
+  resolveCanonicalRepository,
+  resolveRevision,
+} from "../canonical/repository.js";
+import {
+  SPINE_REL,
+  buildAgentContextSpineViewFromText,
+  buildPathBriefFromText,
+} from "../diagnostics/agent-context-spine.js";
+import {
   describeSourceRevision,
   snapshotWorktree,
   type SourceProvenance,
@@ -56,6 +66,50 @@ export function registerAgentOpsTools(
   // carries one): that records the revision the artifact was generated FROM, while `source`
   // records the checkout this answer was read OUT OF. When the two disagree, the artifact is
   // stale relative to the tree holding it — precisely the condition worth surfacing.
+  /**
+   * The ref canonical reads resolve. Declared once here rather than taken from a request: which
+   * revision is authoritative is an operator question, not a caller question.
+   */
+  const CANONICAL_REF = "refs/remotes/origin/main";
+
+  /**
+   * Canonical storage could not answer.
+   *
+   * This returns an error rather than reading a working tree. Falling back would reintroduce the
+   * exact dependency R1-B removes, and would do so precisely when the canonical path is broken —
+   * the moment the fallback is least trustworthy.
+   */
+  function canonicalUnavailable(error: {
+    code: string;
+    message: string;
+  }): { content: { type: "text"; text: string }[]; isError: true } {
+    return {
+      // MCP-level error, not just an `error` key in a successful payload. A client that relies
+      // on protocol error handling would otherwise read a fail-closed refusal as a successful
+      // call — an absent answer arriving as a passing one, which is the failure mode this
+      // whole line of work exists to remove.
+      isError: true,
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              error: `canonical read unavailable: ${error.message}`,
+              code: error.code,
+              worktree_consulted: false,
+              note:
+                "This answer is served only from controlled canonical storage at an exact " +
+                "revision. No working tree is inspected, and none is substituted when canonical " +
+                "storage cannot answer.",
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
   async function repoDerived(
     build: () => Record<string, unknown> | Promise<Record<string, unknown>>,
     root?: string,
@@ -312,7 +366,7 @@ export function registerAgentOpsTools(
 
   server.tool(
     "icn_ops_agent_context_spine",
-    "Read-only view of the generated Agent Context Spine (docs/reference/project-index/generated/agent-context-spine.json): a non-canonical, evidence-grounded orientation map of crates, subsystems, docs, routes, invariants, claim surfaces, truth sources, skills/agents and MCP tools. Pass paths=[...] for a CODE-QUALITY BRIEF on changed files (subsystem, invariants, docs, verification commands, claim/API risk, recommended ICN skills/agents, review focus) — query this before editing or reviewing a change. Otherwise: no filter returns a summary; node=<id> returns one node + its incident edges (or a contains-match list); type/subsystem/path filter the node list. Never executes commands or mutates files. Structure is not runtime liveness; asserts no production/live/pilot readiness.",
+    "Read-only view of the generated Agent Context Spine (docs/reference/project-index/generated/agent-context-spine.json): a non-canonical, evidence-grounded orientation map of crates, subsystems, docs, routes, invariants, claim surfaces, truth sources, skills/agents and MCP tools. Pass paths=[...] for a CODE-QUALITY BRIEF on changed files (subsystem, invariants, docs, verification commands, claim/API risk, recommended ICN skills/agents, review focus) — query this before editing or reviewing a change. Otherwise: no filter returns a summary; node=<id> returns one node + its incident edges (or a contains-match list); type/subsystem/path filter the node list. Runs only bounded, non-mutating Git object reads against ICN-controlled canonical storage; never executes caller-supplied commands and never mutates files. Structure is not runtime liveness; asserts no production/live/pilot readiness.",
     {
       paths: z
         .array(z.string())
@@ -327,11 +381,50 @@ export function registerAgentOpsTools(
       path: z.string().optional().describe("Filter nodes whose path contains this substring (e.g. icn-gateway)."),
     },
     async ({ paths, node, type, subsystem, path }) => {
-      return await repoDerived(() =>
+      // Revision-addressed read from canonical storage (R1-B). The spine is committed content,
+      // so nothing about answering from it requires a working tree — and reading it from one
+      // made the answer depend on whichever checkout happened to host the server, which on this
+      // host was 23 commits behind with uncommitted edits.
+      //
+      // The ref is resolved to a revision ONCE and that revision is carried through the read, so
+      // a branch moving mid-operation cannot produce a spliced answer.
+      const repo = await resolveCanonicalRepository();
+      if (!repo.ok) return canonicalUnavailable(repo.error);
+      const revision = await resolveRevision(repo.value, CANONICAL_REF);
+      if (!revision.ok) return canonicalUnavailable(revision.error);
+      const spineText = await readFileAtRevision(repo.value, revision.value, SPINE_REL);
+      if (!spineText.ok) return canonicalUnavailable(spineText.error);
+
+      const view =
         paths && paths.length > 0
-          ? buildPathBrief(repoRoot, paths)
-          : buildAgentContextSpineView(repoRoot, { node, type, subsystem, path })
-      );
+          ? buildPathBriefFromText(spineText.value, paths)
+          : buildAgentContextSpineViewFromText(spineText.value, {
+              node,
+              type,
+              subsystem,
+              path,
+            });
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                ...view,
+                source: {
+                  kind: "canonical_revision_read",
+                  source_revision: revision.value,
+                  source_store: repo.value.gitDir,
+                  ref: CANONICAL_REF,
+                  worktree_consulted: false,
+                },
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
     }
   );
 }
