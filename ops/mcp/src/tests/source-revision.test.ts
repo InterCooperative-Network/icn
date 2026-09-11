@@ -1,6 +1,13 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -47,6 +54,9 @@ function originWithClone(): { origin: string; clone: string } {
   git(seed, "push", "-u", "origin", "main");
   const clone = tempDir("clone");
   git(clone, "clone", origin, ".");
+  // A clone does not necessarily leave FETCH_HEAD behind, and currency is only claimable with
+  // evidence that the tracking refs were actually refreshed. This mirrors a synced host.
+  git(clone, "fetch", "origin");
   return { origin, clone };
 }
 
@@ -167,18 +177,115 @@ describe("describeSourceRevision — how the root was chosen is reported", () =>
     else process.env["ICN_ROOT"] = saved;
   });
 
-  it("reports ICN_ROOT when the environment pins the root", async () => {
+  it("reports explicit_root when a root is passed, even if ICN_ROOT is set", async () => {
+    const { clone } = originWithClone();
+    process.env["ICN_ROOT"] = "/some/other/checkout";
+    const s = await describeSourceRevision(clone);
+    // icn_ops_agent_runtime deliberately overrides ICN_ROOT with the caller's lane; saying
+    // "ICN_ROOT" here would contradict the path actually reported in source_checkout.
+    expect(s.resolved_from).toBe("explicit_root");
+    expect(s.source_checkout).toBe(clone);
+  });
+
+  it("reports ICN_ROOT when the environment pins the root and none is passed", async () => {
     const { clone } = originWithClone();
     process.env["ICN_ROOT"] = clone;
-    const s = await describeSourceRevision(clone);
+    const s = await describeSourceRevision();
     expect(s.resolved_from).toBe("ICN_ROOT");
+    expect(s.source_checkout).toBe(clone);
   });
 
   it("reports server_location when nothing pins the root", async () => {
-    const { clone } = originWithClone();
     delete process.env["ICN_ROOT"];
-    const s = await describeSourceRevision(clone);
+    const s = await describeSourceRevision();
     expect(s.resolved_from).toBe("server_location");
+  });
+});
+
+// `@{u}` is a LOCAL ref. A host that never fetches sits at "0 behind" forever while the remote
+// moves away from it — stale and confident, which is the exact state this module exists to
+// expose. Currency therefore requires evidence that the tracking refs were actually refreshed.
+describe("describeSourceRevision — a stale tracking ref cannot certify currency", () => {
+  it("refuses to certify when the upstream has not been fetched recently", async () => {
+    const { clone } = originWithClone();
+    const fetchHead = path.join(clone, ".git", "FETCH_HEAD");
+    const longAgo = new Date(Date.now() - 72 * 3600 * 1000);
+    utimesSync(fetchHead, longAgo, longAgo);
+
+    const s = await describeSourceRevision(clone);
+    // Locally everything looks perfect: clean, and level with the tracking ref.
+    expect(s.dirty).toBe(false);
+    expect(s.behind_upstream).toBe(0);
+    // But "0 behind" is only a lower bound against a three-day-old view of the remote.
+    expect(s.trustworthy).toBe(false);
+    expect(s.warnings.join(" ")).toMatch(/lower bound/);
+    expect(s.upstream_observed_at).not.toBeNull();
+  });
+
+  it("records when the tracking refs were last observed", async () => {
+    const { clone } = originWithClone();
+    const s = await describeSourceRevision(clone);
+    expect(s.upstream_observed_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(s.trustworthy).toBe(true);
+  });
+});
+
+// GIT_DIR overrides -C, and git exports it into child processes in a linked worktree — the only
+// kind ICN uses. If it leaked through, this would name one checkout while describing another:
+// the precise misattribution the stamp exists to remove.
+describe("describeSourceRevision — the environment cannot redirect the probe", () => {
+  const savedDir = process.env["GIT_DIR"];
+  const savedWork = process.env["GIT_WORK_TREE"];
+  afterEach(() => {
+    if (savedDir === undefined) delete process.env["GIT_DIR"];
+    else process.env["GIT_DIR"] = savedDir;
+    if (savedWork === undefined) delete process.env["GIT_WORK_TREE"];
+    else process.env["GIT_WORK_TREE"] = savedWork;
+  });
+
+  it("describes the checkout it was given, not the one GIT_DIR points at", async () => {
+    const target = originWithClone().clone;
+    const decoy = originWithClone().clone;
+    // Make the decoy unmistakably different.
+    writeFileSync(path.join(decoy, "decoy.md"), "decoy\n");
+    git(decoy, "add", "decoy.md");
+    git(decoy, "commit", "-m", "decoy commit");
+
+    const targetHead = git(target, "rev-parse", "HEAD");
+    const decoyHead = git(decoy, "rev-parse", "HEAD");
+    expect(targetHead).not.toBe(decoyHead);
+
+    process.env["GIT_DIR"] = path.join(decoy, ".git");
+    process.env["GIT_WORK_TREE"] = decoy;
+
+    const s = await describeSourceRevision(target);
+    expect(s.source_checkout).toBe(target);
+    expect(s.source_revision).toBe(targetHead);
+    expect(s.source_revision).not.toBe(decoyHead);
+  });
+});
+
+// `git status` honours core.fsmonitor, which may name an executable. Callers supply the path
+// probed by icn_ops_agent_runtime, so an unguarded read-only diagnostic would run a binary of
+// the repository's choosing with the server's authority. This asserts the behaviour, not the
+// flag: a sentinel file appears if and only if the configured program actually ran.
+describe("describeSourceRevision — a read-only probe executes no repository-configured code", () => {
+  it("does not run a core.fsmonitor program configured in the probed repository", async () => {
+    const { clone } = originWithClone();
+    const sentinel = path.join(clone, "FSMONITOR_RAN");
+    const hook = path.join(clone, "fsmonitor-hook.sh");
+    writeFileSync(hook, `#!/bin/sh\necho ran > "${sentinel}"\nexit 1\n`);
+    chmodSync(hook, 0o755);
+    git(clone, "config", "core.fsmonitor", hook);
+
+    // Control: with the guard removed, git really does execute it — otherwise this test would
+    // pass for the wrong reason on a git that ignores the setting.
+    execFileSync("git", ["status", "--porcelain"], { cwd: clone, stdio: "ignore" });
+    expect(existsSync(sentinel), "control: git must execute core.fsmonitor unguarded").toBe(true);
+    rmSync(sentinel, { force: true });
+
+    await describeSourceRevision(clone);
+    expect(existsSync(sentinel), "probe must not execute core.fsmonitor").toBe(false);
   });
 });
 

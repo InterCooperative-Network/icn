@@ -14,7 +14,10 @@ import { buildStateIndex } from "../diagnostics/state-index.js";
 import { buildNextStepsReport } from "../diagnostics/next-steps.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
-import { describeSourceRevision } from "../diagnostics/source-revision.js";
+import {
+  describeSourceRevision,
+  headRevision,
+} from "../diagnostics/source-revision.js";
 import {
   buildAgentContextSpineView,
   buildPathBrief,
@@ -27,29 +30,47 @@ export function registerAgentOpsTools(
   const repoRoot = resolveMonorepoRoot();
 
   // Every repository-DERIVED answer carries the provenance of the tree it was read from, so a
-  // stale or dirty source is visible in the answer instead of looking identical to a current
-  // one. Statically compiled catalogs (agent_brief, command_catalog, verification_plan) are
-  // deliberately NOT stamped: they are baked into the build and are not reads of the checkout,
-  // so tying them to its revision would assert a relationship that does not exist.
+  // stale or dirty source is visible in the answer instead of looking identical to a current one.
+  // Statically compiled catalogs (agent_brief, command_catalog, verification_plan) are
+  // deliberately NOT stamped: they are baked into the build and are not reads of the checkout, so
+  // tying them to its revision would assert a relationship that does not exist.
   //
-  // `root` is the tree the payload was actually read from, which is not always repoRoot —
+  // `build` is a thunk rather than an already-computed value so that HEAD is captured BEFORE the
+  // payload is read. Otherwise a checkout fast-forwarded mid-call would return data read from the
+  // old tree under a stamp naming the new one — a revision-attribution bug in the very feature
+  // that exists to prevent them, and one made likelier by the host-synchronisation work this is
+  // a step towards. A revision that moves across the read fails closed.
+  //
+  // `root` is the tree the payload is read from, which is not always repoRoot —
   // icn_ops_agent_runtime deliberately reads the CALLER's lane instead.
+  //
+  // SCOPE. This covers answers whose CONTENT is read out of one checkout, where the reader
+  // cannot otherwise tell which. It does not cover `repo_status` / `worktree_status` in
+  // tools/repos.ts: those report ON a set of trees and already name each one per row, so the
+  // provenance is intrinsic rather than missing — and `repo_status` returns an array, which this
+  // object-shaped stamp cannot carry without changing its contract. Giving those surfaces
+  // staleness semantics is a separate change, tracked with the bare-store work (R1-B).
   //
   // This is distinct from a generated artifact's own `source_commit` (the Agent Context Spine
   // carries one): that records the revision the artifact was generated FROM, while `source`
   // records the checkout this answer was read OUT OF. When the two disagree, the artifact is
   // stale relative to the tree holding it — precisely the condition worth surfacing.
-  // `payload` is deliberately an object type rather than `unknown`: spreading a string or an
-  // array would silently produce an index-keyed object ({"0":"a"}) instead of failing, so the
-  // shape is constrained at the call site where it can still be checked.
   async function repoDerived(
-    payload: Record<string, unknown>,
+    build: () => Record<string, unknown> | Promise<Record<string, unknown>>,
     root: string = repoRoot
   ): Promise<{ content: { type: "text"; text: string }[] }> {
+    const before = await headRevision(root);
+    const payload = await build();
     const source = await describeSourceRevision(root);
-    const body = { ...payload, source };
+    if (before !== source.source_revision) {
+      source.trustworthy = false;
+      source.warnings.push(
+        `HEAD moved from ${before ?? "unknown"} to ${source.source_revision ?? "unknown"} while ` +
+          "this answer was being read; the payload may describe a different revision than the stamp"
+      );
+    }
     return {
-      content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+      content: [{ type: "text", text: JSON.stringify({ ...payload, source }, null, 2) }],
     };
   }
 
@@ -86,6 +107,7 @@ export function registerAgentOpsTools(
       // fallback for callers that supply no cwd.
       const identity = discoverWorktree(cwd ?? process.cwd(), null);
       const manifestRoot = identity?.worktree_path ?? repoRoot;
+      return await repoDerived(async () => {
       const manifestPath = join(
         manifestRoot,
         "docs/reference/project-index/generated/agent-capabilities.json"
@@ -160,8 +182,8 @@ export function registerAgentOpsTools(
             ? { ...manifest, session }
             : { [section]: manifest[section] ?? [], session };
       if (manifestError) payload["manifest_error"] = manifestError;
-
-      return await repoDerived(payload, manifestRoot);
+      return payload;
+      }, manifestRoot);
     }
   );
 
@@ -170,8 +192,7 @@ export function registerAgentOpsTools(
     "Structured environment snapshot (git, Node/npm, optional gh/kubectl, MCP config parity hints). Never fails on missing optional tools; see warnings array.",
     {},
     async () => {
-      const report = await buildEnvironmentReport(repoRoot);
-      return await repoDerived(report);
+      return await repoDerived(() => buildEnvironmentReport(repoRoot));
     }
   );
 
@@ -180,8 +201,7 @@ export function registerAgentOpsTools(
     "Read-only diagnosis: MCP wiring, native sqlite module, portability script, dirty tree, optional CLIs. Returns severity, checks, and suggested repair commands (not executed).",
     {},
     async () => {
-      const report = await buildDoctorReport(repoRoot);
-      return await repoDerived(report);
+      return await repoDerived(() => buildDoctorReport(repoRoot));
     }
   );
 
@@ -222,7 +242,7 @@ export function registerAgentOpsTools(
       const filtered = wantAbsent
         ? entries
         : entries.filter((e) => e.present);
-      return await repoDerived({ entries: filtered });
+      return await repoDerived(() => ({ entries: filtered }));
     }
   );
 
@@ -231,8 +251,7 @@ export function registerAgentOpsTools(
     "Read-only workflow guidance: severity, short summary, and recommended next verification or setup steps (commands are strings only; never executed by MCP). Uses environment, doctor, state index, MCP parity, and worktree hints without echoing full raw diagnostics.",
     {},
     async () => {
-      const report = await buildNextStepsReport(repoRoot);
-      return await repoDerived(report);
+      return await repoDerived(() => buildNextStepsReport(repoRoot));
     }
   );
 
@@ -261,8 +280,7 @@ export function registerAgentOpsTools(
     "Compact repo layout map for agents: key directories with present flag, one-line description, agent_use, and optional caution. Paths are checked on disk; absent paths are present:false.",
     {},
     async () => {
-      const map = buildRepoMap(repoRoot);
-      return await repoDerived(map);
+      return await repoDerived(() => buildRepoMap(repoRoot));
     }
   );
 
@@ -283,11 +301,11 @@ export function registerAgentOpsTools(
       path: z.string().optional().describe("Filter nodes whose path contains this substring (e.g. icn-gateway)."),
     },
     async ({ paths, node, type, subsystem, path }) => {
-      const view =
+      return await repoDerived(() =>
         paths && paths.length > 0
           ? buildPathBrief(repoRoot, paths)
-          : buildAgentContextSpineView(repoRoot, { node, type, subsystem, path });
-      return await repoDerived(view);
+          : buildAgentContextSpineView(repoRoot, { node, type, subsystem, path })
+      );
     }
   );
 }
