@@ -245,6 +245,34 @@ def main() -> int:
                 "the skill must load dispositions from the canonical owner rather than "
                 "carrying its own list",
             )
+
+            # The projection must not instruct a PROSE decision procedure while
+            # the canonical policy says predicates decide. That contradiction is
+            # not hypothetical: adding `classification` left the skill telling
+            # agents to "apply each disposition's own `test` field", which can
+            # read affirmative for two dispositions at once where the predicates
+            # match exactly one.
+            if doc.get("classification", {}).get("rule"):
+                lowered = body.lower()
+                for phrase in ("apply each disposition's own `test`",
+                               "apply each disposition's own test",
+                               "its `test` tells you when it applies"):
+                    c.ok(
+                        phrase not in lowered,
+                        f"{entry['canonical_path']} instructs classification by the prose "
+                        f"`test` field ({phrase!r}), but classification.rule says the "
+                        "structured predicates decide",
+                    )
+                c.ok(
+                    "predicate" in lowered,
+                    f"{entry['canonical_path']} never mentions the predicates, so an agent "
+                    "following it would classify by prose",
+                )
+                c.ok(
+                    "classification" in lowered and "facts" in lowered,
+                    f"{entry['canonical_path']} must route the agent through "
+                    "classification.facts rather than intuition",
+                )
         for m in entry.get("provider_mirrors", []):
             mp = root / m["path"]
             c.ok(mp.is_file(), f"provider mirror missing: {m['path']}")

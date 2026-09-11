@@ -260,7 +260,38 @@ def main() -> int:
     except Ambiguous:
         t.ok(True, "")
 
-    # (4) The expected label is not reachable by the classifier.
+    # (4) Prose can read affirmative for two dispositions where the predicates
+    #     match exactly one. This is review's counterexample, carried as a
+    #     witness: no recurring class, but a boundary-changing correction. The
+    #     ARCHITECTURAL description ("changes a subsystem boundary, state model,
+    #     authority model, storage model or lifecycle") reads TRUE, and the NONE
+    #     description reads TRUE as well — an agent classifying by prose could
+    #     land on either. The predicates are unambiguous because
+    #     recurring_class_established is false.
+    prose_trap = {
+        "recurring_class_established": False,
+        "changes_subsystem_boundary": True,
+        "structural_change_required_or_in_contract": False,
+    }
+    arch_prose = json.dumps(dispositions["ARCHITECTURAL"]).lower()
+    t.ok(
+        "subsystem boundary" in arch_prose,
+        "the ARCHITECTURAL prose no longer describes a boundary change, so this witness no "
+        "longer demonstrates the trap it was written for",
+    )
+    try:
+        trapped = classify(prose_trap, dispositions)
+    except Ambiguous as exc:
+        trapped = f"<ambiguous: {exc}>"
+    t.ok(
+        trapped == "NONE",
+        f"prose-trap witness: facts with no recurring class but a boundary-changing correction "
+        f"derived {trapped!r}. The predicates must yield NONE here even though the ARCHITECTURAL "
+        "description reads affirmative — otherwise an agent following prose and an agent "
+        "following predicates disagree.",
+    )
+
+    # (5) The expected label is not reachable by the classifier.
     import inspect
     sig = set(inspect.signature(classify).parameters)
     t.ok(
@@ -281,7 +312,7 @@ def main() -> int:
         return 1
     print(
         f"test_engineering_leverage: clean ({t.n} assertions; {len(SCENARIOS)} scenarios "
-        "derived from policy predicates; 5 adversarial witnesses)"
+        "derived from policy predicates; 6 adversarial witnesses)"
     )
     return 0
 

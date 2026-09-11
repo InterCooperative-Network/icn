@@ -78,30 +78,46 @@ If none matches, that is informative. Either the class is new, or there is no cl
 
 ## Classify, then continue
 
-Every candidate gets exactly one disposition. **Do not classify from memory or from this file** —
-the meanings and their applicability tests are data, and a copy of them here would go stale
-silently while still reading plausibly:
+Every candidate gets exactly one disposition, and **the structured predicates decide it**. The
+`meaning` and `test` fields explain a disposition to a human; they are not the decision procedure.
+Reading them and judging is how two agents reach two answers from the same facts.
+
+Answer the facts in `classification.facts`, then let the predicates resolve them:
 
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-python3 -c "
-import json
-d=json.load(open('${REPO_ROOT}/ops/state/truth/engineering-leverage.json'))
-for name, spec in d['dispositions'].items():
-    print(name)
-    print('  means:', spec['meaning'])
-    print('  test :', spec['test'])
-for a in d['anti_patterns']:
-    print('  avoid:', a)
-"
+python3 - "$REPO_ROOT" <<'EOF'
+import json, sys
+d = json.load(open(f"{sys.argv[1]}/ops/state/truth/engineering-leverage.json"))
+
+print("Answer these, then re-run with them filled in:")
+for name, why in d["classification"]["facts"].items():
+    print(f"  {name}: ?    # {why}")
+
+# Replace with your answers, e.g. {"recurring_class_established": True, ...}
+facts = {}
+if facts:
+    matched = [n for n, s in d["dispositions"].items()
+               if all(facts.get(k) == v for k, v in s["predicate"]["all_of"].items())]
+    if len(matched) != 1:
+        raise SystemExit(f"AMBIGUOUS: {len(matched)} matched {matched} — "
+                         f"{d['classification']['rule']}")
+    print("disposition:", matched[0])
+    print("  explains:", d["dispositions"][matched[0]]["meaning"])
+EOF
 ```
 
-Apply each disposition's own `test` field — that is what makes the choice reproducible between
-agents rather than a matter of taste. Where a disposition carries a `recorded_in` or a
-`constraint`, honour it.
+Exactly one predicate must match. Zero or several is ambiguity, and the canonical `rule` is
+explicit that it must fail closed — never resolve it by preferring the answer you expected. If you
+cannot answer a fact honestly, that is the finding: you do not yet know enough to classify.
 
-`NONE` is a legitimate outcome and its `test` tells you when it applies. The `anti_patterns` list
-in the same file names manufacturing architecture work as a failure mode of this framework itself.
+Where the chosen disposition carries a `recorded_in` or a `constraint`, honour it.
+
+Prose can mislead where predicates do not. With no recurring class but a boundary-changing
+correction, the ARCHITECTURAL and NONE descriptions can both *read* as affirmative — while the
+predicates match only `NONE`, because `recurring_class_established` is false. Follow the predicate
+result. The `anti_patterns` list names manufacturing architecture work as a failure mode of this
+framework itself.
 
 ## The boundary that is not negotiable
 
