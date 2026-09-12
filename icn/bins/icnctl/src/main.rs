@@ -2,6 +2,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 mod institution_bootstrap;
+mod institution_runtime_root;
 
 use anyhow::{bail, Context, Result};
 use rust_i18n::t;
@@ -3252,8 +3253,10 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| "en".to_string());
     rust_i18n::set_locale(&locale);
 
-    // Initialize simple logging
-    icn_obs::init()?;
+    // Diagnostics to stderr, not stdout. `icnctl`'s stdout is its result — and
+    // for `--json` subcommands it is a document a caller pipes into a parser —
+    // so tracing lines interleaved into it make that document unparseable.
+    icn_obs::init_to_stderr()?;
 
     let data_dir = get_data_dir(args.data_dir)?;
 
@@ -3399,6 +3402,95 @@ async fn main() -> Result<()> {
 
 fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
+
+    // Subcommands that rewrite `identity.age` join the data-directory exclusion
+    // domain. Classified by what each actually writes, not by living under `id`.
+    //
+    // `id rotate` rewrites the keystore in place and took no lock at all.
+    // Runtime-root provisioning proves founding authority by unlocking that
+    // keystore early and commits its receipt at the very end, so a rotation
+    // landing anywhere in between made the ceremony commit a receipt naming a
+    // node DID the daemon no longer has — and the daemon roots its trust graph
+    // at the new one, so the treasury that receipt vouches for is unreachable.
+    // Re-reading the DID after the commit would not close that; the identity
+    // must not be able to change during the transaction.
+    //
+    // Two separate questions, because a command can answer no to the first and
+    // yes to the second:
+    //
+    //   1. can it change the DID, or replace the key material the receipt
+    //      names?  — `rotate` and `import` yes; `upgrade-pq`, recovery setup
+    //      and the device commands no, they preserve the DID.
+    //   2. can it rewrite `identity.age` while a ceremony is reading it?  —
+    //      all of them yes.
+    //
+    // The second is enough on its own, on this evidence: `AgeKeyStore`
+    // persists the *whole* file with a plain `std::fs::write` (truncate in
+    // place, no temp-and-rename), and provisioning re-opens and re-reads that
+    // keystore at its verification step, immediately before the receipt is
+    // committed. So a DID-preserving rewrite can still be observed torn there,
+    // and the transaction's outcome would depend on arrival order. That is why
+    // `upgrade-pq` is here, and why the recovery and device commands that call
+    // `update_did_document` take the same lock at their own handlers.
+    //
+    // `init` is deliberately **not** here. It refuses when a keystore already
+    // exists, so it cannot replace an established identity underneath a
+    // ceremony — and a ceremony requires that keystore to exist before it
+    // starts. Putting it behind a *creating* lock would also leave a retained
+    // `.icn-data-dir.lock` in every freshly initialised root, which is the
+    // inspection-poisoning property the previous commit just removed, moved
+    // into the setup path.
+    //
+    // Held for the whole subcommand and non-blocking, so a rotation during a
+    // ceremony refuses rather than interleaving, and a ceremony started while
+    // one of these holds the root refuses too.
+    let mutates_identity = match cmd {
+        IdCommands::Rotate { .. } | IdCommands::Import { .. } => true,
+        // Creates only when absent; read-only otherwise.
+        IdCommands::Init | IdCommands::Show | IdCommands::Export { .. } => false,
+        // Preserves the DID but rewrites the same file.
+        #[cfg(feature = "post-quantum")]
+        IdCommands::UpgradePq => true,
+    };
+    let _identity_lock = if mutates_identity {
+        // The lock is *created* here, retained after release, and mode 0600. Run
+        // under `sudo` against a service-owned root it would be root-owned, and
+        // the daemon's account could no longer open it — a mistaken maintenance
+        // command turned into a permanent startup failure. The ceremony refuses
+        // that before it creates anything; so must every other creating holder.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
+        Some(icn_core::DataDirLock::acquire(
+            data_dir,
+            "this identity command",
+        )?)
+    } else {
+        None
+    };
+
+    // `mutates_identity` above is the *tearing* question — can this command
+    // rewrite `identity.age` while something else is reading it. This is the
+    // separate *authority* question: can it replace the node DID that a
+    // committed runtime root is bound to.
+    //
+    // The two sets differ, which is why this is not folded into the match
+    // above. `upgrade-pq` rewrites the keystore but preserves the DID, so it
+    // takes the lock and is not refused here.
+    //
+    // Ordering matters twice over. It runs AFTER the lock, so the state it
+    // reads cannot change under it; and BEFORE the `match cmd` below, so the
+    // refusal happens before any identity mutation rather than partway
+    // through one.
+    let changes_node_did = matches!(cmd, IdCommands::Rotate { .. } | IdCommands::Import { .. });
+    if changes_node_did {
+        let command = match cmd {
+            IdCommands::Rotate { .. } => "`icnctl id rotate`",
+            IdCommands::Import { .. } => "`icnctl id import`",
+            _ => unreachable!("guarded by changes_node_did"),
+        };
+        institution_runtime_root::refuse_node_did_change_if_runtime_root_exists(data_dir, command)?;
+    }
 
     match cmd {
         IdCommands::Init => {
@@ -3649,6 +3741,29 @@ async fn handle_recovery_command(
     endpoint: &str,
 ) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
+
+    // `Setup` calls `update_did_document`, which rewrites `identity.age` with a
+    // plain `fs::write`. A runtime-root ceremony reading that keystore for its
+    // authority proof can observe the write torn, so this joins the same
+    // exclusion domain. The rest of these commands talk to a running daemon
+    // over RPC and write nothing here.
+    let _identity_lock = match cmd {
+        RecoveryCommands::Setup { .. } => {
+            // The lock is *created* here, retained after release, and mode 0600. Run
+            // under `sudo` against a service-owned root it would be root-owned, and
+            // the daemon's account could no longer open it — a mistaken maintenance
+            // command turned into a permanent startup failure. The ceremony refuses
+            // that before it creates anything; so must every other creating holder.
+            institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+                data_dir,
+            )?;
+            Some(icn_core::DataDirLock::acquire(
+                data_dir,
+                "this recovery command",
+            )?)
+        }
+        _ => None,
+    };
 
     match cmd {
         // Setup and Config are local-only operations (modify keystore's DID document)
@@ -4314,6 +4429,120 @@ async fn handle_network_command(
     Ok(())
 }
 
+/// A managed ICN configuration opened for local read-modify-write, under the
+/// exclusive configuration lock.
+///
+/// # Why this is a type and not a pair of calls
+///
+/// The hazard these writers have is not the write, it is the *span*. A command
+/// that loads `icn.toml`, decides what to change, and writes the whole file
+/// back is holding a snapshot; if a runtime-root ceremony publishes its
+/// `[cooperative]` section into that file in between, the writer's `to_file`
+/// silently reverts it from the stale snapshot. Depending on arrival order the
+/// ceremony then either fails verification and leaves the root permanently
+/// `INCOMPLETE`, or commits a receipt moments before the stale write removes
+/// the treasury linkage that receipt asserts.
+///
+/// Taking the lock only around `to_file` does not fix that — the snapshot was
+/// already stale by then. The lock has to cover load-through-write, which is
+/// exactly the extent of this value's lifetime: `open` acquires it and loads,
+/// `commit` writes and drops it.
+///
+/// Making it a type rather than a documented convention means a caller cannot
+/// load the configuration outside the lock and still reach `commit`: there is
+/// no other constructor that yields a `Config` here.
+///
+/// # What this is deliberately not applied to
+///
+/// Only writers of *managed ICN configuration* that read-modify-write take
+/// this. Read-only commands do not: creating a coordination artifact on a
+/// reader is the inspection-poisoning property the ceremony work already had to
+/// remove once, and a lock file left behind by `federation list` would
+/// reintroduce it. `icnd init` also does not — it constructs a fresh `Config`
+/// from defaults rather than reading one back, so it holds no snapshot to go
+/// stale, and locking it would leave a retained lock in every freshly
+/// initialised root. Writers of unrelated files (`genesis.json`) are out of
+/// scope by definition.
+struct ManagedConfigEdit {
+    /// Held for the whole edit. `commit` takes `self` by value and performs the
+    /// write in its body, so the lock is necessarily still held when `to_file`
+    /// runs — no field-drop-order reasoning is required for that guarantee.
+    _lock: icn_core::DataDirLock,
+    path: std::path::PathBuf,
+    config: icn_core::config::Config,
+}
+
+impl ManagedConfigEdit {
+    /// Acquire the exclusive configuration lock, then load.
+    ///
+    /// `missing` decides what an absent configuration means for this caller:
+    /// `federation add` starts from defaults, `remove` and `set` refuse.
+    fn open(config_root: &Path, holder: &str, missing: MissingConfig) -> Result<Self> {
+        // `.icn-config.lock` is created here, retained after release, and mode
+        // 0600 — the same durable coordination artifact as the storage lock, so
+        // it needs the same question asked first. A federation edit run through
+        // `sudo` against a service-owned root would otherwise leave a file the
+        // daemon's account cannot reopen even read-only, and the service stops
+        // starting. The audit that added this guard to the identity, recovery
+        // and device writers swept `DataDirLock::acquire` and missed
+        // `acquire_config`; both create.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            config_root,
+        )?;
+        // Acquired BEFORE the load. This ordering is the entire guarantee.
+        let lock = icn_core::DataDirLock::acquire_config(config_root, holder)?;
+        let path = config_root.join("icn.toml");
+        // The lock names a *directory*; `from_file` and `to_file` follow a
+        // link. A symlinked `icn.toml` therefore puts the bytes being edited
+        // under one directory's lock while this holds another's, so a daemon or
+        // an inspection holding the target's lock does not contend and the file
+        // can be truncated underneath it. Refused rather than resolved: the
+        // ceremony already refuses a hard-linked configuration for the same
+        // reason — a second name for the bytes is a second identity outside
+        // this exclusion domain — and resolving instead would silently move
+        // which directory this command coordinates on.
+        #[cfg(unix)]
+        if let Ok(meta) = std::fs::symlink_metadata(&path) {
+            if meta.file_type().is_symlink() {
+                bail!(
+                    "Refusing to edit {}: it is a symbolic link. The configuration lock is \
+                     taken on the directory holding this name, but reads and writes would \
+                     follow the link elsewhere — so this edit would not contend with a daemon \
+                     or an inspection coordinating on the target. Edit the configuration where \
+                     it actually lives, or replace the link with a regular file.",
+                    path.display()
+                );
+            }
+        }
+        let config = if path.exists() {
+            icn_core::config::Config::from_file(&path)?
+        } else {
+            match missing {
+                MissingConfig::StartFromDefaults => icn_core::config::Config::default(),
+                MissingConfig::Refuse => {
+                    bail!("No configuration file found at {}", path.display())
+                }
+            }
+        };
+        Ok(Self {
+            _lock: lock,
+            path,
+            config,
+        })
+    }
+
+    /// Write the edited configuration and release the lock.
+    fn commit(self) -> Result<()> {
+        self.config.to_file(&self.path)
+    }
+}
+
+/// What an absent managed configuration means to a particular writer.
+enum MissingConfig {
+    StartFromDefaults,
+    Refuse,
+}
+
 async fn handle_federation_command(
     cmd: FederationCommands,
     data_dir: &Path,
@@ -4418,22 +4647,24 @@ async fn handle_federation_command(
                 bail!("Trust score must be between 0.0 and 1.0");
             }
 
-            // Load existing config
-            let mut config = if config_path.exists() {
-                Config::from_file(&config_path)?
-            } else {
-                Config::default()
-            };
+            // Lock, then load. `federation add` is a read-modify-write of managed
+            // configuration, so the exclusive lock has to span both — see
+            // `ManagedConfigEdit`.
+            let mut edit = ManagedConfigEdit::open(
+                data_dir,
+                "icnctl federation add",
+                MissingConfig::StartFromDefaults,
+            )?;
 
             // Check if already exists
-            if config.network.bootstrap_peers.contains(&peer_url) {
+            if edit.config.network.bootstrap_peers.contains(&peer_url) {
                 println!("Peer already configured: {peer_url}");
                 return Ok(());
             }
 
             // Add peer
-            config.network.bootstrap_peers.push(peer_url.clone());
-            config.to_file(&config_path)?;
+            edit.config.network.bootstrap_peers.push(peer_url.clone());
+            edit.commit()?;
 
             println!("✓ Added bootstrap peer: {peer_url}");
             println!("  Initial trust: {trust:.2}");
@@ -4443,24 +4674,24 @@ async fn handle_federation_command(
         }
 
         FederationCommands::Remove { did } => {
-            // Load existing config
-            let mut config = if config_path.exists() {
-                Config::from_file(&config_path)?
-            } else {
-                bail!("No configuration file found at {}", config_path.display());
-            };
+            // Lock, then load — same read-modify-write hazard as `add`.
+            let mut edit = ManagedConfigEdit::open(
+                data_dir,
+                "icnctl federation remove",
+                MissingConfig::Refuse,
+            )?;
 
             // Find and remove peer by DID
-            let original_len = config.network.bootstrap_peers.len();
-            config
+            let original_len = edit.config.network.bootstrap_peers.len();
+            edit.config
                 .network
                 .bootstrap_peers
                 .retain(|url| !url.contains(&did));
 
-            if config.network.bootstrap_peers.len() == original_len {
+            if edit.config.network.bootstrap_peers.len() == original_len {
                 println!("No peer found with DID: {did}");
             } else {
-                config.to_file(&config_path)?;
+                edit.commit()?;
                 println!("✓ Removed bootstrap peer: {did}");
             }
         }
@@ -4527,12 +4758,16 @@ async fn handle_federation_command(
         }
 
         FederationCommands::Set { key, value } => {
-            // Load existing config
-            let mut config = if config_path.exists() {
-                Config::from_file(&config_path)?
-            } else {
-                Config::default()
-            };
+            // Lock, then load — same read-modify-write hazard as `add`.
+            let mut edit = ManagedConfigEdit::open(
+                data_dir,
+                "icnctl federation set",
+                MissingConfig::StartFromDefaults,
+            )?;
+            // Borrowed for the duration of the match below so the existing
+            // per-key assignments read unchanged; the borrow ends before
+            // `commit` consumes the edit.
+            let config = &mut edit.config;
 
             // Clone value for display after potential move
             let display_value = value.clone();
@@ -4583,7 +4818,7 @@ async fn handle_federation_command(
                 }
             }
 
-            config.to_file(&config_path)?;
+            edit.commit()?;
             println!("✓ Set federation.{key} = {display_value}");
         }
 
@@ -6041,6 +6276,47 @@ struct DeviceAddRequest {
 
 fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
+
+    // Only `Approve` and `Revoke` call `update_did_document`, which rewrites
+    // `identity.age` with a plain `fs::write`.
+    //
+    // An earlier version took the lock for the whole handler and justified it on
+    // cost -- "the lock is cheap". Cost was the wrong axis. `acquire` *creates*
+    // the lock file and it is retained after release, so a read-only
+    // `device list` run under `sudo` against a service-owned root leaves a
+    // root-owned 0600 `.icn-data-dir.lock` behind. The daemon's service account
+    // then cannot open it, and this crate's own fail-closed rule refuses to
+    // start rather than proceeding unlocked: a single mistaken inspection turns
+    // into a permanent startup failure. That is the same inspection-poisoning
+    // defect already removed from `id init`; a reader must never be able to lock
+    // a root out of running.
+    //
+    // `Add` writes a `device-add-*.json` request beside the keystore but never
+    // rewrites the keystore, so it does not need this lock either.
+    //
+    // Unlocked readers can therefore observe a keystore mid-rewrite. They fail
+    // rather than misreport: `identity.age` is authenticated, so a torn read
+    // does not decrypt. Do not "repair" that by relocking the read paths.
+    let mutates_identity = match cmd {
+        DeviceCommands::Approve { .. } | DeviceCommands::Revoke { .. } => true,
+        DeviceCommands::List | DeviceCommands::Add { .. } => false,
+    };
+    let _identity_lock = if mutates_identity {
+        // The lock is *created* here, retained after release, and mode 0600. Run
+        // under `sudo` against a service-owned root it would be root-owned, and
+        // the daemon's account could no longer open it — a mistaken maintenance
+        // command turned into a permanent startup failure. The ceremony refuses
+        // that before it creates anything; so must every other creating holder.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
+        Some(icn_core::DataDirLock::acquire(
+            data_dir,
+            "this device command",
+        )?)
+    } else {
+        None
+    };
 
     match cmd {
         DeviceCommands::List => {
@@ -13329,5 +13605,113 @@ mod audit_verify_tests {
                 .any(|c| c.name == "Journal provenance matches decision" && !c.passed),
             "mismatched decision_hash must fail check 13"
         );
+    }
+}
+
+/// #2749 review tranche: local configuration writers and the `.icn-config.lock`
+/// exclusion domain.
+#[cfg(test)]
+mod managed_config_edit_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::{ManagedConfigEdit, MissingConfig};
+    use std::path::Path;
+
+    /// Write a configuration that already carries a `[cooperative]` linkage,
+    /// standing in for one a runtime-root ceremony has published.
+    fn config_with_cooperative(root: &Path) {
+        let config = icn_core::Config {
+            data_dir: root.to_path_buf(),
+            ..Default::default()
+        };
+        let mut doc: toml::Value = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
+        let table = doc.as_table_mut().unwrap();
+        let mut coop = toml::value::Table::new();
+        coop.insert("id".into(), toml::Value::String("coop-under-test".into()));
+        coop.insert(
+            "treasury_did".into(),
+            toml::Value::String("did:icn:treasury-under-test".into()),
+        );
+        table.insert("cooperative".into(), toml::Value::Table(coop));
+        std::fs::write(root.join("icn.toml"), toml::to_string(&doc).unwrap()).unwrap();
+    }
+
+    /// The edit holds the exclusive configuration lock for its whole lifetime —
+    /// load through write, not merely around the write.
+    ///
+    /// That span is the property: a writer that loaded before a ceremony
+    /// published and wrote afterwards would revert `[cooperative]` from its
+    /// stale snapshot. Taking the lock only around `to_file` would not prevent
+    /// it, because the snapshot is already stale by then.
+    #[test]
+    fn an_open_edit_excludes_another_writer_for_its_whole_lifetime() {
+        let dir = tempfile::TempDir::new().unwrap();
+        config_with_cooperative(dir.path());
+
+        let edit = ManagedConfigEdit::open(dir.path(), "witness writer A", MissingConfig::Refuse)
+            .expect("the first writer must be admitted");
+
+        // A second writer, while the first is still open — i.e. exactly the
+        // window in which a stale snapshot would be formed.
+        let second = ManagedConfigEdit::open(dir.path(), "witness writer B", MissingConfig::Refuse);
+        assert!(
+            second.is_err(),
+            "a second configuration writer must be refused while an edit is open"
+        );
+
+        // And admitted again once the first commits and releases.
+        edit.commit().expect("the first writer must commit");
+        ManagedConfigEdit::open(dir.path(), "witness writer C", MissingConfig::Refuse)
+            .expect("a writer must be admitted once the lock is released");
+    }
+
+    /// A legitimate edit preserves a `[cooperative]` linkage it did not author.
+    ///
+    /// `Config` round-trips the whole file, so this is not free: a writer that
+    /// dropped unknown or unmodified sections would lose the treasury linkage
+    /// even without any concurrency.
+    #[test]
+    fn an_edit_preserves_the_cooperative_linkage_it_did_not_author() {
+        let dir = tempfile::TempDir::new().unwrap();
+        config_with_cooperative(dir.path());
+
+        let mut edit =
+            ManagedConfigEdit::open(dir.path(), "witness federation add", MissingConfig::Refuse)
+                .unwrap();
+        edit.config
+            .network
+            .bootstrap_peers
+            .push("icn://did:icn:peer@10.0.0.1:9000".to_string());
+        edit.commit().unwrap();
+
+        let written = std::fs::read_to_string(dir.path().join("icn.toml")).unwrap();
+        let doc: toml::Value = toml::from_str(&written).unwrap();
+        let coop = doc
+            .get("cooperative")
+            .expect("the cooperative linkage must survive an unrelated edit");
+        assert_eq!(
+            coop.get("treasury_did").and_then(|v| v.as_str()),
+            Some("did:icn:treasury-under-test"),
+            "the treasury linkage must survive an unrelated edit"
+        );
+        // ...and the writer's own change must be there too.
+        assert!(
+            written.contains("icn://did:icn:peer@10.0.0.1:9000"),
+            "the writer's own change must be present: {written}"
+        );
+    }
+
+    /// `MissingConfig` is the only thing that decides what an absent
+    /// configuration means, and it decides it *under* the lock.
+    #[test]
+    fn an_absent_configuration_is_refused_or_defaulted_per_caller() {
+        let dir = tempfile::TempDir::new().unwrap();
+        assert!(
+            ManagedConfigEdit::open(dir.path(), "witness remove", MissingConfig::Refuse).is_err(),
+            "a writer that requires an existing configuration must refuse"
+        );
+        // The refusal must not have retained the lock.
+        ManagedConfigEdit::open(dir.path(), "witness add", MissingConfig::StartFromDefaults)
+            .expect("a writer that starts from defaults must be admitted");
     }
 }

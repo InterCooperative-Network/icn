@@ -828,18 +828,21 @@ async fn spawn_actors_with_identity(
     // Subscribe to governance events via the effect path
     // The effect path is now the default - legacy governance_handlers have been removed.
     event_subscriptions.governance_event_subscription = Some({
-        let treasury_did = config
-            .cooperative
-            .treasury_did
-            .as_ref()
-            .and_then(|s| {
-                serde_json::from_value::<icn_identity::Did>(serde_json::Value::String(s.clone()))
-                    .ok()
-            })
-            .unwrap_or_else(|| {
-                debug!("No treasury_did configured, using node DID for budget payouts");
-                did.clone()
-            });
+        // Resolution lives with `CooperativeConfig`, its owner, so the rule
+        // has one home and can be unit-tested without standing up a
+        // supervisor. `None` still falls back to the node DID for every
+        // pre-genesis deployment; a configured-but-unusable value now refuses
+        // instead of silently becoming the node DID (#2744).
+        let resolved = config.cooperative.resolve_treasury_did(&did)?;
+        if resolved.is_configured() {
+            info!(
+                treasury_did = %resolved.did(),
+                "Ledger service using the treasury principal named by the configuration"
+            );
+        } else {
+            debug!("No treasury_did configured, using node DID for budget payouts");
+        }
+        let treasury_did = resolved.into_did();
 
         // Create kernel executor with protocol parameter store
         let mut kernel_executor = super::governance_executor::KernelGovernanceExecutor::new(

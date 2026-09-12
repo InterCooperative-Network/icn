@@ -120,3 +120,7 @@ icn-wt/
 
 # Local rehearsal run artifacts (transcripts, verify.json, evidence packets)
 demo/output/
+
+# ICN coordination lock files, retained after release by design (#2744).
+.icn-config.lock
+.icn-data-dir.lock

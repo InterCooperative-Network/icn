@@ -456,6 +456,27 @@ impl Config {
             Err(id_errors) => errors.extend(id_errors),
         }
 
+        // A configured treasury that cannot parse.
+        //
+        // `--validate-config` is documented as predicting whether the daemon
+        // accepts a file. It did not predict this one: nothing here looked at
+        // `[cooperative] treasury_did`, so validation reported success and
+        // normal startup then failed much later, after stores and services had
+        // begun initializing. `resolve_treasury_did` refuses an unparseable
+        // value rather than silently substituting the node's own DID (#2744),
+        // so the failure is certain — which is exactly what validation is for.
+        //
+        // Through `CooperativeConfig::parse_configured_treasury_did`, which is
+        // the same rule startup applies — not a second copy of the parse. Two
+        // definitions of "usable configured treasury DID" would make this
+        // prediction true only until one of them changed.
+        //
+        // Structural only: it parses the string. No store, no key material, no
+        // authorization, no claim that the treasury exists.
+        if let Err(e) = self.cooperative.parse_configured_treasury_did() {
+            errors.push(format!("{e:#}"));
+        }
+
         if errors.is_empty() {
             Ok(warnings)
         } else {

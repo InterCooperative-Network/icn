@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-09-11T05:32:50+00:00",
-  "source_commit": "4d9db69e91c753e14505ece26a3690436e2e18d3",
+  "generated": "2026-09-11T08:34:20+00:00",
+  "source_commit": "fbd337ff3dd1cb08f5896af3a21c94dfe0193b2e",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -36,7 +36,7 @@
   ],
   "counts": {
     "nodes": 145,
-    "edges": 92
+    "edges": 93
   },
   "nodes": [
     {
@@ -3143,6 +3143,14 @@
       "type": "depends_on",
       "evidence": {
         "source": "icn/crates/icn-testkit/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icnctl",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/bins/icnctl/Cargo.toml"
       }
     },
     {

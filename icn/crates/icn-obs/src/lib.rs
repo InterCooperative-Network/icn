@@ -89,11 +89,28 @@ pub use contribution::{AggregatedMetrics, ResourceMetrics, ResourceType};
 pub use health::{start_monitoring_server, HealthService, HealthState, HealthStatus};
 pub use otel::{init_tracing, shutdown_tracing, TraceContext, TracingConfig};
 
-/// Initialize observability stack
+/// Initialize observability stack, writing diagnostics to **stdout**.
+///
+/// Appropriate for a long-running service whose stdout is the log stream.
 pub fn init() -> Result<()> {
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    Ok(())
+}
+
+/// Initialize observability stack, writing diagnostics to **stderr**.
+///
+/// This is what a command-line tool wants. A CLI's stdout is its result — for
+/// `--json` subcommands it is a machine-readable document — and interleaving
+/// log lines into it makes that document unparseable. Diagnostics belong on
+/// stderr, where a caller can read them without corrupting the payload.
+pub fn init_to_stderr() -> Result<()> {
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
         .init();
 
     Ok(())

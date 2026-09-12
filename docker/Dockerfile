@@ -61,6 +61,18 @@ RUN useradd -m -u 1000 -s /bin/bash icn
 # Create data directory
 RUN mkdir -p /data && chown icn:icn /data
 
+# Create the configuration directory the compose file mounts into, owned by the
+# account the daemon runs as.
+#
+# `docker/docker-compose.yml` bind-mounts a single FILE to /etc/icn/icn.toml. If
+# the directory does not already exist in the image, Docker creates it on the
+# container's writable layer as root:root — and the daemon, running as `icn`,
+# then cannot create the coordination lock it needs to take exclusion over the
+# configuration it is about to consume, so it refuses to start. Creating the
+# directory here means the daemon participates in that exclusion properly
+# instead of depending on the mount-time default.
+RUN mkdir -p /etc/icn && chown icn:icn /etc/icn
+
 # Copy binaries from builder
 COPY --from=builder /build/target/release/icnd /usr/local/bin/
 COPY --from=builder /build/target/release/icnctl /usr/local/bin/
