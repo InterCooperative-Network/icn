@@ -2235,6 +2235,284 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
     icn_core::config::store_path(data_dir)
 }
 
+/// The coordination files this exclusion domain is anchored on.
+///
+/// Retained after release and mode `0600`, they are the *anchor* of the domain
+/// rather than any part of the state it protects. Restore therefore neither
+/// moves them aside nor unpacks over them: replacing one of these inodes is
+/// exactly the split `DataDirLock`'s own anchor check exists to detect
+/// (icn#2758).
+const COORDINATION_FILE_NAMES: [&str; 2] = [".icn-data-dir.lock", ".icn-config.lock"];
+
+/// Is this the relative path of a coordination file at the root of a data
+/// directory?
+///
+/// Anchored at the top level on purpose: `DataDirLock` names a directory, so a
+/// file called `.icn-data-dir.lock` nested inside `store/` is ordinary content
+/// and no lock is held on it.
+fn is_root_coordination_file(relative: &Path) -> bool {
+    COORDINATION_FILE_NAMES
+        .iter()
+        .any(|name| relative == Path::new(name))
+}
+
+/// Proof that this process is inside the storage exclusion domain of the data
+/// root whose stores it is about to open.
+///
+/// # Why this is a type rather than a rule
+///
+/// The maintenance commands crossed the N2-A gate and then opened the
+/// ceremony's own sled databases while holding nothing (icn#2759). Sled's
+/// per-database lock was the only thing between them and a runtime-root
+/// ceremony — and the ceremony deliberately closes its handles to re-read state
+/// through fresh ones, so there is an interval in which sled locks nothing at
+/// all. A maintenance open landing there takes the database, the ceremony's
+/// verification reopen fails, and the root is left half-provisioned by nothing
+/// worse than arrival order.
+///
+/// Taking the lock at each call site is the rule that was already being
+/// forgotten, so the open is placed behind the guard instead: [`Self::open_store`]
+/// cannot be reached without one. This is deliberately *narrow* — one binary's
+/// data-root opens — and is not the general "the primitive rejects an
+/// unanswered ownership question" work, which is icn#2775.
+///
+/// # What it does not add
+///
+/// It does not newly serialize these commands against a running daemon. Every
+/// caller already crossed [`enforce_n2a_gate`], which opens each sled root
+/// *exclusively* while it audits, so a live daemon already refused them. What
+/// changes is membership of the domain a holder can be in **without** holding
+/// sled handles — the ceremony between its phases, and `restore`.
+enum StorageDomain {
+    /// The root exists, is a directory, and this process holds its storage lock.
+    Held {
+        /// Held for the whole command. Never read; dropping it is the release.
+        _storage: icn_core::DataDirLock,
+        /// The caller's spelling, so messages and derived store paths read
+        /// exactly as they did before this guard existed.
+        data_dir: PathBuf,
+        /// The same directory as the kernel resolves it, which is what
+        /// containment has to be judged against.
+        canonical_root: PathBuf,
+    },
+    /// There is no directory here to hold, so nothing is held — and, critically,
+    /// nothing may be opened either.
+    ///
+    /// Two shapes reach this, and both are cases where taking a lock would be
+    /// the wrong answer rather than a missing one:
+    ///
+    /// * **the root does not exist.** These commands are contracted to report an
+    ///   empty result rather than materialize anything —
+    ///   `report_on_missing_ledger_store_reports_empty` pins that — and creating
+    ///   a root merely to hold a lock in it would be the retained-file poisoning
+    ///   this whole mechanism exists to avoid.
+    /// * **the path is not a directory.** A misconfigured `--data-dir` is the
+    ///   N2-A gate's refusal to make, and it makes it by name
+    ///   (`a_data_dir_that_is_not_a_directory_is_refused_not_skipped`). Probing
+    ///   the account of a regular file would report `ENOTDIR` from a probe file
+    ///   instead, burying the actual operator error under a coordination detail.
+    ///
+    /// The window either shape leaves — something creating a real directory at
+    /// that path immediately afterwards — is closed at [`Self::open_store`],
+    /// which refuses here rather than opening unlocked. Nothing to hold can
+    /// never become a way *into* the stores.
+    Unheld {
+        data_dir: PathBuf,
+        why: &'static str,
+    },
+}
+
+/// What is actually at a `--data-dir` path.
+///
+/// Classified explicitly rather than through `Path::is_dir`, which reports a
+/// permission or traversal error as "not a directory" — and being unable to tell
+/// what is there is not evidence about what is there.
+enum RootShape {
+    Directory,
+    Absent,
+    NotADirectory,
+}
+
+fn classify_root(data_dir: &Path, holder: &str) -> Result<RootShape> {
+    match std::fs::metadata(data_dir) {
+        Ok(meta) if meta.is_dir() => Ok(RootShape::Directory),
+        Ok(_) => Ok(RootShape::NotADirectory),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(RootShape::Absent),
+        Err(e) => Err(e).with_context(|| {
+            format!(
+                "Refusing to run {holder}: could not determine what is at the data directory \
+                 {}, so it cannot be established that no other ICN process holds it",
+                data_dir.display()
+            )
+        }),
+    }
+}
+
+impl StorageDomain {
+    /// Join the domain for a command that reads or repairs an existing root.
+    ///
+    /// `acquire_joining_or_creating`, not `acquire`: a maintenance command run
+    /// under `sudo` against a service-owned root must not mint a retained
+    /// `0600` coordination file the daemon's own account cannot reopen. That
+    /// mistake is a permanent daemon startup failure, and #2749 had to remove
+    /// creating acquisition from two read paths after making it. The three
+    /// outcomes — create, join, refuse — are the primitive's, not this
+    /// caller's.
+    fn join(data_dir: &Path, holder: &str) -> Result<Self> {
+        let unheld = |why| {
+            Ok(Self::Unheld {
+                data_dir: data_dir.to_path_buf(),
+                why,
+            })
+        };
+        match classify_root(data_dir, holder)? {
+            RootShape::Directory => {
+                let storage = icn_core::DataDirLock::acquire_joining_or_creating(data_dir, holder)?;
+                Self::held(storage, data_dir)
+            }
+            RootShape::Absent => {
+                unheld("the data directory did not exist when this command started")
+            }
+            // Left to the N2-A gate on the next line, which refuses a
+            // misconfigured `--data-dir` by name. Probing this path's account
+            // first would replace that refusal with `ENOTDIR` from a probe file.
+            RootShape::NotADirectory => unheld("the --data-dir path is not a directory"),
+        }
+    }
+
+    /// Take the domain for a command that provisions the root itself.
+    ///
+    /// The creating holder's shape, identical to the ceremony's: refuse a
+    /// wrong-account run *before* any coordination file exists, then acquire
+    /// outright. `join`'s create-or-join decision is wrong here — this caller
+    /// legitimately creates the directory, so there is no owning account to
+    /// defer to yet.
+    fn create(data_dir: &Path, holder: &str) -> Result<Self> {
+        // Classified before anything is created, including by the account guard
+        // below. Every step from here on makes something *inside* this path — an
+        // ownership probe, a coordination file — and creating inside a regular
+        // file reports `ENOTDIR` named after whichever artefact happened to go
+        // first, burying the operator's actual mistake. The N2-A gate refuses a
+        // misconfigured `--data-dir` by name, so it is what speaks here.
+        //
+        // The `bail!` after it is a fail-closed net, not dead code: it is what
+        // happens if the gate ever stops refusing this shape.
+        if matches!(classify_root(data_dir, holder)?, RootShape::NotADirectory) {
+            enforce_n2a_gate(data_dir, holder)?;
+            bail!(
+                "Refusing to run {holder}: {} exists but is not a directory.",
+                data_dir.display()
+            );
+        }
+        // The account guard belongs here rather than at the call site: it is
+        // part of what taking a creating acquisition *means*, and leaving it
+        // outside let it run before the classification above and produce the
+        // very error that classification exists to prevent.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
+        let storage = icn_core::DataDirLock::acquire(data_dir, holder)?;
+        Self::held(storage, data_dir)
+    }
+
+    fn held(storage: icn_core::DataDirLock, data_dir: &Path) -> Result<Self> {
+        // After acquisition, so a root the lock itself created resolves.
+        let canonical_root = std::fs::canonicalize(data_dir).with_context(|| {
+            format!(
+                "Failed to resolve the data directory {}",
+                data_dir.display()
+            )
+        })?;
+        Ok(Self::Held {
+            _storage: storage,
+            data_dir: data_dir.to_path_buf(),
+            canonical_root,
+        })
+    }
+
+    /// The data directory as the caller spelled it.
+    fn data_dir(&self) -> &Path {
+        match self {
+            Self::Held { data_dir, .. } | Self::Unheld { data_dir, .. } => data_dir,
+        }
+    }
+
+    /// Open one of this root's sled databases, under this guard's exclusion.
+    ///
+    /// Refuses a database that resolves outside the locked root. The lock names
+    /// a directory, so an open that lands elsewhere is an open this process
+    /// holds no exclusion over — the same reasoning that makes the ceremony
+    /// refuse a symlinked store path, asked here as a containment question
+    /// rather than a link question.
+    ///
+    /// The claim is exactly that and no more: the *database directory* is under
+    /// the locked root. A link planted deeper inside an existing database is
+    /// not addressed here.
+    fn open_store(&self, db: &Path) -> Result<SledStore> {
+        let Self::Held { canonical_root, .. } = self else {
+            let why = match self {
+                Self::Unheld { why, .. } => *why,
+                Self::Held { .. } => unreachable!(),
+            };
+            bail!(
+                "Refusing to open the store at {}: no exclusion was taken over the data \
+                 directory {}, because {why}. Opening it now would proceed with no exclusion \
+                 at all — something has put a real directory there since this command \
+                 started, a provisioning ceremony most likely. Re-run once that has finished.",
+                db.display(),
+                self.data_dir().display()
+            );
+        };
+        Self::assert_covers(canonical_root, db)?;
+        SledStore::open(db).with_context(|| {
+            format!(
+                "Failed to open store at {} (stop the daemon first; it holds an exclusive lock)",
+                db.display()
+            )
+        })
+    }
+
+    /// Refuse a path this guard's lock does not cover.
+    ///
+    /// `db` need not exist yet — sled creates it — so the deepest *existing*
+    /// ancestor is resolved and judged instead. Resolving nothing at all is a
+    /// refusal, not a pass.
+    fn assert_covers(canonical_root: &Path, db: &Path) -> Result<()> {
+        let mut probe = db.to_path_buf();
+        let resolved = loop {
+            match std::fs::canonicalize(&probe) {
+                Ok(resolved) => break resolved,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    if !probe.pop() {
+                        bail!(
+                            "Refusing to open the store at {}: none of its path exists, so it \
+                             cannot be established that it lies under the data directory this \
+                             process holds.",
+                            db.display()
+                        );
+                    }
+                }
+                Err(e) => {
+                    return Err(e).with_context(|| {
+                        format!("Failed to resolve the store path {}", db.display())
+                    })
+                }
+            }
+        };
+        if !resolved.starts_with(canonical_root) {
+            bail!(
+                "Refusing to open the store at {}: it resolves to {}, outside the data \
+                 directory {} this process holds. The exclusion lock names a directory, so an \
+                 open landing elsewhere would proceed with no exclusion at all.",
+                db.display(),
+                resolved.display(),
+                canonical_root.display()
+            );
+        }
+        Ok(())
+    }
+}
+
 /// Refuse to touch a data directory the N2-A startup gate would refuse to open
 /// (#2627 M4d).
 ///
@@ -2305,36 +2583,43 @@ fn enforce_n2a_gate(dir: &Path, what: &str) -> Result<()> {
 }
 
 /// Dispatch cooperative maintenance subcommands.
-fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path) -> Result<()> {
+///
+/// Takes the [`StorageDomain`] rather than a bare path: every arm below opens
+/// the ceremony's own cooperative database, and the guard is what says this
+/// process is inside the exclusion while it does (icn#2759).
+fn handle_coop_maintenance_command(
+    cmd: CoopMaintenanceCommands,
+    domain: &StorageDomain,
+) -> Result<()> {
     match cmd {
         CoopMaintenanceCommands::EntityReport {
             json,
             preview_surrogates,
-        } => coop_entity_report(data_dir, json, preview_surrogates),
+        } => coop_entity_report(domain, json, preview_surrogates),
         CoopMaintenanceCommands::UnknownLegacyReport { json } => {
-            coop_entity_unknown_legacy_report(data_dir, json)
+            coop_entity_unknown_legacy_report(domain, json)
         }
         CoopMaintenanceCommands::EntityBackfillSurrogates {
             apply,
             dry_run: _,
             json,
-        } => coop_entity_backfill_surrogates(data_dir, json, apply),
+        } => coop_entity_backfill_surrogates(domain, json, apply),
     }
 }
 
 fn handle_treasury_maintenance_command(
     cmd: TreasuryMaintenanceCommands,
-    data_dir: &Path,
+    domain: &StorageDomain,
 ) -> Result<()> {
     match cmd {
         TreasuryMaintenanceCommands::EntityBackfillReport { json } => {
-            treasury_entity_backfill_report(data_dir, json)
+            treasury_entity_backfill_report(domain, json)
         }
         TreasuryMaintenanceCommands::EntityBackfillApply {
             apply,
             confirm_apply,
             json,
-        } => treasury_entity_backfill_apply(data_dir, json, apply, confirm_apply),
+        } => treasury_entity_backfill_apply(domain, json, apply, confirm_apply),
     }
 }
 
@@ -2348,11 +2633,16 @@ fn handle_treasury_maintenance_command(
 /// binding only and grants no authority. Mutation belongs to a later, separately
 /// reviewed rung (populating `entity_id` is not authorization-neutral under the
 /// treasury entity-auth gate).
-fn treasury_entity_backfill_report(data_dir: &Path, json: bool) -> Result<()> {
+fn treasury_entity_backfill_report(domain: &StorageDomain, json: bool) -> Result<()> {
     use icn_entity::{InMemoryCoopEntityMap, SledCoopEntityMap};
     use icn_ledger::TreasuryManager;
     use icn_store::Store;
     use std::sync::Arc;
+
+    // The guard is the parameter, not the path: these opens are the ones that
+    // used to reach sled with nothing held (icn#2759). `data_dir` is still the
+    // caller's spelling, so every path and message below reads as before.
+    let data_dir = domain.data_dir();
 
     let ledger_store_path = icn_core::config::ledger_store_path(data_dir);
 
@@ -2370,14 +2660,7 @@ fn treasury_entity_backfill_report(data_dir: &Path, json: bool) -> Result<()> {
         return render_treasury_entity_backfill_plan(&empty, json);
     }
 
-    let ledger_store: Arc<dyn Store> = Arc::new(SledStore::open(&ledger_store_path).with_context(
-        || {
-            format!(
-                "Failed to open ledger store at {} (stop the daemon first; it holds an exclusive lock)",
-                ledger_store_path.display()
-            )
-        },
-    )?);
+    let ledger_store: Arc<dyn Store> = Arc::new(domain.open_store(&ledger_store_path)?);
     let treasury_mgr = TreasuryManager::with_store(ledger_store)
         .context("Failed to hydrate treasuries from the ledger store")?;
 
@@ -2388,12 +2671,7 @@ fn treasury_entity_backfill_report(data_dir: &Path, json: bool) -> Result<()> {
     // every hydrated treasury against an explicit empty map, so each safely
     // surfaces as `skipped_no_mapping`. Never create the cooperative store.
     let plan = if coop_store_path.exists() {
-        let coop_store = SledStore::open(&coop_store_path).with_context(|| {
-            format!(
-                "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
-                coop_store_path.display()
-            )
-        })?;
+        let coop_store = domain.open_store(&coop_store_path)?;
         // Share one Db with the canonical map, exactly as the daemon does in
         // init_coop — no separate database is opened.
         let db = Arc::new(coop_store.db().clone());
@@ -2495,7 +2773,7 @@ fn print_treasury_backfill_plan_body(plan: &icn_ledger::TreasuryEntityIdBackfill
 /// identity target only. Mirrors the read-only report's store handling: a
 /// missing store is reported, never materialized on disk (apply included).
 fn treasury_entity_backfill_apply(
-    data_dir: &Path,
+    domain: &StorageDomain,
     json: bool,
     apply: bool,
     confirm_apply: bool,
@@ -2504,6 +2782,11 @@ fn treasury_entity_backfill_apply(
     use icn_ledger::TreasuryManager;
     use icn_store::Store;
     use std::sync::Arc;
+
+    // The guard is the parameter, not the path: these opens are the ones that
+    // used to reach sled with nothing held (icn#2759). `data_dir` is still the
+    // caller's spelling, so every path and message below reads as before.
+    let data_dir = domain.data_dir();
 
     let ledger_store_path = icn_core::config::ledger_store_path(data_dir);
 
@@ -2522,14 +2805,7 @@ fn treasury_entity_backfill_apply(
         return render_treasury_entity_backfill_apply_plan(&empty, json, mode);
     }
 
-    let ledger_store: Arc<dyn Store> = Arc::new(SledStore::open(&ledger_store_path).with_context(
-        || {
-            format!(
-                "Failed to open ledger store at {} (stop the daemon first; it holds an exclusive lock)",
-                ledger_store_path.display()
-            )
-        },
-    )?);
+    let ledger_store: Arc<dyn Store> = Arc::new(domain.open_store(&ledger_store_path)?);
     let mut treasury_mgr = TreasuryManager::with_store(ledger_store)
         .context("Failed to hydrate treasuries from the ledger store")?;
 
@@ -2541,12 +2817,7 @@ fn treasury_entity_backfill_apply(
     // surfaces as `skipped_no_mapping` and nothing is eligible. Never create the
     // cooperative store (apply included).
     let map: Box<dyn CoopEntityMap> = if coop_store_path.exists() {
-        let coop_store = SledStore::open(&coop_store_path).with_context(|| {
-            format!(
-                "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
-                coop_store_path.display()
-            )
-        })?;
+        let coop_store = domain.open_store(&coop_store_path)?;
         // Share one Db with the canonical map, exactly as the daemon does in
         // init_coop — no separate database is opened. Apply never writes the map.
         let db = Arc::new(coop_store.db().clone());
@@ -2702,7 +2973,11 @@ fn render_treasury_entity_backfill_apply_report(
 /// writes**, allocates **no** surrogate IDs, normalizes nothing, and changes
 /// no authorization state — a mapping is a name binding only and grants no
 /// authority.
-fn coop_entity_report(data_dir: &Path, json: bool, preview_surrogates: bool) -> Result<()> {
+fn coop_entity_report(domain: &StorageDomain, json: bool, preview_surrogates: bool) -> Result<()> {
+    // The guard is the parameter, not the path: these opens are the ones that
+    // used to reach sled with nothing held (icn#2759). `data_dir` is still the
+    // caller's spelling, so every path and message below reads as before.
+    let data_dir = domain.data_dir();
     use icn_coop::CoopStore;
     use icn_entity::{
         classify_coop_ids, classify_coop_ids_with_surrogate_preview, CoopEntityInventory,
@@ -2729,12 +3004,7 @@ fn coop_entity_report(data_dir: &Path, json: bool, preview_surrogates: bool) -> 
         );
     }
 
-    let sled_store = SledStore::open(&coop_store_path).with_context(|| {
-        format!(
-            "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
-            coop_store_path.display()
-        )
-    })?;
+    let sled_store = domain.open_store(&coop_store_path)?;
 
     // Share one Db between the cooperative store and the canonical map, exactly
     // as the daemon does in init_coop — no separate database is opened.
@@ -2855,7 +3125,11 @@ fn render_coop_entity_inventory(
 /// nothing, normalizes nothing, and changes no authorization state — a mapping
 /// grants no authority. Reads the cooperative store directly, so run it with the
 /// daemon stopped (it holds an exclusive lock).
-fn coop_entity_unknown_legacy_report(data_dir: &Path, json: bool) -> Result<()> {
+fn coop_entity_unknown_legacy_report(domain: &StorageDomain, json: bool) -> Result<()> {
+    // The guard is the parameter, not the path: these opens are the ones that
+    // used to reach sled with nothing held (icn#2759). `data_dir` is still the
+    // caller's spelling, so every path and message below reads as before.
+    let data_dir = domain.data_dir();
     use icn_coop::CoopStore;
     use icn_entity::{report_unknown_legacy, SledCoopEntityMap, UnknownLegacyReport};
     use std::sync::Arc;
@@ -2874,12 +3148,7 @@ fn coop_entity_unknown_legacy_report(data_dir: &Path, json: bool) -> Result<()> 
         return render_unknown_legacy_report(&UnknownLegacyReport::default(), json);
     }
 
-    let sled_store = SledStore::open(&coop_store_path).with_context(|| {
-        format!(
-            "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
-            coop_store_path.display()
-        )
-    })?;
+    let sled_store = domain.open_store(&coop_store_path)?;
 
     // Share one Db between the cooperative store and the canonical map, exactly
     // as the daemon does in init_coop — no separate database is opened.
@@ -2986,7 +3255,11 @@ fn render_unknown_legacy_report(
 /// authority. In dry-run mode it writes nothing. Returns a non-zero exit (via
 /// `Err`) when an `--apply` run hits a bind conflict/error, a refused surrogate
 /// collision, or a storage error.
-fn coop_entity_backfill_surrogates(data_dir: &Path, json: bool, apply: bool) -> Result<()> {
+fn coop_entity_backfill_surrogates(domain: &StorageDomain, json: bool, apply: bool) -> Result<()> {
+    // The guard is the parameter, not the path: these opens are the ones that
+    // used to reach sled with nothing held (icn#2759). `data_dir` is still the
+    // caller's spelling, so every path and message below reads as before.
+    let data_dir = domain.data_dir();
     use icn_coop::CoopStore;
     use icn_entity::{
         backfill_coop_surrogates, InMemoryCoopEntityMap, SledCoopEntityMap, SurrogateBackfillMode,
@@ -3015,12 +3288,7 @@ fn coop_entity_backfill_surrogates(data_dir: &Path, json: bool, apply: bool) -> 
         return render_coop_surrogate_backfill(&empty, json);
     }
 
-    let sled_store = SledStore::open(&coop_store_path).with_context(|| {
-        format!(
-            "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
-            coop_store_path.display()
-        )
-    })?;
+    let sled_store = domain.open_store(&coop_store_path)?;
 
     // Share one Db between the cooperative store and the canonical map, exactly
     // as the daemon does in init_coop — no separate database is opened.
@@ -3316,18 +3584,55 @@ async fn main() -> Result<()> {
             yes,
             no_start,
         } => {
-            // Opens `<data_dir>/store` and writes trust edges; gate first.
+            // Two resources, so two locks, taken in the order every other
+            // holder takes them (configuration, then storage).
+            //
+            // `init-coop` writes `<data_dir>/icn.toml` with a check-then-write,
+            // which is the same stale-snapshot shape the federation writers had
+            // before `ManagedConfigEdit`: it can decide the file is absent, a
+            // ceremony can publish one carrying `[cooperative]`, and this can
+            // then write over it. The sweep that gave the federation writers
+            // this lock did not reach here. Held for the whole command, not
+            // just across the write, because the decision is what goes stale.
+            //
+            // It also opens `<data_dir>/store/trust` and writes bootstrap edges
+            // — the same store a runtime-root ceremony writes its authority
+            // edges into (icn#2759).
+            //
+            // The creating shape, not the joining one: this command
+            // legitimately creates the data root on a fresh machine, so there
+            // is no owning account to defer to yet.
+            //
+            // Storage before configuration here, which is the opposite of the
+            // order elsewhere. `DataDirLock`'s own documentation states that the
+            // ordering is for readability rather than safety — every acquisition
+            // is non-blocking, so a crossed pair gets an immediate refusal and a
+            // deadlock is not reachable. What the swap buys is that
+            // `StorageDomain::create` classifies the path *before* anything is
+            // created inside it, so a misconfigured `--data-dir` is still the
+            // gate's refusal to make rather than a coordination-file `ENOTDIR`.
+            let domain = StorageDomain::create(&data_dir, "init-coop")?;
+            let _init_coop_config = icn_core::DataDirLock::acquire_config(&data_dir, "init-coop")?;
+            // Inside the lock, so nothing can open these stores between the
+            // gate's verdict and the work it clears.
             enforce_n2a_gate(&data_dir, "init-coop")?;
-            handle_init_coop_command(&data_dir, name, members, yes, no_start).await?
+            handle_init_coop_command(&domain, name, members, yes, no_start).await?
         }
 
         Commands::Coop(coop_cmd) => {
+            // Joined *before* the gate, and held past it. The gate takes its own
+            // exclusive sled locks and releases them when it returns, so passing
+            // it says nothing about the next instant — which is exactly the
+            // interval a ceremony's handle-free re-read window lands in
+            // (icn#2759).
+            let domain = StorageDomain::join(&data_dir, "coop maintenance")?;
             enforce_n2a_gate(&data_dir, "coop maintenance")?;
-            handle_coop_maintenance_command(coop_cmd, &data_dir)?
+            handle_coop_maintenance_command(coop_cmd, &domain)?
         }
         Commands::Treasury(treasury_cmd) => {
+            let domain = StorageDomain::join(&data_dir, "treasury maintenance")?;
             enforce_n2a_gate(&data_dir, "treasury maintenance")?;
-            handle_treasury_maintenance_command(treasury_cmd, &data_dir)?
+            handle_treasury_maintenance_command(treasury_cmd, &domain)?
         }
 
         Commands::Auth(auth_cmd) => handle_auth_command(auth_cmd, &data_dir).await?,
@@ -6881,19 +7186,118 @@ fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Move everything under a data root aside, leaving the root itself in place.
+///
+/// The *contents* move, never the directory. That distinction is the whole
+/// repair for icn#2758: `rename(2)` of the root carried the locked
+/// `.icn-data-dir.lock` inode into the backup while a fresh, unlocked file
+/// appeared at the stable pathname, so restore and a daemon could hold two
+/// valid exclusive locks over "the data directory" and never contend. Keeping
+/// the root — and with it the coordination files this process is holding —
+/// means the exclusion is continuous across the replacement, with no instant in
+/// which the stable path is unlocked.
+///
+/// The coordination files are skipped rather than moved: they are the anchor of
+/// the domain, not state, and moving one is precisely the split above.
+///
+/// Honest limit: entry-by-entry renames are not atomic the way the single
+/// directory rename was. A failure part-way is reported with both directories
+/// named, so an operator can see where the contents are.
+fn move_data_root_contents_aside(data_dir: &Path, backup_dir: &Path) -> Result<usize> {
+    // `create_dir`, not `create_dir_all`: the destination must be *new*.
+    //
+    // The name is derived from the archive's own timestamp, so restoring one
+    // archive twice picks the same one both times. The single `rename` this
+    // replaced failed outright in that case (`ENOTEMPTY`); moving entries
+    // individually would instead overwrite the earlier backup file by file
+    // until it hit a directory collision. Refusing by name is clearer than
+    // either.
+    match std::fs::create_dir(backup_dir) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => bail!(
+            "Refusing to move the existing data aside: {} is already there. It holds the data \
+             moved aside by an earlier restore of this same backup — the directory is named \
+             after the archive's own timestamp — and writing into it would overwrite that copy \
+             entry by entry. Move or remove it first.",
+            backup_dir.display()
+        ),
+        Err(e) => {
+            return Err(e).with_context(|| {
+                format!(
+                    "Failed to create the directory {} to move existing data into",
+                    backup_dir.display()
+                )
+            })
+        }
+    }
+    let mut moved = 0usize;
+    for entry in std::fs::read_dir(data_dir)
+        .with_context(|| format!("Failed to read {}", data_dir.display()))?
+    {
+        let entry =
+            entry.with_context(|| format!("Failed to read an entry of {}", data_dir.display()))?;
+        let name = entry.file_name();
+        if is_root_coordination_file(Path::new(&name)) {
+            continue;
+        }
+        std::fs::rename(entry.path(), backup_dir.join(&name)).with_context(|| {
+            format!(
+                "Failed to move {} aside into {}. {moved} of this data directory's entries had \
+                 already been moved, so its contents are now split between {} and {}.",
+                entry.path().display(),
+                backup_dir.display(),
+                data_dir.display(),
+                backup_dir.display()
+            )
+        })?;
+        moved += 1;
+    }
+    Ok(moved)
+}
+
 fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<()> {
     // Check if input backup file exists
     if !input.exists() {
         bail!("Backup file not found: {}", input.display());
     }
 
-    // Check if data directory already exists
-    if data_dir.exists() && !force {
+    // Check if data directory already exists.
+    //
+    // Asked *before* the locks below, because acquiring one creates the root.
+    // `--force` is the operator saying "replace what is there"; it was never a
+    // licence to replace what another ICN process is using, which is the
+    // remaining half of icn#2758.
+    let replacing_existing = data_dir.exists();
+    if replacing_existing && !force {
         bail!(
             "Data directory already exists: {}. Use --force to overwrite.",
             data_dir.display()
         );
     }
+
+    // Join both exclusion domains over the DESTINATION before reading, moving
+    // or writing anything.
+    //
+    // Two locks for the ceremony's two reasons: restore rewrites every byte of
+    // the storage under this root *and* republishes `<data_dir>/icn.toml`. A
+    // daemon holding the configuration of this directory with its storage
+    // somewhere else does not contend for the storage lock at all, so the
+    // configuration side is not redundant.
+    //
+    // Before this, restore took nothing. It would replace a root a daemon was
+    // actively using, and — worse — a ceremony in flight would keep writing
+    // handle-based state into the moved-aside tree while its pathname-based
+    // work landed in the replacement, splitting one logical root in two with
+    // both sides "correctly" locked.
+    //
+    // Creating acquisitions, so the account question comes first: these files
+    // are retained after release and mode 0600, and a `sudo` restore over a
+    // service-owned root would otherwise leave ones the daemon cannot reopen.
+    institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+        data_dir,
+    )?;
+    let restore_config = icn_core::DataDirLock::acquire_config(data_dir, "this restore")?;
+    let restore_storage = icn_core::DataDirLock::acquire(data_dir, "this restore")?;
 
     println!("Restoring backup from {}...", input.display());
 
@@ -6917,13 +7321,16 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     println!("  Checksum: {}", metadata.checksum);
     println!();
 
-    // If force, backup existing data directory
-    if data_dir.exists() {
+    // If force, move the existing data aside — contents only, never the root.
+    if replacing_existing {
         println!("Backing up existing data directory...");
-        let backup_dir = format!("{}.backup-{}", data_dir.display(), metadata.created_at);
-        std::fs::rename(data_dir, &backup_dir)
-            .with_context(|| "Failed to backup existing data directory".to_string())?;
-        println!("  Existing data moved to: {backup_dir}");
+        let backup_dir = PathBuf::from(format!(
+            "{}.backup-{}",
+            data_dir.display(),
+            metadata.created_at
+        ));
+        move_data_root_contents_aside(data_dir, &backup_dir)?;
+        println!("  Existing data moved to: {}", backup_dir.display());
     }
 
     // Create data directory if it doesn't exist
@@ -6935,6 +7342,12 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
         .with_context(|| format!("Failed to reopen backup file: {}", input.display()))?;
     let mut archive = Archive::new(input_file);
 
+    // Which coordination files the archive itself carried. A backup taken after
+    // #2749 contains them, because `append_dir_all` includes dotfiles; one taken
+    // before does not. The difference decides what the checksum below compares.
+    let mut coordination_files_in_archive: std::collections::BTreeSet<PathBuf> =
+        std::collections::BTreeSet::new();
+
     for entry in archive.entries()? {
         let mut entry = entry?;
         let path = entry.path()?;
@@ -6944,12 +7357,48 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
             continue;
         }
 
+        // Never unpack over a coordination file this process is holding.
+        //
+        // `unpack` replaces the file at that path, and a replaced inode is a
+        // lost anchor — restore would break its own exclusion halfway through
+        // the extraction it is protecting.
+        //
+        // Skipping is checksum-neutral because no ICN process ever writes to
+        // these files: the empty one standing here hashes exactly as the empty
+        // archived one it stands in for. An archived coordination file that is
+        // *not* empty has been written to by something outside ICN, and the
+        // checksum below will refuse the restore rather than quietly accept a
+        // tree that differs from the archive — which is the right outcome.
+        let relative: PathBuf = path
+            .components()
+            .filter(|c| !matches!(c, std::path::Component::CurDir))
+            .collect();
+        if is_root_coordination_file(&relative) {
+            coordination_files_in_archive.insert(relative);
+            continue;
+        }
+
         entry.unpack_in(data_dir)?;
     }
 
-    // Verify checksum
+    // Verify checksum.
+    //
+    // The comparison is against the archive's contents, so the coordination
+    // files *this restore minted* are excluded from it — they were never part
+    // of the backed-up state and counting them would fail every restore of an
+    // archive taken before these files existed. Ones the archive did carry are
+    // included exactly as before: the file standing at that path is this
+    // process's own, empty, and therefore hashes identically to the archived
+    // one it stood in for.
     println!("Verifying checksum...");
-    let restored_checksum = calculate_dir_checksum(data_dir)?;
+    let minted_here: Vec<PathBuf> = COORDINATION_FILE_NAMES
+        .iter()
+        .map(PathBuf::from)
+        .filter(|name| {
+            !coordination_files_in_archive.contains(name) && data_dir.join(name).exists()
+        })
+        .collect();
+    let restored_checksum = calculate_dir_checksum_ignoring(data_dir, &minted_here)?;
     if restored_checksum != metadata.checksum {
         bail!(
             "Checksum mismatch! Expected: {}, Got: {}. Restore may be corrupted.",
@@ -6957,6 +7406,18 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
             restored_checksum
         );
     }
+
+    // The exclusion that covered all of the above must still cover this root.
+    //
+    // Checked rather than assumed: this is the invariant icn#2758 is about, and
+    // asserting it here is what turns "restore no longer renames the root" from
+    // a property of the code above into one the command verifies before it
+    // reports success. Anything that moved or replaced the anchor mid-restore —
+    // a concurrent rename, a hand repair — means some other process can now
+    // hold this pathname, and this restore must not certify a root it no longer
+    // excludes anyone from.
+    restore_storage.assert_still_anchored("this restore")?;
+    restore_config.assert_still_anchored("this restore")?;
 
     println!("✓ Backup restored successfully");
     println!("  Restored to: {}", data_dir.display());
@@ -7669,6 +8130,21 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
 
 /// Calculate SHA256 checksum of all files in a directory
 fn calculate_dir_checksum(dir: &Path) -> Result<String> {
+    calculate_dir_checksum_ignoring(dir, &[])
+}
+
+/// The same checksum, with named top-level entries left out of it.
+///
+/// `ignored` holds paths *relative to `dir`*, and exists for exactly one
+/// caller: `restore` holds this root's coordination files open while it works,
+/// so those files are present in the restored tree whether or not the archive
+/// carried them. Hashing one the archive never contained would make every
+/// restore of a pre-#2749 backup report a mismatch.
+///
+/// Deliberately not a filter on "dotfiles" or on the coordination *names*: the
+/// caller passes the specific entries it created, so a lock file that really
+/// was part of the backed-up state is still hashed.
+fn calculate_dir_checksum_ignoring(dir: &Path, ignored: &[PathBuf]) -> Result<String> {
     use std::collections::BTreeMap;
 
     let mut file_hashes: BTreeMap<String, String> = BTreeMap::new();
@@ -7681,11 +8157,11 @@ fn calculate_dir_checksum(dir: &Path) -> Result<String> {
     {
         if entry.file_type().is_file() {
             let path = entry.path();
-            let relative_path = path
-                .strip_prefix(dir)
-                .unwrap_or(path)
-                .to_string_lossy()
-                .to_string();
+            let relative = path.strip_prefix(dir).unwrap_or(path);
+            if ignored.iter().any(|skip| skip == relative) {
+                continue;
+            }
+            let relative_path = relative.to_string_lossy().to_string();
 
             // Read file and calculate hash
             let mut file = File::open(path)
@@ -8904,12 +9380,16 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
 
 /// Interactive wizard for setting up a new cooperative
 async fn handle_init_coop_command(
-    data_dir: &Path,
+    domain: &StorageDomain,
     name: Option<String>,
     members: Option<String>,
     yes: bool,
     no_start: bool,
 ) -> Result<()> {
+    // The guard is the parameter, not the path. `init-coop` opens the trust
+    // store the ceremony writes its authority edges into, so it belongs to the
+    // same exclusion domain (icn#2759).
+    let data_dir = domain.data_dir();
     println!();
     println!("╔════════════════════════════════════════╗");
     println!("║   ICN Cooperative Setup Wizard         ║");
@@ -9228,7 +9708,9 @@ token_expiry_hours = 24
     // the daemon uses, so the two cannot drift apart again.
     let trust_store_path = icn_core::config::trust_store_path(data_dir);
     std::fs::create_dir_all(&trust_store_path)?;
-    let store = SledStore::open(&trust_store_path).context("Failed to open trust store")?;
+    let store = domain
+        .open_store(&trust_store_path)
+        .context("Failed to open trust store")?;
     let store = Arc::new(store);
     let mut trust_graph = TrustGraph::new(store, my_did.clone());
 
@@ -13713,5 +14195,382 @@ mod managed_config_edit_tests {
         // The refusal must not have retained the lock.
         ManagedConfigEdit::open(dir.path(), "witness add", MissingConfig::StartFromDefaults)
             .expect("a writer that starts from defaults must be admitted");
+    }
+}
+
+/// icn#2758 / icn#2759: the local exclusion domain, at the two places it was
+/// not being honoured.
+///
+/// These drive the real handlers — `handle_restore_command`, `handle_backup_command`
+/// and `StorageDomain` — rather than re-deriving their behaviour, so a change
+/// that removes the participation cannot leave the witness passing.
+#[cfg(test)]
+mod exclusion_domain_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::{
+        calculate_dir_checksum, handle_backup_command, handle_restore_command, StorageDomain,
+    };
+    use std::path::{Path, PathBuf};
+
+    #[cfg(unix)]
+    fn inode_at(path: &Path) -> Option<(u64, u64)> {
+        use std::os::unix::fs::MetadataExt as _;
+        std::fs::symlink_metadata(path)
+            .ok()
+            .map(|m| (m.dev(), m.ino()))
+    }
+
+    /// A data root with a little recognisable state in it.
+    fn seeded_root(root: &Path) {
+        std::fs::create_dir_all(root.join("store")).unwrap();
+        std::fs::write(root.join("icn.toml"), b"# fixture configuration\n").unwrap();
+        std::fs::write(root.join("store").join("marker"), b"original\n").unwrap();
+    }
+
+    /// Back up a freshly seeded root and return the archive path.
+    fn archive_of_a_seeded_root(scratch: &Path) -> PathBuf {
+        let source = scratch.join("source");
+        seeded_root(&source);
+        let archive = scratch.join("backup.tar");
+        handle_backup_command(&source, &archive).expect("the fixture backup must succeed");
+        archive
+    }
+
+    // -----------------------------------------------------------------------
+    // icn#2758 — restore
+    // -----------------------------------------------------------------------
+
+    /// `restore --force` must not replace a root another ICN process holds.
+    ///
+    /// The defect exactly as reported: the only guard was `exists() && !force`,
+    /// and `--force` exists to bypass it. Nothing in the handler referred to a
+    /// daemon, a lock or a running process.
+    #[test]
+    fn restore_force_is_refused_while_another_process_holds_the_data_root() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let archive = archive_of_a_seeded_root(scratch.path());
+        let dest = scratch.path().join("data");
+        seeded_root(&dest);
+
+        let holder = icn_core::DataDirLock::acquire(&dest, "a running daemon").unwrap();
+
+        let err = handle_restore_command(&dest, &archive, true)
+            .expect_err("restore must not replace a root a daemon is using");
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("already holds"),
+            "the refusal must name the conflicting holder: {msg}"
+        );
+        // And it must have refused *before* touching anything.
+        assert_eq!(
+            std::fs::read(dest.join("store").join("marker")).unwrap(),
+            b"original\n",
+            "a refused restore must not have moved or replaced any state"
+        );
+
+        drop(holder);
+        handle_restore_command(&dest, &archive, true)
+            .expect("restore must proceed once the holder releases");
+    }
+
+    /// The configuration side is not redundant.
+    ///
+    /// Restore republishes `<data_dir>/icn.toml`, so it must be refused by a
+    /// daemon holding that directory's configuration even when it holds no
+    /// storage lock — the `--config /A --data-dir /B` deployment.
+    #[test]
+    fn restore_is_refused_while_a_daemon_holds_the_configuration() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let archive = archive_of_a_seeded_root(scratch.path());
+        let dest = scratch.path().join("data");
+        seeded_root(&dest);
+
+        let reader =
+            icn_core::DataDirLock::acquire_config_shared_if_manageable(&dest, "the daemon")
+                .unwrap()
+                .expect("manageable");
+
+        let err = handle_restore_command(&dest, &archive, true)
+            .expect_err("a configuration reader must refuse a republisher");
+        assert!(
+            format!("{err:#}").contains("already holds"),
+            "the refusal must name the conflict"
+        );
+        drop(reader);
+        handle_restore_command(&dest, &archive, true).expect("and admit it once released");
+    }
+
+    /// The exclusion anchor must survive the replacement.
+    ///
+    /// This is the load-bearing half of icn#2758. `rename(2)` of the data root
+    /// carried the locked `.icn-data-dir.lock` inode into the backup directory
+    /// while a fresh, unlocked one appeared at the stable pathname — so a
+    /// daemon or ceremony that had the root before the restore and one that
+    /// takes it afterwards both hold valid exclusive locks and never contend.
+    ///
+    /// Asserted on the inode, not on the file existing: a fresh file at the
+    /// same path is precisely the split.
+    #[cfg(unix)]
+    #[test]
+    fn restore_does_not_move_the_exclusion_anchor_out_from_under_the_path() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let archive = archive_of_a_seeded_root(scratch.path());
+        let dest = scratch.path().join("data");
+        seeded_root(&dest);
+
+        // Establish the anchor the way a daemon would, then step out of the way.
+        let lock_path = {
+            let held = icn_core::DataDirLock::acquire(&dest, "a daemon").unwrap();
+            held.path().to_path_buf()
+        };
+        let before = inode_at(&lock_path).expect("the anchor must exist");
+
+        handle_restore_command(&dest, &archive, true).expect("restore must succeed");
+
+        assert_eq!(
+            inode_at(&lock_path),
+            Some(before),
+            "the exclusion anchor must still be the same file after a restore; a new inode \
+             at this path is the split icn#2758 describes"
+        );
+        // The restored state really is the archive's, not the old root's.
+        assert_eq!(
+            std::fs::read(dest.join("store").join("marker")).unwrap(),
+            b"original\n"
+        );
+        // And the contents that were replaced are recoverable.
+        let backups: Vec<_> = std::fs::read_dir(scratch.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with("data.backup-"))
+            .collect();
+        assert_eq!(backups.len(), 1, "the replaced contents must be kept aside");
+        assert!(
+            backups[0].path().join("icn.toml").exists(),
+            "the moved-aside copy must carry the state, not just exist"
+        );
+    }
+
+    /// Restore is still a restore: an archive taken before these coordination
+    /// files existed must verify.
+    ///
+    /// The checksum covers every file in the tree, so the lock files this
+    /// restore holds open would otherwise be counted against an archive that
+    /// never contained them and fail every such restore.
+    #[test]
+    fn an_archive_without_coordination_files_still_verifies() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let source = scratch.path().join("source");
+        seeded_root(&source);
+        let archive = scratch.path().join("backup.tar");
+        handle_backup_command(&source, &archive).unwrap();
+        // Nothing in the source ever took a lock, so the archive has none.
+        assert!(!source.join(".icn-data-dir.lock").exists());
+
+        let dest = scratch.path().join("data");
+        handle_restore_command(&dest, &archive, false).expect("restore must verify and succeed");
+        assert!(
+            dest.join(".icn-data-dir.lock").exists(),
+            "the restore held a coordination file over this root"
+        );
+    }
+
+    /// And one taken after they existed must verify too, with the archived
+    /// entries accounted for rather than skipped out of the comparison.
+    #[test]
+    fn an_archive_carrying_coordination_files_still_verifies() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let source = scratch.path().join("source");
+        seeded_root(&source);
+        drop(icn_core::DataDirLock::acquire(&source, "an earlier command").unwrap());
+        assert!(source.join(".icn-data-dir.lock").exists());
+
+        let archive = scratch.path().join("backup.tar");
+        handle_backup_command(&source, &archive).unwrap();
+        // The recorded checksum counts the archived lock file.
+        assert_eq!(
+            calculate_dir_checksum(&source).unwrap().len(),
+            64,
+            "sanity: the fixture checksum is a sha256"
+        );
+
+        let dest = scratch.path().join("data");
+        handle_restore_command(&dest, &archive, false).expect("restore must verify and succeed");
+    }
+
+    /// Readers stay readers.
+    ///
+    /// `backup` walks the same tree restore replaces, and it is *not* brought
+    /// into the exclusion by this repair: serializing every observer of a data
+    /// root against every holder is the over-correction #2749 had to undo twice.
+    /// A torn archive taken against a live daemon is a separate question from
+    /// the one these issues ask, and is recorded rather than silently changed.
+    #[test]
+    fn a_read_only_observer_is_not_serialized_by_this_repair() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let source = scratch.path().join("source");
+        seeded_root(&source);
+        let _holder = icn_core::DataDirLock::acquire(&source, "a running daemon").unwrap();
+
+        handle_backup_command(&source, &scratch.path().join("out.tar"))
+            .expect("reading a held root must not be refused");
+    }
+
+    // -----------------------------------------------------------------------
+    // icn#2759 — the store openers
+    // -----------------------------------------------------------------------
+
+    /// The guard is a real hold, and it is the one the dispatch takes.
+    #[test]
+    fn joining_the_storage_domain_excludes_a_ceremony() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let domain = StorageDomain::join(dir.path(), "coop maintenance").unwrap();
+        assert!(
+            icn_core::DataDirLock::acquire(dir.path(), "runtime-root provisioning").is_err(),
+            "a joined maintenance command must exclude a ceremony"
+        );
+        drop(domain);
+        icn_core::DataDirLock::acquire(dir.path(), "runtime-root provisioning")
+            .expect("and release when the command ends");
+    }
+
+    /// A ceremony in flight refuses the maintenance commands, and vice versa.
+    #[test]
+    fn a_held_root_refuses_the_maintenance_commands() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let _ceremony =
+            icn_core::DataDirLock::acquire(dir.path(), "runtime-root provisioning").unwrap();
+        for holder in ["coop maintenance", "treasury maintenance"] {
+            let err = StorageDomain::join(dir.path(), holder)
+                .err()
+                .unwrap_or_else(|| panic!("{holder} must be refused while a ceremony holds"));
+            assert!(
+                format!("{err:#}").contains("already holds"),
+                "the refusal must name the conflict"
+            );
+        }
+        assert!(
+            StorageDomain::create(dir.path(), "init-coop").is_err(),
+            "init-coop must be refused too"
+        );
+    }
+
+    /// An absent root reports emptiness, but can never become a way in.
+    ///
+    /// The commands are contracted to report an empty result for a data
+    /// directory that does not exist, and must not materialize one to hold a
+    /// lock in. The window that leaves — the root appearing immediately
+    /// afterwards — is closed at the open rather than at the join.
+    #[test]
+    fn an_absent_root_holds_nothing_and_opens_nothing() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let absent = scratch.path().join("never-created");
+
+        let domain = StorageDomain::join(&absent, "coop maintenance")
+            .expect("an absent root must not be an error");
+        assert!(
+            !absent.exists(),
+            "joining must not have materialized the data directory"
+        );
+
+        // Something creates it — a ceremony, say — and takes it properly.
+        std::fs::create_dir_all(absent.join("store")).unwrap();
+        let _ceremony =
+            icn_core::DataDirLock::acquire(&absent, "runtime-root provisioning").unwrap();
+
+        let err = match domain.open_store(&absent.join("store").join("cooperative")) {
+            Ok(_) => panic!("an unlocked open must be refused, not performed"),
+            Err(e) => e,
+        };
+        assert!(
+            format!("{err:#}").contains("no exclusion was taken over the data directory"),
+            "the refusal must say why: {err:#}"
+        );
+    }
+
+    /// A misconfigured `--data-dir` stays the N2-A gate's refusal to make.
+    ///
+    /// Joining the domain happens before the gate, so the join must not be what
+    /// speaks for a path that is not a directory. It did: probing the account of
+    /// a regular file reported `ENOTDIR` from a probe filename, burying the
+    /// operator's actual mistake under a coordination detail and breaking
+    /// `a_data_dir_that_is_not_a_directory_is_refused_not_skipped`. Holding
+    /// nothing here is correct; opening anything is not.
+    #[test]
+    fn a_data_dir_that_is_not_a_directory_holds_nothing_and_opens_nothing() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let not_a_dir = scratch.path().join("data-dir-is-a-file");
+        std::fs::write(&not_a_dir, b"oops").unwrap();
+
+        // The join itself must succeed and hold nothing, so the gate that runs
+        // next is what reports the misconfiguration.
+        let domain = StorageDomain::join(&not_a_dir, "coop maintenance")
+            .expect("a non-directory root must be left to the gate, not refused here");
+        let err = match domain.open_store(&not_a_dir.join("store").join("cooperative")) {
+            Ok(_) => panic!("a store under a non-directory root must not be opened"),
+            Err(e) => e,
+        };
+        assert!(
+            format!("{err:#}").contains("not a directory"),
+            "the refusal must name the shape it found: {err:#}"
+        );
+        // Nothing was minted beside it, and the file itself is untouched.
+        assert_eq!(std::fs::read(&not_a_dir).unwrap(), b"oops");
+        assert!(!scratch.path().join(".icn-data-dir.lock").exists());
+    }
+
+    /// The lock names a directory, so an open outside it is unprotected.
+    #[test]
+    fn a_store_outside_the_locked_root_is_refused() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let root = scratch.path().join("data");
+        std::fs::create_dir_all(&root).unwrap();
+        let elsewhere = scratch.path().join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+
+        let domain = StorageDomain::join(&root, "coop maintenance").unwrap();
+        let err = match domain.open_store(&elsewhere.join("ledger")) {
+            Ok(_) => panic!("a database outside the held root must be refused"),
+            Err(e) => e,
+        };
+        assert!(
+            format!("{err:#}").contains("outside the data directory"),
+            "the refusal must say where it landed: {err:#}"
+        );
+    }
+
+    /// Including one reached through a link that leaves the root.
+    ///
+    /// Containment is judged on the resolved path, so a `store/ledger` symlink
+    /// pointing at another database cannot borrow this root's exclusion.
+    #[cfg(unix)]
+    #[test]
+    fn a_store_linked_out_of_the_locked_root_is_refused() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let root = scratch.path().join("data");
+        std::fs::create_dir_all(root.join("store")).unwrap();
+        let outside = scratch.path().join("outside-ledger");
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("store").join("ledger")).unwrap();
+
+        let domain = StorageDomain::join(&root, "treasury maintenance").unwrap();
+        assert!(
+            domain
+                .open_store(&root.join("store").join("ledger"))
+                .is_err(),
+            "an open that resolves out of the locked root must be refused"
+        );
+    }
+
+    /// A database that does not exist yet is fine — sled creates it — provided
+    /// the part of its path that does exist is inside the root.
+    #[test]
+    fn a_store_that_does_not_exist_yet_is_admitted_when_it_is_inside_the_root() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let domain = StorageDomain::create(dir.path(), "init-coop").unwrap();
+        domain
+            .open_store(&dir.path().join("store").join("trust"))
+            .expect("a creating open inside the held root must be admitted");
     }
 }

@@ -57,6 +57,101 @@ fn daemon_ledger_store_path(data_dir: &Path) -> PathBuf {
 }
 
 // ---------------------------------------------------------------------------
+// What a refused operation must not have done
+// ---------------------------------------------------------------------------
+
+/// Every entry under a data root, identified the way a change would show up:
+/// relative path -> (dev, ino, len, mtime).
+///
+/// # Why this replaced "the coordination files are absent"
+///
+/// Four refusal witnesses below used to assert that `.icn-data-dir.lock` and
+/// `.icn-config.lock` did not exist after a refused ceremony. That was never the
+/// property under test — it was a *proxy* for "the refused run created nothing"
+/// — and it stopped being a sound one when `init-coop` joined the exclusion
+/// domain (icn#2759) and began legitimately creating both files in the very
+/// fixture these tests build. Absence then said something about `init-coop`
+/// rather than about the ceremony.
+///
+/// The replacement is strictly stronger, not weaker. The old assertion proved
+/// two named files were missing; this proves that **no** entry under the root
+/// was added, removed, replaced or rewritten by the operation under test —
+/// coordination files included, keyed on **inode** rather than existence, so a
+/// same-path replacement is caught as well. Pre-existing coordination machinery
+/// is allowed; unauthorised change by the refused operation is not.
+///
+/// The root directory's own metadata is deliberately not recorded. The account
+/// guard legitimately creates and unlinks a probe file there before refusing, so
+/// the directory's mtime moves on a correct refusal; what must hold is that no
+/// *entry* survives it, which is exactly what the map says.
+fn artefact_snapshot(dir: &Path) -> std::collections::BTreeMap<PathBuf, (u64, u64, u64, i64)> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    fn walk(
+        here: &Path,
+        base: &Path,
+        out: &mut std::collections::BTreeMap<PathBuf, (u64, u64, u64, i64)>,
+    ) {
+        let Ok(entries) = std::fs::read_dir(here) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            // `symlink_metadata`: a link is its own entry, and following one
+            // would report the target's identity instead of the link's.
+            let Ok(meta) = std::fs::symlink_metadata(&path) else {
+                continue;
+            };
+            out.insert(
+                path.strip_prefix(base).unwrap_or(&path).to_path_buf(),
+                (meta.dev(), meta.ino(), meta.len(), meta.mtime()),
+            );
+            if meta.is_dir() {
+                walk(&path, base, out);
+            }
+        }
+    }
+
+    let mut out = std::collections::BTreeMap::new();
+    walk(dir, dir, &mut out);
+    out
+}
+
+/// Assert an operation changed nothing under the root.
+///
+/// `minted` names the artefacts that must not merely be *unchanged* but must not
+/// exist at all — key material a refused ceremony must never have produced. The
+/// snapshot alone would pass if such a file had somehow existed beforehand, so
+/// the two claims are made separately rather than collapsed.
+fn assert_refusal_touched_nothing(
+    dir: &Path,
+    before: &std::collections::BTreeMap<PathBuf, (u64, u64, u64, i64)>,
+    minted: &[&str],
+) {
+    let after = artefact_snapshot(dir);
+    if &after != before {
+        let added: Vec<_> = after.keys().filter(|k| !before.contains_key(*k)).collect();
+        let removed: Vec<_> = before.keys().filter(|k| !after.contains_key(*k)).collect();
+        let changed: Vec<_> = after
+            .iter()
+            .filter(|(k, v)| before.get(*k).is_some_and(|b| b != *v))
+            .map(|(k, _)| k)
+            .collect();
+        panic!(
+            "the refused operation must not have created, removed, replaced or rewritten \
+             anything under {}.\n  added:   {added:?}\n  removed: {removed:?}\n  changed: {changed:?}",
+            dir.display()
+        );
+    }
+    for artefact in minted {
+        assert!(
+            !dir.join(artefact).exists(),
+            "{artefact} must not exist: a refused ceremony mints no key material"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Process helpers
 // ---------------------------------------------------------------------------
 
@@ -2486,30 +2581,28 @@ fn provisioning_refuses_when_it_would_change_the_configurations_group() {
         );
     }
 
+    let snapshot = artefact_snapshot(data_dir);
+
     let refused = combined(&provision_runtime_root(data_dir, "Wrong Account Coop"));
     assert!(
         refused.contains("would change which account owns it"),
         "provisioning must refuse rather than silently re-owning the file:\n{refused}"
     );
 
-    // The refusal must land before anything durable exists, so an operator is
+    // The refusal must land before anything durable happens, so an operator is
     // not left with a half-provisioned directory to clean up.
-    for artefact in ["genesis-trust-root.age", "treasury.age"] {
-        assert!(
-            !data_dir.join(artefact).exists(),
-            "{artefact} must not have been minted before the refusal"
-        );
-    }
-    // And before the coordination files, which are retained after release. A
-    // ceremony that took them under the wrong account and only then refused
-    // would leave behind files the daemon's own account cannot reopen — turning
-    // a mistaken `sudo` into a permanent startup failure.
-    for lock in [".icn-config.lock", ".icn-data-dir.lock"] {
-        assert!(
-            !data_dir.join(lock).exists(),
-            "{lock} must not have been created before the account check refused"
-        );
-    }
+    //
+    // The coordination files are the sharpest case and the snapshot covers them
+    // by inode: a ceremony that took them under the wrong account and only then
+    // refused would leave behind files the daemon's own account cannot reopen,
+    // turning a mistaken `sudo` into a permanent startup failure. What it may
+    // not do is create or replace one — which is a different statement from
+    // "none exists", now that `init-coop` legitimately creates both.
+    assert_refusal_touched_nothing(
+        data_dir,
+        &snapshot,
+        &["genesis-trust-root.age", "treasury.age"],
+    );
     let after = std::fs::symlink_metadata(&cfg).unwrap();
     {
         use std::os::unix::fs::MetadataExt as _;
@@ -2629,6 +2722,7 @@ fn a_hard_linked_configuration_is_refused_before_anything_is_provisioned() {
     let before = std::fs::symlink_metadata(&cfg).unwrap();
     assert_eq!(before.nlink(), 2, "fixture: the alias must share the inode");
     let before_bytes = std::fs::read(&cfg).unwrap();
+    let snapshot = artefact_snapshot(data_dir);
 
     let refused = combined(&provision_runtime_root(data_dir, "Aliased Coop"));
     assert!(
@@ -2636,19 +2730,13 @@ fn a_hard_linked_configuration_is_refused_before_anything_is_provisioned() {
         "an aliased configuration must be refused:\n{refused}"
     );
 
-    // Refused before anything durable exists — including the coordination files,
-    // which are retained after release.
-    for artefact in [
-        "genesis-trust-root.age",
-        "treasury.age",
-        ".icn-config.lock",
-        ".icn-data-dir.lock",
-    ] {
-        assert!(
-            !data_dir.join(artefact).exists(),
-            "{artefact} must not exist after the refusal"
-        );
-    }
+    // Refused before anything durable happens — including to the coordination
+    // files, which are retained after release.
+    assert_refusal_touched_nothing(
+        data_dir,
+        &snapshot,
+        &["genesis-trust-root.age", "treasury.age"],
+    );
 
     // Neither name was rewritten, and they are still one inode.
     let after = std::fs::symlink_metadata(&cfg).unwrap();
@@ -3365,6 +3453,8 @@ fn provisioning_refuses_when_new_files_would_not_belong_to_the_data_root_account
         );
     }
 
+    let snapshot = artefact_snapshot(data_dir);
+
     let refused = combined(&provision_runtime_root(data_dir, "Wrong Root Account Coop"));
     assert!(
         refused.contains("that the account owning it cannot use"),
@@ -3375,18 +3465,13 @@ fn provisioning_refuses_when_new_files_would_not_belong_to_the_data_root_account
         "and it must not be the configuration-file guard standing in for it:\n{refused}"
     );
 
-    // Refused before anything durable exists, including the retained lock files.
-    for artefact in [
-        "genesis-trust-root.age",
-        "treasury.age",
-        ".icn-config.lock",
-        ".icn-data-dir.lock",
-    ] {
-        assert!(
-            !data_dir.join(artefact).exists(),
-            "{artefact} must not exist after the refusal"
-        );
-    }
+    // Refused before anything durable happens, the retained coordination files
+    // included.
+    assert_refusal_touched_nothing(
+        data_dir,
+        &snapshot,
+        &["genesis-trust-root.age", "treasury.age"],
+    );
 }
 
 /// A symlinked data root is judged by its target, not by the link.
@@ -3531,24 +3616,26 @@ fn a_blocked_publication_temp_path_is_refused_before_anything_is_minted() {
 
     std::fs::create_dir(data_dir.join("icn.toml.genesis-tmp")).unwrap();
 
+    // Taken with the fixture fully staged and immediately before the operation
+    // under test, so the comparison speaks for that operation and nothing else.
+    let before = artefact_snapshot(data_dir);
+
     let refused = combined(&provision_runtime_root(data_dir, "Blocked Tmp Coop"));
     assert!(
         refused.contains("is not a regular file"),
         "the blocked temporary path must be refused:\n{refused}"
     );
 
-    for artefact in [
-        "genesis-trust-root.age",
-        "treasury.age",
-        ".icn-config.lock",
-        ".icn-data-dir.lock",
-    ] {
-        assert!(
-            !data_dir.join(artefact).exists(),
-            "{artefact} must not exist — the refusal has to precede the first durable write, \
-             or the operator is left with a root to clean up by hand"
-        );
-    }
+    // The refusal has to precede the first durable write, or the operator is
+    // left with a root to clean up by hand. That includes the coordination
+    // files: a ceremony that took them and only then refused would leave
+    // retained `0600` artefacts behind. It may not create them here — but it may
+    // equally not disturb ones an earlier participant legitimately created.
+    assert_refusal_touched_nothing(
+        data_dir,
+        &before,
+        &["genesis-trust-root.age", "treasury.age"],
+    );
 }
 
 /// An empty `[cooperative]` table is unconfigured, not a conflict.
