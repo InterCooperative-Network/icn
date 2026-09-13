@@ -21,7 +21,7 @@ Last Reviewed: 2026-09-13
 > **Live state is owned by `live_issue_state` / `live_pr_state` / `live_ci_state`
 > (github-api), not by this file.** Re-resolve with `gh` before acting on any
 > status here. Snapshot revision:
-> **`fc9e7b8b6da98e2d9f5e2fb90d14deb3644ea117`**, taken 2026-09-13.
+> **`82030804dc26003bf7e1d6e289166989108bcd63`**, taken 2026-09-13.
 
 ---
 
@@ -72,7 +72,7 @@ non-claim**. There is no "then somehow this works" edge.
 
 | # | Link | Resolves to | State at snapshot |
 |---|---|---|---|
-| 1 | substrate to reproducible node/profile | appliance image + manifest; `icnctl appliance verify-manifest` | EXISTS; profile source ADR-0086 (PR #2458) **unmerged** |
+| 1 | substrate to reproducible node/profile | appliance image + manifest; `icnctl appliance verify-manifest` | EXISTS; ADR-0086 merged (PR #2458) but `status: proposed`, `implementation_status: partially implemented` — **adoption is a separate human decision** |
 | 2 | to two-node communication | isolated QEMU topology in the two-node plan | EXISTS (plan, `Canonical: no`) |
 | 3 | to institution package/domain | `InstitutionBootstrapManifest` (`icn-governance/src/bootstrap.rs:14`); `icnctl institution runtime-root` | EXISTS but **disclaims canonical institution genesis** (6.6) |
 | 4 | to fresh current-semantic human Subject | `SubjectContextGenesisV1` | **SLICE — icn#2695** (design-reviewed, unimplemented) |
@@ -82,7 +82,7 @@ non-claim**. There is no "then somehow this works" edge.
 | 8 | to exact bounded resource-action commitment | `SemanticProposalCommitmentV1` | **SLICE — no owner issue** |
 | 9 | to signed Subject ballot(s) | `MemberVoteActionV1` + immutable ballot slot | **SLICE — no owner issue** |
 | 10 | to deterministic tally | `SubjectVoteSetHashV1` + tally | **SLICE — no owner issue** |
-| 11 | to `GovernanceDecisionReceiptV4` | V4 | **DOES NOT EXIST.** V1/V2/V3 exist (6.3) |
+| 11 | to `GovernanceDecisionReceiptV4` | V4 | **DOES NOT EXIST.** V1 emitted on every close path, V3 conditionally and additionally; the open question is the V1-only typed read surface (6.3) |
 | 12 | to canonical `decision_hash` | `compute_decision_hash_bytes` (`icn-governance/src/proof.rs:300`) | **EXISTS and exposes canonical bytes** |
 | 13 | to existing `AllocationReceipt` | `icn-kernel-api/src/receipts.rs:121` | EXISTS; canonical bytes **private** (6.2); unsigned in practice |
 | 14 | to existing `SettlementIntent` | `icn-kernel-api/src/economics.rs:80` | EXISTS; canonical bytes **private**; **no signature field** |
@@ -321,11 +321,34 @@ practice), and `SettlementIntent` has **no signature field at all**. Hence
 
 ### 6.3 Governance receipt versions
 
-V1 (`proof.rs:226`), V2 (`:541`, defined but never emitted), V3 (`:820`, the live
-emission path). **V4 does not exist.** The gateway receipt store persists **V1**
-(`icn-gateway/src/receipt_store.rs:386`) while the governance app emits **V3** — a
-version seam that must be resolved before a V4 is layered on. `icnctl audit verify`
-recomputes the **V1** hash (`icnctl/src/main.rs:12594`).
+V1 (`proof.rs:226`), V2 (`:541`, defined but never emitted), V3 (`:820`).
+**V4 does not exist** — zero repo-wide hits for `ReceiptV4`.
+
+An earlier revision of this document described the seam as "V3 emitted, V1
+persisted." Review corrected that, and re-verification against `main` agrees.
+The accurate shape is:
+
+- **V1 is emitted on every close path** (`apps/governance/src/actor.rs:2613`,
+  `:2432`, `:2891`; `manager.rs:4409`; `lib.rs:380`, `:430`).
+- **V3 is emitted conditionally and additionally**, not as a replacement:
+  `actor.rs:2561` gates on a present `capability_scope` *and* a configured
+  receipt store, so timer/scheduler auto-close and forced-accept emit no V3.
+- **V3 is persisted**, but opaquely — `receipt_backend.rs:509` writes it through
+  `put_opaque`, so it never crosses the gateway's typed boundary.
+- **The real seam is the read surface.** The gateway store's typed API is V1 only
+  (`receipt_store.rs:386` `put_governance`, `:426` `get_governance`), and
+  `icnctl audit verify` recomputes the **V1** decision hash
+  (`icnctl/src/main.rs:12752`) through a *local* `verify_receipt_chain`
+  (`:12702`) rather than through `icn-governance::verify`.
+
+So a V4 does not have to reconcile a persistence mismatch; it has to decide what
+the **typed chain/audit read surface** returns, and whether the conditional V3
+emission becomes unconditional first.
+
+A stale comment at `proof.rs:817` still reads "No handler emits a v3 receipt yet
+— this is schema preparation only." That is now false, and is recorded here as a
+follow-up rather than fixed, because this is a control-plane document and that is
+a Rust change.
 
 ### 6.4 The ledger provenance limitation — be exact
 
@@ -393,15 +416,22 @@ durable domain.
    is required.**
 2. **`ops/state/truth/program.json` does not exist on `main`.** A checkpoint claimed
    the ladder was "durably encoded" in a registered `program_structure` domain. It
-   is not — that file lives in **PR #2690, still OPEN**. Until #2690 lands, the only
-   durable record of the ladder is the #2694 issue body and this document. **This
-   document deliberately does not create a competing machine-readable program
-   surface**; when #2690 lands, this file should link to it rather than duplicate it.
+   is not. Verified at this snapshot: the file is absent from `main`, `sources.json`
+   registers no `program_structure` domain, and **PR #2690 (OPEN)** carries both
+   `ops/state/truth/program.json` and a `sources.json` change among its fifteen
+   files. Note #2690's *headline* contract is the agent registry, so the program
+   surface rides along inside a PR about something else — which is part of why it
+   has not landed. Until it does, the only durable record of the ladder is the
+   #2694 issue body and this document. **This document deliberately does not create
+   a competing machine-readable program surface**; when #2690 lands, this file
+   should link to it rather than duplicate it.
 3. **V3 emitted / V1 persisted** (6.3) — confirmed at the type level, not traced to
    runtime wiring. Verify before relying on it.
 4. **The two-node plan is `Canonical: no`, last reviewed 2026-07-27** — predating
-   #2689 — and references ADR-0086, which does not exist because PR #2458 is
-   unmerged.
+   #2689. It references ADR-0086, which **does** exist on `main` (PR #2458
+   merged 2026-07-28) but carries `status: proposed` and
+   `implementation_status: partially implemented`, so the profile is proposed,
+   not adopted.
 
 ---
 
@@ -475,8 +505,8 @@ that prevents it from invalidating A1.
 | Issue | Disposition | Containment / profile restriction |
 |---|---|---|
 | **#2750** trust bloom scores persisted edges 0.0 | **MUST FIX** | None available. Rejects entries authored by the institution treasury principal at the ledger author-trust gate — directly on the A1 economic chain. |
-| **#2779** snapshot-delete path traversal | **FIX PROPOSED** (PR #2781) | — |
-| **#2748** keystore files at umask | **FIX PROPOSED** (PR #2782) | — |
+| **#2779** snapshot-delete path traversal | **FIXED / LANDED** (PR #2781, squash `08f5bc2cc`) | — |
+| **#2748** keystore files at umask | **FIXED / LANDED** (PR #2782, squash `82030804d`) | — |
 | **#2777** exclusion domain (#2758/#2759) | **IN PROGRESS** (draft PR) | — |
 | **#2746** truncated ledger certified complete | **MUST FIX for #2466** | Cannot be contained if recovery completeness is claimed. |
 | **#2739** verifier writes the audited tree | **CONTAIN** | Claim recovery verification over a mutable copy; do not claim read-only-medium verification. |
@@ -494,6 +524,7 @@ that prevents it from invalidating A1.
 | generic installer claims | **EXCLUDE** | One pinned appliance profile only. |
 | live / hot backup | **EXCLUDE** | Cold ceremony only. |
 | historical DID-member migration | **EXCLUDE** | Fresh context-scoped Subjects only. |
+| Other `.mode(0o600)` creation sites (`data_dir_lock.rs`, `institution_runtime_root.rs`) reachable at mode `000` under an extreme umask | **FOLLOW-UP — not a blocker** | Surfaced by the #2782 review and deliberately left outside #2748. `.mode()` is a request and `mode & !umask` can clear owner bits, so an extreme umask could make a lock anchor or runtime-root file unusable. It cannot invalidate A1 **provided the pinned appliance profile fixes the service umask** — confirm that at profile freeze. No owner issue yet; it needs one only if the profile does not pin the umask. |
 
 ---
 
@@ -514,23 +545,41 @@ which this document does not duplicate.
 | CONTAINED | not fixed; excluded by a named profile restriction |
 | DEFERRED | deliberately out of A1 |
 
+### How merge readiness is actually gated here
+
+Recorded because the first pass guessed wrong and the #2781/#2782 merges settled
+it. Live branch protection on `main`:
+
+| Gate | Value |
+|---|---|
+| `required_approving_review_count` | **0** — no second-identity approval is required |
+| `required_conversation_resolution` | **true** — unresolved review threads block the merge |
+| `strict` | true — the branch must be level with `main`, so every merge puts every other PR `BEHIND` |
+| `enforce_admins` | true — no admin bypass |
+| required contexts | 11 named checks. `Security Audit` and `Compare Against Base` are **not** among them. |
+
+So a `mergeStateStatus` of `BLOCKED` on this repository usually means *unresolved
+threads*, not red CI and not a missing approval; `UNSTABLE` means only
+non-required checks are red. Read the protection API before concluding a PR is
+waiting on a human.
+
 ### Safety / correctness frontier
 
 | Item | State | Evidence at snapshot |
 |---|---|---|
-| **PR #2781** (#2779 traversal) | IMPLEMENTED / UNLANDED | all 11 required checks SUCCESS; `mergeStateStatus: BLOCKED` solely on absent review approval. The `Security Audit` red is the chronic non-required cargo-audit check. |
-| **PR #2782** (#2748 keystore mode) | IMPLEMENTED / UNLANDED | 10 of 11 required checks SUCCESS; `Test` still running at snapshot; blocked on absent review approval. |
+| **PR #2781** (#2779 traversal) | **LANDED** | merged as `08f5bc2cc`; #2779 CLOSED/COMPLETED. |
+| **PR #2782** (#2748 keystore mode) | **LANDED** | merged as `82030804d`; #2748 CLOSED/COMPLETED. Also normalises a newly created keystore, since `.mode()` is a *request* and a hostile umask can clear owner bits. |
 | **PR #2777** (#2758/#2759 exclusion) | IMPLEMENTED / UNLANDED | draft; `mergeStateStatus: BLOCKED`. |
 | **#2750** trust bloom filter | IDENTIFIED | no PR. **Next correctness blocker.** |
 | **#2746 / #2739** verify-backup | IDENTIFIED | no PR. |
 | N2-A principal-state lane | LANDED / UNVERIFIED | #2700-#2716 merged; not exercised on an Alpha profile. |
-| Institutional genesis (#2744) | LANDED / UNVERIFIED | merged as `fc9e7b8b6`; disclaims canonical genesis (6.6). |
+| Institutional genesis (#2744) | LANDED / UNVERIFIED | merged as `fc9e7b8b6` (#2749); disclaims canonical genesis (6.6). |
 
 ### Alpha lanes
 
 | Lane | State | Blocking fact |
 |---|---|---|
-| Deployment profile | BLOCKED | ADR-0086 / PR #2458 unmerged; two-node plan is `Canonical: no`. |
+| Deployment profile | BLOCKED | ADR-0086 exists and is merged but `status: proposed` / partially implemented — **adoption not decided**; two-node plan is `Canonical: no`. |
 | **#2694** semantic convergence | IDENTIFIED | 1 of 12 slices owned (#2695); none implemented; no artifact exists in code. |
 | **#2465** offline evidence | IDENTIFIED | spec only; 0 of 4 slices owned; blocked on 6.2 for any tamper-negative claim. |
 | **#2466** recovery | IDENTIFIED | spec only; completeness blocked by #2746. |
@@ -545,9 +594,9 @@ which this document does not duplicate.
 ### Critical path
 
 ```text
-#2750  (only uncontained defect on the economic chain)
+#2750  (now the ONLY uncontained defect on the economic chain)
    v
-Alpha profile freeze  (needs ADR-0086 / PR #2458 resolved)
+Alpha profile freeze  (needs ADR-0086 ADOPTED, not merely merged)
    v
 #2694 slice 1 (#2695 GEN-A) -> slice 2 (N1-D) -> ... -> slice 10 (V4)
    v
@@ -570,11 +619,10 @@ freeze SHA -> NYCN lock -> rehearsal/a11y -> bounded public claim
 - **#2465 slice B** (bundle substrate) — generic and deterministic.
 - **#2466 completeness prerequisite** (#2746 extent record) — independent of #2694
   entirely.
-- **Review and merge of #2781 and #2782** — both need only human approval.
-- **Resolving the 6.9 decomposition contradiction** — a maintainer decision, no
-  code.
 - **#2627** DID-spelling defect in legacy `compute_vote_hash` — must precede
   trusting Subject ballots.
+- **Resolving the 6.9 decomposition contradiction** — a maintainer decision, no
+  code.
 
 ### Blocked, not worth starting
 
@@ -611,9 +659,11 @@ produces); Gates 4, 5 and 6; anything downstream of the profile freeze.
    program has two disagreeing structures.
 2. **Land or close PR #2690** (6.9.2), which carries the machine-readable
    `program_structure` domain this document deliberately does not duplicate.
-3. **Resolve the profile source**: ADR-0086 / PR #2458, and whether the two-node
+3. **Adopt or reject ADR-0086**. It is merged but `status: proposed`; adoption
+   is the human decision the profile gate actually waits on. Also whether the two-node
    plan should be promoted from `Canonical: no`.
-4. **Decide the V1/V3/V4 receipt seam** (6.3) before a V4 is specified.
+4. **Decide what the typed chain/audit read surface returns** (6.3) before a V4
+   is specified, and whether conditional V3 emission becomes unconditional first.
 5. **Accept or reject the 5.3 evidence-strength taxonomy**, which is proposed here
    and exists nowhere in the repository.
 6. **Decide whether economics needs a registered truth domain** (6.1).
