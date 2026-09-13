@@ -8391,11 +8391,22 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
         }
 
         SnapshotCommands::Verify { snapshot } => {
-            let snapshot_name = snapshot.unwrap_or_else(|| "state.snapshot".to_string());
+            // Same containment boundary as `delete`. `verify` only reads, but it
+            // reached the filesystem through the identical unvalidated join, and
+            // it distinguished "no such file" from "file present but
+            // unchecksummed" — an existence oracle for paths outside the store.
+            // One rule for what a snapshot identifier is, enforced in one place
+            // (#2779).
+            let snapshot_name = match snapshot {
+                Some(raw) => icn_snapshot::SnapshotName::parse(&raw)
+                    .map_err(|e| anyhow::anyhow!("{e}"))
+                    .context("Refusing to verify: not a valid snapshot identifier")?,
+                None => icn_snapshot::SnapshotName::primary(),
+            };
             println!("{} {snapshot_name}", t!("cli.snapshot.verify.verifying"));
 
             // Verify the snapshot (main or timestamped)
-            let verify_result = if snapshot_name == "state.snapshot" {
+            let verify_result = if snapshot_name.is_primary() {
                 icn_snapshot::verify_snapshot(&store_dir)
             } else {
                 icn_snapshot::verify_timestamped_snapshot(&store_dir, &snapshot_name)
@@ -8406,7 +8417,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                     println!("✓ {}", t!("cli.snapshot.verify.valid"));
 
                     // Load and display info
-                    let load_result = if snapshot_name == "state.snapshot" {
+                    let load_result = if snapshot_name.is_primary() {
                         icn_snapshot::load_snapshot(&store_dir)
                     } else {
                         icn_snapshot::load_timestamped_snapshot(&store_dir, &snapshot_name)
@@ -8444,10 +8455,22 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
         }
 
         SnapshotCommands::Delete { snapshot } => {
+            // The operator's string becomes a filesystem path exactly once, and
+            // only after `SnapshotName` has proven it names a single file inside
+            // the store (#2779). Validation runs before the announcement, so a
+            // refused argument is never reported as being acted on.
+            // The context stays neutral on purpose: `parse` also refuses an
+            // in-store name that simply is not a snapshot (`foo.txt`), and
+            // calling that "outside the snapshot store" would tell the operator
+            // the wrong reason. The variant-specific message carries the detail.
+            let snapshot = icn_snapshot::SnapshotName::parse(&snapshot)
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .context("Refusing to delete: not a valid snapshot identifier")?;
+
             println!("{} {snapshot}", t!("cli.snapshot.delete.deleting"));
 
-            let snapshot_path = store_dir.join(&snapshot);
-            let checksum_path = store_dir.join(format!("{snapshot}.sha256"));
+            let snapshot_path = snapshot.path_in(&store_dir);
+            let checksum_path = snapshot.checksum_path_in(&store_dir);
 
             if !snapshot_path.exists() {
                 bail!("Snapshot not found: {}", snapshot_path.display());
