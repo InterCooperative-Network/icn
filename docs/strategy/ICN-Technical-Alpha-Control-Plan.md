@@ -298,10 +298,25 @@ the code are the only authority.
 ### 6.2 Canonical bytes are private for both economic receipts
 
 `AllocationReceiptCanonical` (`receipts.rs:148`) and `SettlementIntentCanonical`
-(`economics.rs:122`) are **module-private and not re-exported**; there is no
-`canonical_bytes()` anywhere in the crate. An external verifier can only recompute
-those hashes by owning a bincode-compatible copy of the struct. The governance path
-is the opposite: `compute_decision_hash_bytes` (`proof.rs:300`) is `pub`.
+(`economics.rs:122`) are **module-private**, and no API returns the preimage
+bytes — only the blake3 digest escapes. The governance path is the opposite:
+`compute_decision_hash_bytes` (`proof.rs:300`) is `pub`.
+
+**This is not a blocker for every verifier, and an earlier revision overstated
+it.** `AllocationReceipt`, `SettlementIntent` and `CanonicalReceipt` are all
+publicly re-exported (`lib.rs:83`, `:121`), so a **Rust verifier that links
+`icn-kernel-api` recomputes owner hashes through the public trait**, exactly as
+the gateway already does (`receipt_store.rs:504`, `api/receipts.rs:65`). Slice A
+is therefore *not* a precondition for a Rust-linked verifier.
+
+It remains a real limitation for exactly two cases, and A1 should state which it
+needs:
+
+1. a **cross-language or non-linking verifier**, which would have to
+   reverse-engineer an unpublished bincode layout — field order, the exclusion of
+   `receipt_id`/`signature`, and the sorting of `intent_hashes`;
+2. any verifier needing **raw preimage bytes** for a byte-level tamper manifest,
+   since no public surface yields them.
 
 Two live traps for any bundle contract:
 
@@ -328,11 +343,26 @@ An earlier revision of this document described the seam as "V3 emitted, V1
 persisted." Review corrected that, and re-verification against `main` agrees.
 The accurate shape is:
 
-- **V1 is emitted on every close path** (`apps/governance/src/actor.rs:2613`,
-  `:2432`, `:2891`; `manager.rs:4409`; `lib.rs:380`, `:430`).
+V1 is universally *constructed* on accepted actor closes (as gate input) but
+persisted on only two production paths. Constructed is not persisted, and the
+distinction decides what a V4 read surface can rely on:
+
+| Close path | V1 constructed | V1 persisted | V3 |
+|---|---|---|---|
+| Actor, Accepted, **non-executing** | yes (gate only) | **no** | only with a capability scope |
+| Actor, Accepted, executing + receipt store | yes | **yes** (`CloseReceipts::apply`) | only with a capability scope |
+| Actor, Rejected / NoQuorum | **no** | no | only with a capability scope |
+| Timer / scheduler auto-close | as above, scope is `None` | as above | **never** |
+| Forced-accept (`ForceCloseProposal`) | yes (gate/hash material) | **no** | **never** |
+| `GovernanceManager::close_proposal_inner` | yes | **yes, every outcome** | only with a capability scope |
+
+`pending_chain_receipts` is assigned only inside `requires_execution_closure`
+(`actor.rs:2523`), and its only drain returns `None => (None, None)` (`:2675`),
+so a non-executing actor close durably stores `governance_receipt: None`.
+
 - **V3 is emitted conditionally and additionally**, not as a replacement:
   `actor.rs:2561` gates on a present `capability_scope` *and* a configured
-  receipt store, so timer/scheduler auto-close and forced-accept emit no V3.
+  receipt store.
 - **V3 is persisted**, but opaquely — `receipt_backend.rs:509` writes it through
   `put_opaque`, so it never crosses the gateway's typed boundary.
 - **The real seam is the read surface.** The gateway store's typed API is V1 only
@@ -341,9 +371,11 @@ The accurate shape is:
   (`icnctl/src/main.rs:12752`) through a *local* `verify_receipt_chain`
   (`:12702`) rather than through `icn-governance::verify`.
 
-So a V4 does not have to reconcile a persistence mismatch; it has to decide what
-the **typed chain/audit read surface** returns, and whether the conditional V3
-emission becomes unconditional first.
+So a V4 does not have to reconcile a persistence mismatch. It has to decide what
+the **typed chain/audit read surface** returns, whether conditional V3 emission
+becomes unconditional, and — the sharper problem — **which close paths leave any
+durable governance receipt at all**. An A1 proof must pin a close path that
+actually persists one.
 
 A stale comment at `proof.rs:817` still reads "No handler emits a v3 receipt yet
 — this is schema preparation only." That is now false, and is recorded here as a
@@ -359,8 +391,25 @@ accounts, parents, nonce`. **`ProvenanceRef` is absent.** `sign_entry`
 
 Therefore: **the author signature does not bind the governance `decision_hash`.
 Provenance can be altered without invalidating either the hash or the signature.**
-No production code cross-verifies that a `ProvenanceRef::Governance.decision_hash`
-corresponds to a real receipt; the gateway only echoes it.
+
+An earlier revision went further and said no production code cross-verifies the
+correspondence at all, and that the gateway "only echoes" the hash. That was
+wrong. Correspondence *is* checked, at three clearly different strengths — A1
+should neither duplicate the real ones nor inherit the weak one:
+
+| Strength | Where | What it establishes |
+|---|---|---|
+| **Existence — real** | gateway loads the receipt by hash (`api/receipts.rs:397`) | a hash with no stored receipt yields `governance: None` and fails closed (`icnctl/src/main.rs:12628`) |
+| **Self-consistency by recomputation — real** | `recompute_decision_hash_matches` (`main.rs:12617`), surfaced as "Decision hash integrity (recomputed)" (`:12752`) | the V1 hash rebuilt from `proposal_id`/`domain_id`/`outcome`/`tally`/`vote_hash` matches |
+| **Journal-to-decision linkage — NOT established** | "check 13" (`main.rs:12909`) | **tautological.** The gateway *selects* entries by that predicate (`api/receipts.rs:515`), so no entry with a different hash can be in the set. A filter restated as an assertion. |
+
+None of it is cryptographic: `vote_hash` and the tally come from the gateway
+response and are never checked against actual votes, and the receipt carries no
+verified signature. The recompute proves internal consistency of server-supplied
+fields, not authorization — as its own comment concedes. The A1 position is
+therefore unchanged in substance — the governance-to-ledger link is **not
+owner-authenticated** — but the plan must not claim the correspondence is wholly
+unchecked.
 
 **Do not rewrite ledger identity casually, and do not claim native cryptographic
 strength that does not exist.** For A1 the bounded evidence architecture may use a
