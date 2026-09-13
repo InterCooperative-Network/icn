@@ -565,6 +565,139 @@ impl AgeKeyStore {
     }
 
     /// Encrypt and save v4 key material
+    /// Mode every filesystem keystore this crate writes must end up with.
+    ///
+    /// Matches the sibling TPM-sealed backend in this crate, which already sets
+    /// `0o600` at creation.
+    #[cfg(unix)]
+    const KEYSTORE_FILE_MODE: u32 = 0o600;
+
+    /// Write encrypted keystore bytes to `path` with owner-only permissions.
+    ///
+    /// The one place this crate turns keystore ciphertext into a file (#2748).
+    /// Every `encrypt_and_save*` variant goes through here, so the rule is a
+    /// property of the owner rather than something three call sites each have to
+    /// remember — and a fourth keystore format would inherit it by construction.
+    ///
+    /// # Why the mode is set at creation
+    ///
+    /// `std::fs::write` is `File::create` plus a write, and `File::create`
+    /// requests `0o666`, which the kernel masks with the process umask. The mode
+    /// was therefore an inherited ambient property, not a decision this code
+    /// made: under the common `umask 0002` a new keystore landed at `0664`.
+    /// Passing `mode` replaces that requested `0o666`, so the umask has nothing
+    /// permissive left to mask off and the file is never *momentarily* readable
+    /// the way a write-then-`chmod` sequence would leave it.
+    ///
+    /// `mode` is still only a *request* — the kernel applies `mode & !umask` —
+    /// so an unusual umask can clear owner bits as well, and `umask 0777` would
+    /// otherwise leave a mode-000 keystore the node cannot reopen. A file this
+    /// call creates is therefore normalised to exactly the target mode while it
+    /// is still empty. The two cases are told apart with `create_new`, which is
+    /// race-free, rather than by a prior `exists()` check.
+    ///
+    /// # Existing files, and why nothing is truncated on open
+    ///
+    /// `OpenOptionsExt::mode` applies only when the call actually creates the
+    /// file; on an existing one it is ignored. Since the callers rewrite a
+    /// keystore's contents as part of normal operation, a pre-existing file is
+    /// tightened here before any new bytes are written, so fresh key material
+    /// never exists while group or other bits are set.
+    ///
+    /// The open deliberately does **not** use `truncate(true)`. Truncating at
+    /// open would destroy the existing ciphertext before permissions are known
+    /// to be safe: a subsequent `set_permissions` failure would then return an
+    /// error having already emptied the operator's only keystore. The order is
+    /// therefore open (no truncate) -> harden -> `set_len(0)` -> write, so every
+    /// failure before the truncation leaves the previous keystore byte-intact.
+    ///
+    /// `set_len(0)` is load-bearing precisely because the open no longer
+    /// truncates: without it a shorter ciphertext would leave a tail of the
+    /// previous one behind.
+    ///
+    /// For a pre-existing file only group and other bits are cleared
+    /// (`existing & 0o7700`); owner and special bits are preserved, so an
+    /// operator who hardened a keystore beyond `0600` keeps that. This is
+    /// deliberately not a migration — it touches only files this code was
+    /// already rewriting. A permissive keystore that is never rewritten is left
+    /// exactly as it is.
+    fn write_keystore_file(path: &Path, contents: &[u8]) -> Result<()> {
+        #[cfg(unix)]
+        {
+            use std::io::Write;
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+            // `create_new` distinguishes the two cases without a TOCTOU race,
+            // and the distinction matters: a file this call creates must be
+            // normalised to exactly the target mode, while one that already
+            // existed must keep an owner mode the operator may have hardened.
+            //
+            // No `truncate(true)` on either path: nothing is destroyed until the
+            // permissions are known to be safe.
+            let (mut file, created) = match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(Self::KEYSTORE_FILE_MODE)
+                .open(path)
+            {
+                Ok(file) => (file, true),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (
+                    std::fs::OpenOptions::new()
+                        .write(true)
+                        .open(path)
+                        .context("Failed to open keystore file")?,
+                    false,
+                ),
+                Err(e) => return Err(e).context("Failed to create keystore file"),
+            };
+
+            let existing = file
+                .metadata()
+                .context("Failed to inspect keystore file")?
+                .permissions()
+                .mode()
+                & 0o7777;
+
+            if created {
+                // `mode` is a *request*: the kernel applies `mode & !umask`, so a
+                // hostile or unusual umask can clear owner bits too and leave a
+                // keystore its own node cannot reopen (a `umask 0777` yields
+                // mode 000). Normalise unconditionally — the file is empty at
+                // this point, so there is no window in which contents exist at
+                // the wrong mode.
+                if existing != Self::KEYSTORE_FILE_MODE {
+                    file.set_permissions(std::fs::Permissions::from_mode(Self::KEYSTORE_FILE_MODE))
+                        .context("Failed to set keystore file permissions")?;
+                }
+            } else if existing & 0o077 != 0 {
+                // Pre-existing file: clear only group and other bits. Owner and
+                // special bits are preserved, so a keystore hardened beyond the
+                // target keeps that.
+                file.set_permissions(std::fs::Permissions::from_mode(existing & 0o7700))
+                    .context("Failed to restrict keystore file permissions")?;
+            }
+
+            // Past this point the previous keystore is gone, so it is the last
+            // step before the new bytes land.
+            file.set_len(0)
+                .context("Failed to truncate keystore file before rewrite")?;
+            file.write_all(contents)
+                .context("Failed to write keystore file")?;
+            file.sync_all()
+                .context("Failed to flush keystore file to disk")?;
+
+            Ok(())
+        }
+
+        #[cfg(not(unix))]
+        {
+            // Non-Unix targets have no umask and no portable mode to request, so
+            // there is nothing to tighten here; access control is the platform
+            // ACL's job. Behaviour is unchanged from before #2748.
+            std::fs::write(path, contents).context("Failed to write keystore file")
+        }
+    }
+
     fn encrypt_and_save_v4(path: &Path, stored: &StoredKeyV4, passphrase: &[u8]) -> Result<()> {
         let json = Zeroizing::new(serde_json::to_vec(stored)?);
 
@@ -587,7 +720,7 @@ impl AgeKeyStore {
             .map(|_| ())
             .context("Failed to finalize encryption")?;
 
-        std::fs::write(path, encrypted).context("Failed to write keystore file")?;
+        Self::write_keystore_file(path, &encrypted)?;
 
         Ok(())
     }
@@ -864,7 +997,7 @@ impl AgeKeyStore {
             .context("Failed to finalize encryption")?;
 
         // Write to file
-        std::fs::write(path, encrypted).context("Failed to write keystore file")?;
+        Self::write_keystore_file(path, &encrypted)?;
 
         // json is automatically zeroized when dropped here
         Ok(())
@@ -928,7 +1061,7 @@ impl AgeKeyStore {
             .context("Failed to finalize encryption")?;
 
         // Write to file
-        std::fs::write(path, encrypted).context("Failed to write keystore file")?;
+        Self::write_keystore_file(path, &encrypted)?;
 
         // json is automatically zeroized when dropped here
         Ok(())
@@ -1316,6 +1449,260 @@ mod tests {
         assert_eq!(rotation.old_did, old_did);
         assert_eq!(rotation.new_did, new_did);
         assert_eq!(ks.get_keypair().unwrap().did(), &new_did);
+    }
+
+    /// Keystore files must never be created at the process umask (#2748).
+    ///
+    /// `AgeKeyStore` wrote every keystore with a plain `std::fs::write`, which
+    /// creates at `0o666 & ~umask` — `0664` under the common `umask 0002`. The
+    /// contents are age-encrypted, so this is not plaintext key exposure; it
+    /// hands any local user the ciphertext and the scrypt salt, which turns a
+    /// weak or reused passphrase into an offline target instead of an online
+    /// one.
+    ///
+    /// These tests assert the mode is *exactly* `0600` rather than merely "not
+    /// group-readable", so they fail on the unfixed crate under any umask that
+    /// leaves a group or other bit set (`0002` and `0022` both do).
+    #[cfg(unix)]
+    mod owner_only_keystore_files {
+        use super::*;
+        use std::os::unix::fs::PermissionsExt;
+
+        fn mode_of(path: &Path) -> u32 {
+            std::fs::metadata(path)
+                .expect("keystore file should exist")
+                .permissions()
+                .mode()
+                & 0o777
+        }
+
+        const PASSPHRASE: &[u8] = b"2748-owner-only-fixture-passphrase";
+
+        /// A v1-shaped record, the same construction the migration test uses.
+        fn stored_v1_fixture() -> StoredKey {
+            let keypair = KeyPair::generate().unwrap();
+            StoredKey {
+                secret_bytes: *keypair.secret_bytes(),
+                public_bytes: keypair.verifying_key().to_bytes(),
+                did: keypair.did().as_str().to_string(),
+                tls_cert_der: None,
+                tls_key_der: None,
+                tls_binding_sig: None,
+                created_at: None,
+                x25519_secret: None,
+                x25519_public: None,
+                #[cfg(feature = "post-quantum")]
+                pq_secret: None,
+                #[cfg(feature = "post-quantum")]
+                pq_public: None,
+            }
+        }
+
+        /// `AgeKeyStore::init` — the path `icnctl id init` and `init-coop` take.
+        /// Reaches `encrypt_and_save_v3`.
+        #[test]
+        fn a_new_keystore_is_created_owner_only() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("identity.age");
+
+            AgeKeyStore::init(&path, PASSPHRASE).unwrap();
+
+            assert_eq!(
+                mode_of(&path),
+                0o600,
+                "a freshly created keystore must be owner-only, not umask-derived"
+            );
+        }
+
+        /// Reaches `encrypt_and_save` (the v1/v2 writer).
+        #[test]
+        fn the_legacy_save_path_creates_an_owner_only_file() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("legacy.age");
+
+            AgeKeyStore::encrypt_and_save(&path, &stored_v1_fixture(), PASSPHRASE).unwrap();
+
+            assert_eq!(mode_of(&path), 0o600);
+        }
+
+        /// Reaches `encrypt_and_save_v4` through the real API, so the third
+        /// writer is covered by behaviour rather than by inspection.
+        #[test]
+        fn the_v4_save_path_writes_an_owner_only_file() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("identity.age");
+
+            let mut ks = AgeKeyStore::init(&path, PASSPHRASE).unwrap();
+            // `init_sdis` is the first thing that rewrites the keystore in v4
+            // format; `rotate_keybundle` then rewrites it again.
+            ks.init_sdis(Anchor::genesis("2748-mode-fixture"), PASSPHRASE)
+                .unwrap();
+            ks.rotate_keybundle(PASSPHRASE).unwrap();
+
+            assert_eq!(
+                mode_of(&path),
+                0o600,
+                "the v4 writer must observe the same rule as the others"
+            );
+        }
+
+        /// An overwrite of an already-permissive keystore tightens it.
+        ///
+        /// This is not a fleet migration: it applies only where the code was
+        /// already rewriting that file's contents as part of normal operation.
+        /// Leaving it alone would mean freshly written key material sits at
+        /// `0644` — the very thing #2748 is about.
+        #[test]
+        fn overwriting_tightens_an_already_permissive_keystore() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("permissive.age");
+            std::fs::write(&path, b"stale contents").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+            assert_eq!(mode_of(&path), 0o644, "fixture precondition");
+
+            AgeKeyStore::encrypt_and_save(&path, &stored_v1_fixture(), PASSPHRASE).unwrap();
+
+            assert_eq!(
+                mode_of(&path),
+                0o600,
+                "rewriting a keystore must not leave the new contents group-readable"
+            );
+        }
+
+        /// An owner that is *stricter* than `0600` is left alone.
+        ///
+        /// The rule clears group and other bits; it never widens owner bits, so
+        /// an operator who deliberately hardened a keystore keeps their choice.
+        #[test]
+        fn overwriting_does_not_weaken_a_stricter_owner_mode() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("strict.age");
+            std::fs::write(&path, b"stale contents").unwrap();
+            // 0o200 is write-only for the owner: stricter on read than 0o600,
+            // and still writable, so the save path can actually run.
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o200)).unwrap();
+
+            AgeKeyStore::encrypt_and_save(&path, &stored_v1_fixture(), PASSPHRASE).unwrap();
+
+            assert_eq!(
+                mode_of(&path),
+                0o200,
+                "a stricter owner mode must be preserved, not reset to 0600"
+            );
+        }
+
+        /// The write is in place: no temporary or sibling file ever holds
+        /// keystore bytes at a looser mode.
+        #[test]
+        fn writing_a_keystore_creates_no_sibling_files() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("identity.age");
+
+            AgeKeyStore::init(&path, PASSPHRASE).unwrap();
+
+            let entries: Vec<String> = std::fs::read_dir(dir.path())
+                .unwrap()
+                .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+                .collect();
+            assert_eq!(
+                entries,
+                vec!["identity.age".to_string()],
+                "the keystore directory must hold only the keystore itself"
+            );
+        }
+
+        /// Removing `truncate(true)` from the open means `set_len(0)` is the only
+        /// thing clearing the previous contents.
+        ///
+        /// If it were ever dropped, a ciphertext shorter than its predecessor
+        /// would leave a tail of the old one behind — a silently corrupt
+        /// keystore. This fails against exactly that mistake.
+        #[test]
+        fn rewriting_over_a_longer_file_leaves_no_trailing_bytes() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("stale.age");
+
+            let junk = vec![b'X'; 64 * 1024];
+            std::fs::write(&path, &junk).unwrap();
+
+            AgeKeyStore::encrypt_and_save(&path, &stored_v1_fixture(), PASSPHRASE).unwrap();
+
+            let written = std::fs::metadata(&path).unwrap().len();
+            assert!(
+                written < junk.len() as u64,
+                "the previous, longer contents were not truncated: {written} bytes remain"
+            );
+
+            // The decisive check: it must still decrypt. A stale tail would make
+            // this fail even if the length looked plausible.
+            let mut ks = AgeKeyStore::open(&path).unwrap();
+            ks.unlock(PASSPHRASE)
+                .expect("a rewritten keystore must still decrypt");
+        }
+
+        /// A write that cannot even be opened must leave the previous keystore
+        /// intact.
+        ///
+        /// **Scope of this claim, stated precisely: this test does _not_ prove
+        /// that permission hardening precedes destructive truncation.** A `0400`
+        /// file fails the write-open before any truncation could occur, so this
+        /// passes against a `truncate(true)` implementation too. The only failure
+        /// that would discriminate the ordering is `set_permissions` itself
+        /// failing on an already-open file, and forcing `fchmod` to fail needs
+        /// privileges or a filesystem fixture a unit test should not assume —
+        /// and this repository has no existing seam for it. That ordering is
+        /// established by reading `write_keystore_file`, where `set_len(0)` sits
+        /// after the hardening, not by this test.
+        ///
+        /// What it does carry: a generic non-destructive-failure regression, so
+        /// a future refactor cannot make a refused write cost the operator their
+        /// keystore.
+        #[test]
+        fn a_failed_write_does_not_destroy_the_existing_keystore() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("identity.age");
+
+            AgeKeyStore::init(&path, PASSPHRASE).unwrap();
+            let before = std::fs::read(&path).unwrap();
+            assert!(!before.is_empty(), "fixture precondition");
+
+            // Read-only for the owner: the save path cannot open it for writing.
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400)).unwrap();
+
+            // Establish the precondition instead of assuming it. Root and some
+            // container runners bypass DAC entirely, and there the write-open
+            // simply succeeds — there is no refused write to regress against, so
+            // the test has nothing to assert rather than something to fail on.
+            if std::fs::OpenOptions::new().write(true).open(&path).is_ok() {
+                return;
+            }
+
+            let result = AgeKeyStore::encrypt_and_save(&path, &stored_v1_fixture(), PASSPHRASE);
+            assert!(result.is_err(), "the write should have been refused");
+
+            assert_eq!(
+                std::fs::read(&path).unwrap(),
+                before,
+                "a refused write truncated or altered the existing keystore"
+            );
+            assert_eq!(mode_of(&path), 0o400, "the mode must be untouched too");
+        }
+
+        /// Tightening permissions must not have broken encryption or reload.
+        #[test]
+        fn the_keystore_still_roundtrips_after_the_mode_change() {
+            let dir = tempdir().unwrap();
+            let path = dir.path().join("identity.age");
+
+            let created = AgeKeyStore::init(&path, PASSPHRASE).unwrap();
+            let expected_did = created.get_keypair().unwrap().did().clone();
+
+            let mut reopened = AgeKeyStore::open(&path).unwrap();
+            reopened.unlock(PASSPHRASE).unwrap();
+
+            assert_eq!(reopened.get_keypair().unwrap().did(), &expected_did);
+            assert_eq!(mode_of(&path), 0o600);
+        }
     }
 
     #[test]
