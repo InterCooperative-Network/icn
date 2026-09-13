@@ -2167,6 +2167,16 @@ last_updated = "2026-03-12"
 owner = "matt"
 audiences = ["architects", "stakeholders", "grant-reviewers"]
 
+[docs."docs/strategy/ICN-Technical-Alpha-Control-Plan.md"]
+category = "strategy"
+status = "living"
+title = "ICN Organizational Technical Alpha — Control Plan"
+description = "Navigable reconstruction of the Technical Alpha program: bounded claim, proof chain with every arrow resolved, dependency DAG, containment ledger, owner seams. A projection, not a truth owner — live status is owned by live_issue_state."
+last_updated = "2026-09-13"
+owner = "matt"
+audiences = ["team", "stakeholders"]
+last_reviewed = "2026-09-13"
+
 [docs."docs/strategy/ICN-Roadmap-Live.md"]
 category = "strategy"
 status = "living"
