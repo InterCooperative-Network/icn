@@ -14,6 +14,11 @@
 //! `sh -c 'umask 0002; exec ...'`, which puts the permissive umask in a
 //! dedicated child and leaves the harness alone. That also makes this a test of
 //! the shipped binary rather than of a library helper.
+//! Unix-only: this file uses `std::os::unix` permission bits and drives the CLI
+//! through `sh` to control the umask. The production helper keeps a non-Unix
+//! branch, which this PR deliberately does not claim to harden, so the whole
+//! test crate is gated rather than pretending to cover it.
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::os::unix::fs::PermissionsExt;
@@ -77,6 +82,50 @@ fn id_init_creates_identity_age_owner_only_under_a_permissive_umask() {
         mode, 0o600,
         "identity.age was created {mode:o} under umask 0002; keystore files must \
          be owner-only regardless of the operator's umask"
+    );
+}
+
+/// A umask that clears *owner* bits must not produce an unusable keystore.
+///
+/// `OpenOptionsExt::mode` is only a request — the kernel applies
+/// `mode & !umask` — so `umask 0777` would otherwise leave a mode-000
+/// `identity.age` that the node cannot reopen. The creation path normalises
+/// instead, which is why this asserts `0600` and not merely "no group bits".
+///
+/// This lives here rather than beside the unit tests because `umask(2)` is
+/// process-global: flipping it inside the library test binary would race the
+/// sibling tests that assert file modes. The `sh` child keeps it contained.
+#[test]
+fn a_hostile_umask_cannot_clear_owner_bits_on_a_new_keystore() {
+    let root = TempDir::new().unwrap();
+    let data_dir = root.path().join("data");
+    std::fs::create_dir_all(&data_dir).unwrap();
+
+    let script = format!(
+        "umask 0777; exec '{}' -d '{}' id init",
+        icnctl_bin().display(),
+        data_dir.display()
+    );
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(script)
+        .env("ICN_KEYSTORE_PASSPHRASE", PASSPHRASE)
+        .output()
+        .expect("failed to run icnctl");
+
+    assert!(
+        output.status.success(),
+        "`id init` failed under umask 0777.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let keystore = data_dir.join("identity.age");
+    let mode = mode_of(&keystore);
+    assert_eq!(
+        mode, 0o600,
+        "umask 0777 left identity.age {mode:o}; a mode the owner cannot read is \
+         an unusable keystore, not a safe one"
     );
 }
 

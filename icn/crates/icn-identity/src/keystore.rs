@@ -589,6 +589,13 @@ impl AgeKeyStore {
     /// permissive left to mask off and the file is never *momentarily* readable
     /// the way a write-then-`chmod` sequence would leave it.
     ///
+    /// `mode` is still only a *request* — the kernel applies `mode & !umask` —
+    /// so an unusual umask can clear owner bits as well, and `umask 0777` would
+    /// otherwise leave a mode-000 keystore the node cannot reopen. A file this
+    /// call creates is therefore normalised to exactly the target mode while it
+    /// is still empty. The two cases are told apart with `create_new`, which is
+    /// race-free, rather than by a prior `exists()` check.
+    ///
     /// # Existing files, and why nothing is truncated on open
     ///
     /// `OpenOptionsExt::mode` applies only when the call actually creates the
@@ -608,24 +615,41 @@ impl AgeKeyStore {
     /// truncates: without it a shorter ciphertext would leave a tail of the
     /// previous one behind.
     ///
-    /// Only group and other bits are cleared; owner and special bits are
-    /// preserved, so an operator who hardened a keystore beyond `0600` keeps
-    /// that. This is deliberately not a migration — it touches only files this
-    /// code was already rewriting.
+    /// For a pre-existing file only group and other bits are cleared
+    /// (`existing & 0o7700`); owner and special bits are preserved, so an
+    /// operator who hardened a keystore beyond `0600` keeps that. This is
+    /// deliberately not a migration — it touches only files this code was
+    /// already rewriting. A permissive keystore that is never rewritten is left
+    /// exactly as it is.
     fn write_keystore_file(path: &Path, contents: &[u8]) -> Result<()> {
         #[cfg(unix)]
         {
             use std::io::Write;
             use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
-            // No `truncate(true)`: nothing is destroyed until the permissions
-            // are known to be safe.
-            let mut file = std::fs::OpenOptions::new()
+            // `create_new` distinguishes the two cases without a TOCTOU race,
+            // and the distinction matters: a file this call creates must be
+            // normalised to exactly the target mode, while one that already
+            // existed must keep an owner mode the operator may have hardened.
+            //
+            // No `truncate(true)` on either path: nothing is destroyed until the
+            // permissions are known to be safe.
+            let (mut file, created) = match std::fs::OpenOptions::new()
                 .write(true)
-                .create(true)
+                .create_new(true)
                 .mode(Self::KEYSTORE_FILE_MODE)
                 .open(path)
-                .context("Failed to open keystore file")?;
+            {
+                Ok(file) => (file, true),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (
+                    std::fs::OpenOptions::new()
+                        .write(true)
+                        .open(path)
+                        .context("Failed to open keystore file")?,
+                    false,
+                ),
+                Err(e) => return Err(e).context("Failed to create keystore file"),
+            };
 
             let existing = file
                 .metadata()
@@ -633,7 +657,22 @@ impl AgeKeyStore {
                 .permissions()
                 .mode()
                 & 0o7777;
-            if existing & 0o077 != 0 {
+
+            if created {
+                // `mode` is a *request*: the kernel applies `mode & !umask`, so a
+                // hostile or unusual umask can clear owner bits too and leave a
+                // keystore its own node cannot reopen (a `umask 0777` yields
+                // mode 000). Normalise unconditionally — the file is empty at
+                // this point, so there is no window in which contents exist at
+                // the wrong mode.
+                if existing != Self::KEYSTORE_FILE_MODE {
+                    file.set_permissions(std::fs::Permissions::from_mode(Self::KEYSTORE_FILE_MODE))
+                        .context("Failed to set keystore file permissions")?;
+                }
+            } else if existing & 0o077 != 0 {
+                // Pre-existing file: clear only group and other bits. Owner and
+                // special bits are preserved, so a keystore hardened beyond the
+                // target keeps that.
                 file.set_permissions(std::fs::Permissions::from_mode(existing & 0o7700))
                     .context("Failed to restrict keystore file permissions")?;
             }
@@ -1629,6 +1668,14 @@ mod tests {
 
             // Read-only for the owner: the save path cannot open it for writing.
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400)).unwrap();
+
+            // Establish the precondition instead of assuming it. Root and some
+            // container runners bypass DAC entirely, and there the write-open
+            // simply succeeds — there is no refused write to regress against, so
+            // the test has nothing to assert rather than something to fail on.
+            if std::fs::OpenOptions::new().write(true).open(&path).is_ok() {
+                return;
+            }
 
             let result = AgeKeyStore::encrypt_and_save(&path, &stored_v1_fixture(), PASSPHRASE);
             assert!(result.is_err(), "the write should have been refused");
