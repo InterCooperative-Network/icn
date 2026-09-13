@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
@@ -76,7 +76,7 @@ jobs:
     steps:
       # Checkout PR base commit for baseline (deterministic - won't change during run)
       - name: Checkout base commit
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: baseline
@@ -103,7 +103,7 @@ jobs:
 
       # Checkout PR head commit for comparison
       - name: Checkout PR commit
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: pr
