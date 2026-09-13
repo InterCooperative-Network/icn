@@ -8400,7 +8400,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
             let snapshot_name = match snapshot {
                 Some(raw) => icn_snapshot::SnapshotName::parse(&raw)
                     .map_err(|e| anyhow::anyhow!("{e}"))
-                    .context("Refusing to verify outside the snapshot store")?,
+                    .context("Refusing to verify: not a valid snapshot identifier")?,
                 None => icn_snapshot::SnapshotName::primary(),
             };
             println!("{} {snapshot_name}", t!("cli.snapshot.verify.verifying"));
@@ -8459,9 +8459,13 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
             // only after `SnapshotName` has proven it names a single file inside
             // the store (#2779). Validation runs before the announcement, so a
             // refused argument is never reported as being acted on.
+            // The context stays neutral on purpose: `parse` also refuses an
+            // in-store name that simply is not a snapshot (`foo.txt`), and
+            // calling that "outside the snapshot store" would tell the operator
+            // the wrong reason. The variant-specific message carries the detail.
             let snapshot = icn_snapshot::SnapshotName::parse(&snapshot)
                 .map_err(|e| anyhow::anyhow!("{e}"))
-                .context("Refusing to delete outside the snapshot store")?;
+                .context("Refusing to delete: not a valid snapshot identifier")?;
 
             println!("{} {snapshot}", t!("cli.snapshot.delete.deleting"));
 

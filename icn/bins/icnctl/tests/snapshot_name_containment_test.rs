@@ -184,16 +184,27 @@ fn dot_and_dotdot_components_are_refused() {
     );
 }
 
+/// Separator-bearing arguments are refused even when they name a file that
+/// really is reachable under the store.
+///
+/// **Unix-only, and the gate is the fixture, not the rule.** The setup relies on
+/// `\` being an ordinary filename byte so the targets can be created *inside*
+/// `store/`; on Windows `Path::join` would treat it as a separator, resolve
+/// outside the store, and the fixture would clobber the keystore or panic on a
+/// directory it never created. The cross-platform guarantee — that both `/` and
+/// `\` are refused on every target — is carried by
+/// `icn-snapshot`'s `hostile_snapshot_names_are_refused`, which is pure string
+/// validation and runs everywhere.
+#[cfg(unix)]
 #[test]
-fn path_separator_variants_are_refused_on_every_platform() {
+fn separator_bearing_names_are_refused_even_when_reachable() {
     let fixture = Fixture::new();
 
-    // `\` is an ordinary filename character on Unix and a separator on Windows.
-    // These targets are therefore *created as real files inside the store* on
-    // this platform — otherwise the unfixed handler would refuse them merely
-    // because they do not exist, and the test would pass without discriminating.
-    // Made reachable, they show the actual rule: `snapshot delete` removes
-    // snapshots, not whatever file the argument happens to reach.
+    // Created as real files inside the store — otherwise the unfixed handler
+    // would refuse them merely because they do not exist, and the test would
+    // pass without discriminating. Made reachable, they show the actual rule:
+    // `snapshot delete` removes snapshots, not whatever file the argument
+    // happens to reach.
     std::fs::create_dir_all(fixture.store_dir.join("sub")).unwrap();
     let reachable = [
         "..\\identity.age",
