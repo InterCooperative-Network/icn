@@ -502,6 +502,10 @@ Public introduction materials (June 2026, claims bounded by the evidence map):
 - [ICN_HARD_QUESTIONS.md](strategy/ICN_HARD_QUESTIONS.md) - Hard questions answered directly (bad-answer/honest-answer format): production use, fixture vs live vs design-only, capture, surveillance, private data, regulation, bus factor
 - [ICN_INTRODUCTION_EVIDENCE_MAP.md](strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md) - Maps every introduction claim to verifiable merged artifacts and states what each does NOT prove
 
+Programme control:
+
+- [ICN-Technical-Alpha-Control-Plan.md](strategy/ICN-Technical-Alpha-Control-Plan.md) - **Navigation surface for the Organizational Technical Alpha**: the bounded A1 claim and its non-claims, the proof chain with every edge resolved to a primitive / bounded slice / containment / non-claim, the dependency DAG, the containment ledger with a profile restriction per contained defect, the critical path, and the open maintainer decisions. A projection over owner truth, not a truth owner — live status routes to `live_issue_state`.
+
 Strategic direction and gap analysis (dated snapshots, March–July 2026):
 
 - [ICN_SECOND_PASS_STRATEGY_BRIEF_2026-07-17.md](strategy/ICN_SECOND_PASS_STRATEGY_BRIEF_2026-07-17.md) - **Non-canonical** dated analysis snapshot: software-vs-institutional axis reframe, built-but-sidelined pattern, minimum-cut sets, horizon map, re-ranked wedges, recommended ADRs; institutional axis advances only on a human-signed act
