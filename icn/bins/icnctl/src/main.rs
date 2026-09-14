@@ -7836,8 +7836,20 @@ fn verify_ledger_in_backup(restore_dir: &Path, metadata: &BackupMetadata) -> Res
         // No commitment exists to compare against. Fail closed to Unresolved:
         // "could not decide" must never render as "verified".
         None => VerificationStatus::Unresolved,
-        Some(expected) if expected == entry_count => VerificationStatus::Pass,
-        Some(_) => VerificationStatus::Fail,
+        // A MISMATCH is evidence: the journal is not the one this backup
+        // committed to, whichever direction it runs.
+        Some(expected) if expected != entry_count => VerificationStatus::Fail,
+        // Equality is NOT evidence of completeness — only the absence of one
+        // disproof. This command checks no content hashes, signatures,
+        // provenance or parent existence, so an archive that drops one original
+        // row and adds one well-formed row has the same cardinality and would
+        // otherwise read as verified.
+        //
+        // So a cardinality commitment can refute completeness and can never
+        // establish it, and `Pass` stays unreachable until icn#2786 chooses a
+        // commitment that actually binds identity (a digest accumulator over
+        // entry ids, say) rather than a count.
+        Some(_) => VerificationStatus::Unresolved,
     };
 
     Ok(LedgerCheck {

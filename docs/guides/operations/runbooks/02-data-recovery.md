@@ -73,7 +73,9 @@ journal row cannot be read, or if the invariant does not hold (icn#2717).
 > carries an independent commitment to how many journal entries it should hold,
 > so a ledger that silently lost entries before the backup was taken is
 > indistinguishable from one that always held that many. The command reports
-> what it can establish — every entry present is valid — and refuses to certify
+> what it can establish — every entry present is valid *under the checks this
+> command runs*, which exclude amount signs, content hashes, signatures,
+> provenance and parent existence — and refuses to certify
 > completeness it cannot check (icn#2746). The mechanism that would make
 > completeness checkable is icn#2786.
 >
@@ -82,7 +84,7 @@ journal row cannot be read, or if the invariant does not hold (icn#2717).
 > | output | meaning | action |
 > |---|---|---|
 > | `✓ BACKUP VERIFICATION PASSED` | bare form only; ledger not inspected | re-run with `--verify-ledger` |
-> | `⚠ BACKUP VERIFICATION UNRESOLVED` + `entries observed: N` + `observed entries valid: yes` | every entry present is valid; completeness unknown | proceed, knowing completeness is unverified |
+> | `⚠ BACKUP VERIFICATION UNRESOLVED` + `entries observed: N` + `observed entries valid: yes` | every entry present passed the checks this command runs; completeness unknown, and signs/hashes/signatures/provenance are **not** among those checks | proceed only if that narrower claim is enough for what you are relying on |
 > | `✗ BACKUP VERIFICATION FAILED` | something was actually established as wrong | do not rely on this backup |
 > | any other failure (absent ledger, unreadable row, imbalance) | icn#2717 / icn#2736 refusals | do not rely on this backup |
 >
