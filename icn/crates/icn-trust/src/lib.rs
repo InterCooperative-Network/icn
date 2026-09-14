@@ -842,11 +842,18 @@ impl TrustGraph {
         for edge in &direct_edges {
             reachable.push(edge.target.clone());
 
-            // Transitive edges (2 hops)
-            if let Ok(indirect_edges) = self.get_outgoing_edges(&edge.target) {
-                for indirect in indirect_edges {
-                    reachable.push(indirect.target.clone());
-                }
+            // Transitive edges (2 hops).
+            //
+            // PROPAGATE. An unreadable branch is not an empty branch: swallowing
+            // this error would drop every target behind it from the enumeration
+            // and then hand the result to `rebuild`, which marks it
+            // authoritative — so a target that merely could not be READ would be
+            // rejected as known-unreachable. That is icn#2750 again, one level
+            // up. Returning early leaves the filter non-authoritative, which
+            // costs a slow path and nothing else.
+            let indirect_edges = self.get_outgoing_edges(&edge.target)?;
+            for indirect in indirect_edges {
+                reachable.push(indirect.target.clone());
             }
         }
 

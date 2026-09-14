@@ -211,16 +211,27 @@ fn an_authoritative_filter_still_rejects() {
     let (node, _root, subject) = persist_genesis_shape(&path);
 
     let g = TrustGraph::new(open(&path), node);
-    let stranger = did();
 
     g.rebuild_reachability_filter().unwrap();
     assert!(
         g.reachability_filter().is_authoritative(),
         "an explicit rebuild must establish authority"
     );
+    // The filter is probabilistic: at a 1% false-positive rate a single random
+    // DID is not guaranteed to be absent, so asserting on one sample would flake
+    // about one run in a hundred. Probe a batch and require that the fast path
+    // fires for at least one — which is what "the optimization still works"
+    // actually means.
+    let strangers: Vec<_> = (0..64).map(|_| did()).collect();
+    let rejected = strangers
+        .iter()
+        .filter(|s| g.reachability_filter().is_known_unreachable(s))
+        .count();
     assert!(
-        g.reachability_filter().is_known_unreachable(&stranger),
-        "an authoritative filter must still reject a DID it enumerated away"
+        rejected > 0,
+        "an authoritative filter must still reject DIDs it enumerated away; \
+         none of {} probes was rejected",
+        strangers.len()
     );
     assert!(
         !g.reachability_filter().is_known_unreachable(&subject),
@@ -279,5 +290,31 @@ fn only_a_rebuild_confers_authority() {
     assert!(
         !f.is_authoritative(),
         "an empty filter is the absence of a claim, not a claim that nothing is reachable"
+    );
+}
+
+/// The second guard, which the issue did not mention.
+///
+/// `compute_trust_score_with_threshold` carried its own copy of the
+/// `!is_empty() && !may_be_reachable()` short-circuit at `lib.rs:792`. It was
+/// independently defective and is a separate changed call site, so it needs its
+/// own witness — otherwise a regression there passes unnoticed behind the
+/// weighted path's coverage.
+#[test]
+fn the_threshold_path_also_honours_persisted_edges() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("trust");
+    let (node, _root, subject) = persist_genesis_shape(&path);
+
+    let mut g = TrustGraph::new(open(&path), node.clone());
+    g.add_edge(TrustEdge::new(node, did(), full())).unwrap();
+
+    let score = g
+        .compute_trust_score_with_threshold(&subject, Some(AUTHOR_TRUST_GATE))
+        .unwrap();
+    assert!(
+        score >= AUTHOR_TRUST_GATE,
+        "the threshold path must not zero a persisted-only principal after an \
+         unrelated runtime edge; got {score}"
     );
 }

@@ -68,11 +68,19 @@ impl ReachabilityFilter {
         }
     }
 
-    /// Check if a DID might be reachable (has trust path)
+    /// Raw Bloom membership: has this DID ever been entered into the filter?
+    ///
+    /// **This is a hint, not a verdict, and `false` is NOT grounds to return
+    /// 0.0.** On a fresh or incrementally-maintained filter `false` means only
+    /// "never entered here", which is indistinguishable from "this filter has
+    /// enumerated nothing". Rejecting on it is icn#2750.
+    ///
+    /// Route every rejection through [`Self::is_known_unreachable`], which is
+    /// the only query that also establishes the filter was entitled to answer.
     ///
     /// Returns:
-    /// - `false` = definitely NOT reachable, safe to return 0.0 immediately
-    /// - `true` = possibly reachable, need to compute actual score
+    /// - `false` = absent from this filter (meaningful only if authoritative)
+    /// - `true` = possibly present; compute the actual score
     #[inline]
     pub fn may_be_reachable(&self, did: &Did) -> bool {
         if let Ok(filter) = self.filter.lock() {
@@ -87,6 +95,11 @@ impl ReachabilityFilter {
     /// therefore be trusted to answer "definitely not reachable".
     ///
     /// True only between a [`Self::rebuild`] and the next mutation.
+    ///
+    /// This is a point-in-time observation for diagnostics and tests. Do NOT
+    /// combine it with [`Self::may_be_reachable`] to decide a rejection — that
+    /// pair is not atomic, and the gap between them is a real race. Use
+    /// [`Self::is_known_unreachable`].
     #[inline]
     pub fn is_authoritative(&self) -> bool {
         self.authoritative
@@ -105,7 +118,26 @@ impl ReachabilityFilter {
     /// liveness proxy such as [`Self::is_empty`]; that substitution is icn#2750.
     #[inline]
     pub fn is_known_unreachable(&self, did: &Did) -> bool {
-        self.is_authoritative() && !self.may_be_reachable(did)
+        // Read the authority flag UNDER the same lock that guards the contents
+        // it describes. Every writer (`add_reachable`, `rebuild`, `clear`) sets
+        // it while holding this lock, so this pair is atomic with respect to
+        // them.
+        //
+        // Composing `is_authoritative() && !may_be_reachable()` instead is a
+        // time-of-check/time-of-use hole that reinstates the exact defect this
+        // type exists to prevent: a concurrent `clear()` can revoke authority
+        // and empty the filter between the flag load and the lookup, and the
+        // stale `true` then rejects a target from a filter that explicitly
+        // knows nothing.
+        match self.filter.lock() {
+            Ok(filter) => {
+                self.authoritative
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                    && !filter.check(&did.to_string())
+            }
+            // A poisoned lock is not knowledge. Never reject on it.
+            Err(_) => false,
+        }
     }
 
     /// Add a DID to the set of reachable targets.
