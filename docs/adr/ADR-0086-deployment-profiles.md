@@ -111,8 +111,11 @@ ledger that always held that many, so restoration cannot be shown to restore a
 overclaiming: `verify-backup --verify-ledger` now reports completeness as
 `unresolved` and fails closed instead of certifying it. That removed a false
 positive; it is not detection, and it did not make restoration provable.
-icn#2786 owns the independent extent/frontier commitment that would make
-completeness checkable at all, and remains open. **Item 7 closes only when
+icn#2786 owns the requirement for an independent extent/frontier commitment
+that would make completeness checkable at all. It remains open, and the
+mechanism is deliberately **not yet selected** — a durable count, a monotonic
+frontier and a digest accumulator differ in what they can prove, and a count
+alone can refute completeness but never establish it. **Item 7 closes only when
 BOTH causes are closed** — the secret-bearing environment file must travel with
 the backup, *and* icn#2786 must land. Closing either alone leaves an appliance
 that cannot be independently restored, which is what item 7 asserts. Items
