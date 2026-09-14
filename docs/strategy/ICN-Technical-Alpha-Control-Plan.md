@@ -113,9 +113,6 @@ owner problems documented in section 6, not merely missing code.
     semantic       offline        recovery
     convergence    evidence       proof
         |              |              |
-        |              v              |
-        |     (needs 6.2 owner        |
-        |      canonical bytes)       |
         |              |              |
         +--------------+--------------+
                        v
@@ -135,7 +132,9 @@ ASCII suggests:
 
 - **#2465 depends on #2694** for its *subject matter* (there is no decision
   receipt to export until the ladder produces one), but its **substrate work
-  (slices A and B in section 5.6) does not** — that can start immediately.
+  (slice B) does not** — that can start immediately. Slice A is **conditional**
+  and gates nothing until the verifier model selects a cross-language or
+  raw-preimage requirement (5.6, 6.2).
 - **#2466 is independent of #2694 entirely.** It is a sovereignty proof about node
   state, not about semantics.
 
@@ -441,9 +440,21 @@ signed founding act, no institution DID, and `genesis_authority_did` is today th
 
 ### 6.7 The fail-closed verifier is wired to nothing
 
-`icn-governance/src/verify.rs` is a complete four-valued fail-closed verifier with
-**zero callers repo-wide**. A1 should consume it rather than write a third
-verification path.
+`icn-governance/src/verify.rs` is a four-valued fail-closed verifier with **zero
+callers repo-wide**. But "just wire it up" understates the work, and an earlier
+revision implied otherwise.
+
+What it actually provides is a **reusable verdict framework** (the
+`VerificationStatus` taxonomy and its fold) plus a **V1 receipt verifier**: its
+public functions cover the unversioned V1 `GovernanceDecisionReceipt`, the legacy
+`GovernanceProof`, generic chain links and hash-conflict claims. There are **no
+V2/V3/V4 adapters, and none for `AllocationReceipt`, `SettlementIntent`,
+execution, or the journal** — the module's own header records per-ladder recompute
+shims as follow-up.
+
+So A1 should reuse the verdict framework and the V1 path rather than mint a third
+verification vocabulary, **and must schedule the missing adapters explicitly** as
+part of #2465 slice C. The gap is adapter work, not wiring.
 
 ### 6.8 Identity primitives exist but are unreferenced
 
@@ -657,9 +668,13 @@ Alpha profile freeze  (needs ADR-0086 ADOPTED, not merely merged)
    v
 V4 decision_hash through AllocationReceipt / SettlementIntent
    v
-#2465 slice D  (composed tamper-negative proof)
+#2465 slice C  (execution/journal evidence adapters)
+   v
+#2465 slice D  (composes C; tamper-negative proof)
    v
 Gate 4  (Node A stopped)
+   v
+Gate 5  (restart + reboot continuity, Node A still disconnected)
    v
 #2466  -> Gate 6
    v
