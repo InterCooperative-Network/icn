@@ -319,17 +319,29 @@ needs:
 2. any verifier needing **raw preimage bytes** for a byte-level tamper manifest,
    since no public surface yields them.
 
-Two live traps for any bundle contract:
+Two live traps for any bundle contract, stated per type because they differ:
 
-- `AllocationReceipt::canonical_hash` **sorts** intent hashes (order-independent).
-- `SettlementIntent`'s hash **excludes `memo`**, and its ids and signature are
-  `#[serde(skip)]`.
+- `AllocationReceipt::canonical_hash` **sorts** intent hashes, so the canonical
+  identity is order-independent. Its `signature` is
+  `#[serde(skip_serializing_if = "Option::is_none")]` — **serialized whenever
+  present**, not skipped — so an exported payload does carry a signature that the
+  canonical hash excludes.
+- `SettlementIntent` has **no signature field at all**. Only `intent_id` is
+  `#[serde(skip)]`; `memo` is `skip_serializing_if`, so it is exported when
+  present while being excluded from the canonical hash.
 
-So the exported payload is strictly **wider** than the canonical preimage:
+So the exported payload is strictly **wider** than the canonical preimage, and
 **mutating `memo` leaves `canonical_hash` unchanged.** A digest manifest covering
 only canonical hashes would therefore *pass* #2465's "flip one byte, must fail"
-criterion on a genuinely tampered bundle. This is the sharpest single reason slice
-A exists.
+criterion on a genuinely tampered bundle.
+
+**This is not an argument for slice A**, and an earlier revision wrongly called it
+"the sharpest reason slice A exists." Exposing the owner-canonical preimage cannot
+detect a changed `memo` either — `SettlementIntentCanonical` excludes that field
+for exactly the same reason `canonical_hash` does. The mutation is caught by
+5.4's **SHA-256 over the exact exported payload**, which is a separate mechanism
+and needs no new API. Slice A's justification rests solely on the two narrower
+requirements above, if A1 selects one.
 
 Also: `AllocationReceipt::with_signature` has **no production caller** (unsigned in
 practice), and `SettlementIntent` has **no signature field at all**. Hence
@@ -355,7 +367,7 @@ distinction decides what a V4 read surface can rely on:
 | Actor, Rejected / NoQuorum | **no** | no | only with a capability scope |
 | Timer / scheduler auto-close | as above, scope is `None` | as above | **never** |
 | Forced-accept (`ForceCloseProposal`) | yes (gate/hash material) | **no** | **never** |
-| `GovernanceManager::close_proposal_inner` | yes | **yes, every outcome** | only with a capability scope |
+| `GovernanceManager::close_proposal_inner` | yes, **if a receipt store is attached** | **yes, every outcome — but only when a store is attached** (`receipt_store` defaults to `None`, and all construction plus `CloseReceipts::apply` sits inside `if let Some(ref store)`) | only with a capability scope |
 
 `pending_chain_receipts` is assigned only inside `requires_execution_closure`
 (`actor.rs:2523`), and its only drain returns `None => (None, None)` (`:2675`),
