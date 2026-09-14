@@ -1584,27 +1584,28 @@ fn show_says_that_it_did_not_re_verify_key_provenance() {
     );
 }
 
-/// The exact boundary of the G4 claim, pinned so the PR cannot overstate it.
+/// The institutional economic chain, end to end: a treasury principal reachable
+/// only through *persisted* genesis trust edges must clear the ledger's
+/// author-trust gate on a daemon that has since written edges of its own.
 ///
-/// `a_governance_authored_append_crosses_the_real_gate_without_dev_self_trust`
-/// opens a fresh `TrustGraph` and scores immediately, which is what a
-/// just-started `icnd` does — and it passes. But `TrustGraph`'s reachability
-/// bloom filter starts empty, is populated only by in-process `add_edge`, and
-/// is never built from storage (`rebuild_reachability_filter` has no production
-/// caller). So from the first runtime edge onward, a principal reachable only
-/// through *persisted* edges short-circuits to `0.0`.
+/// This test previously pinned the opposite — it asserted the score was `0.0`
+/// and documented the limit as a measured fact, because `TrustGraph`'s
+/// reachability filter was populated only by in-process `add_edge` and treated
+/// its own non-emptiness as proof of completeness. icn#2750 removed that
+/// substitution: the filter may now reject only while it is explicitly
+/// authoritative, which incremental maintenance never makes it. So the G4 claim
+/// widens here, deliberately, exactly as the previous version of this test asked.
 ///
-/// That is icn#2750: pre-existing, affecting every out-of-process trust write
-/// including `init-coop`'s own bootstrap edges, and NOT introduced here. This
-/// test exists so the limit is a measured fact rather than a footnote, and so
-/// that the day icn#2750 is fixed this test fails and the claim can be widened
-/// deliberately.
+/// Kept at this layer rather than folded into the `icn-trust` regressions
+/// because this is the shape `icnctl institution genesis` (#2744) actually
+/// leaves on disk for a separately-running `icnd` to read, and the
+/// cross-process seam is the part that matters for the Alpha economic chain.
 ///
 /// Note the inversion worth remembering: `icnd`'s `ICN_DEV_SELF_TRUST` seed is
-/// itself a runtime `add_edge`, so enabling the dev flag would *cause* this
-/// failure rather than paper over it.
+/// itself a runtime `add_edge`, so enabling the dev flag used to *cause* this
+/// failure rather than paper over it. It no longer does either.
 #[test]
-fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() {
+fn persisted_genesis_trust_facts_survive_an_unrelated_in_process_edge() {
     let dir = TempDir::new().unwrap();
     let node = icn_identity::KeyPair::generate().unwrap().did().clone();
     let trust_root = icn_identity::KeyPair::generate().unwrap().did().clone();
@@ -1630,7 +1631,7 @@ fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() 
         .unwrap();
     }
 
-    // A freshly started daemon that has added nothing of its own: correct.
+    // A freshly started daemon that has added nothing of its own.
     {
         let store: std::sync::Arc<dyn icn_store::Store> = std::sync::Arc::new(open_store(&path));
         let g = icn_trust::TrustGraph::new(store, node.clone());
@@ -1641,7 +1642,8 @@ fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() 
     }
 
     // The same daemon after one unrelated runtime edge, scored for the first
-    // time (no cache entry to mask it).
+    // time (no cache entry, so nothing can mask the answer). This is the case
+    // that used to return 0.0 and reject every treasury-authored entry.
     {
         let store: std::sync::Arc<dyn icn_store::Store> = std::sync::Arc::new(open_store(&path));
         let mut g = icn_trust::TrustGraph::new(store, node.clone());
@@ -1650,11 +1652,11 @@ fn persisted_genesis_trust_facts_are_zeroed_once_any_edge_is_added_in_process() 
             .unwrap();
 
         let score = g.compute_trust_score(&treasury).unwrap();
-        assert_eq!(
-            score, 0.0,
-            "icn#2750: persisted edges are expected to be zeroed here today. If \
-             this now scores {score}, icn#2750 has been fixed — delete this test \
-             and widen the G4 claim in the PR body accordingly."
+        assert!(
+            score >= 0.1,
+            "a treasury principal reachable only through persisted genesis edges \
+             must still clear the ledger author-trust gate after an unrelated \
+             runtime edge (icn#2750); got {score}"
         );
     }
 }

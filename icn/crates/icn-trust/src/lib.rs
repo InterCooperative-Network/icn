@@ -697,9 +697,13 @@ impl TrustGraph {
             return Ok(score);
         }
 
-        // Fast path: bloom filter check for unreachable DIDs (Phase 22)
-        // If the filter says the DID is definitely NOT reachable, return 0 immediately
-        if !self.reachability.is_empty() && !self.reachability.may_be_reachable(target) {
+        // Fast path: bloom filter check for unreachable DIDs (Phase 22).
+        //
+        // Only an authoritative filter may reject. The former guard was
+        // `!is_empty() && !may_be_reachable()`, which treated "something was
+        // inserted" as "this filter is complete" — so a single in-process
+        // `add_edge` made every persisted-only principal score 0.0 (icn#2750).
+        if self.reachability.is_known_unreachable(target) {
             debug!("Bloom filter: {} is definitely not reachable", target);
             self.cache.put(target.clone(), 0.0);
             return Ok(0.0);
@@ -788,8 +792,9 @@ impl TrustGraph {
             return Ok(score);
         }
 
-        // Fast path: bloom filter check
-        if !self.reachability.is_empty() && !self.reachability.may_be_reachable(target) {
+        // Fast path: bloom filter check. Only an authoritative filter may
+        // reject — see the note in `compute_trust_score_weighted` (icn#2750).
+        if self.reachability.is_known_unreachable(target) {
             self.cache.put(target.clone(), 0.0);
             return Ok(0.0);
         }
@@ -812,10 +817,22 @@ impl TrustGraph {
         Ok(score)
     }
 
-    /// Rebuild the reachability filter from current trust graph
+    /// Rebuild the reachability filter from the current trust graph, and mark
+    /// it authoritative.
     ///
-    /// This should be called periodically or after bulk edge operations
-    /// to ensure the bloom filter accurately reflects reachable DIDs.
+    /// Calling this asserts that the caller owns every write to the underlying
+    /// store for as long as it intends the filter's negative answers to be
+    /// believed. That is why nothing in production calls it: `icnctl init-coop`
+    /// (#2718) and `icnctl institution genesis` (#2744) write trust edges from a
+    /// *different process* than the `icnd` that reads them, so a filter marked
+    /// authoritative when the daemon opened its graph would go stale the moment
+    /// the CLI wrote an edge — reinstating icn#2750 with a longer fuse rather
+    /// than fixing it.
+    ///
+    /// Until a caller can make that ownership argument, the fast path stays
+    /// dormant in production and every score is computed from storage. Benches,
+    /// which own an in-process graph and rebuild after their last write, are the
+    /// current legitimate callers.
     pub fn rebuild_reachability_filter(&self) -> Result<()> {
         // Get all DIDs reachable from our node within 2 hops
         let mut reachable = Vec::new();

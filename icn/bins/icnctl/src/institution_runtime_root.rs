@@ -271,11 +271,11 @@
 //!   configuration rather than certify a node that cannot start.
 //! * **icn#2748** — general `AgeKeyStore` file-mode behaviour. The two
 //!   keystores minted here are hardened to 0600.
-//! * **icn#2750** — persisted trust edges become invisible to
-//!   `compute_trust_score_weighted` once any unrelated in-process edge exists
-//!   (`0.300 -> 0.000`). Not introduced here, and deliberately not fixed here:
-//!   special-casing this ceremony inside the trust substrate would be the wrong
-//!   owner.
+//! * **icn#2750** — persisted trust edges used to become invisible to
+//!   `compute_trust_score_weighted` once any unrelated in-process edge existed
+//!   (`0.300 -> 0.000`). Fixed at the owner in `icn-trust`, not special-cased
+//!   for this ceremony: the reachability filter may now reject a target only
+//!   while it is explicitly authoritative.
 //!
 //! # Standing non-claims
 //!
@@ -2314,10 +2314,10 @@ fn verify_durable_state(
     // immutable for all time. Should a configured threshold ever be introduced,
     // this check must read the configured value instead.
     //
-    // One honest caveat: this runs on a graph that has added no edge of its own,
-    // which is the arm icn#2750 does NOT break. It therefore verifies the facts
-    // are *sufficient*, not that a long-running daemon will still honour them —
-    // that is exactly what icn#2750 blocks, and it is not papered over here.
+    // This runs on a graph that has added no edge of its own, so what it
+    // verifies is that the persisted facts are *sufficient*. That a
+    // long-running daemon still honours them is a separate property, owned by
+    // `icn-trust` and witnessed there (icn#2750) rather than asserted here.
     let scored = graph.compute_trust_score(&treasury_did).map_err(|e| {
         uninspectable(anyhow::anyhow!(
             "Verification: could not score the treasury as the ledger would ({e})"
@@ -3669,9 +3669,8 @@ fn print_receipt(data_dir: &Path, receipt: &RuntimeRootReceipt, provenance_verif
              above the ledger's author threshold on a cold reopened graph, and\n\
              key provenance — the node, trust-root and treasury keystores were\n\
              each unlocked and derive the DIDs above.\n\
-             NOTE (icn#2750): a running daemon scores this treasury 0.0 once any\n\
-             unrelated trust edge is added in-process, so the score above\n\
-             describes the persisted facts rather than the live daemon."
+             The score above describes the persisted facts, measured on a cold\n\
+             reopened graph."
         );
     } else {
         println!(
@@ -3682,9 +3681,8 @@ fn print_receipt(data_dir: &Path, receipt: &RuntimeRootReceipt, provenance_verif
              matches the one recorded. This command does not prompt for a\n\
              passphrase, so it cannot open the keystores — only see that they are\n\
              present.\n\
-             NOTE (icn#2750): a running daemon scores this treasury 0.0 once any\n\
-             unrelated trust edge is added in-process, so the score above\n\
-             describes the persisted facts rather than the live daemon."
+             The score above is measured on a cold reopened graph and describes\n\
+             the persisted facts."
         );
     }
     println!(
@@ -3786,7 +3784,7 @@ pub fn handle_institution_runtime_root_command(
                                     "treasury_key_provenance": "not_reverified",
                                     "node_identity": "not_reverified",
                                 },
-                                "note": "key provenance is not re-verified by `show`; it does not prompt for a passphrase. The ceremony verifies it before writing the receipt. `trust_score_above_ledger_threshold` is measured on a cold reopened graph: under icn#2750 the running daemon scores this treasury 0.0 once any unrelated in-process edge exists, so this field describes the persisted facts, not the live daemon.",
+                                "note": "key provenance is not re-verified by `show`; it does not prompt for a passphrase. The ceremony verifies it before writing the receipt. `trust_score_above_ledger_threshold` is measured on a cold reopened graph, so this field describes the persisted facts rather than a live daemon's view.",
                                 "receipt": receipt,
                             }))?
                         );
