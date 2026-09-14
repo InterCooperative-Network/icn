@@ -82,7 +82,7 @@ non-claim**. There is no "then somehow this works" edge.
 | 8 | to exact bounded resource-action commitment | `SemanticProposalCommitmentV1` | **SLICE — no owner issue** |
 | 9 | to signed Subject ballot(s) | `MemberVoteActionV1` + immutable ballot slot | **SLICE — no owner issue** |
 | 10 | to deterministic tally | `SubjectVoteSetHashV1` + tally | **SLICE — no owner issue** |
-| 11 | to `GovernanceDecisionReceiptV4` | V4 | **DOES NOT EXIST.** V1 construction *and persistence* are path-dependent — Rejected/NoQuorum construct none, non-executing and forced-accept closes persist none (matrix in 6.3). A1 must pin a close path that leaves durable receipt evidence. |
+| 11 | to `GovernanceDecisionReceiptV4` | V4 | **DOES NOT EXIST.** V1 evidence is path-dependent across five separable surfaces — Rejected/NoQuorum construct no *gate* or *chain-store* V1 but do produce a signed V1 inside durable `proof_bytes` when a signing key is configured; non-executing and forced-accept closes persist no chain-store V1 (matrix in 6.3). A1 must pin a close path on **two axes**: decision-hash-addressable and proposal-id-addressable evidence are different things. |
 | 12 | to canonical `decision_hash` | `compute_decision_hash_bytes` (`icn-governance/src/proof.rs:300`) | **EXISTS and exposes canonical bytes** |
 | 13 | to existing `AllocationReceipt` | `icn-kernel-api/src/receipts.rs:121` | EXISTS; canonical bytes **private** (6.2); unsigned in practice |
 | 14 | to existing `SettlementIntent` | `icn-kernel-api/src/economics.rs:80` | EXISTS; canonical bytes **private**; **no signature field** |
@@ -558,8 +558,11 @@ claim may depend on having passed it.
    #2694 issue body and this document. **This document deliberately does not create
    a competing machine-readable program surface**; when #2690 lands, this file
    should link to it rather than duplicate it.
-3. **V3 emitted / V1 persisted** (6.3) — confirmed at the type level, not traced to
-   runtime wiring. Verify before relying on it.
+3. **The typed chain/audit read surface is V1-only** (6.3). The dataflow is now
+   traced, and the earlier "V3 emitted / V1 persisted" model is disproven — V3 *is*
+   persisted, opaquely. What remains unresolved is what a V4 read surface should
+   return, and whether decision-hash-addressable evidence is required when
+   proposal-id-addressable signed evidence already exists.
 4. **The two-node plan is `Canonical: no`, last reviewed 2026-07-27** — predating
    #2689. It references ADR-0086, which **does** exist on `main` (PR #2458
    merged 2026-07-28) but carries `status: proposed` and
