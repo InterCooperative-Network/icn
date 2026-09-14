@@ -697,9 +697,13 @@ impl TrustGraph {
             return Ok(score);
         }
 
-        // Fast path: bloom filter check for unreachable DIDs (Phase 22)
-        // If the filter says the DID is definitely NOT reachable, return 0 immediately
-        if !self.reachability.is_empty() && !self.reachability.may_be_reachable(target) {
+        // Fast path: bloom filter check for unreachable DIDs (Phase 22).
+        //
+        // Only an authoritative filter may reject. The former guard was
+        // `!is_empty() && !may_be_reachable()`, which treated "something was
+        // inserted" as "this filter is complete" — so a single in-process
+        // `add_edge` made every persisted-only principal score 0.0 (icn#2750).
+        if self.reachability.is_known_unreachable(target) {
             debug!("Bloom filter: {} is definitely not reachable", target);
             self.cache.put(target.clone(), 0.0);
             return Ok(0.0);
@@ -788,11 +792,21 @@ impl TrustGraph {
             return Ok(score);
         }
 
-        // Fast path: bloom filter check
-        if !self.reachability.is_empty() && !self.reachability.may_be_reachable(target) {
-            self.cache.put(target.clone(), 0.0);
-            return Ok(0.0);
-        }
+        // NO bloom fast path here, deliberately.
+        //
+        // This scorer uses `TrustPathfinder`, which checks `get_edge(current,
+        // target)` for nodes it has already expanded to `max_hops`
+        // (`pathfinder.rs`), so it can legitimately score `own -> A -> B ->
+        // target` — three edges. `rebuild_reachability_filter` enumerates two
+        // (direct, and one hop beyond each direct target), and `max_hops` is
+        // caller-configurable besides. An authoritative filter is therefore NOT
+        // authoritative *for this query*: a three-edge target is absent from it
+        // and would short-circuit to 0.0, while the identical cold query scores
+        // positive when no rebuild has happened.
+        //
+        // A filter may only reject for a query whose reachability it provably
+        // enumerated. It does not cover this one, so this path always computes.
+        // That costs time and never correctness (icn#2750).
 
         icn_obs::metrics::trust::cache_misses_inc();
 
@@ -812,11 +826,45 @@ impl TrustGraph {
         Ok(score)
     }
 
-    /// Rebuild the reachability filter from current trust graph
+    /// Rebuild the reachability filter from the current trust graph, and mark
+    /// it authoritative.
     ///
-    /// This should be called periodically or after bulk edge operations
-    /// to ensure the bloom filter accurately reflects reachable DIDs.
+    /// Calling this asserts that the caller owns every write to the underlying
+    /// store for as long as it intends the filter's negative answers to be
+    /// believed. That is why nothing in production calls it: `icnctl init-coop`
+    /// (#2718) and `icnctl institution genesis` (#2744) write trust edges from a
+    /// *different process* than the `icnd` that reads them, so a filter marked
+    /// authoritative when the daemon opened its graph would go stale the moment
+    /// the CLI wrote an edge — reinstating icn#2750 with a longer fuse rather
+    /// than fixing it.
+    ///
+    /// Until a caller can make that ownership argument, the fast path stays
+    /// dormant in production and every score is computed from storage. Benches,
+    /// which own an in-process graph and rebuild after their last write, are the
+    /// current legitimate callers.
+    ///
+    /// The enumeration is **two edges deep** — direct targets, plus one hop
+    /// beyond each. The resulting filter may therefore only guard a query whose
+    /// reachability is also two edges deep, which is why
+    /// `compute_trust_score_with_threshold` does not consult it: its pathfinder
+    /// can follow three.
     pub fn rebuild_reachability_filter(&self) -> Result<()> {
+        // Revoke FIRST. On a second rebuild, an error partway through
+        // enumeration returns early and would otherwise leave the previous
+        // snapshot still marked authoritative — and a stale snapshot rejects
+        // targets that storage has gained since it was taken. Revoking up front
+        // means a failed refresh degrades to "not authoritative", never to
+        // "authoritative about an older graph".
+        self.reachability.revoke_authority();
+
+        // Drop cached scores too. The cache is consulted BEFORE the filter, so a
+        // `0.0` an authoritative snapshot cached earlier would go on being served
+        // for the rest of its TTL even after this refresh learns the target is
+        // reachable — leaving the answer dependent on whether anyone happened to
+        // ask before the refresh. Refreshing the reachability picture without
+        // invalidating the answers derived from the old one is not a refresh.
+        self.cache.clear();
+
         // Get all DIDs reachable from our node within 2 hops
         let mut reachable = Vec::new();
 
@@ -825,11 +873,18 @@ impl TrustGraph {
         for edge in &direct_edges {
             reachable.push(edge.target.clone());
 
-            // Transitive edges (2 hops)
-            if let Ok(indirect_edges) = self.get_outgoing_edges(&edge.target) {
-                for indirect in indirect_edges {
-                    reachable.push(indirect.target.clone());
-                }
+            // Transitive edges (2 hops).
+            //
+            // PROPAGATE. An unreadable branch is not an empty branch: swallowing
+            // this error would drop every target behind it from the enumeration
+            // and then hand the result to `rebuild`, which marks it
+            // authoritative — so a target that merely could not be READ would be
+            // rejected as known-unreachable. That is icn#2750 again, one level
+            // up. Returning early leaves the filter non-authoritative, which
+            // costs a slow path and nothing else.
+            let indirect_edges = self.get_outgoing_edges(&edge.target)?;
+            for indirect in indirect_edges {
+                reachable.push(indirect.target.clone());
             }
         }
 
