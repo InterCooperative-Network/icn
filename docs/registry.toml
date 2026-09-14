@@ -4793,6 +4793,23 @@ domain_tags = ["website", "design", "accessibility"]
 recommended_action = "keep"
 last_reviewed = "2026-08-17"
 
+[docs."docs/design/PUBLIC_SURFACE_DESIGN_CONTRACT.md"]
+category = "design"
+status = "draft"
+title = "Public surface design contract"
+description = "The design contract between the canonical public website and the future icn.zone operational/access surface — what the second surface inherits (tokens, icon semantics, scope representation, standing indicators, truth-state patterns, accessibility floor, the action-card contract), what it must never inherit (maturity-band content, the narrative sequence, a root landing page), the reserved short-route obligations, and the implementation brief a first icn.zone pass would start from. Builds nothing; no icn.zone implementation exists in the repository."
+last_updated = "2026-09-14"
+owner = "matt"
+audiences = ["contributors", "designers", "architects"]
+truth_class = "descriptive"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["website", "design", "accessibility", "routing"]
+depends_on = ["docs/adr/ADR-0032-website-truth-boundary.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/design/PUBLIC_SITE_IA.md", "docs/design/MUST_NOT_SHIP.md", "docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md", "docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md"]
+recommended_action = "keep"
+last_reviewed = "2026-09-14"
+
 [docs."docs/reference/project-index/public-state-projection.md"]
 category = "reference"
 status = "canonical"

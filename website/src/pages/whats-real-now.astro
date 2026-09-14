@@ -37,10 +37,12 @@
 import Layout from '../layouts/Layout.astro';
 import MaturityGrid from '../components/MaturityGrid.astro';
 import MaturityCard from '../components/MaturityCard.astro';
+import MaturityBadge from '../components/MaturityBadge.astro';
 import SubsystemTable from '../components/SubsystemTable.astro';
 import EvidenceBadge from '../components/EvidenceBadge.astro';
 import ReadingLadder from '../components/ReadingLadder.astro';
-import { PROJECT_STATE as projectState, evidenceClassesInUse } from '../lib/projectState';
+import { PROJECT_STATE as projectState, evidenceClassesInUse, subsystemsInBand } from '../lib/projectState';
+import type { Band } from '../components/MaturityBadge.astro';
 import buildLog from '../data/build-log.generated.json';
 
 /**
@@ -55,6 +57,30 @@ const subsystems = projectState.subsystems;
 // The legend lists only the evidence classes that actually appear below —
 // a legend explaining classes the reader will never encounter is noise.
 const evidenceLegend = evidenceClassesInUse();
+
+// ─── At a glance ─────────────────────────────────────────────────────────────
+//
+// A reader arriving here had to pass a two-axis legend and a 10-row table
+// before learning anything. The legend teaches how to read an answer; it is not
+// the answer. This summary puts the answer first and is entirely derived from
+// the same projection the table renders, so it cannot disagree with it.
+//
+// Ordered strongest-first, so the shape of the picture is the reading order.
+const GLANCE_BANDS: Array<{ band: Band; question: string }> = [
+  { band: 'strong', question: 'What is load-bearing' },
+  { band: 'advancing', question: 'What is moving fastest' },
+  { band: 'maturing', question: 'What is real but unfinished' },
+  { band: 'behind', question: 'What is trailing the substrate' },
+  { band: 'notyet', question: 'What does not exist yet' },
+];
+
+const glance = GLANCE_BANDS
+  .map((g) => ({ ...g, members: subsystemsInBand(g.band) }))
+  .filter((g) => g.members.length > 0);
+
+// The oldest verification date is the honest freshness figure — a page is only
+// as fresh as its stalest row, and `newestVerified` alone flatters it.
+const oldestVerified = projectState.oldestVerified;
 ---
 
 <Layout
@@ -94,6 +120,47 @@ const evidenceLegend = evidenceClassesInUse();
             </span>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ AT A GLANCE ═══════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="container">
+      <h2>The short version</h2>
+      <p class="sublede">
+        Every subsystem ICN tracks against its own source, sorted by how far
+        along it is. Derived from the same file as the table further down, so the
+        two cannot disagree.
+      </p>
+
+      <ul class="wrn-glance">
+        {glance.map((g) => (
+          <li class="wrn-glance-row">
+            <div class="wrn-glance-head">
+              <span class="wrn-glance-q">{g.question}</span>
+              <MaturityBadge band={g.band} />
+            </div>
+            <p class="wrn-glance-names">{g.members.map((s) => s.name).join(' · ')}</p>
+          </li>
+        ))}
+      </ul>
+
+      <div class="callout callout-caution wrn-glance-caveat">
+        <span class="callout-label">What "load-bearing" does not mean</span>
+        <p>
+          It does not mean deployed, adopted, or run by an institution in
+          ordinary use. <strong>ICN has no production deployment and no live
+          federation.</strong> A subsystem can be well-built and have only ever
+          been exercised against prepared data — several are. It also does not
+          mean complete: every row above has a published list of what is missing
+          from it, in the table below.
+        </p>
+        <p>
+          Freshness is uneven too. The oldest row here was last checked against
+          source on <time datetime={oldestVerified}>{oldestVerified}</time>; the
+          newest on <time datetime={projectState.newestVerified}>{projectState.newestVerified}</time>.
+        </p>
       </div>
     </div>
   </section>
@@ -315,6 +382,66 @@ const evidenceLegend = evidenceClassesInUse();
 </Layout>
 
 <style>
+  /* At-a-glance rows. Deliberately not cards: a card grid would make five
+     bands look like five equivalent buckets, and the whole point of the
+     ordering is that they are not equivalent. */
+  .wrn-glance {
+    list-style: none;
+    margin: var(--space-lg) 0 var(--space-xl);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .wrn-glance-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border-subtle, var(--border-default));
+  }
+
+  .wrn-glance-row:first-child {
+    border-top: 1px solid var(--border-subtle, var(--border-default));
+  }
+
+  .wrn-glance-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6em;
+  }
+
+  .wrn-glance-q {
+    font-weight: 600;
+    color: var(--text-heading);
+  }
+
+  .wrn-glance-names {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    min-width: 0;
+  }
+
+  .wrn-glance-caveat {
+    margin-top: var(--space-lg);
+  }
+
+  @media (min-width: 720px) {
+    .wrn-glance-row {
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--space-lg);
+    }
+
+    .wrn-glance-head {
+      flex: 0 0 34%;
+      align-items: baseline;
+    }
+  }
+
   .wrn-hero {
     padding-top: calc(64px + var(--space-3xl));
   }

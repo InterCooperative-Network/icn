@@ -319,6 +319,17 @@ pre code {
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
 }
+/* Clearance for the fixed 64px header on pages whose first section starts at
+   the top of the document. This was an identical `style="padding-top: calc(64px
+   + var(--space-3xl))"` inline attribute on eight pages — a shared primitive
+   spelled eight times, and forbidden by website/.claude/rules/
+   astro-conventions.md ("No inline styles"). */
+.section-page-top {
+  padding-top: calc(64px + var(--space-3xl));
+}
+.section-page-top-sm {
+  padding-top: calc(64px + var(--space-2xl));
+}
 .section-pre-ladder {
   padding-bottom: var(--space-lg);
 }
