@@ -39,7 +39,7 @@ The strongest intended eventual claim, in full:
 > decision was cryptographically committed to a canonical decision hash; existing
 > ICN economic and execution machinery carried that same hash through the bounded
 > resource action and retained provenance; an independent Node B verified the
-> retained evidence offline while Node A was stopped; and the verifier/recovery
+> retained evidence offline while Node A was unreachable; and the verifier/recovery
 > node subsequently survived the separately specified encrypted destroy/restore
 > proof.
 
@@ -72,7 +72,7 @@ non-claim**. There is no "then somehow this works" edge.
 
 | # | Link | Resolves to | State at snapshot |
 |---|---|---|---|
-| 1 | substrate to reproducible node/profile | appliance image + manifest; `icnctl appliance verify-manifest` | EXISTS; ADR-0086 merged (PR #2458) but `status: proposed`, `implementation_status: partially implemented` — **adoption is a separate human decision** |
+| 1 | substrate to reproducible node/profile | appliance image + manifest; `icnctl appliance verify-manifest` | EXISTS; ADR-0086 merged (PR #2458) but `status: proposed` — reaching **`status: accepted`** (ADR-0018's lifecycle) is a separate decision, and `implementation_status` is a separate axis again |
 | 2 | to two-node communication | isolated QEMU topology in the two-node plan | EXISTS (plan, `Canonical: no`) |
 | 3 | to institution package/domain | `InstitutionBootstrapManifest` (`icn-governance/src/bootstrap.rs:14`); `icnctl institution runtime-root` | EXISTS but **disclaims canonical institution genesis** (6.6) |
 | 4 | to fresh current-semantic human Subject | `SubjectContextGenesisV1` | **SLICE — icn#2695** (design-reviewed, unimplemented) |
@@ -89,7 +89,7 @@ non-claim**. There is no "then somehow this works" edge.
 | 15 | to execution | `ExecutionRecord` (`execution.rs:78`) | EXISTS; **mutable operational state**, not a canonical receipt |
 | 16 | to ledger/provenance evidence | `JournalEntry` + `ProvenanceRef` | EXISTS; **provenance is not in the hash and not signed** (6.4) |
 | 17 | to self-contained offline evidence | offline bundle contract | **SLICE — icn#2465** (spec only, no implementation) |
-| 18 | to Node A stopped | two-node plan Gate 4 step 5 | **Gate 4 BLOCKED** |
+| 18 | to Node A unreachable | two-node plan Gate 4 step 5 is literally "Disconnect Node A" — **isolation, not a service or VM stop** | **Gate 4 BLOCKED** |
 | 19 | to Node B independently verifies | reviewed offline verifier | **SLICE — icn#2465** |
 | 20 | to encrypted destroy/restore continuity | recovery bundle | **SLICE — icn#2466**; Gate 6 BLOCKED |
 | 21 | to same evidence still independently verifiable | re-run of 19 post-restore | depends on 19 + 20 |
@@ -356,22 +356,41 @@ An earlier revision of this document described the seam as "V3 emitted, V1
 persisted." Review corrected that, and re-verification against `main` agrees.
 The accurate shape is:
 
-V1 is universally *constructed* on accepted actor closes (as gate input) but
-persisted on only two production paths. Constructed is not persisted, and the
-distinction decides what a V4 read surface can rely on:
+Treating "V1 constructed" and "V1 persisted" as one property is too coarse: there
+are **five separable surfaces**, and no close path has all of them.
 
-| Close path | V1 constructed | V1 persisted | V3 |
-|---|---|---|---|
-| Actor, Accepted, **non-executing** | yes (gate only) | **no** | only with a capability scope |
-| Actor, Accepted, executing + receipt store | yes | **yes** (`CloseReceipts::apply`) | only with a capability scope |
-| Actor, Rejected / NoQuorum | **no** | no | only with a capability scope |
-| Timer / scheduler auto-close | as above, scope is `None` | as above | **never** |
-| Forced-accept (`ForceCloseProposal`) | yes (gate/hash material) | **no** | **never** |
-| `GovernanceManager::close_proposal_inner` | yes, **if a receipt store is attached** | **yes, every outcome — but only when a store is attached** (`receipt_store` defaults to `None`, and all construction plus `CloseReceipts::apply` sits inside `if let Some(ref store)`) | only with a capability scope |
+1. **gate/hash V1** — a receipt built only to derive the gate/decision hash, never stored
+2. **chain-store V1** — persisted via `put_governance` (decision-hash addressable)
+3. **V1 inside `GovernanceProofV2`** — a receipt constructed during proof construction
+4. **durable `proof_bytes`** — those signed proof bytes written to the proposal state store
+5. **V3** — persisted opaquely via `put_opaque`
 
-`pending_chain_receipts` is assigned only inside `requires_execution_closure`
-(`actor.rs:2523`), and its only drain returns `None => (None, None)` (`:2675`),
-so a non-executing actor close durably stores `governance_receipt: None`.
+| Close path | gate V1 | chain-store V1 | V1-in-ProofV2 | durable proof_bytes | V3 |
+|---|---|---|---|---|---|
+| Actor Accepted, **non**-exec-required | yes | **no** | if `signing_key` | if `signing_key` | if `capability_scope` **and** `receipt_store` |
+| Actor Accepted, exec-required | yes | **yes** (fatal on failure) | if `signing_key` | if `signing_key` | if `capability_scope` |
+| Actor **Rejected** | no | no | if `signing_key` | if `signing_key` | if `capability_scope` + `receipt_store` |
+| Actor **NoQuorum** | no | no | if `signing_key` | if `signing_key` | if `capability_scope` + `receipt_store` |
+| Timer / scheduler | by outcome | by outcome | if `signing_key` | if `signing_key` | **never** — `capability_scope: None` is hardcoded |
+| `ForceCloseProposal` | Accept only | **no** | **no** | **no** — bare `save_proposal`, no journal | **no** |
+| `GovernanceManager::close_proposal_inner` | n/a | **yes, all outcomes** (requires `receipt_store`) | **no** | **no** | if `capability_scope` |
+
+The proof path is gated on `signing_key` **alone** — not on outcome, not on
+`receipt_store`, not on `capability_scope` — and it covers all three terminal
+outcomes. Its bytes are genuinely durable: close journal `save_close_intent`
+then `commit` then `save_proof_bytes`, landing under the sled key
+`governance:proof:{proposal_id}`.
+
+**So "no chain-store persistence" does not mean "no durable V1."** An
+actor-driven Rejected, NoQuorum or non-execution-required Accepted close writes a
+complete signed `GovernanceDecisionReceipt` inside `proof_bytes` while
+`put_governance` is never called.
+
+But that evidence is **differently addressable**: it lives in the proposal state
+store rather than the receipt backend, under a *proposal-id* key, behind a
+different reader, and it carries **no `decision_hash` index**. The chain read
+surfaces — `get_governance_by_decision`, the receipt-chain endpoint, and
+`icnctl audit verify` — structurally cannot see it.
 
 - **V3 is emitted conditionally and additionally**, not as a replacement:
   `actor.rs:2561` gates on a present `capability_scope` *and* a configured
@@ -386,9 +405,20 @@ so a non-executing actor close durably stores `governance_receipt: None`.
 
 So a V4 does not have to reconcile a persistence mismatch. It has to decide what
 the **typed chain/audit read surface** returns, whether conditional V3 emission
-becomes unconditional, and — the sharper problem — **which close paths leave any
-durable governance receipt at all**. An A1 proof must pin a close path that
-actually persists one.
+becomes unconditional, and whether decision-hash-addressable evidence is required
+at all when proposal-id-addressable signed evidence already exists.
+
+**A1 must pin a close path on two independent axes**, not one:
+
+- `signing_key: Some` buys **proposal-id-addressable** V1 evidence for every
+  terminal outcome, via `proof_bytes`;
+- only execution-required Accepted (actor), or any outcome under the standalone
+  manager with a receipt store, buys **decision-hash-addressable** chain evidence.
+
+If the A1 read surface is decision-hash-keyed — which every existing chain reader
+is — the proof-bytes route does **not** satisfy it. Note also that `signing_key`
+is a node-configuration fact, not a governance fact, so this evidence's existence
+depends on deployment wiring rather than on the decision itself.
 
 A stale comment at `proof.rs:817` still reads "No handler emits a v3 receipt yet
 — this is schema preparation only." That is now false, and is recorded here as a
@@ -480,6 +510,35 @@ different names (`SessionAuthority`, `AuthorityProfile`, `AuthorityCapabilities`
 authority** — do not conflate. `NodeId` is `pub type NodeId = String`; Node has no
 durable domain.
 
+### 6.10 Gate 5 is not an executable sequence as written
+
+**This contradiction is in the linked source procedure, not introduced here**, and
+this plan exposes rather than repairs it — correcting it is the two-node plan's
+own change, not #2783's.
+
+`docs/demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md` Gate 5 requires all three of:
+
+| Step | Requirement |
+|---|---|
+| 2 | restart `icnd`; wait for authenticated health **and peer reconnection** |
+| 3 | re-run receipt verification on Node B **while Node A remains disconnected** |
+| 4 | reboot both VMs; wait for first-boot marker, active service **and peer reconnection** |
+
+Steps 2 and 4 require the peer link to be **up**; step 3 requires it to be
+**down**. No single run satisfies all three as written, so Gate 5 cannot be
+executed and the critical path is blocked at it.
+
+**The owner decision that must be made** — one of:
+
+1. offline isolation ends after Gate 4, the witness link is restored, and Gate 5
+   proves restart/reboot *continuity* rather than continued isolation (step 3's
+   "while Node A remains disconnected" is then the clause to drop or reword); or
+2. Gate 5's intended topology is genuinely isolated, in which case steps 2 and 4
+   must stop requiring peer reconnection and the source procedure is corrected.
+
+Until that is decided, this plan does not present Gate 5 as runnable, and no A1
+claim may depend on having passed it.
+
 ### 6.9 Unresolved owner contradictions
 
 1. **Two competing decompositions.** #2694 defines a 12-step semantic ladder.
@@ -504,8 +563,8 @@ durable domain.
 4. **The two-node plan is `Canonical: no`, last reviewed 2026-07-27** — predating
    #2689. It references ADR-0086, which **does** exist on `main` (PR #2458
    merged 2026-07-28) but carries `status: proposed` and
-   `implementation_status: partially implemented`, so the profile is proposed,
-   not adopted.
+   `implementation_status: partially implemented` — so the profile is proposed,
+   not `accepted`.
 
 ---
 
@@ -562,7 +621,13 @@ Node B is **not** a second institution, not federation, not a production peer an
 not a governance participant. Two-institution operation requires a later ratified
 enrollment ceremony.
 
-**For offline evidence, Node A must actually be stopped or unreachable.** A Node B
+**For offline evidence, Node A must actually be unreachable from Node B.** The
+selected procedure proves *isolation*, not shutdown: Gate 4 step 5 is
+"Disconnect Node A", and nothing in it stops the service or the VM. This plan
+therefore claims only what the procedure establishes — the verifier did not reach
+Node A — and deliberately does **not** say "stopped", which would be a stronger
+property nobody tests. Strengthening it would require changing the upstream
+procedure, which is out of scope here. A Node B
 `curl` back to Node A is **transfer evidence only**. The plan's Gate 4 step 5 is
 literally "Disconnect Node A"; Gate 5 re-runs verification while Node A remains
 disconnected.
@@ -657,11 +722,11 @@ waiting on a human.
 
 | Lane | State | Blocking fact |
 |---|---|---|
-| Deployment profile | BLOCKED | ADR-0086 exists and is merged but `status: proposed` / partially implemented — **adoption not decided**; two-node plan is `Canonical: no`. |
+| Deployment profile | BLOCKED | ADR-0086 is merged but `status: proposed`; the freeze prerequisite is **`status: accepted`** per ADR-0018. Merged and partially implemented are neither of them. Two-node plan is `Canonical: no`. |
 | **#2694** semantic convergence | IDENTIFIED | 1 of 12 slices owned (#2695); none implemented; no artifact exists in code. |
 | **#2465** offline evidence | IDENTIFIED | spec only; 0 of 4 slices owned. Slice A is conditional, not a blocker (5.6). |
 | **#2466** recovery | IDENTIFIED | spec only; completeness blocked by #2746. |
-| Two-node witness | BLOCKED | Gate 4 and Gate 6 both blocked. |
+| Two-node witness | BLOCKED | Gate 4 and Gate 6 blocked; **Gate 5 is not executable as written** (6.10). |
 | NYCN lock bump | BLOCKED | requires a frozen SHA and a human signature. |
 | Public claim | BLOCKED | requires all seventeen #2689 section 10 criteria. |
 
@@ -674,7 +739,7 @@ waiting on a human.
 ```text
 #2750  (now the ONLY uncontained defect on the economic chain)
    v
-Alpha profile freeze  (needs ADR-0086 ADOPTED, not merely merged)
+Alpha profile freeze  (needs ADR-0086 status: accepted)
    v
 #2694 slice 1 (#2695 GEN-A) -> slice 2 (N1-D) -> ... -> slice 10 (V4)
    v
@@ -684,9 +749,9 @@ V4 decision_hash through AllocationReceipt / SettlementIntent
    v
 #2465 slice D  (composes C; tamper-negative proof)
    v
-Gate 4  (Node A stopped)
+Gate 4  (Node A disconnected — isolation, not shutdown)
    v
-Gate 5  (restart + reboot continuity, Node A still disconnected)
+Gate 5  (restart + reboot continuity)  <-- BLOCKED: see 6.10
    v
 #2466  -> Gate 6
    v
@@ -740,9 +805,10 @@ produces); Gates 4, 5 and 6; anything downstream of the profile freeze.
    program has two disagreeing structures.
 2. **Land or close PR #2690** (6.9.2), which carries the machine-readable
    `program_structure` domain this document deliberately does not duplicate.
-3. **Adopt or reject ADR-0086**. It is merged but `status: proposed`; adoption
-   is the human decision the profile gate actually waits on. Also whether the two-node
-   plan should be promoted from `Canonical: no`.
+3. **Move ADR-0086 to `status: accepted`, or decline it** through ADR-0018's
+   lifecycle. It is merged but `status: proposed`, and `accepted` — not merged,
+   not "partially implemented" — is what the profile gate waits on. Also whether
+   the two-node plan should be promoted from `Canonical: no`.
 4. **Decide what the typed chain/audit read surface returns** (6.3) before a V4
    is specified, and whether conditional V3 emission becomes unconditional first.
 5. **Accept or reject the 5.3 evidence-strength taxonomy**, which is proposed here
