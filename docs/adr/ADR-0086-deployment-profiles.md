@@ -113,7 +113,9 @@ overclaiming: `verify-backup --verify-ledger` now reports completeness as
 positive; it is not detection, and it did not make restoration provable.
 icn#2786 owns the independent extent/frontier commitment that would make
 completeness checkable at all, and remains open. **Item 7 closes only when
-icn#2786 lands**, not when icn#2787 did. Items
+BOTH causes are closed** — the secret-bearing environment file must travel with
+the backup, *and* icn#2786 must land. Closing either alone leaves an appliance
+that cannot be independently restored, which is what item 7 asserts. Items
 8–9 are only partially
 met: manifests exist and Kubernetes is not required, but appliance artifacts
 are not yet signed or reproducibly built.
