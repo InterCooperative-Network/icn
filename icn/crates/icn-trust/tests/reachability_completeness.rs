@@ -318,3 +318,79 @@ fn the_threshold_path_also_honours_persisted_edges() {
          unrelated runtime edge; got {score}"
     );
 }
+
+/// A filter may only guard a query whose reachability it actually enumerated.
+///
+/// `rebuild_reachability_filter` enumerates two edges deep. The pathfinder that
+/// `compute_trust_score_with_threshold` uses checks `get_edge(current, target)`
+/// for nodes it expanded to `max_hops`, so it can score `own -> a -> b ->
+/// target` — three. A rebuilt filter does not contain that target, so guarding
+/// the threshold path with it made an authoritative rebuild *cause* a 0.0 that
+/// the identical cold query scores positively.
+#[test]
+fn a_rebuild_does_not_zero_a_three_edge_target_on_the_threshold_path() {
+    let dir = TempDir::new().unwrap();
+    let node = did();
+    let a = did();
+    let b = did();
+    let target = did();
+
+    let mut g = TrustGraph::new(open(&dir.path().join("trust")), node.clone());
+    for (s, t) in [
+        (node.clone(), a.clone()),
+        (a, b.clone()),
+        (b, target.clone()),
+    ] {
+        g.add_edge(TrustEdge::new(s, t, full())).unwrap();
+    }
+
+    let before = g.compute_trust_score_with_threshold(&target, None).unwrap();
+
+    // Make the filter authoritative, then ask the same question again.
+    g.rebuild_reachability_filter().unwrap();
+    assert!(
+        g.reachability_filter().is_authoritative(),
+        "precondition: the rebuild must have conferred authority"
+    );
+    // The rebuilt filter genuinely does not know this target — that is the
+    // point. Guarding this path with it would reject a reachable principal.
+    assert!(
+        !g.reachability_filter().may_be_reachable(&target),
+        "precondition: a three-edge target is outside a two-edge enumeration"
+    );
+
+    let after = g.compute_trust_score_with_threshold(&target, None).unwrap();
+    assert_eq!(
+        before, after,
+        "rebuilding the filter must not change what the threshold path scores \
+         (before={before}, after={after})"
+    );
+}
+
+/// A refresh that fails partway must not leave the previous snapshot
+/// authoritative — a stale snapshot rejects targets storage has since gained.
+#[test]
+fn authority_is_revoked_before_a_rebuild_re_enumerates() {
+    let f = ReachabilityFilter::new();
+    let a = did();
+    f.rebuild([a.clone()]);
+    assert!(
+        f.is_authoritative(),
+        "precondition: authoritative after rebuild"
+    );
+
+    f.revoke_authority();
+    assert!(
+        !f.is_authoritative(),
+        "a revoked filter may not answer for the graph it used to describe"
+    );
+    assert!(
+        !f.is_known_unreachable(&did()),
+        "and must not reject while revoked"
+    );
+    // Contents survive the revocation; only the claim about them is withdrawn.
+    assert!(
+        f.may_be_reachable(&a),
+        "revocation must not discard contents"
+    );
+}

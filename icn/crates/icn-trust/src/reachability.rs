@@ -159,6 +159,19 @@ impl ReachabilityFilter {
         }
     }
 
+    /// Revoke authoritative status without discarding the contents.
+    ///
+    /// For a refresh that is about to re-enumerate: if it fails partway, the
+    /// PREVIOUS snapshot must not still be marked authoritative, or a stale
+    /// filter keeps rejecting targets that storage has since gained.
+    pub fn revoke_authority(&self) {
+        // Under the lock, like every other writer of this flag.
+        if let Ok(_filter) = self.filter.lock() {
+            self.authoritative
+                .store(false, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
     /// Rebuild the filter from a list of reachable DIDs
     ///
     /// This should be called when the trust graph topology changes significantly.

@@ -792,12 +792,21 @@ impl TrustGraph {
             return Ok(score);
         }
 
-        // Fast path: bloom filter check. Only an authoritative filter may
-        // reject — see the note in `compute_trust_score_weighted` (icn#2750).
-        if self.reachability.is_known_unreachable(target) {
-            self.cache.put(target.clone(), 0.0);
-            return Ok(0.0);
-        }
+        // NO bloom fast path here, deliberately.
+        //
+        // This scorer uses `TrustPathfinder`, which checks `get_edge(current,
+        // target)` for nodes it has already expanded to `max_hops`
+        // (`pathfinder.rs`), so it can legitimately score `own -> A -> B ->
+        // target` — three edges. `rebuild_reachability_filter` enumerates two
+        // (direct, and one hop beyond each direct target), and `max_hops` is
+        // caller-configurable besides. An authoritative filter is therefore NOT
+        // authoritative *for this query*: a three-edge target is absent from it
+        // and would short-circuit to 0.0, while the identical cold query scores
+        // positive when no rebuild has happened.
+        //
+        // A filter may only reject for a query whose reachability it provably
+        // enumerated. It does not cover this one, so this path always computes.
+        // That costs time and never correctness (icn#2750).
 
         icn_obs::metrics::trust::cache_misses_inc();
 
@@ -833,7 +842,21 @@ impl TrustGraph {
     /// dormant in production and every score is computed from storage. Benches,
     /// which own an in-process graph and rebuild after their last write, are the
     /// current legitimate callers.
+    ///
+    /// The enumeration is **two edges deep** — direct targets, plus one hop
+    /// beyond each. The resulting filter may therefore only guard a query whose
+    /// reachability is also two edges deep, which is why
+    /// `compute_trust_score_with_threshold` does not consult it: its pathfinder
+    /// can follow three.
     pub fn rebuild_reachability_filter(&self) -> Result<()> {
+        // Revoke FIRST. On a second rebuild, an error partway through
+        // enumeration returns early and would otherwise leave the previous
+        // snapshot still marked authoritative — and a stale snapshot rejects
+        // targets that storage has gained since it was taken. Revoking up front
+        // means a failed refresh degrades to "not authoritative", never to
+        // "authoritative about an older graph".
+        self.reachability.revoke_authority();
+
         // Get all DIDs reachable from our node within 2 hops
         let mut reachable = Vec::new();
 
