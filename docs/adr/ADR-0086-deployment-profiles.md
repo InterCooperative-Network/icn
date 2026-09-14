@@ -99,9 +99,16 @@ The canonical appliance contract requires:
 
 Items 1–5 have partial runtime evidence. Item 6 exists as generic `icnctl`
 backup tooling, but it writes a data-directory tar archive and is not yet an
-encrypted appliance recovery contract. Item 7 is open: the current data backup
-does not include `/etc/icn/icnd.env`, so restoring `/var/lib/icn` alone is not
-an independently operable appliance recovery. Items 8–9 are only partially
+encrypted appliance recovery contract. Item 7 is open for two independent
+reasons, and closing either alone does not close the item. First, the current
+data backup does not include `/etc/icn/icnd.env`, so restoring `/var/lib/icn`
+alone is not an independently operable appliance recovery. Second, a restored
+ledger cannot be shown to be *complete*: a `db` truncated to a partial length
+reopens cleanly as a valid short prefix, and nothing commits to the extent it
+should have had, so `verify-backup --verify-ledger` reports completeness as
+`unresolved` rather than certifying it (icn#2746; the independent
+extent/frontier commitment required for actual detection is icn#2786). Items
+8–9 are only partially
 met: manifests exist and Kubernetes is not required, but appliance artifacts
 are not yet signed or reproducibly built.
 
@@ -174,7 +181,7 @@ workflow, but supplies and protects all deployment-specific values itself.
 | Identity survives restart/reboot | Stable retained-overlay identity/config/genesis hashes | Proven for the witnessed bytes |
 | Durable receipt survives restart/reboot | Exact completion receipt re-fetched after both transitions | Proven for the witnessed fixture receipt |
 | Full demo workspace is durable | Read-only status became uninitialized after process restart | Not proven; currently false |
-| Independent appliance restoration | Plain data-directory tar omits the secret-bearing environment file | Open blocker |
+| Independent appliance restoration | Two independent causes: the plain data-directory tar omits the secret-bearing environment file, and ledger completeness cannot be established at all — a truncated journal reopens as a valid short prefix and nothing commits to its expected extent (icn#2746, mechanism icn#2786) | Open blocker |
 | Signed immutable appliance release | Manifest states `signed: false`, `immutable: false` | Not implemented |
 | Generic OCI image builds | Local cold build plus merged hosted workflow from PR #2455 | Build evidence only |
 | Kubernetes production readiness | Conflicting/stale generic and homelab material | Not claimed |
