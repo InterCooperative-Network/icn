@@ -12,7 +12,7 @@ An ICN node's critical state lives in three places:
 |-----------|-----------------|----------|
 | **Keystore** | `~/.icn/identity.age` | Ed25519 signing key, X25519 encryption key, TLS cert |
 | **Sled database** | `~/.icn/db/` | Ledger entries, replica metadata, trust graph, gossip state |
-| **Configuration** | `~/.icn/config.toml` | Node settings, listen addresses, peers |
+| **Configuration** | `~/.icn/icn.toml` | Node settings, listen addresses, peers (older installs may have `config.toml`; it is not auto-discovered — pass `--config` explicitly) |
 
 ### Priority Order
 

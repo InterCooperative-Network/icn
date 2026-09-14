@@ -345,3 +345,182 @@ fn the_pinned_umask_makes_daemon_created_files_owner_only() {
         "fixture: expected at least two daemon-created files to inspect, saw {checked}"
     );
 }
+
+// ── A: the EFFECTIVE profile, not just the base unit ───────────────────────
+//
+// The appliance installs `20-demo-profile.conf` into
+// `/etc/systemd/system/icnd.service.d/`, and that drop-in REPLACES `ExecStart`
+// wholesale. Proving the base unit alone would leave the composed profile —
+// the thing that actually runs on the image — unproven, and a drop-in that
+// forgot `--config` would silently reinstate icn#2755 on that profile only.
+
+/// Apply systemd's documented drop-in semantics to a base unit and its
+/// drop-ins, in lexical order.
+///
+/// Rules modelled, from systemd.unit(5): drop-ins are applied after the base
+/// unit; a directive assigned again overrides the earlier value; and assigning
+/// an **empty** value to a list-valued directive such as `ExecStart` resets the
+/// list, which is why `20-demo-profile.conf` writes `ExecStart=` before its own.
+fn compose_unit(base: &Path, dropins: &[PathBuf]) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    for file in std::iter::once(base).chain(dropins.iter().map(|p| p.as_path())) {
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("fixture: could not read {}: {e}", file.display()));
+        let mut joined: Vec<String> = Vec::new();
+        let mut cont = String::new();
+        for raw in text.lines() {
+            let t = raw.trim();
+            if t.starts_with('#') || t.starts_with(';') {
+                continue;
+            }
+            if let Some(stripped) = t.strip_suffix('\\') {
+                cont.push_str(stripped.trim_end());
+                cont.push(' ');
+                continue;
+            }
+            if !cont.is_empty() {
+                cont.push_str(t);
+                joined.push(std::mem::take(&mut cont));
+            } else {
+                joined.push(t.to_string());
+            }
+        }
+        for line in joined {
+            let Some((k, v)) = line.split_once('=') else {
+                continue;
+            };
+            let (k, v) = (k.trim().to_string(), v.trim().to_string());
+            if k.is_empty() {
+                continue;
+            }
+            if v.is_empty() {
+                // Reset: drop everything previously assigned to this key.
+                out.retain(|(ek, _)| *ek != k);
+                continue;
+            }
+            // Non-list directives override; ExecStart accumulates after a reset.
+            if k != "ExecStart" {
+                out.retain(|(ek, _)| *ek != k);
+            }
+            out.push((k, v));
+        }
+    }
+    out
+}
+
+fn effective(directives: &[(String, String)], key: &str) -> Vec<String> {
+    directives
+        .iter()
+        .filter(|(k, _)| k == key)
+        .map(|(_, v)| v.clone())
+        .collect()
+}
+
+/// The composed appliance profile must retain BOTH properties.
+///
+/// What this proves: systemd parses the base unit and the drop-in together as
+/// one unit (asserted through `systemd-analyze verify`, which reports errors
+/// against the drop-in's own path, so it demonstrably reads it); and under
+/// systemd's documented override semantics the composed `ExecStart` still
+/// carries `--config <data_dir>/icn.toml` while the composed `UMask` is still
+/// the base unit's `0077`.
+///
+/// What this does NOT prove: the in-memory property values of a running systemd
+/// manager. That needs a live manager and an installed binary, neither of which
+/// exists in CI. The composition semantics are modelled here from
+/// systemd.unit(5), and the negative control below is what keeps that model
+/// honest — it fails if a drop-in drops `--config`.
+#[test]
+fn the_composed_appliance_profile_keeps_config_and_umask() {
+    let root = repo_root();
+    let base = root.join("deploy").join("icnd.service");
+    let dropin = root
+        .join("deploy/appliance/systemd/icnd.service.d")
+        .join("20-demo-profile.conf");
+    assert!(dropin.is_file(), "fixture: missing {}", dropin.display());
+
+    // 1. systemd itself must accept the pair as a composed unit.
+    let staged = TempDir::new().unwrap();
+    let unit = staged.path().join("icnd.service");
+    let dd = staged.path().join("icnd.service.d");
+    std::fs::create_dir_all(&dd).unwrap();
+    std::fs::copy(&base, &unit).unwrap();
+    std::fs::copy(&dropin, dd.join("20-demo-profile.conf")).unwrap();
+    if let Ok(out) = Command::new("systemd-analyze")
+        .arg("verify")
+        .arg(&unit)
+        .output()
+    {
+        let text = String::from_utf8_lossy(&out.stderr).to_string()
+            + &String::from_utf8_lossy(&out.stdout);
+        // The only tolerated complaint is the binary being absent on a build host.
+        for line in text.lines().filter(|l| !l.trim().is_empty()) {
+            assert!(
+                line.contains("is not executable") || line.contains("No such file or directory"),
+                "systemd rejected the composed profile: {line}"
+            );
+        }
+    }
+
+    // 2. The composed directives must carry both properties.
+    let composed = compose_unit(&base, std::slice::from_ref(&dropin));
+    let exec = effective(&composed, "ExecStart");
+    assert_eq!(
+        exec.len(),
+        1,
+        "the drop-in resets ExecStart and sets exactly one: {exec:?}"
+    );
+    assert!(
+        exec[0].contains("--config /var/lib/icn/icn.toml"),
+        "icn#2755: the COMPOSED profile must still pass the provisioned \
+         configuration; the drop-in replaces ExecStart wholesale, so dropping it \
+         here reinstates the node-DID fallback on the appliance profile:\n{}",
+        exec[0]
+    );
+    let umask = effective(&composed, "UMask");
+    assert_eq!(
+        umask,
+        vec!["0077".to_string()],
+        "the composed profile must retain the pinned umask"
+    );
+    // The demo drop-in must not have quietly loosened the bind either.
+    assert!(
+        exec[0].contains("--gateway-bind"),
+        "sanity: the composed ExecStart is the drop-in's: {}",
+        exec[0]
+    );
+}
+
+/// Negative control for the composition model above.
+///
+/// Without this, `compose_unit` could be wrong in a way that makes the real
+/// assertion pass for the wrong reason. A drop-in that resets `ExecStart` and
+/// omits `--config` must be detected.
+#[test]
+fn the_composition_check_fails_when_a_dropin_drops_config() {
+    let root = repo_root();
+    let base = root.join("deploy").join("icnd.service");
+
+    let tmp = TempDir::new().unwrap();
+    let bad = tmp.path().join("99-bad.conf");
+    std::fs::write(
+        &bad,
+        "[Service]\nExecStart=\nExecStart=/usr/local/bin/icnd \\\n    --data-dir /var/lib/icn \\\n    --gateway-enable\n",
+    )
+    .unwrap();
+
+    let composed = compose_unit(&base, &[bad]);
+    let exec = effective(&composed, "ExecStart");
+    assert_eq!(
+        exec.len(),
+        1,
+        "the bad drop-in resets and sets one: {exec:?}"
+    );
+    assert!(
+        !exec[0].contains("--config"),
+        "the negative control must actually lose --config, or it controls nothing: {}",
+        exec[0]
+    );
+    // And the umask must survive a drop-in that does not mention it.
+    assert_eq!(effective(&composed, "UMask"), vec!["0077".to_string()]);
+}

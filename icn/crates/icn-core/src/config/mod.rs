@@ -223,9 +223,32 @@ pub fn ledger_store_path(data_dir: &Path) -> PathBuf {
 /// * secrets keep their own custody at `/etc/icn/icnd.env`, consumed by
 ///   `EnvironmentFile=`, and mutable state stays under the data directory.
 ///
-/// `<data_dir>/config.toml` is **deprecated** as a native configuration
-/// location. It was never loaded at daemon startup — only `--config` is — so a
-/// treasury provisioned into it could never have reached the running node.
+/// # `<data_dir>/config.toml` — the compatibility contract, stated explicitly
+///
+/// **Deprecated as a native daemon configuration location, and deliberately not
+/// migrated.** This is an Alpha non-claim, not an oversight:
+///
+/// * an existing native installation whose configuration exists only as
+///   `config.toml` is **not an upgrade target of the Technical Alpha profile**;
+/// * the supported Alpha path is a fresh or provisioned `<data_dir>/icn.toml`;
+/// * **no dual-path auto-discovery is introduced**, now or later — a loader
+///   that searches two names is a loader whose answer depends on which files
+///   happen to exist, which is the ambiguity this owner exists to remove.
+///
+/// Nothing is silently broken by that choice. `--config` still honours whatever
+/// path it is given, so an operator with a hand-written unit passing
+/// `--config <data_dir>/config.toml` keeps working unchanged; what moved is the
+/// file `icnd --init` writes and the file the SHIPPED unit reads.
+///
+/// Migration machinery was considered and rejected on evidence: there is no
+/// existing supported upgrade promise for native installs (`deploy/install.sh`
+/// has no upgrade path at all), and reading both names would have to define
+/// what a disagreement between them means — inventing a semantics for a
+/// situation this project has never shipped.
+///
+/// The deprecation costs nothing in reach, because `config.toml` was never
+/// loaded at daemon startup in the first place — only `--config` is. A treasury
+/// provisioned into it could not have reached the running node.
 pub fn config_file_path(data_dir: &Path) -> PathBuf {
     data_dir.join("icn.toml")
 }
