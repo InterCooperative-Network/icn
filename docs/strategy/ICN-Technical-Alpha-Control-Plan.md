@@ -22,6 +22,12 @@ Last Reviewed: 2026-09-13
 > (github-api), not by this file.** Re-resolve with `gh` before acting on any
 > status here. Snapshot revision:
 > **`82030804dc26003bf7e1d6e289166989108bcd63`**, taken 2026-09-13.
+>
+> **Post-snapshot addenda.** A row that changed *because of the commit carrying
+> it* is marked inline as a post-snapshot addendum rather than silently
+> refreshed, so this file never reads as a single reproducible snapshot when it
+> is really mixed. Re-taking the snapshot means re-verifying every row, which is
+> a deliberate act and not a side effect of one row moving.
 
 ---
 
@@ -604,7 +610,7 @@ complete recovery proof.
 
 | Issue | Defect | Effect on recovery claims |
 |---|---|---|
-| **icn#2746** | a truncated ledger reopens via sled recovery and scans short *without error*, and nothing in the artifact distinguishes that from a ledger that always held that many | **Still blocks completeness.** The verifier no longer *overclaims*: it reports `ledger completeness: unresolved` and fails closed instead of certifying. That removed a false positive; it is not detection. A backup-time extent record does **not** close this — if the damage precedes the backup the count records the already-reduced extent, and post-capture damage is already caught by the whole-directory checksum. Detection needs an independent commitment that advances on append and survives loss of the journal: **icn#2786**. |
+| **icn#2746** | a truncated ledger reopens via sled recovery and scans short *without error*, and nothing in the artifact distinguishes that from a ledger that always held that many | **Still blocks completeness.** *(Post-snapshot addendum — see the note under the snapshot revision above; the rest of this row's evidence predates it.)* At the snapshot revision the verifier still printed `BACKUP VERIFICATION PASSED` for a short ledger. **icn#2787** stops that overclaim — it reports `ledger completeness: unresolved` and fails closed instead of certifying — which removes a false positive without being detection. A backup-time extent record does **not** close this: if the damage precedes the backup the count records the already-reduced extent, and post-capture damage is already caught by the whole-directory checksum. Detection needs an independent commitment that advances on append and survives loss of the journal: **icn#2786**. |
 | **icn#2739** | the verifier writes into the tree it inspects (sled has no read-only open; the N2-A gate writes into the audited tree) | **Caps claim strength**, does not falsify it. Blocks "verified a write-protected medium" and "two verifications observed the same bytes". |
 
 Note also: **CI invokes the weak `verify-backup` form, without `--verify-ledger`**
