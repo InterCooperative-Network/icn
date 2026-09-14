@@ -51,6 +51,11 @@ the stale layer.</strong></p>
 (github-api), not by this file.</strong> Re-resolve with <code>gh</code> before acting on any
 status here. Snapshot revision:
 <strong><code>82030804dc26003bf7e1d6e289166989108bcd63</code></strong>, taken 2026-09-13.</p>
+<p><strong>Post-snapshot addenda.</strong> A row that changed <em>because of the commit carrying
+it</em> is marked inline as a post-snapshot addendum rather than silently
+refreshed, so this file never reads as a single reproducible snapshot when it
+is really mixed. Re-taking the snapshot means re-verifying every row, which is
+a deliberate act and not a side effect of one row moving.</p>
 </blockquote>
 <hr>
 <h2 id="1-the-bounded-claim">1. The bounded claim</h2>
@@ -904,8 +909,8 @@ complete recovery proof.</p>
 </thead>
 <tbody><tr>
 <td><strong>icn#2746</strong></td>
-<td>a truncated ledger reopens via sled recovery and scans short <em>without error</em>, so <code>verify-backup --verify-ledger</code> reports a passing verification for an incomplete archive</td>
-<td><strong>Blocks completeness outright.</strong> Nothing records how many rows the archive should hold. Needs a backup-time extent record cross-checked at verify.</td>
+<td>a truncated ledger reopens via sled recovery and scans short <em>without error</em>, and nothing in the artifact distinguishes that from a ledger that always held that many</td>
+<td><strong>Still blocks completeness.</strong> <em>(Post-snapshot addendum — see the note under the snapshot revision above; the rest of this row&#39;s evidence predates it.)</em> At the snapshot revision the verifier still printed <code>BACKUP VERIFICATION PASSED</code> for a short ledger. <strong>icn#2787</strong> stops that overclaim — it reports <code>ledger completeness: unresolved</code> and fails closed instead of certifying — which removes a false positive without being detection. A backup-time extent record does <strong>not</strong> close this: if the damage precedes the backup the count records the already-reduced extent, and post-capture damage is already caught by the whole-directory checksum. Detection needs an independent commitment that advances on append and survives loss of the journal: <strong>icn#2786</strong>.</td>
 </tr>
 <tr>
 <td><strong>icn#2739</strong></td>

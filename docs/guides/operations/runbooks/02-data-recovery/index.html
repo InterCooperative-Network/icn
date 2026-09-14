@@ -88,6 +88,51 @@ intend to rely on, verify the ledger too:</strong></p>
 <p>This opens the restored ledger, runs the N2-A principal audit over the restored tree, and checks the
 double-entry invariant. It fails — rather than reporting PASSED — if the ledger is absent, if any
 journal row cannot be read, or if the invariant does not hold (icn#2717).</p>
+<blockquote>
+<p><strong>This command currently always exits non-zero, including for a healthy backup.</strong>
+It reports <code>⚠ BACKUP VERIFICATION UNRESOLVED</code> and
+<code>ledger completeness: unresolved</code>.</p>
+<p>That is deliberate and is not a signal that your backup is damaged. No backup
+carries an independent commitment to how many journal entries it should hold,
+so a ledger that silently lost entries before the backup was taken is
+indistinguishable from one that always held that many. The command reports
+what it can establish — every entry present is valid <em>under the checks this
+command runs</em>, which exclude amount signs, content hashes, signatures,
+provenance and parent existence — and refuses to certify
+completeness it cannot check (icn#2746). The mechanism that would make
+completeness checkable is icn#2786.</p>
+<p><strong>How to read the result while that is open:</strong></p>
+<table>
+<thead>
+<tr>
+<th>output</th>
+<th>meaning</th>
+<th>action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>✓ BACKUP VERIFICATION PASSED</code></td>
+<td>bare form only; ledger not inspected</td>
+<td>re-run with <code>--verify-ledger</code></td>
+</tr>
+<tr>
+<td><code>⚠ BACKUP VERIFICATION UNRESOLVED</code> + <code>entries observed: N</code> + <code>observed entries valid: yes</code></td>
+<td>every entry present passed the checks this command runs; completeness unknown, and signs/hashes/signatures/provenance are <strong>not</strong> among those checks</td>
+<td>proceed only if that narrower claim is enough for what you are relying on</td>
+</tr>
+<tr>
+<td><code>✗ BACKUP VERIFICATION FAILED</code></td>
+<td>something was actually established as wrong</td>
+<td>do not rely on this backup</td>
+</tr>
+<tr>
+<td>any other failure (absent ledger, unreadable row, imbalance)</td>
+<td>icn#2717 / icn#2736 refusals</td>
+<td>do not rely on this backup</td>
+</tr>
+</tbody></table>
+<p>Treat a non-zero exit as &quot;read the banner&quot;, not as &quot;the backup is bad&quot;.</p>
+</blockquote>
 <h3 id="step-3-preserve-current-data-optional">Step 3: Preserve Current Data (Optional)</h3>
 <p>If there&#39;s any chance current data is recoverable:</p>
 <pre><code class="language-bash"># Move current data aside
@@ -122,7 +167,9 @@ kubectl -n icn delete pod restore-pod
 <pre><code class="language-bash"># Check identity is accessible
 ICN_PASSPHRASE=&quot;your-passphrase&quot; icnctl --data-dir ~/.icn id show
 
-# Verify ledger integrity (if had transactions)
+# Verify ledger integrity (if had transactions).
+# Exits non-zero with `⚠ BACKUP VERIFICATION UNRESOLVED` even when healthy —
+# see the note in Step 2. Check the banner, not just the exit status.
 icnctl verify-backup /path/to/backup.tar --verify-ledger
 </code></pre>
 <blockquote>
