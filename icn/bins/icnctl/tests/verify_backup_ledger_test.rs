@@ -1623,14 +1623,22 @@ fn sleds_recovery_signal_is_destroyed_by_the_first_open() {
 ///
 /// The whole point of icn#2732 is to separate two facts, not to collapse them in
 /// the other direction. A database sled really did recover, which really has no
-/// journal rows, must still report `✓ Ledger empty` and still pass — otherwise
+/// journal rows, must still be READ and reported as `✓ Ledger empty` — otherwise
 /// the fix has simply moved the false conclusion.
 ///
+/// What changed with icn#2746: this case no longer *passes* the command, because
+/// its COMPLETENESS is unresolved for exactly the same reason a populated
+/// ledger's is — nothing commits to how many entries there should have been, and
+/// "zero entries" is as unprovable a total as any other. The recovery check
+/// still does not reject it, which is what this test is about; the claim above
+/// it narrowed. icn#2746's acceptance criterion "a genuinely empty readable
+/// ledger still verifies" is therefore superseded rather than met, and that is
+/// recorded on the issue rather than quietly reinterpreted here.
+///
 /// Complements `an_empty_ledger_does_not_claim_the_invariant_was_verified`, which
-/// pins the same case's summary wording; this one pins that the new recovery
-/// check does not reject it.
+/// pins the same case's summary wording.
 #[test]
-fn a_genuinely_empty_readable_ledger_still_verifies() {
+fn a_genuinely_empty_readable_ledger_is_read_and_reported_empty() {
     let dir = TempDir::new().unwrap();
     let data_dir = dir.path().join("data");
     let archive = dir.path().join("backup.tar");

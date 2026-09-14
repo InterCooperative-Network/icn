@@ -65,6 +65,29 @@ This opens the restored ledger, runs the N2-A principal audit over the restored 
 double-entry invariant. It fails — rather than reporting PASSED — if the ledger is absent, if any
 journal row cannot be read, or if the invariant does not hold (icn#2717).
 
+> **This command currently always exits non-zero, including for a healthy backup.**
+> It reports `⚠ BACKUP VERIFICATION UNRESOLVED` and
+> `ledger completeness: unresolved`.
+>
+> That is deliberate and is not a signal that your backup is damaged. No backup
+> carries an independent commitment to how many journal entries it should hold,
+> so a ledger that silently lost entries before the backup was taken is
+> indistinguishable from one that always held that many. The command reports
+> what it can establish — every entry present is valid — and refuses to certify
+> completeness it cannot check (icn#2746). The mechanism that would make
+> completeness checkable is icn#2786.
+>
+> **How to read the result while that is open:**
+>
+> | output | meaning | action |
+> |---|---|---|
+> | `✓ BACKUP VERIFICATION PASSED` | bare form only; ledger not inspected | re-run with `--verify-ledger` |
+> | `⚠ BACKUP VERIFICATION UNRESOLVED` + `entries observed: N` + `observed entries valid: yes` | every entry present is valid; completeness unknown | proceed, knowing completeness is unverified |
+> | `✗ BACKUP VERIFICATION FAILED` | something was actually established as wrong | do not rely on this backup |
+> | any other failure (absent ledger, unreadable row, imbalance) | icn#2717 / icn#2736 refusals | do not rely on this backup |
+>
+> Treat a non-zero exit as "read the banner", not as "the backup is bad".
+
 ### Step 3: Preserve Current Data (Optional)
 
 If there's any chance current data is recoverable:
@@ -110,7 +133,9 @@ kubectl -n icn delete pod restore-pod
 # Check identity is accessible
 ICN_PASSPHRASE="your-passphrase" icnctl --data-dir ~/.icn id show
 
-# Verify ledger integrity (if had transactions)
+# Verify ledger integrity (if had transactions).
+# Exits non-zero with `⚠ BACKUP VERIFICATION UNRESOLVED` even when healthy —
+# see the note in Step 2. Check the banner, not just the exit status.
 icnctl verify-backup /path/to/backup.tar --verify-ledger
 ```
 

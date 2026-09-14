@@ -7094,8 +7094,15 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         .as_ref()
         .map(|c| c.completeness)
         .unwrap_or(icn_governance::verify::VerificationStatus::NotApplicable);
-    let completeness_unproven =
-        verify_ledger && ledger_completeness != icn_governance::verify::VerificationStatus::Pass;
+    // Fail and Unresolved are DIFFERENT verdicts and must stay different.
+    // "we know entries are missing" and "we cannot tell whether any are" carry
+    // opposite operator actions, and collapsing them would report a known
+    // incomplete ledger as merely unproven the moment icn#2786 makes the
+    // extent commitment real.
+    let completeness_failed =
+        verify_ledger && ledger_completeness == icn_governance::verify::VerificationStatus::Fail;
+    let completeness_unproven = verify_ledger
+        && ledger_completeness == icn_governance::verify::VerificationStatus::Unresolved;
 
     if verify_ledger {
         // The structured result, so an operator can tell the three questions
@@ -7124,7 +7131,9 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
 
     println!();
     println!("═══════════════════════════════════════");
-    if completeness_unproven {
+    if completeness_failed {
+        println!("✗ BACKUP VERIFICATION FAILED");
+    } else if completeness_unproven {
         println!("⚠ BACKUP VERIFICATION UNRESOLVED");
     } else {
         println!("✓ BACKUP VERIFICATION PASSED");
@@ -7175,7 +7184,16 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         println!("progressive limits are append-time policy — evaluated against live");
         println!("ledger state and the current clock — so they are not properties of a");
         println!("backup at rest and are deliberately not checked here.");
-        if completeness_unproven {
+        if completeness_failed {
+            let (expected, observed) = ledger_check
+                .as_ref()
+                .map(|c| (c.expected_entries.unwrap_or(0), c.entries))
+                .unwrap_or((0, 0));
+            println!();
+            println!("Ledger completeness FAILED. This backup commits to {expected} journal");
+            println!("entries and {observed} were found: entries are missing. This is not the");
+            println!("absence of evidence — it is evidence of loss.");
+        } else if completeness_unproven {
             // The specific overclaim icn#2746 is about. "All N entries are
             // valid" is a statement about the entries that are HERE; it was
             // being read as a statement that N is all there ever were.
@@ -7192,6 +7210,21 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         println!("Re-run with --verify-ledger to check those before relying on this backup.");
     }
 
+    if completeness_failed {
+        let (expected, observed) = ledger_check
+            .as_ref()
+            .map(|c| (c.expected_entries.unwrap_or(0), c.entries))
+            .unwrap_or((0, 0));
+        bail!(
+            concat!(
+                "FAILED: this backup commits to {} journal entries and {} were ",
+                "found. Entries are missing; the backup is not complete."
+            ),
+            expected,
+            observed
+        );
+    }
+
     if completeness_unproven {
         // Fail closed. `--verify-ledger` is a verification that was ASKED FOR;
         // completeness is part of what an operator reads it as establishing, and
@@ -7200,7 +7233,14 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         // #2717 (requested-but-unperformable verification must not count toward
         // PASSED).
         bail!(
-            "UNRESOLVED: --verify-ledger established that the {} journal entries present              are valid, but could NOT establish that the journal is complete, because              this backup carries no independent commitment to its expected extent              (icn#2746). Nothing here is evidence of damage; it is the absence of              evidence of completeness, and it is reported rather than assumed away.",
+            concat!(
+                "UNRESOLVED: --verify-ledger established that the {} journal entries ",
+                "present are valid, but could NOT establish that the journal is ",
+                "complete, because this backup carries no independent commitment to ",
+                "its expected extent (icn#2746). Nothing here is evidence of damage; ",
+                "it is the absence of evidence of completeness, and it is reported ",
+                "rather than assumed away."
+            ),
             ledger_check.as_ref().map(|c| c.entries).unwrap_or(0)
         );
     }
