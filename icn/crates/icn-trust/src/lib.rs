@@ -857,6 +857,14 @@ impl TrustGraph {
         // "authoritative about an older graph".
         self.reachability.revoke_authority();
 
+        // Drop cached scores too. The cache is consulted BEFORE the filter, so a
+        // `0.0` an authoritative snapshot cached earlier would go on being served
+        // for the rest of its TTL even after this refresh learns the target is
+        // reachable — leaving the answer dependent on whether anyone happened to
+        // ask before the refresh. Refreshing the reachability picture without
+        // invalidating the answers derived from the old one is not a refresh.
+        self.cache.clear();
+
         // Get all DIDs reachable from our node within 2 hops
         let mut reachable = Vec::new();
 

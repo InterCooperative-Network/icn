@@ -394,3 +394,35 @@ fn authority_is_revoked_before_a_rebuild_re_enumerates() {
         "revocation must not discard contents"
     );
 }
+
+/// A refresh must invalidate the answers derived from the picture it replaces.
+///
+/// The score cache is consulted before the filter, so a `0.0` cached by an
+/// authoritative snapshot would outlive the rebuild that learns better — making
+/// the result depend on whether anyone happened to ask first.
+#[test]
+fn a_rebuild_invalidates_scores_cached_from_the_previous_picture() {
+    let dir = TempDir::new().unwrap();
+    let node = did();
+    let late = did();
+
+    let mut g = TrustGraph::new(open(&dir.path().join("trust")), node.clone());
+    g.add_edge(TrustEdge::new(node.clone(), did(), full()))
+        .unwrap();
+    g.rebuild_reachability_filter().unwrap();
+
+    // An authoritative snapshot rejects `late` and caches that 0.0.
+    assert_eq!(g.compute_trust_score(&late).unwrap(), 0.0);
+
+    // The graph then gains it, and the filter is refreshed.
+    g.add_edge(TrustEdge::new(node, late.clone(), full()))
+        .unwrap();
+    g.rebuild_reachability_filter().unwrap();
+
+    let score = g.compute_trust_score(&late).unwrap();
+    assert!(
+        score >= AUTHOR_TRUST_GATE,
+        "a stale cached rejection must not survive the refresh that supersedes \
+         it; got {score}"
+    );
+}
