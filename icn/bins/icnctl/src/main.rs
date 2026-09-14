@@ -7190,9 +7190,24 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
                 .map(|c| (c.expected_entries.unwrap_or(0), c.entries))
                 .unwrap_or((0, 0));
             println!();
+            // Say which direction the mismatch runs. "Missing" and "surplus"
+            // are different incidents — loss versus injected or duplicated
+            // rows — and send recovery and incident response different ways.
             println!("Ledger completeness FAILED. This backup commits to {expected} journal");
-            println!("entries and {observed} were found: entries are missing. This is not the");
-            println!("absence of evidence — it is evidence of loss.");
+            if observed < expected {
+                println!(
+                    "entries and {observed} were found: {} are MISSING. This is not the",
+                    expected - observed
+                );
+                println!("absence of evidence — it is evidence of loss.");
+            } else {
+                println!(
+                    "entries and {observed} were found: {} are SURPLUS. The journal holds",
+                    observed - expected
+                );
+                println!("entries the backup does not account for — treat as possible injected");
+                println!("or duplicated rows, not as loss.");
+            }
         } else if completeness_unproven {
             // The specific overclaim icn#2746 is about. "All N entries are
             // valid" is a statement about the entries that are HERE; it was
@@ -7218,7 +7233,10 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         bail!(
             concat!(
                 "FAILED: this backup commits to {} journal entries and {} were ",
-                "found. Entries are missing; the backup is not complete."
+                "found. The journal does not match the extent this backup ",
+                "committed to, so it is not the ledger that was backed up. A ",
+                "shortfall is loss; a surplus is unaccounted-for rows, which is ",
+                "a different incident — the summary above says which this is."
             ),
             expected,
             observed
