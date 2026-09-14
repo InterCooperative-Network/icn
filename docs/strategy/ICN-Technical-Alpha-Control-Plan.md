@@ -82,7 +82,7 @@ non-claim**. There is no "then somehow this works" edge.
 | 8 | to exact bounded resource-action commitment | `SemanticProposalCommitmentV1` | **SLICE — no owner issue** |
 | 9 | to signed Subject ballot(s) | `MemberVoteActionV1` + immutable ballot slot | **SLICE — no owner issue** |
 | 10 | to deterministic tally | `SubjectVoteSetHashV1` + tally | **SLICE — no owner issue** |
-| 11 | to `GovernanceDecisionReceiptV4` | V4 | **DOES NOT EXIST.** V1 emitted on every close path, V3 conditionally and additionally; the open question is the V1-only typed read surface (6.3) |
+| 11 | to `GovernanceDecisionReceiptV4` | V4 | **DOES NOT EXIST.** V1 construction *and persistence* are path-dependent — Rejected/NoQuorum construct none, non-executing and forced-accept closes persist none (matrix in 6.3). A1 must pin a close path that leaves durable receipt evidence. |
 | 12 | to canonical `decision_hash` | `compute_decision_hash_bytes` (`icn-governance/src/proof.rs:300`) | **EXISTS and exposes canonical bytes** |
 | 13 | to existing `AllocationReceipt` | `icn-kernel-api/src/receipts.rs:121` | EXISTS; canonical bytes **private** (6.2); unsigned in practice |
 | 14 | to existing `SettlementIntent` | `icn-kernel-api/src/economics.rs:80` | EXISTS; canonical bytes **private**; **no signature field** |
@@ -271,14 +271,16 @@ verify_offline_bundle(retained_bundle, externally_pinned_policy, externally_pinn
 
 | Slice | Scope | Owner |
 |---|---|---|
-| **A** owner canonical export surfaces | expose owner-controlled canonical bytes for `AllocationReceipt` / `SettlementIntent`; make the existing hash consume those same bytes | **needs an issue** |
+| **A** owner canonical export surfaces | expose owner-controlled canonical bytes for `AllocationReceipt` / `SettlementIntent` | **CONDITIONAL — do not schedule yet.** Needed only if A1 selects a cross-language/non-linking verifier or a raw-preimage requirement (6.2). A Rust-linked verifier recomputes through the public trait, and 5.4's SHA-256 over the exported payload already catches changes to excluded fields such as `memo`. |
 | **B** deterministic generic offline-bundle substrate | byte-stable bundle, digest manifest, no network | **needs an issue** |
 | **C** bounded A1 execution/journal evidence adapters | `ExecutionEvidenceSnapshotV1`, `JournalProvenanceWitnessV1` | **needs an issue** |
 | **D** `TechnicalAlphaA1PolicyV1` + composed proof | externally pinned policy, tamper-negative test | **needs an issue** |
 
 Slice A must **not** change the semantic hashes of those types merely to support
-export. The direction is: expose the bytes the owner already commits to, then make
-the existing hash consume them.
+export, and must not be scheduled at all until the A1 verifier model picks one of
+the two narrower requirements in 6.2. Together, the owner hash (recomputed through
+the public trait) and the exported-payload SHA-256 already cover both
+canonical-field tampering and tampering with fields the canonical hash excludes.
 
 ---
 
@@ -560,7 +562,7 @@ that prevents it from invalidating A1.
 | **#2746** truncated ledger certified complete | **MUST FIX for #2466** | Cannot be contained if recovery completeness is claimed. |
 | **#2739** verifier writes the audited tree | **CONTAIN** | Claim recovery verification over a mutable copy; do not claim read-only-medium verification. |
 | **#2778** backup reads a data root with no exclusion | **CONTAIN or FIX** | Take A1 backups only with the node stopped. |
-| **#2755** native `icnd` ignores runtime-root config | **CONTAIN** | A1 profile must not use the native service path. |
+| **#2755** native `icnd` ignores runtime-root config | **MUST FIX, or pin a unit** | The earlier entry excluded "the native service path", which is self-defeating: ADR-0086's appliance baseline *is* native systemd, and the two-node plan starts and restarts `icnd` under systemd in Gates 1, 2 and 5. Excluding it excludes the profile. The concrete defect is that `deploy/icnd.service` invokes `icnd --data-dir ROOT` without `--config ROOT/icn.toml`, so a provisioned runtime root has no effect. Containment therefore requires a **pinned unit or drop-in that passes the managed runtime-root configuration**, recorded as a profile artifact — otherwise this is a required fix. |
 | **#2747** `init-coop` emits an `icn.toml` `icnd` cannot load | **CONTAIN** | A1 uses `institution runtime-root`, not `init-coop`. |
 | **#2757** no trusted bootstrap authority for first gateway token | **CONTAIN** | Single-institution A1; trusted-local mint only; no generalized remote bootstrap. |
 | **#2772** node-authority migration across DID change | **EXCLUDE** | A1 does not rotate the node DID. |
@@ -634,7 +636,7 @@ waiting on a human.
 |---|---|---|
 | Deployment profile | BLOCKED | ADR-0086 exists and is merged but `status: proposed` / partially implemented — **adoption not decided**; two-node plan is `Canonical: no`. |
 | **#2694** semantic convergence | IDENTIFIED | 1 of 12 slices owned (#2695); none implemented; no artifact exists in code. |
-| **#2465** offline evidence | IDENTIFIED | spec only; 0 of 4 slices owned; blocked on 6.2 for any tamper-negative claim. |
+| **#2465** offline evidence | IDENTIFIED | spec only; 0 of 4 slices owned. Slice A is conditional, not a blocker (5.6). |
 | **#2466** recovery | IDENTIFIED | spec only; completeness blocked by #2746. |
 | Two-node witness | BLOCKED | Gate 4 and Gate 6 both blocked. |
 | NYCN lock bump | BLOCKED | requires a frozen SHA and a human signature. |
@@ -666,10 +668,9 @@ freeze SHA -> NYCN lock -> rehearsal/a11y -> bounded public claim
 
 ### Safely parallel right now
 
-- **#2465 slice A** (owner canonical export surfaces) — depends only on
-  `icn-kernel-api`, not on the ladder. It is also a *precondition* for any honest
-  tamper-negative claim, per 6.2.
-- **#2465 slice B** (bundle substrate) — generic and deterministic.
+- **#2465 slice B** (bundle substrate) — generic and deterministic, and the only
+  #2465 slice that is unconditionally ready. Slice A is **conditional** (5.6) and
+  should not be started until the verifier model requires it.
 - **#2466 completeness prerequisite** (#2746 extent record) — independent of #2694
   entirely.
 - **#2627** DID-spelling defect in legacy `compute_vote_hash` — must precede
