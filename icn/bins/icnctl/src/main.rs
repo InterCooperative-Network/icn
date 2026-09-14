@@ -7081,13 +7081,54 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         // empty` (#2732).
         assert_ledger_recovered_as_written(restore_dir)?;
         enforce_n2a_gate(restore_dir, "backup verification")?;
-        ledger_check = Some(verify_ledger_in_backup(restore_dir)?);
+        ledger_check = Some(verify_ledger_in_backup(restore_dir, &metadata)?);
     }
 
     // Temp directory auto-cleaned on drop
+    //
+    // The banner is decided by what was actually established, not by having
+    // reached the end of the function. When `--verify-ledger` was requested, the
+    // ledger's COMPLETENESS is a separate claim from its validity, and this
+    // command cannot establish it (icn#2746) — so it must not render as PASSED.
+    let ledger_completeness = ledger_check
+        .as_ref()
+        .map(|c| c.completeness)
+        .unwrap_or(icn_governance::verify::VerificationStatus::NotApplicable);
+    let completeness_unproven =
+        verify_ledger && ledger_completeness != icn_governance::verify::VerificationStatus::Pass;
+
+    if verify_ledger {
+        // The structured result, so an operator can tell the three questions
+        // apart instead of inferring them from one banner.
+        let observed = ledger_check.as_ref().map(|c| c.entries).unwrap_or(0);
+        println!();
+        println!("Ledger result:");
+        println!("  entries observed:         {observed}");
+        println!("  observed entries valid:   yes");
+        println!(
+            "  expected extent available: {}",
+            match ledger_check.as_ref().and_then(|c| c.expected_entries) {
+                Some(n) => format!("yes ({n})"),
+                None => "no".to_string(),
+            }
+        );
+        println!(
+            "  ledger completeness:      {}",
+            match ledger_completeness {
+                icn_governance::verify::VerificationStatus::Pass => "verified",
+                icn_governance::verify::VerificationStatus::Fail => "failed",
+                _ => "unresolved",
+            }
+        );
+    }
+
     println!();
     println!("═══════════════════════════════════════");
-    println!("✓ BACKUP VERIFICATION PASSED");
+    if completeness_unproven {
+        println!("⚠ BACKUP VERIFICATION UNRESOLVED");
+    } else {
+        println!("✓ BACKUP VERIFICATION PASSED");
+    }
     println!("═══════════════════════════════════════");
     println!();
     // Say what was verified, not more. Without `--verify-ledger` this command
@@ -7134,10 +7175,34 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         println!("progressive limits are append-time policy — evaluated against live");
         println!("ledger state and the current clock — so they are not properties of a");
         println!("backup at rest and are deliberately not checked here.");
+        if completeness_unproven {
+            // The specific overclaim icn#2746 is about. "All N entries are
+            // valid" is a statement about the entries that are HERE; it was
+            // being read as a statement that N is all there ever were.
+            println!();
+            println!("Ledger completeness was NOT verified. This backup carries no");
+            println!("independent commitment to the expected journal extent, so a ledger");
+            println!("that silently lost entries before the backup was taken is");
+            println!("indistinguishable from one that always held this many. The count");
+            println!("above describes what is present, not that nothing is missing.");
+        }
     } else {
         println!("Verified: archive integrity, checksum, and required files.");
         println!("NOT verified: ledger contents and the N2-A principal audit.");
         println!("Re-run with --verify-ledger to check those before relying on this backup.");
+    }
+
+    if completeness_unproven {
+        // Fail closed. `--verify-ledger` is a verification that was ASKED FOR;
+        // completeness is part of what an operator reads it as establishing, and
+        // it could not be established. Exiting 0 here renders uncertainty as
+        // success, which is the same overclaim this command was corrected for in
+        // #2717 (requested-but-unperformable verification must not count toward
+        // PASSED).
+        bail!(
+            "UNRESOLVED: --verify-ledger established that the {} journal entries present              are valid, but could NOT establish that the journal is complete, because              this backup carries no independent commitment to its expected extent              (icn#2746). Nothing here is evidence of damage; it is the absence of              evidence of completeness, and it is reported rather than assumed away.",
+            ledger_check.as_ref().map(|c| c.entries).unwrap_or(0)
+        );
     }
 
     Ok(())
@@ -7488,10 +7553,52 @@ fn sanitize_diagnostic(line: &str) -> String {
 struct LedgerCheck {
     entries: usize,
     currencies_balanced: usize,
+    /// The extent this backup committed to when it was written, if any.
+    ///
+    /// Always `None` today: no such commitment exists. See
+    /// [`expected_ledger_extent`].
+    expected_entries: Option<usize>,
+    /// Whether this backup's journal is *complete*, as distinct from whether
+    /// the entries it still holds are valid. Reuses `icn-governance`'s
+    /// verification vocabulary so "could not decide" cannot render as a pass.
+    completeness: icn_governance::verify::VerificationStatus,
+}
+
+/// The expected journal extent committed by this backup, if it carries one.
+///
+/// Always `None`, because nothing commits one yet — and that is the finding, not
+/// an oversight (icn#2746).
+///
+/// A ledger `db` truncated to a partial length reopens cleanly: sled recovers
+/// the surviving prefix and returns fewer rows with no error. Nothing in the
+/// artifact distinguishes "this ledger has always held N entries" from "this
+/// ledger held more and silently recovered to N":
+///
+/// * `was_recovered()` is true for healthy recovery too, so it does not
+///   discriminate (and icn#2745 already spends it on the replaced-database case);
+/// * a full scan completes successfully, just short;
+/// * there is no reference length to compare the `db` file against;
+/// * the archive checksum is computed over the data directory *at backup time*,
+///   so a ledger already damaged when the backup was taken checksums
+///   consistently.
+///
+/// Counting rows at backup time does not close this either. If the damage
+/// precedes the backup, the count records the already-reduced extent and later
+/// compares equal to itself. It would only detect damage occurring *after*
+/// capture — and that case is already caught, by the whole-directory checksum
+/// this command recomputes in step [3/4].
+///
+/// Detection therefore requires a commitment that advances when a journal append
+/// succeeds and survives loss of the journal itself, so that losing the data
+/// cannot also erase the evidence the data existed. That owner does not exist
+/// yet; until it does, completeness is `Unresolved` and this command says so
+/// rather than certifying it.
+fn expected_ledger_extent(_metadata: &BackupMetadata) -> Option<usize> {
+    None
 }
 
 /// Verify ledger integrity in a restored backup directory.
-fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
+fn verify_ledger_in_backup(restore_dir: &Path, metadata: &BackupMetadata) -> Result<LedgerCheck> {
     use icn_store::{SledStore, Store};
 
     // `backup` archives the data directory at archive root
@@ -7661,9 +7768,25 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
         );
     }
 
+    // Validity and completeness are different claims. Everything above decides
+    // whether the entries that are HERE are valid; none of it can decide whether
+    // any are MISSING. Keep them separate so the second cannot be read off the
+    // first (icn#2746).
+    use icn_governance::verify::VerificationStatus;
+    let expected_entries = expected_ledger_extent(metadata);
+    let completeness = match expected_entries {
+        // No commitment exists to compare against. Fail closed to Unresolved:
+        // "could not decide" must never render as "verified".
+        None => VerificationStatus::Unresolved,
+        Some(expected) if expected == entry_count => VerificationStatus::Pass,
+        Some(_) => VerificationStatus::Fail,
+    };
+
     Ok(LedgerCheck {
         entries: entry_count,
         currencies_balanced: currencies_seen.len(),
+        expected_entries,
+        completeness,
     })
 }
 

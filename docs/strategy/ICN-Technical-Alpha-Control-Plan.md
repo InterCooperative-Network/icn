@@ -604,7 +604,7 @@ complete recovery proof.
 
 | Issue | Defect | Effect on recovery claims |
 |---|---|---|
-| **icn#2746** | a truncated ledger reopens via sled recovery and scans short *without error*, so `verify-backup --verify-ledger` reports a passing verification for an incomplete archive | **Blocks completeness outright.** Nothing records how many rows the archive should hold. Needs a backup-time extent record cross-checked at verify. |
+| **icn#2746** | a truncated ledger reopens via sled recovery and scans short *without error*, and nothing in the artifact distinguishes that from a ledger that always held that many | **Still blocks completeness.** The verifier no longer *overclaims*: it reports `ledger completeness: unresolved` and fails closed instead of certifying. That removed a false positive; it is not detection. A backup-time extent record does **not** close this — if the damage precedes the backup the count records the already-reduced extent, and post-capture damage is already caught by the whole-directory checksum. Detection needs an independent commitment that advances on append and survives loss of the journal: **icn#2786**. |
 | **icn#2739** | the verifier writes into the tree it inspects (sled has no read-only open; the N2-A gate writes into the audited tree) | **Caps claim strength**, does not falsify it. Blocks "verified a write-protected medium" and "two verifications observed the same bytes". |
 
 Note also: **CI invokes the weak `verify-backup` form, without `--verify-ledger`**
