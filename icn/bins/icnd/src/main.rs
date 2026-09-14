@@ -379,7 +379,8 @@ async fn build_services(
 /// Creates:
 /// 1. Data directory structure
 /// 2. Age-encrypted keystore with a new Ed25519 identity
-/// 3. `config.toml` with sane defaults for the node
+/// 3. `icn.toml` with sane defaults for the node (the canonical native
+///    configuration path; see `icn_core::config::config_file_path`)
 /// 4. `genesis.json` sealing the initial network identity and seed peers
 ///
 /// Uses `ICN_KEYSTORE_PASSPHRASE` env var or prompts interactively.
@@ -393,7 +394,11 @@ fn handle_init(args: &Args) -> Result<()> {
         .with_context(|| format!("Failed to create data directory: {}", data_dir.display()))?;
 
     let keystore_path = data_dir.join("identity.age");
-    let config_path = data_dir.join("config.toml");
+    // The canonical native configuration path, owned by `icn-core` rather than
+    // re-derived here. `icnd --init` previously wrote `config.toml`, which
+    // startup never loads — so the file this command created was not the file
+    // the daemon read (icn#2755).
+    let config_path = icn_core::config::config_file_path(&data_dir);
 
     // Check if already initialized
     if keystore_path.exists() {

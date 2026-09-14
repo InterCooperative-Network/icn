@@ -12,11 +12,33 @@ Group=icn
 # Working directory
 WorkingDirectory=/var/lib/icn
 
+# File-creation mask.
+#
+# PINNED, and load-bearing for the Alpha profile. `.mode(0o600)` is a REQUEST:
+# the kernel applies `mode & ~umask`, so an inherited umask with owner bits set
+# (0o377, say) turns a 0600 request into mode 000 — an unusable lock anchor or
+# runtime-root file. `icn-core`'s data-directory lock and the institution
+# runtime-root ceremony both create files that way.
+#
+# 0077 clears group and other while leaving owner rw intact, so 0600 survives
+# exactly (`0o600 & ~0o077 == 0o600`) and anything laxer is tightened to
+# owner-only rather than loosened. systemd sets this before ExecStart, so it
+# covers every file the daemon creates regardless of the invoking shell.
+UMask=0077
+
 # Environment
 EnvironmentFile=-/etc/icn/icnd.env
 
 # Command - passphrase must be provided via environment or file
+# --config is LOAD-BEARING. Without it `icnd` builds `Config::default()`, whose
+# `cooperative.treasury_did` is None, and the ledger silently falls back to the
+# NODE DID for budget payouts — so a provisioned institutional runtime root had
+# no effect on the daemon an operator actually runs (icn#2755). The path is the
+# canonical native configuration location owned by
+# `icn_core::config::config_file_path`, and it is exactly what `icnctl
+# institution runtime-root create` publishes and `icnd --init` writes.
 ExecStart=/usr/local/bin/icnd \
+    --config /var/lib/icn/icn.toml \
     --data-dir /var/lib/icn \
     --gateway-enable \
     --gateway-bind 127.0.0.1:8080

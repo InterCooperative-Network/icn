@@ -10160,14 +10160,14 @@ async fn handle_steward_command(
             println!("======================\n");
 
             // Read config to check if steward is enabled
-            let config_path = data_dir.join("config.toml");
+            let config_path = icn_core::config::config_file_path(data_dir);
             if config_path.exists() {
                 let config_content = std::fs::read_to_string(&config_path)?;
                 if config_content.contains("steward") && config_content.contains("enabled = true") {
                     println!("Status:     ENABLED");
                 } else {
                     println!("Status:     DISABLED");
-                    println!("\nTo enable steward mode, add to config.toml:");
+                    println!("\nTo enable steward mode, add to icn.toml:");
                     println!("  [steward]");
                     println!("  enabled = true");
                     println!("  vui_threshold = 3");
@@ -10175,7 +10175,7 @@ async fn handle_steward_command(
                     return Ok(());
                 }
             } else {
-                println!("Status:     DISABLED (no config.toml found)");
+                println!("Status:     DISABLED (no icn.toml found)");
                 return Ok(());
             }
 
@@ -10209,9 +10209,9 @@ async fn handle_steward_command(
             println!("=====================\n");
 
             // Read config
-            let config_path = data_dir.join("config.toml");
+            let config_path = icn_core::config::config_file_path(data_dir);
             if !config_path.exists() {
-                println!("No config.toml found at {}", config_path.display());
+                println!("No icn.toml found at {}", config_path.display());
                 println!("\nDefault steward configuration:");
                 print_default_steward_config();
                 return Ok(());
@@ -10257,12 +10257,12 @@ async fn handle_steward_command(
                         token_validity / 86400
                     );
                 } else {
-                    println!("No [steward] section in config.toml");
+                    println!("No [steward] section in icn.toml");
                     println!("\nDefault configuration:");
                     print_default_steward_config();
                 }
             } else {
-                println!("No [steward] section in config.toml");
+                println!("No [steward] section in icn.toml");
                 println!("\nDefault configuration:");
                 print_default_steward_config();
             }
@@ -10589,7 +10589,7 @@ async fn handle_steward_command(
             // Note: In a full implementation, this would query the steward network
             // For now, we just validate the input and print a placeholder
             println!("\n⚠️  VUI registry check requires running steward daemon.");
-            println!("   Start daemon with steward enabled in config.toml");
+            println!("   Start daemon with steward enabled in icn.toml");
         }
 
         StewardCommands::StartEnrollment {
@@ -13285,7 +13285,7 @@ async fn handle_preflight_command(
 
     // Check 3: Config file (optional)
     check_count += 1;
-    let config_path = data_dir.join("config.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     print!("  [{}] Config file... ", if skip_keystore { 2 } else { 4 });
     if config_path.exists() {
         // Try to parse it

@@ -202,6 +202,34 @@ pub fn ledger_store_path(data_dir: &Path) -> PathBuf {
     store_path(data_dir).join("ledger")
 }
 
+/// The canonical native daemon configuration file inside a data directory.
+///
+/// One name, owned here, because this path had four spellings and no owner
+/// (icn#2755): nothing at all (`icnd` with no `--config` silently builds
+/// `Config::default()`), `<data_dir>/icn.toml` published by `icnctl institution
+/// runtime-root create`, `<data_dir>/config.toml` written by `icnd --init` and
+/// read by `icnctl steward`, and `/etc/icn/icn.toml` in archived and Kubernetes
+/// material.
+///
+/// `icn.toml` wins on ownership evidence, not convention:
+///
+/// * the runtime-root ceremony already publishes exactly here, and `icnd` takes
+///   its configuration lock on *the directory holding the configuration file*
+///   precisely so that ceremony and daemon coordinate on these bytes;
+/// * that lock is created inside the same directory, so a root-owned
+///   `/etc/icn/` would be refused outright under `User=icn` — the conventional
+///   split cannot be adopted without also making `/etc/icn` daemon-writable,
+///   which defeats its purpose;
+/// * secrets keep their own custody at `/etc/icn/icnd.env`, consumed by
+///   `EnvironmentFile=`, and mutable state stays under the data directory.
+///
+/// `<data_dir>/config.toml` is **deprecated** as a native configuration
+/// location. It was never loaded at daemon startup — only `--config` is — so a
+/// treasury provisioned into it could never have reached the running node.
+pub fn config_file_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("icn.toml")
+}
+
 impl Config {
     /// Load configuration from a TOML file
     pub fn from_file(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
