@@ -1,0 +1,1407 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Navigable reconstruction of the Technical Alpha program: bounded claim, proof chain with every arrow resolved, dependency DAG, containment ledger, owner seams. A projection, not a truth owner — live status is owned by live_issue_state."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Organizational Technical Alpha — Control Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN Technical Alpha Control Plan</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-09-13</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-organizational-technical-alpha--control-plan">ICN Organizational Technical Alpha — Control Plan</h1>
+<blockquote>
+<p><strong>What this document is.</strong> One navigable reconstruction of the entire
+Organizational Technical Alpha program: the bounded claim, the proof chain, the
+dependency graph, the containment ledger, and the owner boundaries. It exists so
+that a maintainer who has never seen a planning conversation can reconstruct the
+program from the repository alone.</p>
+<p><strong>What this document is not.</strong> It is <strong>not</strong> a truth owner. It owns no domain
+fact. Every status below is a <em>snapshot</em> taken at one revision, and
+<code>ops/state/truth/sources.json</code> routes each underlying fact to its real owner.
+Where this document and an owner disagree, <strong>the owner wins and this document is
+the stale layer.</strong></p>
+<p><strong>Live state is owned by <code>live_issue_state</code> / <code>live_pr_state</code> / <code>live_ci_state</code>
+(github-api), not by this file.</strong> Re-resolve with <code>gh</code> before acting on any
+status here. Snapshot revision:
+<strong><code>82030804dc26003bf7e1d6e289166989108bcd63</code></strong>, taken 2026-09-13.</p>
+</blockquote>
+<hr>
+<h2 id="1-the-bounded-claim">1. The bounded claim</h2>
+<p>The Technical Alpha is <strong>not</strong> &quot;make ICN production ready.&quot; It is one bounded,
+independently witnessed proof at one exact reviewed revision and profile.</p>
+<p>The strongest intended eventual claim, in full:</p>
+<blockquote>
+<p>On one exact reviewed ICN Alpha profile, a fresh context-scoped human Subject
+used a separately keyed, explicitly delegated device Principal to act as a
+recognized member of an institution; that standing authorized participation in a
+frozen governance process over one exact bounded resource action; the resulting
+decision was cryptographically committed to a canonical decision hash; existing
+ICN economic and execution machinery carried that same hash through the bounded
+resource action and retained provenance; an independent Node B verified the
+retained evidence offline while Node A was unreachable; and the verifier/recovery
+node subsequently survived the separately specified encrypted destroy/restore
+proof.</p>
+</blockquote>
+<p>Anything stronger is <strong>not</strong> part of A1 unless added through reviewed owner work.</p>
+<p>The program&#39;s own exit criteria are owned by <strong>icn#2689 section 10</strong> — seventeen
+checkboxes, <strong>all unchecked</strong> at this snapshot. They are not duplicated here.</p>
+<h3 id="standing-non-claims">Standing non-claims</h3>
+<p>A1 does <strong>not</strong> claim any of:</p>
+<ul>
+<li>production readiness, availability, or operational maturity;</li>
+<li>federation, multi-institution operation, or cross-institution identity;</li>
+<li>that a contained defect is fixed;</li>
+<li>hot or live backup;</li>
+<li>generalized N3/N4/N5 protocol completeness;</li>
+<li>that any downstream repository lock is human-signed;</li>
+<li>that an HTTP fetch from Node A constitutes independent verification;</li>
+<li>native cryptographic binding between a governance decision and a ledger entry
+(see 6.4 — this specifically does not exist today).</li>
+</ul>
+<hr>
+<h2 id="2-proof-chain-with-every-arrow-resolved">2. Proof chain, with every arrow resolved</h2>
+<p>Each arrow resolves to exactly one of: an <strong>existing reviewed owner primitive</strong>, a
+<strong>bounded implementation slice</strong>, an <strong>explicit containment</strong>, or an <strong>explicit
+non-claim</strong>. There is no &quot;then somehow this works&quot; edge.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Link</th>
+<th>Resolves to</th>
+<th>State at snapshot</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>substrate to reproducible node/profile</td>
+<td>appliance image + manifest; <code>icnctl appliance verify-manifest</code></td>
+<td>EXISTS; ADR-0086 merged (PR #2458) but <code>status: proposed</code> — reaching <strong><code>status: accepted</code></strong> (ADR-0018&#39;s lifecycle) is a separate decision, and <code>implementation_status</code> is a separate axis again</td>
+</tr>
+<tr>
+<td>2</td>
+<td>to two-node communication</td>
+<td>isolated QEMU topology in the two-node plan</td>
+<td>EXISTS (plan, <code>Canonical: no</code>)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>to institution package/domain</td>
+<td><code>InstitutionBootstrapManifest</code> (<code>icn-governance/src/bootstrap.rs:14</code>); <code>icnctl institution runtime-root</code></td>
+<td>EXISTS but <strong>disclaims canonical institution genesis</strong> (6.6)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>to fresh current-semantic human Subject</td>
+<td><code>SubjectContextGenesisV1</code></td>
+<td><strong>SLICE — icn#2695</strong> (design-reviewed, unimplemented)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>to separately keyed delegated device Principal</td>
+<td><code>DeviceGrant</code> (<code>icn-identity/src/authority_log/derive.rs:25</code>)</td>
+<td>PRIMITIVE EXISTS; unreferenced outside <code>icn-identity</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>to explicit institutional recognition</td>
+<td><code>SubjectRecognitionV1</code></td>
+<td><strong>SLICE — no owner issue</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td>to frozen governance process</td>
+<td><code>VotingProcessSnapshotV1</code></td>
+<td><strong>SLICE — no owner issue</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td>to exact bounded resource-action commitment</td>
+<td><code>SemanticProposalCommitmentV1</code></td>
+<td><strong>SLICE — no owner issue</strong></td>
+</tr>
+<tr>
+<td>9</td>
+<td>to signed Subject ballot(s)</td>
+<td><code>MemberVoteActionV1</code> + immutable ballot slot</td>
+<td><strong>SLICE — no owner issue</strong></td>
+</tr>
+<tr>
+<td>10</td>
+<td>to deterministic tally</td>
+<td><code>SubjectVoteSetHashV1</code> + tally</td>
+<td><strong>SLICE — no owner issue</strong></td>
+</tr>
+<tr>
+<td>11</td>
+<td>to <code>GovernanceDecisionReceiptV4</code></td>
+<td>V4</td>
+<td><strong>DOES NOT EXIST.</strong> V1 evidence is path-dependent across five separable surfaces — Rejected/NoQuorum construct no <em>gate</em> or <em>chain-store</em> V1 but do produce a signed V1 inside durable <code>proof_bytes</code> when a signing key is configured; non-executing and forced-accept closes persist no chain-store V1 (matrix in 6.3). A1 must pin a close path on <strong>two axes</strong>: decision-hash-addressable and proposal-id-addressable evidence are different things.</td>
+</tr>
+<tr>
+<td>12</td>
+<td>to canonical <code>decision_hash</code></td>
+<td><code>compute_decision_hash_bytes</code> (<code>icn-governance/src/proof.rs:300</code>)</td>
+<td><strong>EXISTS and exposes canonical bytes</strong></td>
+</tr>
+<tr>
+<td>13</td>
+<td>to existing <code>AllocationReceipt</code></td>
+<td><code>icn-kernel-api/src/receipts.rs:121</code></td>
+<td>EXISTS; canonical bytes <strong>private</strong> (6.2); unsigned in practice</td>
+</tr>
+<tr>
+<td>14</td>
+<td>to existing <code>SettlementIntent</code></td>
+<td><code>icn-kernel-api/src/economics.rs:80</code></td>
+<td>EXISTS; canonical bytes <strong>private</strong>; <strong>no signature field</strong></td>
+</tr>
+<tr>
+<td>15</td>
+<td>to execution</td>
+<td><code>ExecutionRecord</code> (<code>execution.rs:78</code>)</td>
+<td>EXISTS; <strong>mutable operational state</strong>, not a canonical receipt</td>
+</tr>
+<tr>
+<td>16</td>
+<td>to ledger/provenance evidence</td>
+<td><code>JournalEntry</code> + <code>ProvenanceRef</code></td>
+<td>EXISTS; <strong>provenance is not in the hash and not signed</strong> (6.4)</td>
+</tr>
+<tr>
+<td>17</td>
+<td>to self-contained offline evidence</td>
+<td>offline bundle contract</td>
+<td><strong>SLICE — icn#2465</strong> (spec only, no implementation)</td>
+</tr>
+<tr>
+<td>18</td>
+<td>to Node A unreachable</td>
+<td>two-node plan Gate 4 step 5 is literally &quot;Disconnect Node A&quot; — <strong>isolation, not a service or VM stop</strong></td>
+<td><strong>Gate 4 BLOCKED</strong></td>
+</tr>
+<tr>
+<td>19</td>
+<td>to Node B independently verifies</td>
+<td>reviewed offline verifier</td>
+<td><strong>SLICE — icn#2465</strong></td>
+</tr>
+<tr>
+<td>20</td>
+<td>to encrypted destroy/restore continuity</td>
+<td>recovery bundle</td>
+<td><strong>SLICE — icn#2466</strong>; Gate 6 BLOCKED</td>
+</tr>
+<tr>
+<td>21</td>
+<td>to same evidence still independently verifiable</td>
+<td>re-run of 19 post-restore</td>
+<td>depends on 19 + 20</td>
+</tr>
+</tbody></table>
+<p><strong>Eleven of twenty-one links are unbuilt.</strong> Links 11, 13, 14 and 16 carry concrete
+owner problems documented in section 6, not merely missing code.</p>
+<hr>
+<h2 id="3-dependency-dag">3. Dependency DAG</h2>
+<pre><code class="language-text">            SAFETY / CORRECTNESS FRONTIER
+                       |
+                       v
+            EXACT ALPHA DEPLOYMENT PROFILE
+                       |
+        +--------------+--------------+
+        v              v              v
+    icn#2694       icn#2465       icn#2466
+    semantic       offline        recovery
+    convergence    evidence       proof
+        |              |              |
+        |              |              |
+        +--------------+--------------+
+                       v
+              TWO-NODE A1 WITNESS
+                       v
+             FREEZE EXACT SHA/PROFILE
+                       v
+                 NYCN LOCK BUMP
+                       v
+            HUMAN REHEARSAL / A11Y
+                       v
+             BOUNDED PUBLIC CLAIM
+</code></pre>
+<p>This diagram is <strong>reconciled, not immutable</strong>. Two edges are sharper than the
+ASCII suggests:</p>
+<ul>
+<li><strong>#2465 depends on #2694</strong> for its <em>subject matter</em> (there is no decision
+receipt to export until the ladder produces one), but its <strong>substrate work
+(slice B) does not</strong> — that can start immediately. Slice A is <strong>conditional</strong>
+and gates nothing until the verifier model selects a cross-language or
+raw-preimage requirement (5.6, 6.2).</li>
+<li><strong>#2466 is independent of #2694 entirely.</strong> It is a sovereignty proof about node
+state, not about semantics.</li>
+</ul>
+<hr>
+<h2 id="4-icn2694--semantic-convergence-ladder">4. icn#2694 — semantic convergence ladder</h2>
+<p>The missing proof is <strong>generation convergence</strong>, not invention of another economic
+system. The target path, in the issue&#39;s own vocabulary:</p>
+<pre><code class="language-text">context-bound N1 Subject genesis -&gt; N1 device authorization
+  -&gt; institutional Subject recognition -&gt; context-scoped session
+  -&gt; immutable voting-process snapshot -&gt; preview
+  -&gt; device-signed member vote action -&gt; immutable Subject ballot
+  -&gt; Subject tally -&gt; GovernanceDecisionReceiptV4 -&gt; canonical decision_hash
+  -&gt; existing AllocationReceipt -&gt; existing SettlementIntent
+  -&gt; existing ExecutionRecord -&gt; existing journal/provenance
+  -&gt; offline evidence bundle
+</code></pre>
+<p>#2694 states that each numbered item becomes a bounded child issue <strong>only when its
+direct owner contracts have been reverified and implementation is authorized</strong>.
+That gate has fired exactly once.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Slice</th>
+<th>Owner issue</th>
+<th>Upstream contract owner</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>GEN-A context binding + <code>SubjectContextGenesisV1</code></td>
+<td><strong>icn#2695</strong></td>
+<td>#2602 GEN</td>
+<td>OPEN, <code>status:needs-design</code>, design-reviewed, <strong>unimplemented</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>N1-D restart-durable <code>AuthorityFactStore</code></td>
+<td><strong>none</strong></td>
+<td>#2607</td>
+<td>named by #2695 as the next child</td>
+</tr>
+<tr>
+<td>3</td>
+<td>GEN-B <code>SubjectRecognitionV1</code></td>
+<td><strong>none</strong></td>
+<td>#2602 GEN</td>
+<td>unowned</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>HumanActorModel</code> / legacy-rail firewall</td>
+<td><strong>none</strong></td>
+<td>—</td>
+<td>unowned; appears in <strong>no other issue</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>N4-alpha relying-party prefix evaluation</td>
+<td><strong>none</strong></td>
+<td>#2599 N4</td>
+<td>unowned</td>
+</tr>
+<tr>
+<td>6</td>
+<td>G1-A commitment + frozen <code>VotingProcessSnapshotV1</code></td>
+<td><strong>none</strong></td>
+<td>#2600 G1</td>
+<td>unowned</td>
+</tr>
+<tr>
+<td>7</td>
+<td>context-aware session rail</td>
+<td><strong>none</strong></td>
+<td>—</td>
+<td>unowned; no artifact name</td>
+</tr>
+<tr>
+<td>8</td>
+<td>N5-A <code>MemberVoteActionV1</code> + ballot slot</td>
+<td><strong>none</strong></td>
+<td>#2605 N5</td>
+<td>unowned</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Subject vote-set hash + deterministic tally</td>
+<td><strong>none</strong></td>
+<td>—</td>
+<td>unowned</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>GovernanceDecisionReceiptV4</code></td>
+<td><strong>none</strong></td>
+<td>—</td>
+<td>unowned; see 6.3</td>
+</tr>
+<tr>
+<td>11</td>
+<td>V4 <code>decision_hash</code> through the economic chain</td>
+<td><strong>none</strong></td>
+<td>#2625 identifier domain</td>
+<td>unowned</td>
+</tr>
+<tr>
+<td>12</td>
+<td>offline evidence convergence</td>
+<td>partially <strong>#2465</strong> / <strong>#2466</strong></td>
+<td>—</td>
+<td>composition step itself unowned</td>
+</tr>
+</tbody></table>
+<p><strong>None of the twelve artifact names exists in <code>icn/crates</code> or <code>icn/apps</code> at this
+revision.</strong> No PR references #2694 or #2695.</p>
+<hr>
+<h2 id="5-icn2465--offline-evidence-architecture">5. icn#2465 — offline evidence architecture</h2>
+<h3 id="51-architecture">5.1 Architecture</h3>
+<pre><code class="language-text">bundle transport / exact bytes
+            |
+            v
+existing owner artifact verification
+            |
+            v
+cross-artifact binding verification
+            |
+            v
+externally pinned A1 policy
+            |
+            v
+        composed verdict
+</code></pre>
+<p><strong>Do not invent a parallel evidence ontology.</strong> The repository already owns the
+verdict vocabulary: <code>VerificationStatus</code> at
+<code>icn/crates/icn-governance/src/verify.rs:46</code> — <code>Pass</code> / <code>Fail</code> / <code>Unresolved</code> /
+<code>NotApplicable</code>, fail-closed, with fold severity
+<code>Fail &gt; Unresolved &gt; Pass &gt; NotApplicable</code>. Normative spec:
+<code>docs/spec/receipt-chain-verification.md</code> (<code>status: draft</code>). Reuse it; do not mint
+a second verdict set.</p>
+<p>Keep distinct: <strong>integrity</strong>, <strong>authenticity</strong>, <strong>authorization</strong>, <strong>legitimacy</strong>.
+<code>verify.rs</code> is explicit that a Pass means integrity — and authenticity when keyed
+— and <strong>never</strong> authorization or legitimacy.</p>
+<h3 id="52-two-hard-criteria-verbatim-do-not-weaken">5.2 Two hard criteria (verbatim, do not weaken)</h3>
+<blockquote>
+<ul>
+<li><input disabled="" type="checkbox"> The bundle exports no DIDs or credentials beyond the producer identity the
+contract explicitly requires.</li>
+</ul>
+</blockquote>
+<blockquote>
+<ul>
+<li><input disabled="" type="checkbox"> Verification never falls back to contacting the producer — a network call
+in the verify path is a defect, not a convenience.</li>
+</ul>
+</blockquote>
+<p>Neither admits tiering. Missing required evidence yields <code>Unresolved</code> or failure —
+<strong>never</strong> a network lookup. No gateway URL, no producer callback, no remote DID
+resolver, no HTTP client anywhere in the verify path.</p>
+<p>If the chosen A1 economic action cannot satisfy the privacy criterion, that is a
+concrete owner/integration problem to surface — <strong>not</strong> a licence to redact a
+security-critical owner-canonical field and still call it independently verifiable.</p>
+<h3 id="53-evidence-strength--additive-planning-vocabulary">5.3 Evidence strength — additive planning vocabulary</h3>
+<p>This taxonomy <strong>does not exist in the repository</strong>. It is proposed here, not
+established.</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Meaning</th>
+<th>Expected members</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>OwnerCanonical</code></td>
+<td>owner computes and owns the canonical identity</td>
+<td><code>GovernanceDecisionReceiptV4</code>, <code>AllocationReceipt</code>, <code>SettlementIntent</code></td>
+</tr>
+<tr>
+<td><code>OwnerAuthenticated</code></td>
+<td>owner-canonical <strong>and</strong> signed by a named key</td>
+<td>none today — see 6.2</td>
+</tr>
+<tr>
+<td><code>ProducerAttestedSnapshot</code></td>
+<td>producer asserts it exported this view</td>
+<td><code>ExecutionEvidenceSnapshotV1</code>, <code>JournalProvenanceWitnessV1</code></td>
+</tr>
+</tbody></table>
+<p>It must not be used to soften 5.2.</p>
+<h3 id="54-two-digest-meanings--never-collapse">5.4 Two digest meanings — never collapse</h3>
+<table>
+<thead>
+<tr>
+<th>Meaning</th>
+<th>Algorithm today</th>
+<th>Subject</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>owner canonical identity</td>
+<td>blake3 over bincode (<code>receipts.rs:100</code>); blake3 over a domain-tagged stream (governance)</td>
+<td>domain-semantic identity</td>
+</tr>
+<tr>
+<td>exact exported payload</td>
+<td>SHA-256</td>
+<td><em>these exact bytes were retained/exported</em></td>
+</tr>
+</tbody></table>
+<p>These are different algorithms over different subjects. <strong>Conflating them is a
+defect</strong>, because canonical hashes intentionally exclude fields — see 6.2.</p>
+<h3 id="55-producer-attestation">5.5 Producer attestation</h3>
+<p>A producer signature means <strong>&quot;this producer exported this exact
+manifest/artifact-byte set.&quot;</strong> It does <strong>not</strong> mean &quot;everything in this bundle is
+legitimate.&quot; Policy and trust are pinned <strong>externally</strong>; the bundle must not choose
+how it is judged:</p>
+<pre><code class="language-text">verify_offline_bundle(retained_bundle, externally_pinned_policy, externally_pinned_trust)
+</code></pre>
+<h3 id="56-decomposition">5.6 Decomposition</h3>
+<p><strong>#2465 defines no bounded slices.</strong> A search of 400 issues found zero hits for
+<code>TechnicalAlphaA1Policy</code>, <code>RecoveryBundle</code>, <code>JournalProvenanceWitness</code> or
+<code>ExecutionEvidenceSnapshot</code> — in issues <em>or</em> in the checkout.</p>
+<table>
+<thead>
+<tr>
+<th>Slice</th>
+<th>Scope</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A</strong> owner canonical export surfaces</td>
+<td>expose owner-controlled canonical bytes for <code>AllocationReceipt</code> / <code>SettlementIntent</code></td>
+<td><strong>CONDITIONAL — do not schedule yet.</strong> Needed only if A1 selects a cross-language/non-linking verifier or a raw-preimage requirement (6.2). A Rust-linked verifier recomputes through the public trait, and 5.4&#39;s SHA-256 over the exported payload already catches changes to excluded fields such as <code>memo</code>.</td>
+</tr>
+<tr>
+<td><strong>B</strong> deterministic generic offline-bundle substrate</td>
+<td>byte-stable bundle, digest manifest, no network</td>
+<td><strong>needs an issue</strong></td>
+</tr>
+<tr>
+<td><strong>C</strong> bounded A1 execution/journal evidence adapters</td>
+<td><code>ExecutionEvidenceSnapshotV1</code>, <code>JournalProvenanceWitnessV1</code></td>
+<td><strong>needs an issue</strong></td>
+</tr>
+<tr>
+<td><strong>D</strong> <code>TechnicalAlphaA1PolicyV1</code> + composed proof</td>
+<td>externally pinned policy, tamper-negative test</td>
+<td><strong>needs an issue</strong></td>
+</tr>
+</tbody></table>
+<p>Slice A must <strong>not</strong> change the semantic hashes of those types merely to support
+export, and must not be scheduled at all until the A1 verifier model picks one of
+the two narrower requirements in 6.2. Together, the owner hash (recomputed through
+the public trait) and the exported-payload SHA-256 already cover both
+canonical-field tampering and tampering with fields the canonical hash excludes.</p>
+<hr>
+<h2 id="6-owner-boundaries-seams-and-live-contradictions">6. Owner boundaries, seams, and live contradictions</h2>
+<p>This section records what the code actually does. It is the part most likely to
+invalidate planning vocabulary.</p>
+<h3 id="61-no-registered-owner-for-economics">6.1 No registered owner for economics</h3>
+<p><code>ops/state/truth/sources.json</code> has <strong>26 domains</strong>, and only two touch this proof
+chain: <code>identity_semantics</code> (<code>docs/architecture/IDENTITY_SEMANTICS.md</code>) and
+<code>adr_decisions</code> (<code>docs/adr/</code>). There is <strong>no registered truth domain for receipts,
+provenance, ledger, settlement, treasury or economics.</strong> For those, the ADRs plus
+the code are the only authority.</p>
+<h3 id="62-canonical-bytes-are-private-for-both-economic-receipts">6.2 Canonical bytes are private for both economic receipts</h3>
+<p><code>AllocationReceiptCanonical</code> (<code>receipts.rs:148</code>) and <code>SettlementIntentCanonical</code>
+(<code>economics.rs:122</code>) are <strong>module-private</strong>, and no API returns the preimage
+bytes — only the blake3 digest escapes. The governance path is the opposite:
+<code>compute_decision_hash_bytes</code> (<code>proof.rs:300</code>) is <code>pub</code>.</p>
+<p><strong>This is not a blocker for every verifier, and an earlier revision overstated
+it.</strong> <code>AllocationReceipt</code>, <code>SettlementIntent</code> and <code>CanonicalReceipt</code> are all
+publicly re-exported (<code>lib.rs:83</code>, <code>:121</code>), so a <strong>Rust verifier that links
+<code>icn-kernel-api</code> recomputes owner hashes through the public trait</strong>, exactly as
+the gateway already does (<code>receipt_store.rs:504</code>, <code>api/receipts.rs:65</code>). Slice A
+is therefore <em>not</em> a precondition for a Rust-linked verifier.</p>
+<p>It remains a real limitation for exactly two cases, and A1 should state which it
+needs:</p>
+<ol>
+<li>a <strong>cross-language or non-linking verifier</strong>, which would have to
+reverse-engineer an unpublished bincode layout — field order, the exclusion of
+<code>receipt_id</code>/<code>signature</code>, and the sorting of <code>intent_hashes</code>;</li>
+<li>any verifier needing <strong>raw preimage bytes</strong> for a byte-level tamper manifest,
+since no public surface yields them.</li>
+</ol>
+<p>Two live traps for any bundle contract, stated per type because they differ:</p>
+<ul>
+<li><code>AllocationReceipt::canonical_hash</code> <strong>sorts</strong> intent hashes, so the canonical
+identity is order-independent. Its <code>signature</code> is
+<code>#[serde(skip_serializing_if = &quot;Option::is_none&quot;)]</code> — <strong>serialized whenever
+present</strong>, not skipped — so an exported payload does carry a signature that the
+canonical hash excludes.</li>
+<li><code>SettlementIntent</code> has <strong>no signature field at all</strong>. Only <code>intent_id</code> is
+<code>#[serde(skip)]</code>; <code>memo</code> is <code>skip_serializing_if</code>, so it is exported when
+present while being excluded from the canonical hash.</li>
+</ul>
+<p>So the exported payload is strictly <strong>wider</strong> than the canonical preimage, and
+<strong>mutating <code>memo</code> leaves <code>canonical_hash</code> unchanged.</strong> A digest manifest covering
+only canonical hashes would therefore <em>pass</em> #2465&#39;s &quot;flip one byte, must fail&quot;
+criterion on a genuinely tampered bundle.</p>
+<p><strong>This is not an argument for slice A</strong>, and an earlier revision wrongly called it
+&quot;the sharpest reason slice A exists.&quot; Exposing the owner-canonical preimage cannot
+detect a changed <code>memo</code> either — <code>SettlementIntentCanonical</code> excludes that field
+for exactly the same reason <code>canonical_hash</code> does. The mutation is caught by
+5.4&#39;s <strong>SHA-256 over the exact exported payload</strong>, which is a separate mechanism
+and needs no new API. Slice A&#39;s justification rests solely on the two narrower
+requirements above, if A1 selects one.</p>
+<p>Also: <code>AllocationReceipt::with_signature</code> has <strong>no production caller</strong> (unsigned in
+practice), and <code>SettlementIntent</code> has <strong>no signature field at all</strong>. Hence
+<code>OwnerAuthenticated</code> in 5.3 currently has no members.</p>
+<h3 id="63-governance-receipt-versions">6.3 Governance receipt versions</h3>
+<p>V1 (<code>proof.rs:226</code>), V2 (<code>:541</code>, defined but never emitted), V3 (<code>:820</code>).
+<strong>V4 does not exist</strong> — zero repo-wide hits for <code>ReceiptV4</code>.</p>
+<p>An earlier revision of this document described the seam as &quot;V3 emitted, V1
+persisted.&quot; Review corrected that, and re-verification against <code>main</code> agrees.
+The accurate shape is:</p>
+<p>Treating &quot;V1 constructed&quot; and &quot;V1 persisted&quot; as one property is too coarse: there
+are <strong>five separable surfaces</strong>, and no close path has all of them.</p>
+<ol>
+<li><strong>gate/hash V1</strong> — a receipt built only to derive the gate/decision hash, never stored</li>
+<li><strong>chain-store V1</strong> — persisted via <code>put_governance</code> (decision-hash addressable)</li>
+<li><strong>V1 inside <code>GovernanceProofV2</code></strong> — a receipt constructed during proof construction</li>
+<li><strong>durable <code>proof_bytes</code></strong> — those signed proof bytes written to the proposal state store</li>
+<li><strong>V3</strong> — persisted opaquely via <code>put_opaque</code></li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Close path</th>
+<th>gate V1</th>
+<th>chain-store V1</th>
+<th>V1-in-ProofV2</th>
+<th>durable proof_bytes</th>
+<th>V3</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Actor Accepted, <strong>non</strong>-exec-required</td>
+<td>yes</td>
+<td><strong>no</strong></td>
+<td>if <code>signing_key</code></td>
+<td>if <code>signing_key</code></td>
+<td>if <code>capability_scope</code> <strong>and</strong> <code>receipt_store</code></td>
+</tr>
+<tr>
+<td>Actor Accepted, exec-required</td>
+<td>yes</td>
+<td><strong>yes</strong> (fatal on failure)</td>
+<td>if <code>signing_key</code></td>
+<td>if <code>signing_key</code></td>
+<td>if <code>capability_scope</code></td>
+</tr>
+<tr>
+<td>Actor <strong>Rejected</strong></td>
+<td>no</td>
+<td>no</td>
+<td>if <code>signing_key</code></td>
+<td>if <code>signing_key</code></td>
+<td>if <code>capability_scope</code> + <code>receipt_store</code></td>
+</tr>
+<tr>
+<td>Actor <strong>NoQuorum</strong></td>
+<td>no</td>
+<td>no</td>
+<td>if <code>signing_key</code></td>
+<td>if <code>signing_key</code></td>
+<td>if <code>capability_scope</code> + <code>receipt_store</code></td>
+</tr>
+<tr>
+<td>Timer / scheduler</td>
+<td>by outcome</td>
+<td>by outcome</td>
+<td>if <code>signing_key</code></td>
+<td>if <code>signing_key</code></td>
+<td><strong>never</strong> — <code>capability_scope: None</code> is hardcoded</td>
+</tr>
+<tr>
+<td><code>ForceCloseProposal</code></td>
+<td>Accept only</td>
+<td><strong>no</strong></td>
+<td><strong>no</strong></td>
+<td><strong>no</strong> — bare <code>save_proposal</code>, no journal</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td><code>GovernanceManager::close_proposal_inner</code></td>
+<td>n/a</td>
+<td><strong>yes, all outcomes</strong> (requires <code>receipt_store</code>)</td>
+<td><strong>no</strong></td>
+<td><strong>no</strong></td>
+<td>if <code>capability_scope</code></td>
+</tr>
+</tbody></table>
+<p>The proof path is gated on <code>signing_key</code> <strong>alone</strong> — not on outcome, not on
+<code>receipt_store</code>, not on <code>capability_scope</code> — and it covers all three terminal
+outcomes. Its bytes are genuinely durable: close journal <code>save_close_intent</code>
+then <code>commit</code> then <code>save_proof_bytes</code>, landing under the sled key
+<code>governance:proof:{proposal_id}</code>.</p>
+<p><strong>So &quot;no chain-store persistence&quot; does not mean &quot;no durable V1.&quot;</strong> An
+actor-driven Rejected, NoQuorum or non-execution-required Accepted close writes a
+complete signed <code>GovernanceDecisionReceipt</code> inside <code>proof_bytes</code> while
+<code>put_governance</code> is never called.</p>
+<p>But that evidence is <strong>differently addressable</strong>: it lives in the proposal state
+store rather than the receipt backend, under a <em>proposal-id</em> key, behind a
+different reader, and it carries <strong>no <code>decision_hash</code> index</strong>. The chain read
+surfaces — <code>get_governance_by_decision</code>, the receipt-chain endpoint, and
+<code>icnctl audit verify</code> — structurally cannot see it.</p>
+<ul>
+<li><strong>V3 is emitted conditionally and additionally</strong>, not as a replacement:
+<code>actor.rs:2561</code> gates on a present <code>capability_scope</code> <em>and</em> a configured
+receipt store.</li>
+<li><strong>V3 is persisted</strong>, but opaquely — <code>receipt_backend.rs:509</code> writes it through
+<code>put_opaque</code>, so it never crosses the gateway&#39;s typed boundary.</li>
+<li><strong>The real seam is the read surface.</strong> The gateway store&#39;s typed API is V1 only
+(<code>receipt_store.rs:386</code> <code>put_governance</code>, <code>:426</code> <code>get_governance</code>), and
+<code>icnctl audit verify</code> recomputes the <strong>V1</strong> decision hash
+(<code>icnctl/src/main.rs:12752</code>) through a <em>local</em> <code>verify_receipt_chain</code>
+(<code>:12702</code>) rather than through <code>icn-governance::verify</code>.</li>
+</ul>
+<p>So a V4 does not have to reconcile a persistence mismatch. It has to decide what
+the <strong>typed chain/audit read surface</strong> returns, whether conditional V3 emission
+becomes unconditional, and whether decision-hash-addressable evidence is required
+at all when proposal-id-addressable signed evidence already exists.</p>
+<p><strong>A1 must pin a close path on two independent axes</strong>, not one:</p>
+<ul>
+<li><code>signing_key: Some</code> buys <strong>proposal-id-addressable</strong> V1 evidence for every
+terminal outcome, via <code>proof_bytes</code>;</li>
+<li>only execution-required Accepted (actor), or any outcome under the standalone
+manager with a receipt store, buys <strong>decision-hash-addressable</strong> chain evidence.</li>
+</ul>
+<p>If the A1 read surface is decision-hash-keyed — which every existing chain reader
+is — the proof-bytes route does <strong>not</strong> satisfy it. Note also that <code>signing_key</code>
+is a node-configuration fact, not a governance fact, so this evidence&#39;s existence
+depends on deployment wiring rather than on the decision itself.</p>
+<p>A stale comment at <code>proof.rs:817</code> still reads &quot;No handler emits a v3 receipt yet
+— this is schema preparation only.&quot; That is now false, and is recorded here as a
+follow-up rather than fixed, because this is a control-plane document and that is
+a Rust change.</p>
+<h3 id="64-the-ledger-provenance-limitation--be-exact">6.4 The ledger provenance limitation — be exact</h3>
+<p><code>compute_entry_hash</code> (<code>icn-ledger/src/hash.rs:9</code>) is serde_json then SHA-256 over
+<code>HashableEntry</code> (<code>hash.rs:37-45</code>), which carries <code>timestamp, author, contract_ref, accounts, parents, nonce</code>. <strong><code>ProvenanceRef</code> is absent.</strong> <code>sign_entry</code>
+(<code>entry.rs:28</code>) signs <code>entry.id</code>.</p>
+<p>Therefore: <strong>the author signature does not bind the governance <code>decision_hash</code>.
+Provenance can be altered without invalidating either the hash or the signature.</strong></p>
+<p>An earlier revision went further and said no production code cross-verifies the
+correspondence at all, and that the gateway &quot;only echoes&quot; the hash. That was
+wrong. Correspondence <em>is</em> checked, at three clearly different strengths — A1
+should neither duplicate the real ones nor inherit the weak one:</p>
+<table>
+<thead>
+<tr>
+<th>Strength</th>
+<th>Where</th>
+<th>What it establishes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Existence — real</strong></td>
+<td>gateway loads the receipt by hash (<code>api/receipts.rs:397</code>)</td>
+<td>a hash with no stored receipt yields <code>governance: None</code> and fails closed (<code>icnctl/src/main.rs:12628</code>)</td>
+</tr>
+<tr>
+<td><strong>Self-consistency by recomputation — real</strong></td>
+<td><code>recompute_decision_hash_matches</code> (<code>main.rs:12617</code>), surfaced as &quot;Decision hash integrity (recomputed)&quot; (<code>:12752</code>)</td>
+<td>the V1 hash rebuilt from <code>proposal_id</code>/<code>domain_id</code>/<code>outcome</code>/<code>tally</code>/<code>vote_hash</code> matches</td>
+</tr>
+<tr>
+<td><strong>Journal-to-decision linkage — NOT established</strong></td>
+<td>&quot;check 13&quot; (<code>main.rs:12909</code>)</td>
+<td><strong>tautological.</strong> The gateway <em>selects</em> entries by that predicate (<code>api/receipts.rs:515</code>), so no entry with a different hash can be in the set. A filter restated as an assertion.</td>
+</tr>
+</tbody></table>
+<p>None of it is cryptographic: <code>vote_hash</code> and the tally come from the gateway
+response and are never checked against actual votes, and the receipt carries no
+verified signature. The recompute proves internal consistency of server-supplied
+fields, not authorization — as its own comment concedes. The A1 position is
+therefore unchanged in substance — the governance-to-ledger link is <strong>not
+owner-authenticated</strong> — but the plan must not claim the correspondence is wholly
+unchecked.</p>
+<p><strong>Do not rewrite ledger identity casually, and do not claim native cryptographic
+strength that does not exist.</strong> For A1 the bounded evidence architecture may use a
+<strong>producer-attested witness</strong> connecting <code>entry_hash</code>, <code>decision_hash</code> and
+<code>provenance_kind</code>, while explicitly reporting that proof strength. A future
+owner-defined governance-to-ledger binding receipt may supersede it.</p>
+<h3 id="65-three-incompatible-canonical-hash-schemes">6.5 Three incompatible canonical-hash schemes</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Scheme</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>kernel-api receipts</td>
+<td>bincode then blake3</td>
+</tr>
+<tr>
+<td>governance proof</td>
+<td>domain-tagged byte stream then blake3</td>
+</tr>
+<tr>
+<td>ledger journal</td>
+<td>serde_json then SHA-256</td>
+</tr>
+</tbody></table>
+<p>No single re-verification primitive spans them. A bundle verifier must dispatch per
+artifact class rather than assume one hash function.</p>
+<h3 id="66-institution-genesis-is-not-canonical-yet">6.6 Institution genesis is not canonical yet</h3>
+<p><code>icnctl institution runtime-root</code> (shipped in #2744/#2749) creates two keystores, a
+cooperative record, a treasury registration, trust edges and a receipt — but its
+<strong>own doc comments disclaim canonical institution genesis</strong>: no <code>EntityId</code>, no
+signed founding act, no institution DID, and <code>genesis_authority_did</code> is today the
+<em>same principal</em> as <code>node_did</code>. It is not idempotent and not restartable. ADR-0083&#39;s
+&quot;runtime root&quot; is a different, <code>not-started</code> concept.</p>
+<h3 id="67-the-fail-closed-verifier-is-wired-to-nothing">6.7 The fail-closed verifier is wired to nothing</h3>
+<p><code>icn-governance/src/verify.rs</code> is a four-valued fail-closed verifier with <strong>zero
+callers repo-wide</strong>. But &quot;just wire it up&quot; understates the work, and an earlier
+revision implied otherwise.</p>
+<p>What it actually provides is a <strong>reusable verdict framework</strong> (the
+<code>VerificationStatus</code> taxonomy and its fold) plus a <strong>V1 receipt verifier</strong>: its
+public functions cover the unversioned V1 <code>GovernanceDecisionReceipt</code>, the legacy
+<code>GovernanceProof</code>, generic chain links and hash-conflict claims. There are <strong>no
+V2/V3/V4 adapters, and none for <code>AllocationReceipt</code>, <code>SettlementIntent</code>,
+execution, or the journal</strong> — the module&#39;s own header records per-ladder recompute
+shims as follow-up.</p>
+<p>So A1 should reuse the verdict framework and the V1 path rather than mint a third
+verification vocabulary, <strong>and must schedule the missing adapters explicitly</strong> as
+part of #2465 slice C. The gap is adapter work, not wiring.</p>
+<h3 id="68-identity-primitives-exist-but-are-unreferenced">6.8 Identity primitives exist but are unreferenced</h3>
+<p>N1&#39;s authority log (<code>icn-identity/src/authority_log/</code>) is described by its owner as
+&quot;a library primitive only&quot; with <strong>zero references outside <code>icn-identity</code></strong>.
+<code>AuthorityFactStore</code>, <code>SubjectContextGenesis</code>, <code>SubjectRecognition</code>,
+<code>HumanActorModel</code>, <code>VotingProcessSnapshot</code>, <code>MemberVoteAction</code> and
+<code>SubjectVoteSetHash</code> <strong>do not exist in code</strong>. Session authority exists under
+different names (<code>SessionAuthority</code>, <code>AuthorityProfile</code>, <code>AuthorityCapabilities</code> in
+<code>icn-gateway/src/session_authority.rs</code>). <code>ScopeLevel</code> is <strong>network reach, not
+authority</strong> — do not conflate. <code>NodeId</code> is <code>pub type NodeId = String</code>; Node has no
+durable domain.</p>
+<h3 id="610-gate-5-is-not-an-executable-sequence-as-written">6.10 Gate 5 is not an executable sequence as written</h3>
+<p><strong>This contradiction is in the linked source procedure, not introduced here</strong>, and
+this plan exposes rather than repairs it — correcting it is the two-node plan&#39;s
+own change, not #2783&#39;s.</p>
+<p><code>docs/demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md</code> Gate 5 requires all three of:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2</td>
+<td>restart <code>icnd</code>; wait for authenticated health <strong>and peer reconnection</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>re-run receipt verification on Node B <strong>while Node A remains disconnected</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>reboot both VMs; wait for first-boot marker, active service <strong>and peer reconnection</strong></td>
+</tr>
+</tbody></table>
+<p>Steps 2 and 4 require the peer link to be <strong>up</strong>; step 3 requires it to be
+<strong>down</strong>. No single run satisfies all three as written, so Gate 5 cannot be
+executed and the critical path is blocked at it.</p>
+<p><strong>The owner decision that must be made</strong> — one of:</p>
+<ol>
+<li>offline isolation ends after Gate 4, the witness link is restored, and Gate 5
+proves restart/reboot <em>continuity</em> rather than continued isolation (step 3&#39;s
+&quot;while Node A remains disconnected&quot; is then the clause to drop or reword); or</li>
+<li>Gate 5&#39;s intended topology is genuinely isolated, in which case steps 2 and 4
+must stop requiring peer reconnection and the source procedure is corrected.</li>
+</ol>
+<p>Until that is decided, this plan does not present Gate 5 as runnable, and no A1
+claim may depend on having passed it.</p>
+<h3 id="69-unresolved-owner-contradictions">6.9 Unresolved owner contradictions</h3>
+<ol>
+<li><strong>Two competing decompositions.</strong> #2694 defines a 12-step semantic ladder.
+#2689&#39;s 2026-09-02 checkpoint defines an overlapping <strong>P0-P10 proof ladder</strong> with
+six lanes, adds N3-A two-node authority reconciliation (which #2694 explicitly
+non-goals) and a mobile edge. <strong>Neither supersedes the other in writing.</strong>
+#2689&#39;s <em>body</em> still describes the older four-lane model. <strong>A maintainer decision
+is required.</strong></li>
+<li><strong><code>ops/state/truth/program.json</code> does not exist on <code>main</code>.</strong> A checkpoint claimed
+the ladder was &quot;durably encoded&quot; in a registered <code>program_structure</code> domain. It
+is not. Verified at this snapshot: the file is absent from <code>main</code>, <code>sources.json</code>
+registers no <code>program_structure</code> domain, and <strong>PR #2690 (OPEN)</strong> carries both
+<code>ops/state/truth/program.json</code> and a <code>sources.json</code> change among its fifteen
+files. Note #2690&#39;s <em>headline</em> contract is the agent registry, so the program
+surface rides along inside a PR about something else — which is part of why it
+has not landed. Until it does, the only durable record of the ladder is the
+#2694 issue body and this document. <strong>This document deliberately does not create
+a competing machine-readable program surface</strong>; when #2690 lands, this file
+should link to it rather than duplicate it.</li>
+<li><strong>The typed chain/audit read surface is V1-only</strong> (6.3). The dataflow is now
+traced, and the earlier &quot;V3 emitted / V1 persisted&quot; model is disproven — V3 <em>is</em>
+persisted, opaquely. What remains unresolved is what a V4 read surface should
+return, and whether decision-hash-addressable evidence is required when
+proposal-id-addressable signed evidence already exists.</li>
+<li><strong>The two-node plan is <code>Canonical: no</code>, last reviewed 2026-07-27</strong> — predating
+#2689. It references ADR-0086, which <strong>does</strong> exist on <code>main</code> (PR #2458
+merged 2026-07-28) but carries <code>status: proposed</code> and
+<code>implementation_status: partially implemented</code> — so the profile is proposed,
+not <code>accepted</code>.</li>
+</ol>
+<hr>
+<h2 id="7-icn2466--recovery">7. icn#2466 — recovery</h2>
+<p>A <strong>separate sovereignty proof</strong>, independent of #2694.</p>
+<p>#2466 specifies no field list and no ordered ceremony — it specifies a drill plus
+invariants. The expected artifact shape (planning vocabulary, <code>RecoveryBundleV1</code>)
+is: exact profile/revision, encrypted state, encrypted effective secret material,
+node identity commitment, config commitment, institutional/runtime-root
+commitments, retained evidence commitments, extent/completeness manifest, bundle
+root digest.</p>
+<p>Its binding invariants, which <strong>are</strong> from the issue: secrets never written to an
+unencrypted archive <em>at any point including temporary files</em>; an explicit custody
+model; restore into a fresh overlay assumes the prior node&#39;s identity, state and
+relationships and reopens its keystore without operator re-entry outside the
+documented custody path; continuity asserted over identity, machine ID,
+configuration and genesis hashes; missing required material <strong>refuses</strong> to restore
+rather than half-restoring.</p>
+<pre><code class="language-text">capture known state -&gt; encrypt -&gt; destroy/remove Node B
+  -&gt; recreate from fresh appliance overlay -&gt; restore -&gt; reopen keystore
+  -&gt; compare identity/config/state commitments
+  -&gt; independently verify retained Alpha evidence again
+</code></pre>
+<p><strong>Do not claim hot backup.</strong> Do not let recovered-prefix behaviour masquerade as
+complete recovery proof.</p>
+<h3 id="completeness-dependencies">Completeness dependencies</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Defect</th>
+<th>Effect on recovery claims</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>icn#2746</strong></td>
+<td>a truncated ledger reopens via sled recovery and scans short <em>without error</em>, so <code>verify-backup --verify-ledger</code> reports a passing verification for an incomplete archive</td>
+<td><strong>Blocks completeness outright.</strong> Nothing records how many rows the archive should hold. Needs a backup-time extent record cross-checked at verify.</td>
+</tr>
+<tr>
+<td><strong>icn#2739</strong></td>
+<td>the verifier writes into the tree it inspects (sled has no read-only open; the N2-A gate writes into the audited tree)</td>
+<td><strong>Caps claim strength</strong>, does not falsify it. Blocks &quot;verified a write-protected medium&quot; and &quot;two verifications observed the same bytes&quot;.</td>
+</tr>
+</tbody></table>
+<p>Note also: <strong>CI invokes the weak <code>verify-backup</code> form, without <code>--verify-ledger</code></strong>
+(<code>.github/workflows/ci.yml:530</code>), and the command prints its own non-claims at
+<code>icnctl/src/main.rs:7133-7134</code>.</p>
+<hr>
+<h2 id="8-two-node-roles">8. Two-node roles</h2>
+<pre><code class="language-text">Node A   institution host / producer / artifact source
+Node B   independent technical witness / verifier
+</code></pre>
+<p>Node B is <strong>not</strong> a second institution, not federation, not a production peer and
+not a governance participant. Two-institution operation requires a later ratified
+enrollment ceremony.</p>
+<p><strong>For offline evidence, Node A must actually be unreachable from Node B.</strong> The
+selected procedure proves <em>isolation</em>, not shutdown: Gate 4 step 5 is
+&quot;Disconnect Node A&quot;, and nothing in it stops the service or the VM. This plan
+therefore claims only what the procedure establishes — the verifier did not reach
+Node A — and deliberately does <strong>not</strong> say &quot;stopped&quot;, which would be a stronger
+property nobody tests. Strengthening it would require changing the upstream
+procedure, which is out of scope here. A Node B
+<code>curl</code> back to Node A is <strong>transfer evidence only</strong>. The plan&#39;s Gate 4 step 5 is
+literally &quot;Disconnect Node A&quot;; Gate 5 re-runs verification while Node A remains
+disconnected.</p>
+<p>For recovery, Node B is the natural destroy/restore witness.</p>
+<hr>
+<h2 id="9-containment-ledger">9. Containment ledger</h2>
+<p>A contained flaw is <strong>not fixed</strong>. Each row names the exact profile restriction
+that prevents it from invalidating A1.</p>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Disposition</th>
+<th>Containment / profile restriction</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>#2750</strong> trust bloom scores persisted edges 0.0</td>
+<td><strong>MUST FIX</strong></td>
+<td>None available. Rejects entries authored by the institution treasury principal at the ledger author-trust gate — directly on the A1 economic chain.</td>
+</tr>
+<tr>
+<td><strong>#2779</strong> snapshot-delete path traversal</td>
+<td><strong>FIXED / LANDED</strong> (PR #2781, squash <code>08f5bc2cc</code>)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>#2748</strong> keystore files at umask</td>
+<td><strong>FIXED / LANDED</strong> (PR #2782, squash <code>82030804d</code>)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>#2777</strong> exclusion domain (#2758/#2759)</td>
+<td><strong>IN PROGRESS</strong> (draft PR)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>#2746</strong> truncated ledger certified complete</td>
+<td><strong>MUST FIX for #2466</strong></td>
+<td>Cannot be contained if recovery completeness is claimed.</td>
+</tr>
+<tr>
+<td><strong>#2739</strong> verifier writes the audited tree</td>
+<td><strong>CONTAIN</strong></td>
+<td>Claim recovery verification over a mutable copy; do not claim read-only-medium verification.</td>
+</tr>
+<tr>
+<td><strong>#2778</strong> backup reads a data root with no exclusion</td>
+<td><strong>CONTAIN or FIX</strong></td>
+<td>Take A1 backups only with the node stopped.</td>
+</tr>
+<tr>
+<td><strong>#2755</strong> native <code>icnd</code> ignores runtime-root config</td>
+<td><strong>MUST FIX, or pin a unit</strong></td>
+<td>The earlier entry excluded &quot;the native service path&quot;, which is self-defeating: ADR-0086&#39;s appliance baseline <em>is</em> native systemd, and the two-node plan starts and restarts <code>icnd</code> under systemd in Gates 1, 2 and 5. Excluding it excludes the profile. The concrete defect is that <code>deploy/icnd.service</code> invokes <code>icnd --data-dir ROOT</code> without <code>--config ROOT/icn.toml</code>, so a provisioned runtime root has no effect. Containment therefore requires a <strong>pinned unit or drop-in that passes the managed runtime-root configuration</strong>, recorded as a profile artifact — otherwise this is a required fix.</td>
+</tr>
+<tr>
+<td><strong>#2747</strong> <code>init-coop</code> emits an <code>icn.toml</code> <code>icnd</code> cannot load</td>
+<td><strong>CONTAIN</strong></td>
+<td>A1 uses <code>institution runtime-root</code>, not <code>init-coop</code>.</td>
+</tr>
+<tr>
+<td><strong>#2757</strong> no trusted bootstrap authority for first gateway token</td>
+<td><strong>CONTAIN</strong></td>
+<td>Single-institution A1; trusted-local mint only; no generalized remote bootstrap.</td>
+</tr>
+<tr>
+<td><strong>#2772</strong> node-authority migration across DID change</td>
+<td><strong>EXCLUDE</strong></td>
+<td>A1 does not rotate the node DID.</td>
+</tr>
+<tr>
+<td><strong>#2627</strong> N2-A <code>Did</code> equality/hashing</td>
+<td><strong>PARTIALLY LANDED</strong></td>
+<td>Owns the legacy <code>compute_vote_hash</code> DID-spelling defect; must be resolved before Subject ballots are trusted.</td>
+</tr>
+<tr>
+<td>TIME / deadline semantics (#2601)</td>
+<td><strong>EXCLUDE</strong></td>
+<td>Explicitly out of Alpha scope.</td>
+</tr>
+<tr>
+<td>vote amendments</td>
+<td><strong>EXCLUDE</strong></td>
+<td>Frozen process snapshot only.</td>
+</tr>
+<tr>
+<td>cross-institution identity federation</td>
+<td><strong>EXCLUDE</strong></td>
+<td>Node B is a witness, not an institution.</td>
+</tr>
+<tr>
+<td>generalized N3/N4/N5</td>
+<td><strong>EXCLUDE</strong></td>
+<td>Only the N4-alpha prefix slice is in scope.</td>
+</tr>
+<tr>
+<td>mobile / QR workflow</td>
+<td><strong>EXCLUDE</strong></td>
+<td>Not on the A1 chain.</td>
+</tr>
+<tr>
+<td>generic installer claims</td>
+<td><strong>EXCLUDE</strong></td>
+<td>One pinned appliance profile only.</td>
+</tr>
+<tr>
+<td>live / hot backup</td>
+<td><strong>EXCLUDE</strong></td>
+<td>Cold ceremony only.</td>
+</tr>
+<tr>
+<td>historical DID-member migration</td>
+<td><strong>EXCLUDE</strong></td>
+<td>Fresh context-scoped Subjects only.</td>
+</tr>
+<tr>
+<td>Other <code>.mode(0o600)</code> creation sites (<code>data_dir_lock.rs</code>, <code>institution_runtime_root.rs</code>) reachable at mode <code>000</code> under an extreme umask</td>
+<td><strong>FOLLOW-UP — not a blocker</strong></td>
+<td>Surfaced by the #2782 review and deliberately left outside #2748. <code>.mode()</code> is a request and <code>mode &amp; !umask</code> can clear owner bits, so an extreme umask could make a lock anchor or runtime-root file unusable. It cannot invalidate A1 <strong>provided the pinned appliance profile fixes the service umask</strong> — confirm that at profile freeze. No owner issue yet; it needs one only if the profile does not pin the umask.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="10-status-snapshot">10. Status snapshot</h2>
+<p>Program-level <strong>evidence maturity</strong>: how well-established a <em>fact about the Alpha</em>
+is. This is a different axis from the per-PR delivery lifecycle, whose states and
+transitions are owned by <code>ops/state/truth/delivery.json</code> — read them there. A PR
+can be <code>DONE</code> on that axis while the fact it delivered is still only
+LANDED / UNVERIFIED on this one.</p>
+<p>The vocabulary below is this document&#39;s own, and is deliberately <strong>not</strong> a
+restatement of the owner&#39;s lifecycle.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IDENTIFIED</td>
+<td>a defect or need is described, nothing built</td>
+</tr>
+<tr>
+<td>IMPLEMENTED / UNLANDED</td>
+<td>code exists on a branch; not on <code>main</code></td>
+</tr>
+<tr>
+<td>LANDED / UNVERIFIED</td>
+<td>merged to <code>main</code>; not exercised on the Alpha profile</td>
+</tr>
+<tr>
+<td>VERIFIED</td>
+<td>exercised and witnessed on the pinned profile</td>
+</tr>
+<tr>
+<td>BLOCKED</td>
+<td>cannot proceed until a named dependency resolves</td>
+</tr>
+<tr>
+<td>CONTAINED</td>
+<td>not fixed; excluded by a named profile restriction</td>
+</tr>
+<tr>
+<td>DEFERRED</td>
+<td>deliberately out of A1</td>
+</tr>
+</tbody></table>
+<h3 id="how-merge-readiness-is-actually-gated-here">How merge readiness is actually gated here</h3>
+<p>Recorded because the first pass guessed wrong and the #2781/#2782 merges settled
+it. Live branch protection on <code>main</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>required_approving_review_count</code></td>
+<td><strong>0</strong> — no second-identity approval is required</td>
+</tr>
+<tr>
+<td><code>required_conversation_resolution</code></td>
+<td><strong>true</strong> — unresolved review threads block the merge</td>
+</tr>
+<tr>
+<td><code>strict</code></td>
+<td>true — the branch must be level with <code>main</code>, so every merge puts every other PR <code>BEHIND</code></td>
+</tr>
+<tr>
+<td><code>enforce_admins</code></td>
+<td>true — no admin bypass</td>
+</tr>
+<tr>
+<td>required contexts</td>
+<td>11 named checks. <code>Security Audit</code> and <code>Compare Against Base</code> are <strong>not</strong> among them.</td>
+</tr>
+</tbody></table>
+<p>So a <code>mergeStateStatus</code> of <code>BLOCKED</code> on this repository usually means <em>unresolved
+threads</em>, not red CI and not a missing approval; <code>UNSTABLE</code> means only
+non-required checks are red. Read the protection API before concluding a PR is
+waiting on a human.</p>
+<h3 id="safety--correctness-frontier">Safety / correctness frontier</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>State</th>
+<th>Evidence at snapshot</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>PR #2781</strong> (#2779 traversal)</td>
+<td><strong>LANDED</strong></td>
+<td>merged as <code>08f5bc2cc</code>; #2779 CLOSED/COMPLETED.</td>
+</tr>
+<tr>
+<td><strong>PR #2782</strong> (#2748 keystore mode)</td>
+<td><strong>LANDED</strong></td>
+<td>merged as <code>82030804d</code>; #2748 CLOSED/COMPLETED. Also normalises a newly created keystore, since <code>.mode()</code> is a <em>request</em> and a hostile umask can clear owner bits.</td>
+</tr>
+<tr>
+<td><strong>PR #2777</strong> (#2758/#2759 exclusion)</td>
+<td>IMPLEMENTED / UNLANDED</td>
+<td>draft; <code>mergeStateStatus: BLOCKED</code>.</td>
+</tr>
+<tr>
+<td><strong>#2750</strong> trust bloom filter</td>
+<td>IDENTIFIED</td>
+<td>no PR. <strong>Next correctness blocker.</strong></td>
+</tr>
+<tr>
+<td><strong>#2746 / #2739</strong> verify-backup</td>
+<td>IDENTIFIED</td>
+<td>no PR.</td>
+</tr>
+<tr>
+<td>N2-A principal-state lane</td>
+<td>LANDED / UNVERIFIED</td>
+<td>#2700-#2716 merged; not exercised on an Alpha profile.</td>
+</tr>
+<tr>
+<td>Institutional genesis (#2744)</td>
+<td>LANDED / UNVERIFIED</td>
+<td>merged as <code>fc9e7b8b6</code> (#2749); disclaims canonical genesis (6.6).</td>
+</tr>
+</tbody></table>
+<h3 id="alpha-lanes">Alpha lanes</h3>
+<table>
+<thead>
+<tr>
+<th>Lane</th>
+<th>State</th>
+<th>Blocking fact</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Deployment profile</td>
+<td>BLOCKED</td>
+<td>ADR-0086 is merged but <code>status: proposed</code>; the freeze prerequisite is <strong><code>status: accepted</code></strong> per ADR-0018. Merged and partially implemented are neither of them. Two-node plan is <code>Canonical: no</code>.</td>
+</tr>
+<tr>
+<td><strong>#2694</strong> semantic convergence</td>
+<td>IDENTIFIED</td>
+<td>1 of 12 slices owned (#2695); none implemented; no artifact exists in code.</td>
+</tr>
+<tr>
+<td><strong>#2465</strong> offline evidence</td>
+<td>IDENTIFIED</td>
+<td>spec only; 0 of 4 slices owned. Slice A is conditional, not a blocker (5.6).</td>
+</tr>
+<tr>
+<td><strong>#2466</strong> recovery</td>
+<td>IDENTIFIED</td>
+<td>spec only; completeness blocked by #2746.</td>
+</tr>
+<tr>
+<td>Two-node witness</td>
+<td>BLOCKED</td>
+<td>Gate 4 and Gate 6 blocked; <strong>Gate 5 is not executable as written</strong> (6.10).</td>
+</tr>
+<tr>
+<td>NYCN lock bump</td>
+<td>BLOCKED</td>
+<td>requires a frozen SHA and a human signature.</td>
+</tr>
+<tr>
+<td>Public claim</td>
+<td>BLOCKED</td>
+<td>requires all seventeen #2689 section 10 criteria.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="11-critical-path-and-parallel-work">11. Critical path and parallel work</h2>
+<h3 id="critical-path">Critical path</h3>
+<pre><code class="language-text">#2750  (now the ONLY uncontained defect on the economic chain)
+   v
+Alpha profile freeze  (needs ADR-0086 status: accepted)
+   v
+#2694 slice 1 (#2695 GEN-A) -&gt; slice 2 (N1-D) -&gt; ... -&gt; slice 10 (V4)
+   v
+V4 decision_hash through AllocationReceipt / SettlementIntent
+   v
+#2465 slice C  (execution/journal evidence adapters)
+   v
+#2465 slice D  (composes C; tamper-negative proof)
+   v
+Gate 4  (Node A disconnected — isolation, not shutdown)
+   v
+Gate 5  (restart + reboot continuity)  &lt;-- BLOCKED: see 6.10
+   v
+#2466  -&gt; Gate 6
+   v
+freeze SHA -&gt; NYCN lock -&gt; rehearsal/a11y -&gt; bounded public claim
+</code></pre>
+<h3 id="safely-parallel-right-now">Safely parallel right now</h3>
+<ul>
+<li><strong>#2465 slice B</strong> (bundle substrate) — generic and deterministic, and the only
+#2465 slice that is unconditionally ready. Slice A is <strong>conditional</strong> (5.6) and
+should not be started until the verifier model requires it.</li>
+<li><strong>#2466 completeness prerequisite</strong> (#2746 extent record) — independent of #2694
+entirely.</li>
+<li><strong>#2627</strong> DID-spelling defect in legacy <code>compute_vote_hash</code> — must precede
+trusting Subject ballots.</li>
+<li><strong>Resolving the 6.9 decomposition contradiction</strong> — a maintainer decision, no
+code.</li>
+</ul>
+<h3 id="blocked-not-worth-starting">Blocked, not worth starting</h3>
+<p>Slices 3-12 of #2694 (each gated on its predecessor and on owner-contract
+reverification); #2465 slice C (needs the execution/journal shape the ladder
+produces); Gates 4, 5 and 6; anything downstream of the profile freeze.</p>
+<hr>
+<h2 id="12-navigation">12. Navigation</h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Authority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>What is being worked on right now?</td>
+<td><code>gh issue list</code> / <code>gh pr list</code> — domain <code>live_issue_state</code></td>
+</tr>
+<tr>
+<td>Program control surface and exit criteria</td>
+<td><strong>icn#2689</strong></td>
+</tr>
+<tr>
+<td>Semantic convergence ladder</td>
+<td><strong>icn#2694</strong>; GEN-A child <strong>icn#2695</strong></td>
+</tr>
+<tr>
+<td>Offline evidence contract</td>
+<td><strong>icn#2465</strong></td>
+</tr>
+<tr>
+<td>Encrypted recovery contract</td>
+<td><strong>icn#2466</strong></td>
+</tr>
+<tr>
+<td>Two-node acceptance gates</td>
+<td><code>docs/demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md</code> (<code>Canonical: no</code>)</td>
+</tr>
+<tr>
+<td>Identity semantics</td>
+<td><code>docs/architecture/IDENTITY_SEMANTICS.md</code> (<strong>normative</strong>)</td>
+</tr>
+<tr>
+<td>Receipt/provenance envelope</td>
+<td><code>docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md</code></td>
+</tr>
+<tr>
+<td>Verification vocabulary</td>
+<td><code>icn/crates/icn-governance/src/verify.rs</code>; <code>docs/spec/receipt-chain-verification.md</code></td>
+</tr>
+<tr>
+<td>Fact ownership</td>
+<td><code>ops/state/truth/sources.json</code></td>
+</tr>
+<tr>
+<td>PR delivery lifecycle</td>
+<td><code>ops/state/truth/delivery.json</code></td>
+</tr>
+<tr>
+<td>Merge policy</td>
+<td><code>ops/state/truth/policy.json</code></td>
+</tr>
+<tr>
+<td>Contract document conventions</td>
+<td><code>docs/contracts/</code> (<code>.md</code> + <code>.schema.json</code> + <code>.example.json</code>)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="13-maintainer-decisions-outstanding">13. Maintainer decisions outstanding</h2>
+<ol>
+<li><strong>Reconcile the two decompositions</strong> (6.9.1): #2694&#39;s 12-step ladder versus
+#2689&#39;s P0-P10 proof ladder. Pick one, or state how they compose. Until then the
+program has two disagreeing structures.</li>
+<li><strong>Land or close PR #2690</strong> (6.9.2), which carries the machine-readable
+<code>program_structure</code> domain this document deliberately does not duplicate.</li>
+<li><strong>Move ADR-0086 to <code>status: accepted</code>, or decline it</strong> through ADR-0018&#39;s
+lifecycle. It is merged but <code>status: proposed</code>, and <code>accepted</code> — not merged,
+not &quot;partially implemented&quot; — is what the profile gate waits on. Also whether
+the two-node plan should be promoted from <code>Canonical: no</code>.</li>
+<li><strong>Decide what the typed chain/audit read surface returns</strong> (6.3) before a V4
+is specified, and whether conditional V3 emission becomes unconditional first.</li>
+<li><strong>Accept or reject the 5.3 evidence-strength taxonomy</strong>, which is proposed here
+and exists nowhere in the repository.</li>
+<li><strong>Decide whether economics needs a registered truth domain</strong> (6.1).</li>
+</ol>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN-Technical-Alpha-Control-Plan.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
