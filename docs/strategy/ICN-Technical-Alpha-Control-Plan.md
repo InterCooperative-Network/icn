@@ -579,10 +579,14 @@ that prevents it from invalidating A1.
 
 ## 10. Status snapshot
 
-Program-level **evidence maturity**. This axis is distinct from the per-PR delivery
-lifecycle owned by `ops/state/truth/delivery.json`
-(`DRAFTING -> REVIEWING -> FIXING -> VERIFYING -> FROZEN -> MERGING -> DONE`),
-which this document does not duplicate.
+Program-level **evidence maturity**: how well-established a *fact about the Alpha*
+is. This is a different axis from the per-PR delivery lifecycle, whose states and
+transitions are owned by `ops/state/truth/delivery.json` — read them there. A PR
+can be `DONE` on that axis while the fact it delivered is still only
+LANDED / UNVERIFIED on this one.
+
+The vocabulary below is this document's own, and is deliberately **not** a
+restatement of the owner's lifecycle.
 
 | Term | Meaning |
 |---|---|
