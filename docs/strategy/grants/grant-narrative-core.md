@@ -36,7 +36,7 @@ Three convergent factors make this the right moment:
 
 2. **Institutional funders want accountability.** Foundations funding cooperative development increasingly require governance evidence. "Show us your minutes" is becoming "show us your decision trail." ICN provides machine-verifiable proof, not self-reported documents.
 
-3. **The technology is ready.** Peer-to-peer cryptographic systems have matured. QUIC transport, Ed25519 signatures, content-addressed storage, and capability-based authorization are production-ready. ICN is not speculative technology. It is an integration of proven components for a specific institutional need.
+3. **The technology is ready.** Peer-to-peer cryptographic systems have matured. QUIC transport, Ed25519 signatures, content-addressed storage, and capability-based authorization are mature, widely deployed technologies. ICN is not speculative technology. It is an integration of proven components for a specific institutional need.
 
 ## Why ICN and Not Existing Tools
 

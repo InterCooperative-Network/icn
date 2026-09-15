@@ -8,6 +8,7 @@
 //                  [docs."path"] overlays, with a CI-validated closed
 //                  vocabulary.
 // OUTPUT:          website/src/data/docs-classification.generated.json
+//                  website/src/data/published-docs.generated.json (claim-lint manifest)
 //
 // Why this exists (#2609): the website used to walk docs/ off the filesystem
 // and publish every .md it found — 965 pages, including docs/internal/ (whose
@@ -44,6 +45,25 @@ const outPath = path.join(
   "src",
   "data",
   "docs-classification.generated.json",
+);
+
+// The claim-lint manifest. `.github/scripts/readiness_overclaim_linter.py`
+// consumes this to lint exactly the documents that actually publish, instead of
+// all of docs/ (most of which is withheld) or none of it (the previous state:
+// `just website-claims` scanned website/ only, so ~640 republished docs pages
+// were public content that no claim gate ever read).
+//
+// The shape is deliberately minimal — {path, bannered} — so the linter stays
+// agnostic about this file's schema. `bannered` means "the published rendering
+// of this page carries a stale/archive banner", which for the archive layer is
+// not a guess: check-docs-boundary.mjs asserts, blocking, that every archive
+// page ships the historical banner and noindex. The linter treats it exactly
+// as it treats a banner found in the source text.
+const manifestPath = path.join(
+  websiteRoot,
+  "src",
+  "data",
+  "published-docs.generated.json",
 );
 
 function fail(message) {
@@ -450,10 +470,38 @@ const payload = {
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, JSON.stringify(payload, null, 2) + "\n");
+
+// Sorted by path so the file is byte-stable across runs and diffs review cleanly.
+const manifestFiles = Object.values(entries)
+  .filter((e) => e.publish)
+  .map((e) => ({ path: e.rel, bannered: e.layer === "archive" }))
+  .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+if (manifestFiles.length !== counts.published) {
+  fail(
+    `manifest has ${manifestFiles.length} entries but ${counts.published} docs ` +
+      `are published — the claim-lint manifest would not match the public surface.`,
+  );
+}
+
+fs.writeFileSync(
+  manifestPath,
+  JSON.stringify(
+    {
+      source: REGISTRY_REL,
+      generator: "website/scripts/gen-docs-classification.mjs",
+      count: manifestFiles.length,
+      files: manifestFiles,
+    },
+    null,
+    2,
+  ) + "\n",
+);
 console.log(
   `[gen-docs-classification] ${counts.total} docs → ` +
     `${counts.published} published ` +
     `(learn ${counts.learn} · reference ${counts.reference} · ` +
     `decisions ${counts.decisions} · archive ${counts.archive}), ` +
-    `${counts.withheld} withheld`,
+    `${counts.withheld} withheld; ` +
+    `claim-lint manifest ${manifestFiles.length} files`,
 );
