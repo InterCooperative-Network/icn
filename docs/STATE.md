@@ -1713,7 +1713,7 @@ Last Reviewed: 2026-07-28
 
 **Open software lanes (selected):** production trusted issuance (#2080); recurring assembled-image smoke (#2398); provider-boundary slice 3 (#2393); RPC credential lifetime (#2445); SDIS capability-vs-trust authority (#2447); unauthenticated anchor key rotation (#2448); community topic ownership (#2457).
 
-**Non-claims:** no production readiness, no formal pilot, no organizer acceptance, no human-accessibility sign-off, no live federation, no two-node proof, no signed or immutable appliance, no independent appliance restoration, no adopted deployment ADR, and no claim that kernel/app separation is complete.
+**Non-claims:** no production readiness, no formal pilot, no organizer acceptance, no human-accessibility sign-off, no live federation, no two-node proof, no signed or immutable appliance, no independent appliance restoration, and no claim that kernel/app separation is complete. The deployment ADR (ADR-0086) **is** adopted — accepted 2026-09-15, Alpha profile frozen at `860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1` — which grants none of the above: acceptance settles the classification and the frozen revision, and `implementation_status` remains *partially implemented*.
 
 ## Historical: Current status (2026-07-17 snapshot)
 
