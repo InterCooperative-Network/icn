@@ -108,7 +108,7 @@ non-claim</strong>. There is no &quot;then somehow this works&quot; edge.</p>
 <td>1</td>
 <td>substrate to reproducible node/profile</td>
 <td>appliance image + manifest; <code>icnctl appliance verify-manifest</code></td>
-<td>EXISTS; ADR-0086 merged (PR #2458) but <code>status: proposed</code> — reaching <strong><code>status: accepted</code></strong> (ADR-0018&#39;s lifecycle) is a separate decision, and <code>implementation_status</code> is a separate axis again</td>
+<td>EXISTS; <em>(post-snapshot addendum)</em> ADR-0086 reached <strong><code>status: accepted</code></strong> on 2026-09-15 through ADR-0018&#39;s lifecycle and the profile is frozen at <code>860c6f6c22f1</code>; at the snapshot revision it was still <code>proposed</code>. <code>implementation_status</code> remains a separate axis and is still <em>partially implemented</em></td>
 </tr>
 <tr>
 <td>2</td>
@@ -870,10 +870,10 @@ persisted, opaquely. What remains unresolved is what a V4 read surface should
 return, and whether decision-hash-addressable evidence is required when
 proposal-id-addressable signed evidence already exists.</li>
 <li><strong>The two-node plan is <code>Canonical: no</code>, last reviewed 2026-07-27</strong> — predating
-#2689. It references ADR-0086, which <strong>does</strong> exist on <code>main</code> (PR #2458
-merged 2026-07-28) but carries <code>status: proposed</code> and
-<code>implementation_status: partially implemented</code> — so the profile is proposed,
-not <code>accepted</code>.</li>
+#2689. <em>(Post-snapshot addendum.)</em> It references ADR-0086, which was
+<strong>accepted 2026-09-15</strong>; at the snapshot revision that status was still
+<code>proposed</code>. The two-node plan&#39;s own <code>Canonical: no</code> and review date are what
+remain stale here, not the ADR&#39;s status.</li>
 </ol>
 <hr>
 <h2 id="7-icn2466--recovery">7. icn#2466 — recovery</h2>
@@ -1194,8 +1194,8 @@ waiting on a human.</p>
 </thead>
 <tbody><tr>
 <td>Deployment profile</td>
-<td>BLOCKED</td>
-<td>ADR-0086 is merged but <code>status: proposed</code>; the freeze prerequisite is <strong><code>status: accepted</code></strong> per ADR-0018. Merged and partially implemented are neither of them. Two-node plan is <code>Canonical: no</code>.</td>
+<td><strong>FROZEN</strong></td>
+<td><em>(Post-snapshot addendum.)</em> ADR-0086 was <strong>accepted 2026-09-15</strong> and the Alpha profile is frozen at <code>860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1</code>. Freeze prerequisites closed: icn#2755 (native + every shipped drop-in pass the provisioned configuration) and the <code>UMask=0077</code> pin on both units that create <code>icnd</code>&#39;s files. <code>implementation_status</code> stays <em>partially implemented</em> — a separate axis. Two-node plan is still <code>Canonical: no</code>.</td>
 </tr>
 <tr>
 <td><strong>#2694</strong> semantic convergence</td>
@@ -1231,9 +1231,12 @@ waiting on a human.</p>
 <hr>
 <h2 id="11-critical-path-and-parallel-work">11. Critical path and parallel work</h2>
 <h3 id="critical-path">Critical path</h3>
-<pre><code class="language-text">#2750  (now the ONLY uncontained defect on the economic chain)
+<p><em>(Post-snapshot addendum: the first two rows below changed with the commit
+carrying them. At the snapshot revision #2750 was the open blocker and the
+profile freeze was pending <code>status: accepted</code>.)</em></p>
+<pre><code class="language-text">#2750  MERGED 2026-09-14 (80a5faf2c) — was the ONLY uncontained defect here
    v
-Alpha profile freeze  (needs ADR-0086 status: accepted)
+Alpha profile freeze  DONE 2026-09-15 -&gt; frozen at 860c6f6c22f1
    v
 #2694 slice 1 (#2695 GEN-A) -&gt; slice 2 (N1-D) -&gt; ... -&gt; slice 10 (V4)
    v
@@ -1337,10 +1340,12 @@ produces); Gates 4, 5 and 6; anything downstream of the profile freeze.</p>
 program has two disagreeing structures.</li>
 <li><strong>Land or close PR #2690</strong> (6.9.2), which carries the machine-readable
 <code>program_structure</code> domain this document deliberately does not duplicate.</li>
-<li><strong>Move ADR-0086 to <code>status: accepted</code>, or decline it</strong> through ADR-0018&#39;s
-lifecycle. It is merged but <code>status: proposed</code>, and <code>accepted</code> — not merged,
-not &quot;partially implemented&quot; — is what the profile gate waits on. Also whether
-the two-node plan should be promoted from <code>Canonical: no</code>.</li>
+<li><del><strong>Move ADR-0086 to <code>status: accepted</code>, or decline it</strong></del> — <strong>RESOLVED
+2026-09-15.</strong> Accepted through ADR-0018&#39;s lifecycle after the freeze
+prerequisites closed; the Alpha profile is frozen at <code>860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1</code>.
+<code>implementation_status</code> remains <em>partially implemented</em>, which is a separate
+axis. <strong>Still open:</strong> whether the two-node plan should be promoted from
+<code>Canonical: no</code>.</li>
 <li><strong>Decide what the typed chain/audit read surface returns</strong> (6.3) before a V4
 is specified, and whether conditional V3 emission becomes unconditional first.</li>
 <li><strong>Accept or reject the 5.3 evidence-strength taxonomy</strong>, which is proposed here
