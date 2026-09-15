@@ -260,6 +260,71 @@ fn the_shipped_unit_starts_a_daemon_that_uses_the_provisioned_treasury() {
     );
 }
 
+/// The pinned mask, as the Alpha profile declares it.
+const PINNED_UMASK: &str = "0077";
+
+fn declared_umask(unit: &Path) -> String {
+    let text = std::fs::read_to_string(unit)
+        .unwrap_or_else(|e| panic!("fixture: could not read {}: {e}", unit.display()));
+    text.lines()
+        .find_map(|l| l.trim().strip_prefix("UMask="))
+        .unwrap_or_else(|| {
+            panic!(
+                "{} creates icnd's files but pins no UMask, so they inherit \
+                 whatever mask the unit was started with",
+                unit.display()
+            )
+        })
+        .trim()
+        .to_string()
+}
+
+/// BOTH execution boundaries that create `icnd`'s files must pin the mask.
+///
+/// Named explicitly rather than discovered. An earlier version of this test
+/// looked for units whose text contained "icnd" and flagged
+/// `icn-demo-session.service`, which only names `/etc/icn/icnd.env` in a
+/// comment while running a Python seeder over HTTP. A predicate that produces
+/// false positives teaches the next reader to silence the test rather than
+/// trust it, and the two boundaries here are a closed, reviewable set:
+///
+/// * `icnd.service` runs the long-lived daemon;
+/// * `icn-appliance-firstboot.service` runs the script that runs
+///   `icnd --init`, which is what creates `identity.age`, `icn.toml` and
+///   `genesis.json` — asserted below rather than assumed.
+///
+/// The mask is compared for EQUALITY with the declared policy. Asserting only
+/// that owner bits survive would pass `UMask=0000`, which defeats the point.
+#[test]
+fn both_units_that_create_icnd_files_pin_the_declared_umask() {
+    let root = repo_root();
+
+    for unit in [
+        root.join("deploy").join("icnd.service"),
+        root.join("deploy/appliance/systemd/icn-appliance-firstboot.service"),
+    ] {
+        assert!(unit.is_file(), "fixture: missing {}", unit.display());
+        assert_eq!(
+            declared_umask(&unit),
+            PINNED_UMASK,
+            "{} must pin the profile's declared umask exactly",
+            unit.display()
+        );
+    }
+
+    // The firstboot unit only matters here because its script invokes the
+    // initializer. Prove that link instead of trusting the unit's name.
+    let script = root.join("deploy/appliance/scripts/icn-appliance-firstboot.sh");
+    let body = std::fs::read_to_string(&script)
+        .unwrap_or_else(|e| panic!("fixture: could not read {}: {e}", script.display()));
+    assert!(
+        body.contains("icnd --init") || body.contains("-- icnd \\"),
+        "{} is asserted to be the path that runs `icnd --init`; if that moved, \
+         the umask assertion above is guarding the wrong unit",
+        script.display()
+    );
+}
+
 /// B3 — the Alpha profile must pin the service umask, and the pin must have the
 /// effect it is pinned for.
 ///
@@ -290,13 +355,11 @@ fn the_pinned_umask_makes_daemon_created_files_owner_only() {
         .trim()
         .to_string();
 
-    // A mask that clears an owner bit is the hazard itself, not a fix.
-    let numeric = u32::from_str_radix(mask.trim_start_matches("0o"), 8)
-        .unwrap_or_else(|_| panic!("UMask={mask} is not octal"));
+    // Equality with the declared policy. `numeric & 0o600 == 0` would also pass
+    // `UMask=0000`, which masks nothing at all and is not the pin.
     assert_eq!(
-        numeric & 0o600,
-        0,
-        "UMask={mask} clears owner bits, which is the failure it exists to prevent"
+        mask, PINNED_UMASK,
+        "the unit must pin the profile's declared umask exactly"
     );
 
     let dir = TempDir::new().unwrap();

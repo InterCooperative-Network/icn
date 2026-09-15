@@ -11,6 +11,27 @@ ConditionPathExists=!/var/lib/icn/.firstboot-complete
 
 [Service]
 Type=oneshot
+
+# PINNED, matching icnd.service.
+#
+# THIS is the unit that runs `icnd --init`, so it is the one that creates
+# identity.age, icn.toml and genesis.json — and pinning the mask only on
+# icnd.service would leave all of that at whatever mask this unit inherited.
+#
+# Be precise about what a umask can and cannot do. It only ever REMOVES
+# permission bits (`mode & ~umask`), so an explicitly requested 0600 keystore
+# can never become more permissive than 0600 no matter how lax the inherited
+# mask is. Two real effects remain:
+#
+#   * files and directories created with ordinary default modes (0666 / 0777
+#     requested) are owner-only under 0077 instead of group- or world-readable.
+#     That is the security value here, and it covers everything initialization
+#     writes that does not carry an explicit mode;
+#   * an over-RESTRICTIVE inherited mask is the other hazard: 0377 would turn a
+#     0600 request into mode 000 and leave an unusable keystore or lock anchor.
+#     0077 clears group and other while leaving owner rw intact, so it avoids
+#     both ends.
+UMask=0077
 # RemainAfterExit=yes so `systemctl status` shows the unit as "active (exited)"
 # after a successful run, instead of "inactive (dead)". This makes the marker
 # inspectable from systemd and not just from the filesystem.
