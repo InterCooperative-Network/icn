@@ -39,6 +39,13 @@ Authority for this split:
   **draft, not accepted.** Names the six-domain split. It subordinates itself
   explicitly: "Where this RFC and ADR-0032 disagree, ADR-0032 wins." Everything
   in it beyond the truth boundary is exploratory framing.
+- [`docs/spec/icn-civic-shell-v0.md`](../spec/icn-civic-shell-v0.md) §"Domain and
+  route doctrine" — `Status: normative`. The strongest statement of what
+  `icn.zone` is *for*: "the short operational/access/discovery domain… Its job is
+  fast routing into action surfaces, not republishing ICN's public narrative."
+  It also fixes the status of every route name: `/status`, `/forge`, `/dev`,
+  `/docs`, **`/join`**, `/dashboard` are "examples only until a separate PR
+  proves any route live." And: "No DNS record is created or changed by this spec."
 - [DOMAIN_ROUTING_AND_DNS_BINDINGS.md](../architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md) —
   design-direction. Owns the hostname/authority distinction.
 - [ICN_ZONE_ROUTING.md](../deployment/ICN_ZONE_ROUTING.md) — a manual runbook,
@@ -117,6 +124,23 @@ rank — that is [MUST_NOT_SHIP](MUST_NOT_SHIP.md) §6 vocabulary and a category
 error besides. Standing is always shown *scoped*, and always with the basis that
 established it reachable.
 
+### 2.4a The authority direction is one-way
+
+[`icn-civic-shell-v0.md`](../spec/icn-civic-shell-v0.md) §"Authentication" is
+normative and this is the rule an access surface is most likely to violate,
+because every off-the-shelf pattern points the wrong way:
+
+```text
+permitted:  DID / ICN standing / mandate  →  short-lived service/session claim
+forbidden:  IdP group                     →  ICN authority
+```
+
+"Groups are projection state, not authority." An identity provider may carry
+browser-session state; none of them grants ICN authority by itself. A join
+surface that reads "user is in the `brightworks-members` group, therefore they
+are a member of Brightworks" has inverted the arrow and rebuilt the platform
+model inside the login box.
+
 ### 2.5 Truth-state and evidence patterns
 
 The two-axis pattern — maturity band + evidence class, always travelling
@@ -148,14 +172,37 @@ Two obligations bind harder on `icn.zone` than on the website:
   rejects English-only fixed-width UI. Reading pages degrade gracefully in a
   second language; an action card that clips its mandate text does not.
 
-### 2.7 The action-card contract
+### 2.7 The pre-confirm contract
 
-Any `icn.zone` surface that produces a receipt inherits
-[ADR-0027](../adr/ADR-0027-action-card-contract.md) in full: mandate,
-reversibility, and named receipt declared **before** the confirm step, plus sync
-state and — for governance actions — threshold and current tally
+Any `icn.zone` surface that mutates institutional state inherits the pre-confirm
+flow. **Two documents, and it is worth being precise about which owns what**,
+because the obvious citation is the wrong one:
+
+- **[`docs/spec/member-shell-v0.md`](../spec/member-shell-v0.md) §"Signing /
+  confirmation flow" owns the flow** — a normative ten-step contract opening
+  "No member action that mutates institutional state happens without passing
+  through a pre-confirm summary": review summary, authority basis, scope,
+  consequence, reversibility/challenge window, **named** receipt class, privacy
+  warning, offline/sync warning, distinct confirm/cancel affordances, and a
+  post-action receipt status. Irreversible actions require an explicit "this
+  cannot be undone" line and a second, distinct confirmation.
+- **[ADR-0027](../adr/ADR-0027-action-card-contract.md) owns the card's data
+  model**, not the flow. It defines the eight card elements and the closed
+  `card_kind` taxonomy. Steps 2 and 3 above render from its `authority_basis`
+  and `scope` fields.
+
+[MUST_NOT_SHIP](MUST_NOT_SHIP.md) §3 states the rule but attributes it to
+ADR-0027 alone; ADR-0027's text does not contain a pre-confirm contract. Cite
+`member-shell-v0.md` for the flow and ADR-0027 for the fields. Governance
+actions additionally render threshold and current tally above the confirm step
 ([CONTENT_STYLE_GUIDE](CONTENT_STYLE_GUIDE.md) §"Dangerous-action copy" v0.2
 fields 5 and 6).
+
+`MembershipApproval` and `MembershipDeparture` are already reserved
+`card_kind`s, so an admission flow does not require amending the taxonomy — but
+note that **`member-shell-v0.md` specifies no entry, onboarding, or admission
+surface at all.** It begins after a member already has standing. A join flow is
+new specification work, not an extension of an existing one.
 
 This is the single highest-risk inheritance. The website has no confirm buttons,
 so it has never had to honor this rule at runtime. `icn.zone` is the first
@@ -227,7 +274,69 @@ An implementation pass has to answer these; none are settled here.
 
 ---
 
-## 6 · Implementation brief for the next pass
+## 6 · The edge trust boundary
+
+[`ICN_ZONE_ROUTING.md`](../deployment/ICN_ZONE_ROUTING.md) §"Phase 2" specifies a
+Cloudflare Worker that "looks up code in Cloudflare KV **or** queries the ICN
+gateway API."
+
+That `or` is the whole architectural decision, and it is currently a disjunction
+inside a runbook step. The two branches are not variants of one design:
+
+- **Worker queries the ICN gateway.** Cloudflare is a proxy. ICN stays
+  authoritative. The edge sees a code in transit — unavoidable for any TLS
+  terminator — and stores nothing.
+- **Cloudflare KV holds the mapping.** Cloudflare becomes a store of record for
+  admission-adjacent data, inside the ICN trust boundary but outside ICN
+  governance, outside the repository, outside review, and outside
+  `just website-verify`.
+
+The runbook lists "Worker deployment does not require changes to the ICN Rust
+codebase" as a benefit. For a dumb redirect it is one. For anything that resolves
+a code it is a warning: it means the resolution logic is unversioned relative to
+the kernel it is fronting.
+
+### The layering
+
+The question is not "can Cloudflare route this?" It is which layers may sit
+outside the ICN trust boundary. Flattening these into one decision is the error.
+
+| Layer | Outside ICN? | Why |
+|---|---|---|
+| HTTP redirect, path preservation, TLS | **Yes** | No ICN semantics. This is what a CDN is for. |
+| Rate limiting, abuse control on code endpoints | **Yes** | Wants to be at the edge; carries no authority. |
+| Resolving an opaque code → *which public page to show* | **Only as a cache** of an ICN-authoritative answer, never as the store of record | A store of record at the edge means a KV misconfiguration can point a join code at an attacker-controlled destination. |
+| Deciding whether an invitation is **valid** | **No** | Validity is governed state. |
+| Membership / invite **authorization** | **No** | Mandate-gated (ADR-0027). |
+| **Admission** — actually making someone a member | **No** | A governed decision that must produce a receipt. |
+| Institutional **authority** | **No** | Lives in `InstitutionalDomain`. DNS never confers it. |
+| Identity information about the invitee | **No** | Must not persist at the edge in linkable form. |
+| Receipt issuance or validation | **No** | Kernel path, ADR-0026. |
+
+### The rule that keeps the line clean
+
+> **A short route resolves to a page, never to an outcome.**
+
+`/j/<code>` identifies *which invitation to display*. It must not itself admit
+anyone, grant standing, or create a record. Admission happens afterwards, inside
+ICN, under a mandate, producing a receipt — with the action-card contract
+(ADR-0027) satisfied at that step: mandate, reversibility, and named receipt
+declared before the member confirms.
+
+This rule is what makes the edge question tractable. Under it, even the KV
+variant holds only *code → which institution's public join page*, not *code →
+membership grant*. A URL that conveys an outcome is a bearer credential, and a
+bearer credential resolved by a third party is an authorization decision
+delegated outside the trust boundary.
+
+It leaks less, not nothing: an enumerable code→institution map still reveals
+which institutions exist and lets an attacker probe for live codes. So codes must
+be high-entropy, revocable, expiring, and rate-limited regardless of where they
+are resolved.
+
+---
+
+## 7 · Implementation brief for the next pass
 
 Smallest honest first slice, in order. Each step is independently shippable and
 none of them requires the step after it.
@@ -246,11 +355,37 @@ none of them requires the step after it.
    scope, authority, and what accepting would do — before any accept control.
    This is ADR-0027 applied at the entry point.
 
-**Preconditions.** RFC-0015 is still `draft`; its readiness audit records the
-disposition "supersede_or_amend for the canonical-surface section". The
-canonical-surface question should be settled — amended RFC or new ADR — before
-`icn.zone` acquires a UI, because that is the moment the two-surface split stops
-being theoretical.
+**Preconditions — RFC-0015 is not one of them.**
+
+It is tempting to read RFC-0015's `draft` status plus its readiness-audit
+disposition ("supersede_or_amend for the canonical-surface section") as a gate on
+this work. It is not, and treating it as one would block Slice 1 on a question
+that is already answered.
+
+The audit
+([`ops/coordination/RFC_ADR_READINESS_AUDIT.md:41`](../../ops/coordination/RFC_ADR_READINESS_AUDIT.md),
+2026-04-28) prescribed a specific remedy: *"add a status note in the RFC that
+ADR-0032 is the accepted policy for the canonical-truth-surface decision."*
+**That remedy was applied the same day** — the RFC's frontmatter records
+`updated: "2026-04-28" # ADR-0032 alignment note added`, and its §Status now
+carries a "Relationship to ADR-0032 (accepted)" section ending "Where this RFC
+and ADR-0032 disagree, ADR-0032 wins."
+
+What remains `draft` in RFC-0015 is the **learning-repo direction**, and every
+one of its five open questions is about `learn.icn.zone`, `cooperative-systems.org`,
+or `thesync.net`. None is about `icn.zone`. Its three design options differ only
+on where *learning* content lives; all three assign `icn.zone` the same role
+("utility routing — short links, QR, redirects, cluster subdomains"), so no
+option in the RFC is in tension with building it.
+
+The real preconditions are §5's, and only two of them gate Slice 1:
+
+1. **The edge trust boundary** (§5, "Who serves it") — unresolved, and it is the
+   one that matters. See §6.
+2. **What a code resolves to** — a design decision, not a doctrine one, but it
+   must be made before code is written rather than discovered afterwards. See §6.
+
+`DnsBinding` not existing in code gates `/n/<name>`, not `/j/<code>`.
 
 ---
 
