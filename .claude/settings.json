@@ -64,7 +64,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"branch: $(git branch --show-current 2>/dev/null || echo detached)\"",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/report-branch.sh",
             "timeout": 5,
             "statusMessage": "Current branch"
           },
