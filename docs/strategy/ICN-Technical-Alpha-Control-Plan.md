@@ -78,7 +78,7 @@ non-claim**. There is no "then somehow this works" edge.
 
 | # | Link | Resolves to | State at snapshot |
 |---|---|---|---|
-| 1 | substrate to reproducible node/profile | appliance image + manifest; `icnctl appliance verify-manifest` | EXISTS; ADR-0086 merged (PR #2458) but `status: proposed` — reaching **`status: accepted`** (ADR-0018's lifecycle) is a separate decision, and `implementation_status` is a separate axis again |
+| 1 | substrate to reproducible node/profile | appliance image + manifest; `icnctl appliance verify-manifest` | EXISTS; *(post-snapshot addendum)* ADR-0086 reached **`status: accepted`** on 2026-09-15 through ADR-0018's lifecycle and the profile is frozen at `860c6f6c22f1`; at the snapshot revision it was still `proposed`. `implementation_status` remains a separate axis and is still *partially implemented* |
 | 2 | to two-node communication | isolated QEMU topology in the two-node plan | EXISTS (plan, `Canonical: no`) |
 | 3 | to institution package/domain | `InstitutionBootstrapManifest` (`icn-governance/src/bootstrap.rs:14`); `icnctl institution runtime-root` | EXISTS but **disclaims canonical institution genesis** (6.6) |
 | 4 | to fresh current-semantic human Subject | `SubjectContextGenesisV1` | **SLICE — icn#2695** (design-reviewed, unimplemented) |
@@ -570,9 +570,10 @@ claim may depend on having passed it.
    return, and whether decision-hash-addressable evidence is required when
    proposal-id-addressable signed evidence already exists.
 4. **The two-node plan is `Canonical: no`, last reviewed 2026-07-27** — predating
-   #2689. It references ADR-0086, which was **accepted 2026-09-15**; the two-node
-   plan's own `Canonical: no` and review date are what remain stale here, not the
-   ADR's status.
+   #2689. *(Post-snapshot addendum.)* It references ADR-0086, which was
+   **accepted 2026-09-15**; at the snapshot revision that status was still
+   `proposed`. The two-node plan's own `Canonical: no` and review date are what
+   remain stale here, not the ADR's status.
 
 ---
 
@@ -744,8 +745,12 @@ waiting on a human.
 
 ### Critical path
 
+*(Post-snapshot addendum: the first two rows below changed with the commit
+carrying them. At the snapshot revision #2750 was the open blocker and the
+profile freeze was pending `status: accepted`.)*
+
 ```text
-#2750  (now the ONLY uncontained defect on the economic chain)
+#2750  MERGED 2026-09-14 (80a5faf2c) — was the ONLY uncontained defect here
    v
 Alpha profile freeze  DONE 2026-09-15 -> frozen at 860c6f6c22f1
    v
