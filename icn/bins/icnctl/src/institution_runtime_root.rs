@@ -544,7 +544,7 @@ fn treasury_keystore_path(data_dir: &Path) -> PathBuf {
 /// This does **not** fix #2725 itself: `init-coop`'s existing-config branch is a
 /// different caller with its own acceptance criteria and remains open.
 fn resolve_storage_root(data_dir: &Path) -> Result<()> {
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     if !config_path.exists() {
         return Ok(());
     }
@@ -795,7 +795,7 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
     // so reporting it as missing also breaks
     // `configuration validation should predict structural daemon acceptance`.
     let config_linkage = {
-        let path = data_dir.join("icn.toml");
+        let path = icn_core::config::config_file_path(data_dir);
         match std::fs::read_to_string(&path) {
             Ok(text) => toml::from_str::<toml::Value>(&text)
                 // A `[cooperative]` table is not a linkage; a `treasury_did` is.
@@ -2335,7 +2335,7 @@ fn verify_durable_state(
 
     // The configuration the daemon will actually parse, resolved through the
     // owner of that rule rather than by re-reading the key here.
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     let text = std::fs::read_to_string(&config_path)
         .with_context(|| format!("Verification: failed to read {}", config_path.display()))
         .map_err(uninspectable)?;
@@ -2774,7 +2774,7 @@ fn store_directory_exists(db: &Path) -> Result<bool> {
 fn refuse_if_the_configuration_is_hard_linked(data_dir: &Path) -> Result<()> {
     use std::os::unix::fs::MetadataExt as _;
 
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     let meta = match std::fs::symlink_metadata(&config_path) {
         Ok(meta) => meta,
         // Absent, or not a regular file: both are refused by other layers, with
@@ -2883,7 +2883,7 @@ fn open_store_refusing_links(db: &Path) -> Result<icn_store::SledStore> {
 
 /// Where publication stages the new configuration before renaming it into place.
 fn config_publish_tmp_path(data_dir: &Path) -> PathBuf {
-    data_dir.join("icn.toml").with_extension("toml.genesis-tmp")
+    icn_core::config::config_file_path(data_dir).with_extension("toml.genesis-tmp")
 }
 
 /// Refuse anything at the publication temporary path that cannot be written
@@ -3021,7 +3021,7 @@ pub fn refuse_if_new_files_would_not_belong_to_the_data_root_account(
 ///   before it replaces the file, closing the window between the two.
 #[cfg(unix)]
 fn refuse_if_the_configuration_belongs_to_another_account(data_dir: &Path) -> Result<()> {
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     let existing = match std::fs::symlink_metadata(&config_path) {
         Ok(meta) => meta,
         // No configuration yet: nothing to take away from anyone. Its absence
@@ -3065,7 +3065,7 @@ fn refuse_if_the_configuration_belongs_to_another_account(_data_dir: &Path) -> R
 /// section may already name a different treasury, and silently repointing a
 /// running institution's spend source is not this command's decision.
 fn check_config_linkable(data_dir: &Path) -> Result<()> {
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     if !config_path.exists() {
         bail!(
             "Refusing institutional runtime-root provisioning: there is no configuration at {} to \
@@ -3197,7 +3197,7 @@ fn check_config_linkable(data_dir: &Path) -> Result<()> {
 fn publish_cooperative_config(data_dir: &Path, name: &str, treasury_did: &Did) -> Result<()> {
     use std::io::Write as _;
 
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     // Re-checked here because this is the step that actually mutates the file;
     // the same preconditions were checked before the first write of the
     // ceremony so that a failure here is not the first sign of trouble.
@@ -3707,8 +3707,9 @@ fn print_receipt(data_dir: &Path, receipt: &RuntimeRootReceipt, provenance_verif
         \x20   icnd --config {} --data-dir {}\n\
          A daemon started without --config falls back to the node DID for\n\
          governance-authored ledger entries, whatever this receipt says. The\n\
-         shipped systemd unit does not pass --config yet (icn#2755).",
-        data_dir.join("icn.toml").display(),
+         shipped systemd unit passes it (icn#2755); a hand-rolled unit or a\n\
+         direct invocation must too.",
+        icn_core::config::config_file_path(data_dir).display(),
         data_dir.display()
     );
 }

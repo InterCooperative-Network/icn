@@ -328,7 +328,7 @@ Both are written to `/etc/icn/icnd.env` (mode `600`, owned `icn:icn`).
 up the env file and starts normally.
 
 To rotate: remove `/var/lib/icn/.firstboot-complete` AND the keystore
-file `/var/lib/icn/identity.age` (plus `config.toml` / `genesis.json` in
+file `/var/lib/icn/identity.age` (plus `icn.toml` / `genesis.json` in
 the same directory), then reboot or rerun firstboot.
 
 ## Demo profile (DEV/DEMO image variant)

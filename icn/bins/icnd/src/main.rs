@@ -379,7 +379,8 @@ async fn build_services(
 /// Creates:
 /// 1. Data directory structure
 /// 2. Age-encrypted keystore with a new Ed25519 identity
-/// 3. `config.toml` with sane defaults for the node
+/// 3. `icn.toml` with sane defaults for the node (the canonical native
+///    configuration path; see `icn_core::config::config_file_path`)
 /// 4. `genesis.json` sealing the initial network identity and seed peers
 ///
 /// Uses `ICN_KEYSTORE_PASSPHRASE` env var or prompts interactively.
@@ -393,7 +394,11 @@ fn handle_init(args: &Args) -> Result<()> {
         .with_context(|| format!("Failed to create data directory: {}", data_dir.display()))?;
 
     let keystore_path = data_dir.join("identity.age");
-    let config_path = data_dir.join("config.toml");
+    // The canonical native configuration path, owned by `icn-core` rather than
+    // re-derived here. `icnd --init` previously wrote `config.toml`, which
+    // startup never loads — so the file this command created was not the file
+    // the daemon read (icn#2755).
+    let config_path = icn_core::config::config_file_path(&data_dir);
 
     // Check if already initialized
     if keystore_path.exists() {
@@ -667,6 +672,34 @@ async fn main() -> Result<()> {
 
     // Load or create config (before tracing init so we can use tracing config)
     let mut config = if let Some(config_path) = &args.config {
+        // Name the legacy file when it is the likely cause. A node installed
+        // before icn#2755 has `config.toml` and no `icn.toml`, and the shipped
+        // unit now asks for the latter — so "Failed to load config file" would
+        // be true and useless. This does NOT read `config.toml`: there is
+        // deliberately no dual-path discovery, because a loader that searches
+        // two names answers differently depending on which files happen to
+        // exist. It only explains what an operator is looking at.
+        if !config_path.exists() {
+            if let Some(dir) = config_path.parent() {
+                let legacy = dir.join("config.toml");
+                if legacy.is_file() {
+                    anyhow::bail!(
+                        "Configuration not found at {}, but a legacy {} exists.\n\
+                         \n\
+                         `icn.toml` is the canonical native configuration (icn#2755); \
+                         `config.toml` is deprecated and is NOT auto-discovered. This \
+                         node predates that change. Either point this invocation at the \
+                         old file explicitly with `--config {}`, or provision a \
+                         `{}` — existing installs are not an upgrade target of the \
+                         Technical Alpha profile.",
+                        config_path.display(),
+                        legacy.display(),
+                        legacy.display(),
+                        config_path.display()
+                    );
+                }
+            }
+        }
         Config::from_file(config_path).context("Failed to load config file")?
     } else {
         Config::default()

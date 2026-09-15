@@ -12,11 +12,38 @@ Group=icn
 # Working directory
 WorkingDirectory=/var/lib/icn
 
+# File-creation mask.
+#
+# PINNED for the Alpha profile, and it does two distinct jobs.
+#
+# A umask only ever REMOVES permission bits (`mode & ~umask`). So an explicitly
+# requested 0600 file — the keystore, the data-directory lock anchor, the
+# runtime-root files — cannot be made MORE permissive by a lax inherited mask.
+# What 0077 buys is everything created with an ordinary default mode (0666 /
+# 0777 requested): under 0077 those land owner-only rather than group- or
+# world-readable.
+#
+# The opposite end is the hazard the containment ledger names: an
+# over-restrictive inherited mask such as 0377 turns a 0600 request into mode
+# 000, leaving an unusable lock anchor or runtime-root file. 0077 clears group
+# and other while leaving owner rw intact (`0o600 & ~0o077 == 0o600`), so it
+# avoids both ends. systemd applies it before ExecStart, so it covers every
+# file the daemon creates regardless of the invoking shell.
+UMask=0077
+
 # Environment
 EnvironmentFile=-/etc/icn/icnd.env
 
 # Command - passphrase must be provided via environment or file
+# --config is LOAD-BEARING. Without it `icnd` builds `Config::default()`, whose
+# `cooperative.treasury_did` is None, and the ledger silently falls back to the
+# NODE DID for budget payouts — so a provisioned institutional runtime root had
+# no effect on the daemon an operator actually runs (icn#2755). The path is the
+# canonical native configuration location owned by
+# `icn_core::config::config_file_path`, and it is exactly what `icnctl
+# institution runtime-root create` publishes and `icnd --init` writes.
 ExecStart=/usr/local/bin/icnd \
+    --config /var/lib/icn/icn.toml \
     --data-dir /var/lib/icn \
     --gateway-enable \
     --gateway-bind 127.0.0.1:8080

@@ -10,7 +10,7 @@
 #   - When ICN_FIRSTBOOT_INIT_IDENTITY=1 (default), generates a per-instance
 #     JWT secret + keystore passphrase, writes them to /etc/icn/icnd.env
 #     (mode 600, owned icn:icn), and runs `icnd --init` to seal the
-#     keystore + write config.toml/genesis.json under /var/lib/icn.
+#     keystore + write icn.toml/genesis.json under /var/lib/icn.
 #     The image itself contains NO secrets; everything is generated on
 #     this specific boot.
 #   - Optionally installs the icnd.service unit if it can be found
@@ -53,7 +53,7 @@
 #   NOT embedded in the appliance image; they are generated per-VM on first
 #   boot and written to /etc/icn/icnd.env (mode 600). To rotate, remove
 #   /var/lib/icn/.firstboot-complete AND the keystore file
-#   (/var/lib/icn/identity.age plus config.toml/genesis.json in the same
+#   (/var/lib/icn/identity.age plus icn.toml/genesis.json in the same
 #   directory), then re-run.
 #
 # This script is intended to be safe to re-run. It will no-op once the
@@ -68,7 +68,7 @@ ICN_CONFIG_DIR="${ICN_CONFIG_DIR:-/etc/icn}"
 ICN_LOG_DIR="${ICN_LOG_DIR:-/var/log/icn}"
 ICN_USER="${ICN_USER:-icn}"
 
-# Ports written into the generated config.toml. These match the runtime
+# Ports written into the generated icn.toml. These match the runtime
 # binds in deploy/icnd.service (--gateway-bind 127.0.0.1:8080) and the
 # scaffold defaults in /etc/icn/appliance.env. Override via env if needed.
 ICN_FIRSTBOOT_INIT_GATEWAY_PORT="${ICN_FIRSTBOOT_INIT_GATEWAY_PORT:-8080}"
@@ -221,7 +221,7 @@ fi
 #                           contains ICN_GATEWAY_JWT_SECRET and
 #                           ICN_KEYSTORE_PASSPHRASE for systemd
 #                           EnvironmentFile=-/etc/icn/icnd.env consumption.
-#   /var/lib/icn/...        icnd --init writes identity, config, and genesis.
+#   /var/lib/icn/...        icnd --init writes identity, icn.toml, and genesis.
 #
 # This block is opt-out: set ICN_FIRSTBOOT_INIT_IDENTITY=0 to skip it (the
 # operator then manages secrets and identity by hand, matching the
@@ -288,10 +288,10 @@ init_identity_block() {
 
     # Run icnd --init as the icn user. The passphrase comes from env, so
     # the call is non-interactive. icnd --init creates identity.age,
-    # config.toml, and genesis.json under $ICN_DATA_DIR, then exits.
+    # icn.toml, and genesis.json under $ICN_DATA_DIR, then exits.
     #
     # --init-gateway-port / --init-gossip-port are written into the generated
-    # config.toml so the persisted config matches deploy/icnd.service's
+    # icn.toml so the persisted config matches deploy/icnd.service's
     # runtime --gateway-bind and the appliance.env scaffold defaults. Without
     # these, icnd --init defaults to gateway:8000 / gossip:9000, which would
     # drift from the runtime bind and from appliance.env's documented ports.
@@ -369,7 +369,7 @@ cat <<'EOF_NEXT'
   1) Per-instance secrets and identity have been generated at /etc/icn/icnd.env
      (mode 600) and /var/lib/icn/ — these are local to this VM only and were
      NOT in the appliance image. To rotate, remove the firstboot marker AND
-     the keystore file (/var/lib/icn/identity.age plus config.toml/genesis.json
+     the keystore file (/var/lib/icn/identity.age plus icn.toml/genesis.json
      in the same directory), then re-run.
 
   2) Select a role profile from /etc/icn/roles/ and apply it deliberately.

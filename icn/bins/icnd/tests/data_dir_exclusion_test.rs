@@ -187,7 +187,8 @@ fn a_running_daemon_keeps_the_configuration_it_consumed_when_its_storage_is_else
     );
 
     let config = config_root.path().join("icn.toml");
-    let generated = std::fs::read_to_string(data_root.path().join("config.toml")).unwrap();
+    let generated =
+        std::fs::read_to_string(icn_core::config::config_file_path(data_root.path())).unwrap();
     // Bind loopback rather than every interface: this witness needs a daemon
     // that stays up, not one that fights the host for a wildcard address.
     let loopback = generated.replace("0.0.0.0:", "127.0.0.1:");
@@ -407,7 +408,7 @@ fn validate_config_rejects_a_treasury_did_the_daemon_would_refuse() {
         String::from_utf8_lossy(&init.stdout),
         String::from_utf8_lossy(&init.stderr)
     );
-    let base = std::fs::read_to_string(dir.path().join("config.toml")).unwrap();
+    let base = std::fs::read_to_string(icn_core::config::config_file_path(dir.path())).unwrap();
     assert!(
         base.contains("[cooperative]"),
         "fixture: the generated config is expected to carry an empty [cooperative] section"
@@ -539,7 +540,7 @@ fn the_daemon_refuses_to_create_its_lock_under_the_wrong_account() {
         String::from_utf8_lossy(&init.stdout),
         String::from_utf8_lossy(&init.stderr)
     );
-    let config = dir.path().join("config.toml");
+    let config = icn_core::config::config_file_path(dir.path());
     let lock = dir.path().join(".icn-data-dir.lock");
     let _ = std::fs::remove_file(&lock);
     assert!(
