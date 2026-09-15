@@ -16,9 +16,9 @@
 
 use ed25519_dalek::SigningKey;
 use icn_identity::authority_log::{
-    authorize_event, sign_body, AdmissionError, AuthorityBody, CapabilitySet, CodecError,
-    ContextNonce, ContinuityRoot, DeviceCapability, EventId, PrincipalKey, SubjectId, ValiditySpan,
-    WitnessSignature,
+    authorize_event, sign_body, AdmissionError, AuthorityBody, AuthorityStore, AuthorityView,
+    CapabilitySet, CodecError, ContextNonce, ContinuityRoot, DeviceCapability, EventId,
+    PrincipalKey, SignedAuthorityEvent, SubjectId, ValiditySpan, WitnessSignature,
 };
 use icn_identity::subject_context::{
     alpha_initial_device_capabilities, incept_subject_context_v1, initial_device_binding_ref,
@@ -718,6 +718,108 @@ fn a_validity_span_is_rejected_by_the_alpha_profile() {
         verify_vector(&bundle),
         GenesisVerifyError::UnexpectedValiditySpan
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// The GEN-A bootstrap separation invariant: the initial device must not be the Subject's own
+// generation-0 establishment authority.
+// ---------------------------------------------------------------------------------------------
+
+/// Construction refuses to mint a genesis whose device credential is also the authority-log
+/// writer key.
+#[test]
+fn construction_rejects_the_root_authority_as_the_initial_device() {
+    let d = vector_descriptor();
+    let root = vector_root(&d);
+    let authority = root.authority_set(0).canonical_signer().unwrap();
+
+    assert_eq!(
+        incept_subject_context_v1(&d, &root, authority).unwrap_err(),
+        SubjectContextError::InitialDeviceIsAuthority
+    );
+}
+
+/// The important half: an externally assembled bundle cannot bypass the constructor.
+///
+/// This history is **valid N1**. The authorize event is admissible, its signer genuinely holds
+/// generation-0 authority, and N1's own fold produces a live grant naming that principal as a
+/// device. Nothing in N1 objects. GEN-A rejects it anyway, because the Alpha profile requires
+/// the bootstrap device and the establishment authority to be distinct principals — a device
+/// credential that is also the log writer is not a narrow credential at all.
+#[test]
+fn verification_rejects_an_externally_assembled_bundle_whose_device_is_the_root_authority() {
+    let d = vector_descriptor();
+    let root = vector_root(&d);
+    let base = incept_subject_context_v1(&d, &root, device_principal()).unwrap();
+    let (subject, prev) = vector_subject_and_inception();
+    let authority = root.authority_set(0).canonical_signer().unwrap();
+
+    // Assemble the bundle by hand, exactly as a hostile or naive third party could.
+    let event = authorize_event(
+        &root.authority_signing_key(0),
+        subject,
+        1,
+        prev,
+        authority,
+        alpha_initial_device_capabilities(),
+        None,
+    );
+
+    // First establish that N1 is perfectly happy with this event.
+    assert!(
+        icn_identity::authority_log::admissible(&event.body, &event.signature).is_ok(),
+        "the event must be N1-admissible for this test to mean anything"
+    );
+    let mut store = AuthorityStore::new();
+    store
+        .ingest(&SignedAuthorityEvent::new(
+            AuthorityBody::decode(&base.inception_body_bytes).unwrap(),
+            base.inception_witness,
+        ))
+        .unwrap();
+    store.ingest(&event).unwrap();
+    match icn_identity::authority_log::derive(subject, &store) {
+        AuthorityView::Live { state, frontier } => {
+            assert_eq!(frontier, 2, "N1 folds the grant into the chain");
+            assert!(
+                state.devices.contains_key(&authority),
+                "N1 derives a live device grant for the authority principal"
+            );
+        }
+        other => panic!("expected N1 to accept this history, got {other:?}"),
+    }
+
+    // GEN-A refuses it regardless.
+    let bundle = SubjectContextGenesisV1 {
+        authorize_body_bytes: event.body.canonical_bytes(),
+        authorize_witness: event.signature,
+        ..base
+    };
+    assert_eq!(
+        verify_vector(&bundle),
+        GenesisVerifyError::InitialDeviceIsAuthority
+    );
+}
+
+/// A device distinct from the authority is still accepted — the rule is about principal
+/// identity, not about being adjacent to the genesis.
+#[test]
+fn an_ordinary_distinct_device_is_still_accepted() {
+    let d = vector_descriptor();
+    let root = vector_root(&d);
+    let other =
+        PrincipalKey::try_from_verifying_key(SigningKey::from_bytes(&[0x5c; 32]).verifying_key())
+            .unwrap();
+    assert_ne!(other, root.authority_set(0).canonical_signer().unwrap());
+
+    let bundle = incept_subject_context_v1(&d, &root, other).unwrap();
+    let v = verify_subject_context_genesis_v1(
+        &bundle,
+        SubjectContextKind::GovernanceDomainV1,
+        VECTOR_CONTEXT_ID,
+    )
+    .unwrap();
+    assert_eq!(v.device, other);
 }
 
 /// The load-bearing one: an authorize event signed by a key the Subject never established is

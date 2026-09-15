@@ -31,8 +31,8 @@ preimage or digest rule is altered or extended.**
 A verified `SubjectContextGenesisV1` proves exactly this:
 
 > A fresh N1 Subject was incepted for one explicitly named governance-domain context, with one
-> narrow initial device authorization, under existing N1 authority-log semantics, without any
-> registrar.
+> narrow initial device authorization to a principal **distinct from the Subject's establishment
+> authority**, under existing N1 authority-log semantics, without any registrar.
 
 It **does not** establish, imply or contribute to: institutional recognition; membership or
 standing; governance participation or voting rights; economic authority or settlement capacity;
@@ -216,6 +216,32 @@ receives the continuity or root authority key — and genesis never receives the
 key either. The authorize event is signed by the Subject's generation-0 authority, so only the
 device's **public** Principal is required, and that is all the construction API accepts.
 
+#### The bootstrap separation invariant
+
+```text
+initial_device_principal MUST NOT be a member of the inception body's initial_authority set
+```
+
+That set is the generation-0 establishment authority — in N1's terms, the `PrincipalSet` carried
+as `initial_authority` in the `Inception` body, whose sole member is also the inception `signer`.
+
+A capability set attenuates what a principal may *do*; it cannot attenuate what that principal
+already *is*. If the device principal is the establishment authority, the narrow
+`{Sign, Present}` credential is simultaneously the authority-log writer key, and whoever holds it
+can mint arbitrary authorize and revoke events — the grant's narrowness is illusory.
+
+**This is where GEN-A is deliberately stricter than N1.** Such a history is entirely valid N1:
+the authorize event is admissible, its signer genuinely holds authority, and N1's fold yields a
+live device grant. Nothing in N1 objects. The Alpha profile refuses it anyway.
+
+```text
+N1-valid authority history  ≠  valid GEN-A profile
+```
+
+Scope: this is the GEN-A **bootstrap** rule, about the position-1 genesis grant. It is not a
+universal claim about every future device, nor about whether some later profile might authorize a
+principal that holds establishment authority under different semantics.
+
 ### 6.4 Semantic references (witness-independent)
 
 ```text
@@ -259,13 +285,26 @@ Given a bundle and an independently supplied `(claimed_kind, claimed_context_id)
 8. Require the authorize body names the derived Subject, is at position `1`, has
    `prev_digest == inception_event_id`, grants exactly `{Sign, Present}`, and has no validity
    span.
-9. Ingest both events into a **fresh** `AuthorityStore` and run N1's existing `derive(subject)`.
-10. Require a clean `AuthorityView::Live` at frontier `2` carrying exactly one device grant, for
+9. Require the authorized device is **not** a member of the decoded inception body's
+    `initial_authority` set (the bootstrap separation invariant). Read from the inception body,
+    never from a bundle-supplied assertion — a bundle may be assembled by anyone, so the
+    constructor's refusal cannot be relied on here.
+10. Ingest both events into a **fresh** `AuthorityStore` and run N1's existing `derive(subject)`.
+11. Require a clean `AuthorityView::Live` at frontier `2` carrying exactly one device grant, for
     the device the authorize body names, with exactly the expected capabilities, no validity
-    span, and `granted_at == 1`.
-11. Recompute both references (§6.4) from body/event references, witnesses excluded.
+    span, and `granted_at == 1`; and require the device is absent from the derived authority set.
+12. Recompute both references (§6.4) from body/event references, witnesses excluded.
 
-Step 9 is load-bearing and not redundant with step 7. Admission proves only *"some key signed
+**Which check is load-bearing.** Step 9 is the one that enforces the separation: it holds
+before any derivation runs and reads the authority set straight out of the decoded inception
+body. The derived-authority clause in step 11 is *equivalent* for a two-event genesis bundle and
+cannot fire on its own — no establishment event can occupy position 1, so the fold never advances
+past generation 0 and the derived authority set is still the inception's `initial_authority`. It
+is kept because it states the invariant against the structure a reader cares about ("the device
+is not a log writer in the derived history") and would keep holding if a later profile ever
+admitted a bundle whose prefix contains a rotation.
+
+Step 10 is load-bearing and not redundant with step 7. Admission proves only *"some key signed
 these bytes"* — an authorize event signed by an arbitrary key is perfectly admissible. Only the
 derived fold answers *"did that key hold authority in this Subject's history?"*
 
@@ -324,7 +363,9 @@ relabelling a bundle into another context; mutated salt; trailing bytes on a can
 inception witness; bad authorize witness; authorize naming another Subject; wrong position; wrong
 parent; extra capability; missing capability; `Recover` capability; validity span present;
 inception body in the authorize slot and vice versa; an authorize event that is **admissible but
-unauthorized**; a continuity root built with a foreign nonce.
+unauthorized**; a continuity root built with a foreign nonce; **the generation-0 establishment
+authority named as the initial device — refused both at construction and, for an externally
+assembled bundle, at verification, with the test first proving N1 itself accepts that history**.
 
 Plus the positive structural obligations: byte-identical reproduction from the same full
 configuration; different context, salt, or plan/horizon all change the Subject; two Subjects in

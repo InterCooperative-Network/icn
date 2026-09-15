@@ -26,6 +26,24 @@
 //! guardian recovery, replication or finality. Each of those is a later, separate fact that may
 //! *reference* [`SubjectContextRef`] — none of them is implied by it.
 //!
+//! # The bootstrap separation invariant
+//!
+//! The initial device principal **MUST NOT** be a member of the inception's generation-0
+//! establishment authority set. A capability set attenuates what a principal may *do*; it cannot
+//! attenuate what that principal already *is*. If the device principal is the establishment
+//! authority, then the narrow `{Sign, Present}` credential is simultaneously the authority-log
+//! writer key, and whoever holds it can mint arbitrary authorize and revoke events — so the
+//! grant's narrowness is illusory.
+//!
+//! N1 has no objection to such a history: the authorize event is admissible, its signer really
+//! does hold authority, and the fold yields a live grant. **GEN-A is deliberately stricter than
+//! N1 validity here.** Both [`incept_subject_context_v1`] and
+//! [`verify_subject_context_genesis_v1`] enforce it, the latter independently, because a bundle
+//! may be assembled by anyone.
+//!
+//! This is the GEN-A *bootstrap* rule. It says nothing about whether some future profile may let
+//! a Subject authorize a device that holds establishment authority under different semantics.
+//!
 //! **Nor is it a current-authority statement.** Verification folds a *fresh* store holding only
 //! the two genesis events, so a verified bundle says the device **was** authorized at position
 //! 1, never that it is authorized **now**. A later revocation or rotation is simply not in the
@@ -361,6 +379,9 @@ pub enum SubjectContextError {
     /// The supplied continuity root does not carry this descriptor's derived nonce.
     #[error("continuity root's context nonce does not match the descriptor's derived nonce")]
     ContextNonceMismatch,
+    /// The initial device principal is the Subject's own generation-0 establishment authority.
+    #[error("initial device principal must not be the generation-0 establishment authority")]
+    InitialDeviceIsAuthority,
     /// N1 refused to construct the inception body.
     #[error("N1 inception construction failed: {0}")]
     Construct(#[from] ConstructError),
@@ -413,6 +434,13 @@ pub enum GenesisVerifyError {
     /// The grant carries a validity span; the Alpha profile requires none.
     #[error("authorize event carries a validity span; the Alpha genesis profile requires none")]
     UnexpectedValiditySpan,
+    /// The authorized device is the inception's own establishment authority.
+    ///
+    /// N1 accepts such a history: the authorize event is admissible, its signer holds authority,
+    /// and the derived grant is live. GEN-A refuses it anyway — see the module docs on the
+    /// bootstrap separation invariant.
+    #[error("initial device principal is the inception's establishment authority")]
+    InitialDeviceIsAuthority,
     /// Derivation did not yield a clean live authority view.
     #[error("derived authority view is not live and clean for this subject")]
     AuthorityNotLive,
@@ -488,6 +516,17 @@ pub fn incept_subject_context_v1(
 ) -> Result<SubjectContextGenesisV1, SubjectContextError> {
     if root.context_nonce() != descriptor.context_nonce() {
         return Err(SubjectContextError::ContextNonceMismatch);
+    }
+
+    // The bootstrap device must not BE the Subject's establishment authority. A device grant
+    // attenuates what a principal may do, but it cannot attenuate what that principal already
+    // is: if the device principal is the generation-0 authority, then the "narrow" device
+    // credential is also the authority-log writer key, and whoever holds it can mint authorize
+    // and revoke events at will. That collapses device capability into establishment authority
+    // — exactly the separation GEN-A exists to hold — so it is refused here rather than
+    // produced and left for a verifier to catch.
+    if root.authority_set(0).members().contains(&device) {
+        return Err(SubjectContextError::InitialDeviceIsAuthority);
     }
 
     let inception = root.incept()?;
@@ -599,6 +638,22 @@ pub fn verify_subject_context_genesis_v1(
         return Err(GenesisVerifyError::UnexpectedValiditySpan);
     }
     let device = authorize.device;
+
+    // The GEN-A bootstrap separation invariant, enforced independently of the constructor
+    // because a bundle may be assembled by anyone.
+    //
+    // This is the LOAD-BEARING check: it reads the authority set out of the *decoded inception
+    // body*, never from a bundle-supplied assertion, and it holds before any derivation runs.
+    // N1 itself has no objection to this configuration — the authorize event is admissible, the
+    // signer genuinely holds authority, and the fold yields a live grant — so nothing downstream
+    // of N1 would reject it. GEN-A is deliberately stricter than N1 validity here: the Alpha
+    // profile requires the bootstrap device and the establishment authority to be distinct
+    // principals, because one key that is both is a device credential that can rewrite the
+    // authority log.
+    if inception.initial_authority.members().contains(&device) {
+        return Err(GenesisVerifyError::InitialDeviceIsAuthority);
+    }
+
     let initial_authorize_event_id = authorize_body.event_id();
 
     // 9-10. Fold both events through N1's own derivation. This is what distinguishes an
@@ -638,6 +693,16 @@ pub fn verify_subject_context_genesis_v1(
         || authority.devices.len() != 1
     {
         return Err(GenesisVerifyError::DeviceGrantMismatch);
+    }
+    // Defence in depth over the derived writer set. For a two-event genesis bundle this is
+    // *equivalent* to the check above and cannot fire on its own: no establishment event can
+    // occupy position 1, so the fold never advances past generation 0 and the derived authority
+    // set is still the inception's `initial_authority`. It is kept because it states the
+    // invariant against the structure a reader actually cares about — "the device is not a log
+    // writer in the derived history" — and would keep holding if a later profile ever admitted a
+    // bundle whose prefix contains a rotation.
+    if authority.authority.contains(&device) {
+        return Err(GenesisVerifyError::InitialDeviceIsAuthority);
     }
 
     // 11. Both references are recomputed from semantic body/event references. Witness bytes are
