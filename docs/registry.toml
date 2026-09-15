@@ -730,7 +730,7 @@ category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-09-14"
+last_updated = "2026-09-15"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -762,7 +762,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-07-28"
+last_updated = "2026-09-15"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -4726,14 +4726,16 @@ audiences = ["architects", "developers"]
 
 [docs."docs/adr/ADR-0086-deployment-profiles.md"]
 # DOC status is "living" because ADRs remain institutional memory at their
-# canonical path. The DECISION lifecycle inside the ADR is still "proposed",
-# so the truth class remains descriptive until that decision is adopted.
+# canonical path. The DECISION inside the ADR was ADOPTED on 2026-09-15, so the
+# truth class advances to normative per the rule this comment previously stated.
+# Decision status and implementation_status stay separate axes (ADR-0018 § 3):
+# the decision is in force while the implementation remains partial.
 category = "architecture"
 status = "living"
-truth_class = "descriptive"
+truth_class = "normative"
 title = "ADR-0086: ICN Deployment Profiles and Public/Private Infrastructure Boundary"
-description = "Proposed four-profile deployment decision: Debian appliance as the canonical sovereign-node artifact; disposable Compose devnet for development; Kubernetes/K3s as optional hosted/operator infrastructure; advanced native Linux. Separates generic public product artifacts from private deployment automation and preserves explicit recovery, signing, two-node, production, and federation nonclaims. Independent appliance restoration is recorded as blocked by TWO independent causes: the backup omits the secret-bearing environment file, and a restored ledger cannot be shown to be complete (#2746; the independent evidence this needs is owned by #2786, where the mechanism is not yet selected)."
-last_updated = "2026-09-14"
+description = "ACCEPTED 2026-09-15; Alpha profile frozen at main 860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1. Four-profile deployment decision: Debian appliance as the canonical sovereign-node artifact; disposable Compose devnet for development; Kubernetes/K3s as optional hosted/operator infrastructure; advanced native Linux. Separates generic public product artifacts from private deployment automation and preserves explicit recovery, signing, two-node, production, and federation nonclaims. Independent appliance restoration is recorded as blocked by TWO independent causes: the backup omits the secret-bearing environment file, and a restored ledger cannot be shown to be complete (#2746; the independent evidence this needs is owned by #2786, where the mechanism is not yet selected). Acceptance settles the classification and the frozen revision; it certifies no production readiness and closes no open item."
+last_updated = "2026-09-15"
 owner = "matt"
 audiences = ["architects", "developers", "operators"]
 

@@ -550,7 +550,7 @@ Live status reports and deployment verification:
 Formal architectural decisions:
 
 - [ADR-0010-app-topology.md](adr/ADR-0010-app-topology.md) - App topology decision
-- [ADR-0086-deployment-profiles.md](adr/ADR-0086-deployment-profiles.md) - Deployment profiles and the public/private infrastructure boundary: Debian appliance as the canonical sovereign-node artifact, Docker Compose as the disposable development network, Kubernetes/K3s as optional hosted operator infrastructure, native Linux as an advanced installation form. **`status: proposed`, `implementation_status: partially implemented`** — merging the record does not adopt the decision, and only the appliance profile has a retained build-and-boot witness
+- [ADR-0086-deployment-profiles.md](adr/ADR-0086-deployment-profiles.md) - Deployment profiles and the public/private infrastructure boundary: Debian appliance as the canonical sovereign-node artifact, Docker Compose as the disposable development network, Kubernetes/K3s as optional hosted operator infrastructure, native Linux as an advanced installation form. **`status: accepted` (2026-09-15), `implementation_status: partially implemented`** — the Alpha profile is frozen at `860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1`. Merging the record did not adopt the decision; acceptance was a separate act, and it settles the classification and the frozen revision without certifying production readiness. Only the appliance profile has a retained build-and-boot witness, and independent restoration is still blocked
 - Additional ADRs as numbered documents
 
 ### Templates (`templates/`)

@@ -78,7 +78,7 @@ non-claim**. There is no "then somehow this works" edge.
 
 | # | Link | Resolves to | State at snapshot |
 |---|---|---|---|
-| 1 | substrate to reproducible node/profile | appliance image + manifest; `icnctl appliance verify-manifest` | EXISTS; ADR-0086 merged (PR #2458) but `status: proposed` — reaching **`status: accepted`** (ADR-0018's lifecycle) is a separate decision, and `implementation_status` is a separate axis again |
+| 1 | substrate to reproducible node/profile | appliance image + manifest; `icnctl appliance verify-manifest` | EXISTS; *(post-snapshot addendum)* ADR-0086 reached **`status: accepted`** on 2026-09-15 through ADR-0018's lifecycle and the profile is frozen at `860c6f6c22f1`; at the snapshot revision it was still `proposed`. `implementation_status` remains a separate axis and is still *partially implemented* |
 | 2 | to two-node communication | isolated QEMU topology in the two-node plan | EXISTS (plan, `Canonical: no`) |
 | 3 | to institution package/domain | `InstitutionBootstrapManifest` (`icn-governance/src/bootstrap.rs:14`); `icnctl institution runtime-root` | EXISTS but **disclaims canonical institution genesis** (6.6) |
 | 4 | to fresh current-semantic human Subject | `SubjectContextGenesisV1` | **SLICE — icn#2695** (design-reviewed, unimplemented) |
@@ -570,10 +570,10 @@ claim may depend on having passed it.
    return, and whether decision-hash-addressable evidence is required when
    proposal-id-addressable signed evidence already exists.
 4. **The two-node plan is `Canonical: no`, last reviewed 2026-07-27** — predating
-   #2689. It references ADR-0086, which **does** exist on `main` (PR #2458
-   merged 2026-07-28) but carries `status: proposed` and
-   `implementation_status: partially implemented` — so the profile is proposed,
-   not `accepted`.
+   #2689. *(Post-snapshot addendum.)* It references ADR-0086, which was
+   **accepted 2026-09-15**; at the snapshot revision that status was still
+   `proposed`. The two-node plan's own `Canonical: no` and review date are what
+   remain stale here, not the ADR's status.
 
 ---
 
@@ -731,7 +731,7 @@ waiting on a human.
 
 | Lane | State | Blocking fact |
 |---|---|---|
-| Deployment profile | BLOCKED | ADR-0086 is merged but `status: proposed`; the freeze prerequisite is **`status: accepted`** per ADR-0018. Merged and partially implemented are neither of them. Two-node plan is `Canonical: no`. |
+| Deployment profile | **FROZEN** | *(Post-snapshot addendum.)* ADR-0086 was **accepted 2026-09-15** and the Alpha profile is frozen at `860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1`. Freeze prerequisites closed: icn#2755 (native + every shipped drop-in pass the provisioned configuration) and the `UMask=0077` pin on both units that create `icnd`'s files. `implementation_status` stays *partially implemented* — a separate axis. Two-node plan is still `Canonical: no`. |
 | **#2694** semantic convergence | IDENTIFIED | 1 of 12 slices owned (#2695); none implemented; no artifact exists in code. |
 | **#2465** offline evidence | IDENTIFIED | spec only; 0 of 4 slices owned. Slice A is conditional, not a blocker (5.6). |
 | **#2466** recovery | IDENTIFIED | spec only; completeness blocked by #2746. |
@@ -745,10 +745,14 @@ waiting on a human.
 
 ### Critical path
 
+*(Post-snapshot addendum: the first two rows below changed with the commit
+carrying them. At the snapshot revision #2750 was the open blocker and the
+profile freeze was pending `status: accepted`.)*
+
 ```text
-#2750  (now the ONLY uncontained defect on the economic chain)
+#2750  MERGED 2026-09-14 (80a5faf2c) — was the ONLY uncontained defect here
    v
-Alpha profile freeze  (needs ADR-0086 status: accepted)
+Alpha profile freeze  DONE 2026-09-15 -> frozen at 860c6f6c22f1
    v
 #2694 slice 1 (#2695 GEN-A) -> slice 2 (N1-D) -> ... -> slice 10 (V4)
    v
@@ -814,10 +818,12 @@ produces); Gates 4, 5 and 6; anything downstream of the profile freeze.
    program has two disagreeing structures.
 2. **Land or close PR #2690** (6.9.2), which carries the machine-readable
    `program_structure` domain this document deliberately does not duplicate.
-3. **Move ADR-0086 to `status: accepted`, or decline it** through ADR-0018's
-   lifecycle. It is merged but `status: proposed`, and `accepted` — not merged,
-   not "partially implemented" — is what the profile gate waits on. Also whether
-   the two-node plan should be promoted from `Canonical: no`.
+3. ~~**Move ADR-0086 to `status: accepted`, or decline it**~~ — **RESOLVED
+   2026-09-15.** Accepted through ADR-0018's lifecycle after the freeze
+   prerequisites closed; the Alpha profile is frozen at `860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1`.
+   `implementation_status` remains *partially implemented*, which is a separate
+   axis. **Still open:** whether the two-node plan should be promoted from
+   `Canonical: no`.
 4. **Decide what the typed chain/audit read surface returns** (6.3) before a V4
    is specified, and whether conditional V3 emission becomes unconditional first.
 5. **Accept or reject the 5.3 evidence-strength taxonomy**, which is proposed here
