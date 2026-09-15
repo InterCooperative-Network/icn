@@ -102,12 +102,6 @@ Reusable activation chain: package manifest -> private overlay -> bootstrap appl
 
 **For:** `architects`, `developers` | **Updated:** 2026-04-26
 
-### 📝 **Living** [ADR-0086: ICN Deployment Profiles and Public/Private Infrastructure Boundary](/docs/adr/ADR-0086-deployment-profiles.md)
-
-ACCEPTED 2026-09-15; Alpha profile frozen at main 860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1. Four-profile deployment decision: Debian appliance as the canonical sovereign-node artifact; disposable Compose devnet for development; Kubernetes/K3s as optional hosted/operator infrastructure; advanced native Linux. Separates generic public product artifacts from private deployment automation and preserves explicit recovery, signing, two-node, production, and federation nonclaims. Independent appliance restoration is recorded as blocked by TWO independent causes: the backup omits the secret-bearing environment file, and a restored ledger cannot be shown to be complete (#2746; the independent evidence this needs is owned by #2786, where the mechanism is not yet selected). Acceptance settles the classification and the frozen revision; it certifies no production readiness and closes no open item.
-
-**For:** `architects`, `developers`, `operators` | **Updated:** 2026-09-15
-
 ### 📝 **Living** [Abuse-case hardening strategy](/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md)
 
 Strategy / doctrine doc codifying ICN's institutional-failure-mode hardening layer: the substrate must not become an administrative panel with receipts. Ten one-line doctrine rules (receipts prove events not legitimacy; authority shortcuts must label themselves as shortcuts; unresolved standing is not standing in production; accepted is not applied; convenience paths must not become authority paths; bootstrap is not democracy; a capability token is not a mandate; a UI must not launder uncertainty into confidence; privacy posture is not private content; index absence is not record absence). Ten code-anchored abuse stories and matching hardening tracks: narrowing the broad governance:write scope, marking direct membership mutation and direct charter activation as bootstrap-only shortcuts with explicit administrative receipts, fail-closed resolver/checker policy in production, closed lifecycle vocabulary across API/shell/cockpit, per-effect idempotency, governance-parameter sanity bands, shell/cockpit fixture matrix, PrivateEvidence non-rendering regression, typed-receipt atomicity inventory. Strategy only — no runtime change, no new ADR, no new contract URN, no production-readiness claim. Companion to ARCHITECTURE_DUE_DILIGENCE.md and upstream of security/production-hardening.md.
@@ -125,12 +119,6 @@ Analysis of architectural weaknesses and remediation strategies
 Process / principle doc codifying two checklists authors and reviewers run when introducing or changing an architectural surface: (1) convenience-vs-authority (centralized convenience is fine; centralized authority is not — name dependencies and assign them to the correct layer), and (2) participation access (language, plain-language, vision, motor, cognitive, bandwidth, AT compatibility, accommodation privacy — designed-in, not bolted on). Triggered by the rehearsal evidence schema's non-DNS $id decision and grounded in docs/design-language/accessibility.md.
 
 **For:** `architects`, `contributors` | **Updated:** 2026-05-04
-
-### 📝 **Living** [The Authority Spine](/docs/architecture/AUTHORITY_SPINE.md)
-
-How ICN proves the powers of an assembled runtime: attenuation, expiration, revocation, and capability truth. Documents the gateway session-authority composition boundary implemented for #2436/#2437, the deployment-profile startup invariants, and — as analysis only — how the same lifecycle would extend to compute, storage, economics, federation, policy, and evidence. Explicitly separates technical capacity, institutional legitimacy, and current availability; records the institutional questions (who may approve, who may revoke, what recourse a member has) that remain open.
-
-**For:** `developers`, `architects` | **Updated:** 2026-07-21
 
 ### 📝 **Living** [Canonical Encoding](/docs/architecture/CANONICAL_ENCODING.md)
 
@@ -180,23 +168,11 @@ Specification of contracts and interfaces for federation interoperability
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-10
 
-### 📝 **Living** [GEN-A - context-scoped Subject genesis (SubjectContextGenesisV1)](/docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md)
-
-NORMATIVE BYTE-LEVEL CONTRACT for GEN-A (icn#2695), slice 1 of the #2694 semantic convergence ladder: the deterministic derivation that turns a named governance-domain context plus a fresh public CSPRNG salt into the 32 opaque bytes N1 already accepts as its ContextNonce, plus the two witness-independent reference hashes (subject_context_ref, initial_device_binding_ref) that later semantic facts may name. Specifies the three GEN domain separators, the exact length-prefixed preimages, the Alpha initial-device profile (exactly {Sign, Present}, position 1, no validity span), the fail-closed verifier including the load-bearing derive step that separates admissible from authorized, and fixed cross-implementation test vectors reproduced by an independent non-Rust reference. Carries the explicit unlinkability argument that IDENTITY_SEMANTICS.md invariant I4b requires of any alternative ContextNonce generation method. Outer binding protocol over N1 - no N1 wire format, canonical body, signature preimage or digest rule is changed. Library, spec and tests only: it makes NO claim of institutional recognition, membership, standing, governance participation, economic authority, delegation, session authorization, guardian recovery, replication, durability, deployment or production readiness, and introduces no registrar or global person registry. Bundle transport, durable storage and every downstream slice remain unimplemented.
-
-**For:** `developers`, `architects` | **Updated:** 2026-09-15
-
 ### 📝 **Living** [Governance State Machine Architecture](/docs/architecture/GOVERNANCE_STATE_MACHINE.md)
 
 State machine design for governance decision-making and enforcement
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-12
-
-### 📝 **Living** [Human Identity in ICN — a first-principles architecture](/docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md)
-
-Re-derives ICN's human-identity model from requirements rather than from the existing Did abstraction. Records the verified current state at b26bf681 including twenty findings that correct or extend PRINCIPAL_MODEL §2 (the gateway multi-device path is unreachable because IdentityManager::get_or_create_document has zero production callers; ~50% of hash-derived DIDs fail Ed25519 deserialization; icn-zkp silently substitutes an all-zero issuer key; two independent production sites compute the VUI as a plain hash of the public DID, so no deployed anchor carries the uniqueness or unlinkability SDIS claims for it, while the acting principal in enrollment is already the device key; icn_time returns 0 on clock error so every expiry fails open; RPC recovery lets a caller name an arbitrary victim while the node signs the trustee attestation). Establishes that a durable human subject identifier must not be a public key, and argues -- as a bounded claim, explicitly NOT a theorem-level impossibility -- that global convergent device revocation is unavailable under ICN's currently chosen premises, since achieving it would require adopting a synchrony assumption, randomization/failure detectors, or an ordering authority, all of which ICN declines (FLP 1985 forbids only deterministic consensus in pure asynchrony; Chandra-Toueg 1996 is itself a positive result). The escape adopted is single-writer logs, whose consensus number is 1 (Guerraoui et al. PODC 2019), given Byzantine reliable broadcast that ICN does not yet have. Compares five candidate models against 25 adversarial scenarios and recommends context-scoped identity with a private continuity root: Did narrowed to a cryptographic principal, per-context self-addressing subject identifiers, a per-subject single-writer authority log with pre-rotation, and revocation semantics stated per act class. Supersedes PRINCIPAL_MODEL §4-§16; retains its §1-§3. The architecture remains proposed; the N1 library primitive is implemented but not production-wired.
-
-**For:** `developers`, `architects` | **Updated:** 2026-08-18
 
 ### 📋 **Draft** [ICN Integrated System Model](/docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md)
 
@@ -210,19 +186,11 @@ Doctrine for vocabulary, placement, and operating-model grammar — the grammar 
 
 **For:** `developers`, `architects`, `contributors` | **Updated:** 2026-06-22
 
-### ❌ **Superseded** [Identity and Membership Architecture](/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md)
+### 📝 **Living** [Identity and Membership Architecture](/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md)
 
-HISTORICAL PREDECESSOR (2025-12-25). Retained for rationale, not as current truth. Its IDENTITY portions are superseded: it documents anchor-derived DIDs as first-class person identifiers, which HUMAN_IDENTITY_ARCHITECTURE.md dispositions for removal, and it predates the N1 authority-log primitive and the N2 semantic contract entirely. For the semantic identity classes, identifier domains, substitution rules and legacy-DID bridge invariants, docs/architecture/IDENTITY_SEMANTICS.md is canonical; for the broader identity architecture, threat model and derivation, HUMAN_IDENTITY_ARCHITECTURE.md controls. Its membership-lifecycle and federation-recognition rationale is not superseded by N2 but is not current truth either - that work is downstream (#2605 N5, blocked). Registry status corrected 2026-08-18: it was `living`, which ranked a superseded predecessor above the documents that supersede it. Retained in place rather than archived so its inbound references stay resolvable; a future move to docs/archive/ is the open follow-up.
+Design of identity primitives, membership verification, and member lifecycle
 
-**For:** `architects`, `developers` | **Updated:** 2026-08-18
-
-> Superseded by [docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md](/docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md)
-
-### 🔒 **Canonical** [Identity Semantics - the N2 semantic contract](/docs/architecture/IDENTITY_SEMANTICS.md)
-
-CANONICAL FOR THE NARROW identity_semantics DOMAIN ONLY (see ops/state/truth/sources.json): the seven normative class contracts - six identity-bearing (Principal, human Subject, Institution, Node, ContinuityRoot, Device Principal) plus ContextNonce, which is public protocol data and names nothing, the identifier domain each class draws from, the exhaustive allowed/forbidden substitution matrix whose default is category error, context-scope and correlation constraints, genesis-AUTHORITY semantics (not the genesis protocol, which is GEN/#2602), the legacy did:icn:<key> bridge invariants and migration terminus, institution and node prohibitions, the ContinuityRoot/ContextNonce secret-vs-public split with the ContextNonce freshness rule, invariants I1-I12 that implementation must enforce, the account/treasury boundary, and the bounded N2 implementation DAG. Settled output of #2597 after three design passes and two independent adversarial reviews; the second returned N2 CONTRACT CLOSED with zero blocking findings. Semantic contract only: it does NOT supersede HUMAN_IDENTITY_ARCHITECTURE.md as the broader architecture note, and it makes no implementation, migration, deployment, federation or pilot claim. N1 remains a merged library primitive with production integration ABSENT; the N2 migration/integration and every downstream protocol are unimplemented.
-
-**For:** `developers`, `architects` | **Updated:** 2026-08-18
+**For:** `architects`, `developers` | **Updated:** 2026-03-10
 
 ### 📝 **Living** [Institutional Feedback and Support Primitives](/docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md)
 
@@ -248,12 +216,6 @@ Forward-direction design for model-driven advisory compute workloads, deliberati
 
 **For:** `developers`, `architects` | **Updated:** 2026-04-27
 
-### 📋 **Draft** [The Principal Model](/docs/architecture/PRINCIPAL_MODEL.md)
-
-Who ICN can honestly say did something. Establishes the Person != Device != Node != Institution invariant, records the verified current state at 74c832f1 (TWO semantically different Person-identity constructions — key-derived Dids, and SDIS anchor-derived Dids built from H(VUI || genesis_random) via new_unchecked that embed no controllable key and are indistinguishable by format, recorded as open decision O18; a device roster whose Capability::Sign is never checked in production; an AddDevice signer able to grant capabilities it does not itself hold; SignedGovernanceOp accepting only the author's root key; the node DID standing in as proposal author in actor-backed mode), and proposes a four-class principal taxonomy in which an institution deliberately holds no signing key. Specifies member-origin signing via a carried, self-contained device authorization, and derives implementation slices and their exact dependency on #2469 slices 4-7. Records ten open decisions (O3, O8-O18), the load-bearing one being O9: ICN has no convergent cross-node device-revocation model, and all three candidate shapes are refuted against current semantics. Design only: no implementation, no change to SignedGovernanceOp, no lifting of #2470 containment.
-
-**For:** `developers`, `architects` | **Updated:** 2026-08-14
-
 ### 📋 **Draft** [Private Data Disclosure Boundary, Scoped Vaults, and Access Receipts](/docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md)
 
 Design-only architecture boundary contract (#1792) for ICN's generic private-data disclosure/access model: private overlays, scoped vaults, opaque receipt storage, redaction, selective disclosure, disclosure policies, and access/export/made-available receipts, following the landed EvidencePacketExportPreparedReceipt. Names candidate vocabulary and a follow-up sequence, distinguishes disclosure/access policy (#1792) from encrypted private-overlay storage (#1767), and implements no runtime.
@@ -265,60 +227,6 @@ Design-only architecture boundary contract (#1792) for ICN's generic private-dat
 Trust model design limiting trust scope to organizational boundaries
 
 **For:** `architects`, `security` | **Updated:** 2026-03-10
-
-### 📝 **Living** [Inbound Handshake Cancellation (#2521) - Causal Record](/docs/architecture/inbound-handshake-cancellation-2521.md)
-
-Causal record for #2521: the inbound accept loop's 100ms shutdown-polling timeout wrapped SessionManager::accept(), which fuses the cancel-safe wait for new work with the cancel-unsafe QUIC/TLS handshake, so the deadline became a hidden maximum handshake lifetime. Records why the shared, re-armed budget made it a ~50% flake rather than a clean threshold, why the polling was load-bearing for shutdown lock liveness, the deterministic one-poll reproducer, the 40-run before/after real-QUIC comparison, and the disproved hypotheses (20s test timeout, 30s dial timeout, mDNS ghost peers, #2517/#2519 regression). Issue thread remains authoritative; this is the summary.
-
-**For:** `architects`, `developers`, `operators` | **Updated:** 2026-08-04
-
-### 📝 **Living** [N2-A Migration Gate: Collision Scan, Dispositions and Partner Invariants](/docs/architecture/n2-a-migration-gate.md)
-
-Design and evidence surface for the N2-A tranche (#2627): Did equality and hashing as key equality rather than string equality (IDENTITY_SEMANTICS I7), landed in #2686. Records the reproducible read-only collision scanner in icn-store (engine, runner binary, grouping by principal-canonical shape, per-tree coverage reporting, fixture tests plus mutation-based discrimination evidence), the collision evidence measured against three live deployments (94 sled databases, 24 registered principal-bearing rows, zero collision groups) together with the two deployments that could not be attached and the principal-bearing rows deliberately deferred, a per-keyspace disposition table with merge rules and fail-closed cases, explicit per-namespace decisions for the namespaces I7 does not move, the partner-invariant designs (PeerId ordering and CCL Value::Did Hash/Eq now landed; the split String/Did peer maps still open), the nine-axis site taxonomy carried in from #2641, the migration sequence as planned (section 8.1) and the live post-flip cutover order (section 8.2), the in-binary startup gate (section 10): icnd audits every sled database beneath its data directory before opening the first one, refuses to start over an unruled alias collision, uncovered or unreadable principal row, unverifiable store or newer-generation receipt, records a payload-free receipt carrying the principal-identity generation, and reports but does not act on deferred vote and challenge collisions; and the load/rebuild/write-back audit of the principal-keyed loaders: section 4.1 for the icn-ledger balance, cleared-volume and freeze rebuilds, which now classify their whole keyspace and refuse through icn_ledger::principal_rows before adopting a row, section 10.6 for how that loader refusal and the startup gate divide the work, section 4 row 19 plus section 6.5 for the icn-federation attestation keyspace, registered in #2703/#2704 as a fail-closed keyspace whose collision unit is (member principal, source cooperative), enforced by the AttestationStore itself and by the startup gate over the same descriptor, with revocation of an ambiguous pair made atomic so no failure can elect an alias survivor; and section 6.5 for the icn-security misbehaviour detector and icn-net peer-map findings that remain unfixed. The three-deployment evidence predates the attestation registration and does not speak for that keyspace. Authorizes no merge rule: the seven AwaitingDomainSignOff keyspaces are unchanged. Migrates nothing, does not discharge the separate section 7.5 membership/vote gate, and states cutover as INCOMPLETE: the remaining loader audits, the weak-holder namespace split, the peer-map pair and fresh quiesced evidence remain open. Fixture evidence only; no deployment-readiness claim. Section 11 (2026-09-04, #2707) adds the persistence-boundary classes P1-P5 that classify every persisted principal boundary by the mechanism that proves it safe, states precisely what a scanner CLEAR verdict does and does not establish, dispositions the federation agreement party index (section 4 row 20) as a derived projection registered Equivalent under the anchored-principal descriptor and consumed by the startup gate with the same (party principal, exact agreement id) collision unit, records the projection store's canonical-membership reads, write protocol, rebuild and namespace serialization, and maps the remaining N2-A boundaries by class; it authorizes no merge rule for authoritative state. Section 4.2 (2026-09-04, #2627 M1) records the treasury loader: the primary ledger:treasury:<did> row (section 4 row 21) is classified through icn_ledger::principal_rows before any in-memory map is touched, key/body spelling identity is byte-exact rather than Did equality, the write-only idx:coop projection is validated against the primary rows and given no authority, unreadable primary rows refuse rather than vanish (which makes the anchor-derived read-path defect of inventory section 10.1 visible without repairing it), the row is registered fail closed in the scanner with a prefix that claims only the primary rows and is consumed by the startup gate, and the audit and budget-index siblings that embed a spelling remain uncovered as the next follow-up; no merge rule is authorized. Section 11.6 (2026-09-04, #2627 M2) records the ADR-0014 by-grantee projection (section 4 row 25): the primary adr0014:grant:<uuid> record is the authority and the by-grantee rows are a lookup projection, a Person grantee is enumerated by decoded Principal rather than by persisted spelling and every candidate is proven against its primary before it is returned, de-duplication is by AuthorityGrantId so a principal may still hold several distinct grants, Entity grantees keep exact string identity and are never principalized, malformed projection rows refuse rather than vanish while stale rows are filtered, no writer-side guard and no namespace lock were needed because the projection is append-only, and the keyspace is registered Equivalent/Established under a third structural descriptor (length-prefixed, tag-discriminated) because neither existing region can read a binary key - one would refuse every row and the other would silently form no group at all. It records the pre-fix defects reproduced on main: alias-spelled enumeration returned nothing, an accepted alias-spelled RevokeAuthority decision left the grant active, the MandateGate domain path returned a false NoMandate, a forged projection row returned another principal's grant, and one ordinary Person grant row made icnd refuse to start. No row is re-keyed, no rebuild is added and no merge rule is authorized. Section 11.7 (2026-09-05, #2627 M3) records the Commons weak-holder mint seam (section 4 rows 13 and 22): both authorization gates on the member-profile route compare Did and so accept an alternate spelling of an enrolled member, while the mint below them decided existence with one exact-key lookup and derived the holder id from the spelling, so an authorized alias request minted a second durable holder for one Principal - reproduced on the production route as a 200 OK with the holder-by-DID row count going 1 to 2 and two primary records with different ids. The seam now classifies before it mints: the exact spelling is read first and its primary must be filed under the byte-identical spelling, a miss reads the whole namespace to prove Principal absence rather than infer it, and same-Principal evidence, an unprovable primary, an index/body disagreement or an unparseable row each refuse under a payload-free reason class. The writer bytes are unchanged and pinned by regression. The index is registered fail closed as icn-commons/holder_by_did, whole-key with did_ends_key, the fourteenth whole-key layout, with the opaque-hex primary and by-anchor siblings outside the prefix; a fixture drives one real commons.sled through both layers so the gate and the runtime agree on the forbidden state. Concurrency is claimed only within the single CommonsHandle production constructs, and the serialization is the handle write lock held across a body with no await point rather than a closed race window - the multi-threaded fixture is an outcome check under lock contention, not a race detector. The guard covers the profile-update seam only: the anchor-keyed enrollment path still de-duplicates by anchor rather than by Principal and is left for its own slice. The crash-partial window between the primary write and the index write is recorded as pre-existing debt and is explicitly not closed. Registration unblocks the by_did holder rows alone; the sibling commons/anchors/by_did rows were still uncovered until section 11.8 registered them. No holder is merged, adopted, re-keyed or deleted, no alias row is removed, no spelling is preferred, existing duplicate holders are not dispositioned, and get_holder_by_did stays fail-closed per spelling rather than alias-transparent. Section 11.8 (2026-09-05, #2627 M4a) records the SDIS enrollment constructor and the Commons anchor-by-DID index (inventory row 66): holder identity is anchor-owned because CommonsHolderRecord sets holder_id = anchor_id verbatim, so the duplicate-holder symptom M3 left open at the enrollment path is caused by duplicate anchors one layer earlier. create_anchor_from_enrollment derived its anchor id from a fresh random genesis and then checked whether that id already existed, so its own duplicate check could never fire, while both production callers decided existence with a single exact-key get_anchor_by_did; the VUI reservation that does refuse a repeat is computed from the textual spelling and is skipped entirely when no steward manager is configured. Reproduced on 99556959 through the seam both callers reach: an alias enrollment produced two anchor primaries, four anchor-by-DID rows, two holders and two holder-by-DID rows for one Principal, and a repeat of the identical spelling produced two anchors and two holders while silently re-pointing both by_did rows at the new records and orphaning the first - so the defect is a re-enrollment and anchor-identity defect of which the alias case is a strict subset. The constructor now classifies the Principal against the whole anchor-by-DID namespace before the pseudo-VUI, the genesis draw and the first durable write, refusing same-Principal evidence, an unresolvable primary and an unreadable row under payload-free reason classes, so no orphan anchor is created by a later refusal. Two structural differences from M3 are load-bearing and were found by the fixtures: there is no PrimaryMismatch arm because put_anchor and put_anchor_did_index deliberately file one anchor under two unrelated spellings, so key/body disagreement is the intended shape of this namespace; and rows are grouped by identifier_bytes_of_spelling rather than Did::from_str, because an anchor-derived DID is built over a SHA-256 anchor id that is not a valid Ed25519 point roughly half the time and a from_str classifier refused every enrollment on the node. The index is registered fail closed as icn-commons/anchor_by_did, whole-key with did_ends_key, the fifteenth whole-key layout and the eighteenth descriptor, with the opaque-hex anchor primary outside the prefix; a fixture drives one real commons.sled through both layers, proving that the two rows a healthy enrollment writes name two different Principals and clear the gate at scale while two rows naming one Principal block the start. The authority claimed is narrow and is stated as such: the enrollment route already refuses a repeat in words but fails to deliver it, because the VUI is spelling-derived and the whole check is skipped without a steward manager. api/sdis/recovery.rs is expressly NOT cited as a rule - complete_recovery is a stub whose own comment lists its steps as unimplemented and which fabricates a DID that Did::from_str would reject - and an earlier draft that cited it as authority is corrected. What is enforced is one anchor per Principal, narrower than one anchor per human: enrollment identity is a per-ceremony device key and rotation writes nothing here, so the index is rotation-blind and device-blind and neither is claimed. No claim is made about the identity semantics of an anchor, which IDENTITY_SEMANTICS.md classifies as a legacy ambiguous carrier and on which it states no uniqueness rule; RuleBasis Established records only that fail closed is what the constructor implements, the M1 formula. Two lockouts are pinned rather than repaired and both are fixtured: a revoked principal cannot enrol again under that key because the guard never reads AnchorStatus and reinstate refuses a revoked anchor, and a retry after a partial enrollment reaches Held and cannot complete; neither is new on the steward-manager configuration. The three-write crash window is not merely unclosed but defeats the invariant - a crash between the primary and the enrollment-index write leaves only the derived row, which names a different principal, so a later enrollment classifies ProvenAbsent and mints a second anchor invisible to both layers. The healthy-state model rests on Did::from_anchor_id, which N2-B schedules for removal, and recovery step 4 would later write a row here for a new principal pointing at an existing anchor; both are recorded as forward dependencies owned elsewhere. No anchor or holder is merged, adopted, re-keyed or deleted, already-derived duplicates are not dispositioned, get_anchor_by_did stays fail-closed per spelling, and the delete_anchor dangling-row leak and the three-write crash window are classified and refused over but explicitly not repaired. A second enrollment of an already-enrolled Principal now fails where it previously succeeded; that behaviour change is stated rather than hidden. Section 11.9 (2026-09-05, #2627 M4b) records the disposition of v1:interest_idx: as a P5 uniqueness lock over a P1 canonical row, fail closed and established. The defect is in the uniqueness mechanism itself rather than at a seam: the sled compare-and-swap that prevents duplicate interests is atomic only on the spelling it is handed, so one principal arriving under two multibase spellings reached two keys, won two independent compare-and-swaps and obtained two canonical interests through the ordinary authenticated route, with the listing owner seeing both. It was reproduced on 35a4195fc5e5e064613e702d947b644dd79e850f through POST /v1/listings/{id}/interest before any fix, along with a second independent defect: cleanup_orphaned_interest_indexes split the whole key on ':' and required four components, but a real key carries a DID spelling with its own colons and so has six, making the pass a no-op in production and leaving an orphaned lock able to refuse its principal indefinitely. The decision is now taken against the canonical rows, whose from_did compares by principal - the rule the in-memory backend already applied, so the two backends behind one trait encode one domain rule instead of two - with a uniqueness row naming the principal treated as a duplicate whether or not its canonical row survived, and a row decoding cleanly to another principal treated as clear even when unbacked so that one member's orphaned lock cannot close a listing to everybody else. Every persisted byte is unchanged and the compare-and-swap is retained behind the classification as the unconditional same-spelling decider. Concurrency is load-bearing here unlike M3 and M4a because no single sled operation spans the read and the compare-and-swap, so classification and write are serialised by a mutex whose scope is one database, justified by sled taking an exclusive flock on the file it opens and by the gateway building exactly one store, with the sled lock fact pinned as a test rather than asserted. The keyspace is registered as icn-gateway/listing_interest_uniqueness at prefix v1:interest_idx:, whole-key with did_ends_key, the sixteenth whole-key layout, and the collision unit is the pair (listing, Principal) because the listing UUID stays in the canonical shape, so one member on two listings forms no group. Crash ordering is unchanged and recorded rather than fixed; the window is narrowed only because the maintenance pass can now recognise such a row at all. Historical duplicate interests are not reconciled, no survivor is chosen, no row is re-keyed or rewritten, the canonical interest bodies remain scanner-blind with their migration unresolved, and the adjacent gateway and ledger-app indexes in section 11.4 stay open.
-
-**For:** `developers`, `architects` | **Updated:** 2026-09-07
-
-### 📝 **Living** [N2-A0 Stored-Key Inventory Before Did Canonicalization](/docs/architecture/n2-a0-stored-key-inventory.md)
-
-Measured inventory of every durable and durability-adjacent keyspace that would be affected if Did equality moved from inner-string equality to decoded-key equality (IDENTITY_SEMANTICS I7). Produced by the N2-A0 tranche (#2623), the HARD GATE on N2-A (#2627), and re-verified by a fresh-context adversarial review. Records 142 inspected candidate stores with mechanically defined verdicts SAFE / SILENT-MERGE RISK / NEEDS MIGRATION (24 rows NEEDS MIGRATION, folding to 13 live keyspaces plus one dormant shape; 0 UNRESOLVED), a re-runnable fourteen-class search methodology, per-store collision mechanics and liveness, identifier-domain classification, legacy compatibility paths, the surface N2-A must design against, and explicit coverage limits. Establishes by measurement that Did::from_str accepts 23 multibase spellings of every key unconditionally (24 declared bases), that the envelope signature binds the key but not the spelling so any party can re-spell and replay a captured envelope, and that about half of anchor-derived DIDs fail a serde round trip today. INVESTIGATION ONLY: changes no code, canonicalizes nothing, migrates nothing, and does not by itself make I7 safe - it makes I7 attemptable. Does not select an account domain (N2-C-prime) and asserts no implementation, migration or deployment status. Row #28 (the federation agreement party index) carries a 2026-09-04 annotation recording its disposition as a derived projection of the canonical agreement rows (migration gate section 11.3), registered Equivalent under the anchored-principal descriptor. Rows #10 and #41 (the treasury record and its Did-keyed maps) carry a 2026-09-04 annotation recording that the treasury loader classifies before it adopts and the primary row is registered fail closed (migration gate section 4.2, #2627 M1); row #70 records that the audit subspace stays uncovered. Row #25 (the ADR-0014 by-grantee index) carries a 2026-09-04 annotation recording its disposition as a derived projection of the canonical adr0014:grant:<uuid> records (migration gate section 11.6, #2627 M2): Person grantees are enumerated by decoded Principal and proven against the primary AuthorityGrant, Entity grantees keep exact-string identity, distinct grant ids stay distinct, and the keyspace is registered under a third structural descriptor for its length-prefixed tag-discriminated layout. Rows #65 and #67 (the weak Commons holder mint seam and the holder-by-DID index) carry a 2026-09-05 annotation recording that the mint classifies the holder-by-DID namespace for the requested Principal before creating anything (migration gate section 11.7, #2627 M3) and refuses when another spelling already names that Principal, when an index row's primary cannot be proven, when index and primary disagree, or when a row cannot be read; the weak-holder derivation SHA-256(did.to_string()) is unchanged and no existing holder is re-keyed, merged or deleted; the index keyspace is registered fail closed as the fourteenth whole-key layout with the two opaque-hex sibling subspaces outside its prefix; and get_holder_by_did is not made alias-transparent. Row #26 (the listing-interest uniqueness index) carries a 2026-09-05 annotation recording its disposition as a uniqueness lock over the canonical v1:interest: rows (migration gate section 11.9, #2627 M4b): the row's value is a constant sentinel rather than the interest id, the sled compare-and-swap on the spelling key was itself the one-interest-per-member rule so a second multibase spelling was a second permission to write a canonical interest, the keyspace is registered fail closed as the sixteenth whole-key layout with the collision unit the pair (listing, Principal), the live writer decides duplicates against the canonical rows under Did equality with classification and write serialised and refuses unreadable evidence rather than reading it as absence, the maintenance parser now follows the writer's framing instead of counting colons that a DID spelling itself contains, and the canonical v1:interest: rows carry their principal in the value and remain outside the key collision scanner with their migration disposition unresolved.
-
-**For:** `developers`, `architects` | **Updated:** 2026-09-05
-
-### 📝 **Living** [Network Identity: The Local Node Is Never a Remote Peer](/docs/architecture/network-identity-self-exclusion.md)
-
-Normative rule (#2506) that a node's local identity may hold local state but must never be admitted into state whose semantics are "remote network peer" — connection map, discovered/gossip peer, replay window, or misbehaviour/ban subject. Names the connection layer as the canonical invariant owner because it is the only point where the remote DID is authenticated rather than claimed, records why self-exclusion is identity-based and never address-based, and documents the two deliberate non-guards (MisbehaviorDetector, AntiEntropy's own nonce entry).
-
-**For:** `architects`, `developers` | **Updated:** 2026-08-02
-
-### 📝 **Living** [Network Session Identity Binding](/docs/architecture/network-session-identity-binding.md)
-
-Normative rule that a connection may be attributed to a remote DID only if that DID's key authenticated the certificate presented by that exact connection. Records the three jointly-required facts (binding names the sender, sender's key signed it, signed hash is of the current peer certificate) and why each is insufficient alone, the measured certificate-availability matrix showing an anonymous inbound peer completes the handshake with no certificate (hence the absent-certificate path must fail closed), the ordering requirement that no DID-keyed state is written before verification, and the rule that a failed unauthenticated claim must never be scored against the claimed DID. Names the composition root rather than the helper as the invariant owner.
-
-**For:** `architects`, `developers` | **Updated:** 2026-08-03
-
-### 📝 **Living** [Protocol State Migration Invariants](/docs/architecture/protocol-state-migration-invariants.md)
-
-Invariants for changing the semantics of persisted protocol-security state (#2517). Distinguishes schema version (can this binary parse the bytes) from semantic version (can it believe them), and shows why a value that parses perfectly can still be meaningless. States that automatic migration is permitted only where an explicit migration from the identified source regime exists, and that unknown semantic versions fail closed with no deadline because time passing cannot make unknown state semantics safe to reinterpret. Records that the sender-side and receiver-side symptoms are one defect, fixed receiver-side; why local recovery, peer-assisted high-water discovery, a large constant offset, and explicit sequence epochs were each rejected; the bounded legacy-migration hold set by the envelope freshness horizon rather than by peer-window expiry; crash-safety and one-way idempotence; the mixed-version matrix including rollback under a newer store; and the explicit bound that a node still running legacy code cannot be reached by any shipped fix.
-
-**For:** `architects`, `developers`, `operators` | **Updated:** 2026-08-03
-
-### 📝 **Living** [Mutation Controls for the #2517 Migration Tests](/docs/architecture/protocol-state-migration-mutation-controls.md)
-
-Records which deliberate defect each #2517 migration test actually catches, so a change that makes one vacuous shows up as a gap rather than a still-green suite. Includes the security control proving the fail-closed hold is load-bearing, the two downgrade-safety controls that show known-legacy and unknown-future are discriminated rather than merely both rejected, and a recorded instance of a text-substitution mutation silently becoming a no-op after the code was restructured.
-
-**For:** `architects`, `developers` | **Updated:** 2026-08-03
-
-### 📝 **Living** [Replay State and Restart Invariants](/docs/architecture/replay-state-restart-invariants.md)
-
-Durability invariants for receiver-side replay protection across restart (#2514). Derives floor == highest-actually-accepted from the two-sided security/liveness constraint, showing why any constant sequence-space safety gap is a liveness bug; states the sender non-reuse guarantee (#2510), durability before acceptance (which removes the accepted-but-unflushed crash window entirely), why wall-clock timestamps cannot order events across machines, and the freshness horizon that makes replay-state expiry safe.
-
-**For:** `architects`, `developers`, `operators` | **Updated:** 2026-08-03
-
-### 📝 **Living** [Restart/Rejoin Investigation (#2504) - Causal Record](/docs/architecture/restart-rejoin-investigation-2504.md)
-
-Navigable causal record for the #2504 restart/rejoin chain: four defects each masked by the one before it (#2505 stale connection cache, #2510 ephemeral signing sequence, #2506 local identity admitted as remote, #2514 receiver restart replay floor). Records live evidence from the four-node rehearsal federation, the disproved hypotheses so they are not re-litigated, the unresolved candidate-freshness lead, and method notes. Issue threads remain authoritative; this is the summary.
-
-**For:** `architects`, `developers`, `operators` | **Updated:** 2026-08-03
 
 ### 🔒 **Canonical** [Constitutional Genesis](/docs/genesis.md)
 
@@ -392,12 +300,6 @@ Defines the design-level proof-loop contract beneath compute placement (#1801), 
 
 **For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-15
 
-### 📋 **Draft** [Receipt-Chain Verification Contract](/docs/spec/receipt-chain-verification.md)
-
-Normative contract for a mechanical, offline re-verifier of ICN receipt chains (ADR-0026 re-verifiability made enforceable). Defines what verifying a receipt chain must check: content-hash recompute for GovernanceDecisionReceipt/GovernanceProof, fail-closed Pass/Fail/Unresolved/NotApplicable folding (NotApplicable least-severe), generic chain-link and hash-collision checks. Implemented as icn-governance::verify and consumed by a rewritten icnctl audit verify that recomputes the decision hash from content instead of comparing hash strings. Proves integrity/authenticity only, never authorization or legitimacy. A concrete supersedes-linked domain-policy-adoption receipt class is a deferred consumer (needs a crash-atomic cross-store transition; see close_journal.rs WAL pattern).
-
-**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-07-18
-
 ### 📋 **Draft** [Steward Cockpit v0](/docs/spec/steward-cockpit-v0.md)
 
 Defines the ICN steward cockpit as the operator-facing civic-infrastructure surface for node and domain stewards at v0 — the operator/steward complement of docs/spec/member-shell-v0.md (#1830). Consumes verbatim the 9-field cockpit surface from docs/spec/network-anti-entropy-proof-loops.md (#1829) for the Network / Federation section, the 14-field operator/steward dashboard from docs/spec/compute-placement-policy.md (#1826) for the Compute / Commons section, and the storage durability policy objects from docs/spec/storage-durability-policies.md (#1823). Names six hard boundary lines (vs member shell #1830, vs node operator civic-role surface #1613, vs public website, vs institution-package skin, vs backend/runtime, vs surveillance/admin-control panel), ten v0 design principles (stewardship-not-domination, proof-before-confidence, degraded-is-visible, privacy-posture-not-private-content, receipts-explain-state, required-actions-explicit, authority-basis-visible, scope-visible, member-impact-summary-always-present, no-financial-framing), twelve cockpit information-architecture surfaces (Overview/Required Actions, Node Status, Domain Status, Network/Federation, Receipt Store, Storage/Artifacts/ScopedVault, Governance/Process, Compute/Commons, Participation Access, Privacy Posture, Backup/Export/Recovery, Warnings/Incidents/Repair), fourteen operator action-card scenarios with source class / authority pattern / expected outcome, per-surface rendering contracts that consume merged sibling specs without redefining them, a closed v0 operator-facing status vocabulary plus a verbatim member-impact summary mapping into the merged #1829 member-shell sync vocabulary, twenty-row failure/safety table including the load-bearing 'dashboard says healthy while member shell says degraded' v0 violation, and three fixture-first dogfood slices (read-only receipt-store + anti-entropy degraded/repair fixture; storage replica / backup overdue / restore-test receipt fixture; compute placement review-required fixture). No new endpoints, no frontend technology decision, no surveillance console, no private-data preview, no production-dashboard claim. Advances #1795 — does not by itself close it. Defers the live cockpit implementation, the frontend technology decision, the per-surface implementation specs, and the cross-link audit against icn-obs metric module renaming to named follow-ups.
@@ -448,12 +350,6 @@ Program for shipping one end-to-end cooperative use case for production 6-month 
 PR-time review checklist for any organizer- or member-facing surface (rehearsal shells, action-card surfaces, preview/review surfaces, evidence-packet rendering, receipt/provenance review, member-facing governance flows). Twelve review categories with four-value gate outcomes (Pass / Pass with documented follow-ups / Blocked / N/A with reason); copy-paste PR checklist block. Operational layer beneath ADR-0028, design/ACCESSIBILITY_BASELINE.md, and design-language/accessibility.md; companion to architecture/ARCHITECTURE_DUE_DILIGENCE.md participation-access half. Not a CI gate; not a legal accessibility audit; not production-readiness.
 
 **For:** `architects`, `contributors`, `design` | **Updated:** 2026-05-05
-
-### 🔒 **Canonical** [Public site information architecture](/docs/design/PUBLIC_SITE_IA.md)
-
-One primary job per public page, homepage narrative order, reduced top-level navigation, and the plain-language-first convention for introductory surfaces
-
-**For:** `contributors`, `public`, `designers` | **Updated:** 2026-08-17
 
 ### 📋 **Draft** [Access, made-available, and disclosure receipt decision rung — R1-R10](/docs/design/access-made-available-disclosure-receipt-decision-rung.md)
 
@@ -859,24 +755,6 @@ Architectural guardrails, contribution workflow, code standards, and review proc
 Quick-start guide for new developers to set up ICN in minutes
 
 **For:** `developers`, `contributors` | **Updated:** 2026-03-15
-
-### 📝 **Living** [Codex Workflow for ICN](/docs/ai/CODEX_WORKFLOW.md)
-
-Codex provider adapter for the provider-neutral agent workflow. Normative for Codex-specific tool usage only; explicitly NOT canonical for project truth, which stays with AGENTS.md and the owners registered in ops/state/truth/sources.json.
-
-**For:** `agents` | **Updated:** 2026-08-19
-
-### 🔒 **Canonical** [ICN Constitutional Core](/docs/ai/ICN_CONSTITUTIONAL_CORE.md)
-
-CANONICAL FOR THE agent_reasoning_constitution DOMAIN ONLY (see ops/state/truth/sources.json): stable agent reasoning principles — mission, Meaning Firewall, sovereignty/no-hidden-authority posture, adversarial honesty, determinism/inspectability, truth discipline, bounded change, authority/role boundary, and the durable-memory rule. Deliberately carries no current phase, subsystem maturity, deployment state, identity taxonomy, or active work sequence; those have their own registered owners.
-
-**For:** `agents`, `developers` | **Updated:** 2026-08-19
-
-### 🔒 **Canonical** [ICN Agent Workflow Architecture](/docs/ai/WORKFLOW_ARCHITECTURE.md)
-
-CANONICAL FOR THE agent_workflow DOMAIN ONLY (see ops/state/truth/sources.json): how an agent resolves a question to its truth owner, loads context in layers, treats implementation and live execution evidence, uses generated projections, bounds memory, bootstraps a session, and promotes durable discoveries. Owns no protocol semantics, project status, merge policy, agent routing, or repository topology.
-
-**For:** `agents`, `developers` | **Updated:** 2026-08-19
 
 ### 📝 **Living** [Deploy Test Network](/docs/deployment/DEPLOY_TEST_NETWORK.md)
 
@@ -1467,7 +1345,7 @@ Runbook for emergency node restart procedures
 
 Runbook for node data recovery from backup
 
-**For:** `operators` | **Updated:** 2026-09-07
+**For:** `operators` | **Updated:** 2026-03-10
 
 ### 📝 **Living** [Version Upgrade Procedure](/docs/guides/operations/runbooks/03-version-upgrade.md)
 
@@ -1564,9 +1442,9 @@ Main project README with overview, quick start, and CI/CD status badge
 
 ### 📝 **Living** [ICN Ecosystem Atlas](/docs/ATLAS.md)
 
-Thin ecosystem router: classifies a question, then points at the registered owner in ops/state/truth/sources.json. Carries cross-repo/privacy boundary rules and claim-level distinctions. Index, not a source of truth.
+Top-level front door composing the project-index map family and the truth spine; cross-repo map (incl. private ops/provider repos), boundary/claims guardrail, and agent preflight. Index, not a source of truth.
 
-**For:** `all`, `agents` | **Updated:** 2026-08-19
+**For:** `all`, `agents` | **Updated:** 2026-06-16
 
 ### 🔒 **Canonical** [ICN Documentation Control System](/docs/DOCUMENTATION_CONTROL_SYSTEM.md)
 
@@ -1578,7 +1456,7 @@ Normative development control plane: discovery vs delivery, artifact routing, an
 
 Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh
 
-**For:** `contributors`, `agents` | **Updated:** 2026-09-15
+**For:** `contributors`, `agents` | **Updated:** 2026-06-22
 
 ### 📝 **Living** [ICN Golden Development Prompt](/docs/GOLDEN_PROMPT.md)
 
@@ -1675,12 +1553,6 @@ Audit-only record of every JSON schema $id under docs/contracts/, classified DNS
 Documentation for ICN demonstration system
 
 **For:** `team`, `demo-users` | **Updated:** 2026-03-15
-
-### 📋 **Draft** [Two-node appliance proof v0.2 plan](/docs/demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md)
-
-Bounded, gated execution plan for a two-node appliance proof: two independently initialized VMs from one reviewed image, distinct sovereign identities, explicit DID-bound peer relationship, one receipt bundle transferred and verified offline with the producer disconnected, restart/reboot continuity, encrypted backup and independent restoration, and clean teardown. Carries a per-layer claim-boundary table; federation is explicitly not exercised and never inferred. Gate 4 is BLOCKED pending an offline receipt-bundle exporter/verifier contract. Does not use COMMUNITY_TOPIC, so the #2457 topic-ownership decision stays independent. Plan only — not an executed proof.
-
-**For:** `team`, `agents` | **Updated:** 2026-07-27
 
 ### 🔒 **Canonical** [Design Directory README](/docs/design/README.md)
 
@@ -1944,7 +1816,7 @@ Show-ready orientation layer — routes outside readers, contributors, and agent
 
 GitHub Actions workflows, deploy paths, K3s smoke runbooks, monitoring; routing layer to substantive runbooks under guides/operations/.
 
-**For:** `operators`, `contributors` | **Updated:** 2026-07-26
+**For:** `operators`, `contributors` | **Updated:** 2026-04-29
 
 ### 📝 **Living** [Claim-Boundary Map](/docs/reference/project-index/claim-boundaries.md)
 
@@ -1954,9 +1826,9 @@ Operational claim-boundary manual: disambiguates the architectural Meaning Firew
 
 ### 📝 **Living** [Current Truth Map](/docs/reference/project-index/current-truth-map.md)
 
-Routes a current claim to the source that can establish it — registered domain owner, current code/tests, or live Git/GitHub. STATE.md and PHASE_PROGRESS.md are historical narrative here, not truth roots.
+One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record.
 
-**For:** `all` | **Updated:** 2026-08-19
+**For:** `all` | **Updated:** 2026-07-13
 
 ### 📝 **Living** [Docs Control Map](/docs/reference/project-index/docs-control-map.md)
 
@@ -1982,12 +1854,6 @@ Proof-level taxonomy (L0-L8) as shared claim-boundary vocabulary, plus a capabil
 
 **For:** `all`, `team` | **Updated:** 2026-06-26
 
-### 🔒 **Canonical** [Public state projection](/docs/reference/project-index/public-state-projection.md)
-
-How canonical repository state is projected onto the public website, including the status.toml to ADR-0032 maturity band mapping and the evidence-class mapping
-
-**For:** `contributors`, `architects` | **Updated:** 2026-08-17
-
 ### 📋 **Draft** [ICN Repo Atlas](/docs/reference/project-index/repo-atlas.md)
 
 Draft interpretive atlas paired with the mechanical full-repo record. Names directory families, Rust-workspace families, and a classification vocabulary for stable atlas authoring across icn / nycn / icn-learn.
@@ -2010,7 +1876,7 @@ The icn/ Rust workspace grouped by rough layer (kernel, identity, networking, le
 
 What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material.
 
-**For:** `all`, `team` | **Updated:** 2026-07-28
+**For:** `all`, `team` | **Updated:** 2026-07-13
 
 ### 📝 **Living** [Source Tree Map](/docs/reference/project-index/source-tree-map.md)
 
@@ -2148,7 +2014,7 @@ Design decision for #2399: trusted-local `icnctl --local-mint` issuance at the r
 
 Living snapshot of repo layout, decisions, constraints, and current engineering status
 
-**For:** `developers`, `agents` | **Updated:** 2026-09-15
+**For:** `developers`, `agents` | **Updated:** 2026-07-13
 
 
 ## Strategy
@@ -2231,12 +2097,6 @@ Specific sprint plan and tactical objectives for week of March 17, 2026
 
 **For:** `team` | **Updated:** 2026-03-17
 
-### 📝 **Living** [ICN Organizational Technical Alpha — Control Plan](/docs/strategy/ICN-Technical-Alpha-Control-Plan.md)
-
-Navigable reconstruction of the Technical Alpha program: bounded claim, proof chain with every arrow resolved, dependency DAG, containment ledger, owner seams. A projection, not a truth owner — live status is owned by live_issue_state.
-
-**For:** `team`, `stakeholders` | **Updated:** 2026-09-13
-
 ### 📝 **Living** [ICN Technical Whitepaper](/docs/strategy/ICN-Technical-Whitepaper.md)
 
 Formal technical specification for grants, regulatory review, and architectural validation
@@ -2272,12 +2132,6 @@ Hard questions answered directly in bad-answer/honest-answer format: production 
 Maps every claim in the introduction materials to verifiable merged artifacts (icn#1985/#1997/#1998/#1999, nycn#78, icn-learn#3, icn-community-bridge#1) and states what each artifact does NOT prove. Anti-overclaim companion to the intro docs; defers to STATE.md and PHASE_PROGRESS.md for current truth.
 
 **For:** `public`, `stakeholders`, `organizers`, `reviewers` | **Updated:** 2026-06-09
-
-### 📝 **Living** [ICN Second-Pass Strategy Brief (2026-07-17)](/docs/strategy/ICN_SECOND_PASS_STRATEGY_BRIEF_2026-07-17.md)
-
-Dated, explicitly non-canonical analysis snapshot from a second-pass multi-lane audit: the software-vs-institutional axis reframe, the built-but-sidelined pattern with composition-root evidence, minimum-cut sets, a horizon map, re-ranked wedges, recommended ADRs, a human-acquisition table, and a human-validation map. Carries the rule that the institutional axis advances only on a human-signed act — never on a document. Publishes no private-repository detail.
-
-**For:** `maintainers`, `contributors`, `reviewers` | **Updated:** 2026-07-17
 
 ### 📋 **Draft** [Licensing strategy matrix (autonomy review)](/docs/strategy/LICENSING_STRATEGY_MATRIX.md)
 
@@ -2320,11 +2174,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 379
+**Total documents:** 355
 
 **By status:**
 - Active: 1
-- Canonical: 45
-- Draft: 103
-- Living: 229
-- Superseded: 1
+- Canonical: 40
+- Draft: 100
+- Living: 214
