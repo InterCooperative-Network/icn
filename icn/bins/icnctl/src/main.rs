@@ -4491,7 +4491,7 @@ impl ManagedConfigEdit {
         )?;
         // Acquired BEFORE the load. This ordering is the entire guarantee.
         let lock = icn_core::DataDirLock::acquire_config(config_root, holder)?;
-        let path = config_root.join("icn.toml");
+        let path = icn_core::config::config_file_path(config_root);
         // The lock names a *directory*; `from_file` and `to_file` follow a
         // link. A symlinked `icn.toml` therefore puts the bytes being edited
         // under one directory's lock while this holds another's, so a daemon or
@@ -4550,7 +4550,7 @@ async fn handle_federation_command(
 ) -> Result<()> {
     use icn_core::config::{Config, FederationConfig};
 
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
 
     match cmd {
         FederationCommands::Status => {
@@ -9266,7 +9266,7 @@ async fn handle_init_coop_command(
     println!();
 
     // Step 4: Create configuration file
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     if !config_path.exists() {
         println!("Step 3: Creating configuration");
         let config_content = format!(

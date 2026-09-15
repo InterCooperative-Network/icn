@@ -4,7 +4,9 @@
 set -euo pipefail
 
 DATA_DIR="${ICN_DATA_DIR:-/data/node}"
-CONFIG_FILE="$DATA_DIR/config.toml"
+# icn.toml is the canonical name `icnd --init` writes and `--config` reads
+# (icn#2755). Defined once here; every reference below follows it.
+CONFIG_FILE="$DATA_DIR/icn.toml"
 GATEWAY_PORT="${ICN_GATEWAY_PORT:-8000}"
 P2P_PORT="${ICN_P2P_PORT:-9000}"
 BOOTSTRAP_PEERS="${ICN_BOOTSTRAP_PEERS:-}"

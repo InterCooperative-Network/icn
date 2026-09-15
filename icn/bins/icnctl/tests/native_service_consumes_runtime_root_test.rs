@@ -416,6 +416,108 @@ fn effective(directives: &[(String, String)], key: &str) -> Vec<String> {
         .collect()
 }
 
+/// Every shipped `icnd` drop-in, discovered rather than named.
+///
+/// The first version of this witness composed the base unit with the demo
+/// drop-in only — and MISSED `deploy/appliance/lan/icnd-30-lan-origin.conf.in`,
+/// which also resets `ExecStart`, sorts after the demo override, and shipped
+/// without `--config`. A hardcoded list of drop-ins tests the drop-ins someone
+/// remembered; enumerating them tests the profile.
+fn shipped_icnd_dropins(root: &Path) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut stack = vec![root.join("deploy")];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in entries.filter_map(Result::ok) {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+                continue;
+            }
+            let name = p
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            // `.conf` and `.conf.in` (templated at image-build time) both ship.
+            let is_conf = name.ends_with(".conf") || name.ends_with(".conf.in");
+            // A drop-in for *icnd* specifically: either it lives in an
+            // `icnd.service.d/` directory, or its own name says `icnd`.
+            let for_icnd = name.contains("icnd")
+                || dir
+                    .file_name()
+                    .map(|d| d.to_string_lossy().contains("icnd.service.d"))
+                    .unwrap_or(false);
+            if is_conf && for_icnd {
+                found.push(p);
+            }
+        }
+    }
+    // Sort by the name each file is INSTALLED as, not by its path in the
+    // repository. systemd orders drop-ins lexically within
+    // `icnd.service.d/`, and `build-image.sh` renders
+    // `lan/icnd-30-lan-origin.conf.in` to `30-lan-origin.conf` — so sorting by
+    // repo path would put `appliance/lan/...` before `appliance/systemd/...`
+    // and get the override order backwards, which is precisely the ordering the
+    // LAN defect depended on.
+    found.sort_by_key(|p| installed_dropin_name(p));
+    found
+}
+
+/// The filename a shipped drop-in is installed as under `icnd.service.d/`.
+fn installed_dropin_name(p: &Path) -> String {
+    let n = p
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let n = n.strip_suffix(".in").unwrap_or(&n).to_string();
+    n.strip_prefix("icnd-").unwrap_or(&n).to_string()
+}
+
+/// EVERY shipped drop-in that replaces `ExecStart` must carry `--config`.
+///
+/// systemd applies drop-ins in lexical order and the last `ExecStart` wins, so
+/// one override that forgets the flag reinstates icn#2755 for whichever profile
+/// installs it — regardless of how correct the base unit and the other drop-ins
+/// are.
+#[test]
+fn every_shipped_dropin_that_replaces_execstart_keeps_config() {
+    let root = repo_root();
+    let dropins = shipped_icnd_dropins(&root);
+    assert!(
+        dropins.len() >= 3,
+        "fixture: expected to discover the firstboot, demo and LAN drop-ins, found {dropins:?}"
+    );
+
+    let mut checked = 0;
+    for d in &dropins {
+        let text = std::fs::read_to_string(d).unwrap();
+        // Only drop-ins that actually redefine ExecStart can lose the flag.
+        let redefines = text
+            .lines()
+            .any(|l| l.trim().starts_with("ExecStart=") && l.trim() != "ExecStart=");
+        if !redefines {
+            continue;
+        }
+        checked += 1;
+        assert!(
+            text.contains("--config /var/lib/icn/icn.toml"),
+            "icn#2755: {} replaces ExecStart but does not pass --config, so the \
+             profile installing it runs with Config::default() and the node-DID \
+             treasury fallback",
+            d.display()
+        );
+    }
+    assert!(
+        checked >= 2,
+        "fixture: expected at least the demo and LAN overrides to redefine \
+         ExecStart, saw {checked}"
+    );
+}
+
 /// The composed appliance profile must retain BOTH properties.
 ///
 /// What this proves: systemd parses the base unit and the drop-in together as
@@ -463,12 +565,18 @@ fn the_composed_appliance_profile_keeps_config_and_umask() {
     }
 
     // 2. The composed directives must carry both properties.
-    let composed = compose_unit(&base, std::slice::from_ref(&dropin));
+    // Compose the base with EVERY shipped drop-in, in the order systemd would
+    // apply them, so the last override to win is the one actually asserted on.
+    let all: Vec<PathBuf> = shipped_icnd_dropins(&root)
+        .into_iter()
+        .filter(|p| p != &base)
+        .collect();
+    let composed = compose_unit(&base, &all);
     let exec = effective(&composed, "ExecStart");
     assert_eq!(
         exec.len(),
         1,
-        "the drop-in resets ExecStart and sets exactly one: {exec:?}"
+        "the last drop-in to reset ExecStart leaves exactly one: {exec:?}"
     );
     assert!(
         exec[0].contains("--config /var/lib/icn/icn.toml"),

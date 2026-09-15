@@ -795,7 +795,7 @@ pub fn runtime_root_components(data_dir: &Path) -> Result<RuntimeRootComponents>
     // so reporting it as missing also breaks
     // `configuration validation should predict structural daemon acceptance`.
     let config_linkage = {
-        let path = data_dir.join("icn.toml");
+        let path = icn_core::config::config_file_path(data_dir);
         match std::fs::read_to_string(&path) {
             Ok(text) => toml::from_str::<toml::Value>(&text)
                 // A `[cooperative]` table is not a linkage; a `treasury_did` is.
@@ -2883,7 +2883,7 @@ fn open_store_refusing_links(db: &Path) -> Result<icn_store::SledStore> {
 
 /// Where publication stages the new configuration before renaming it into place.
 fn config_publish_tmp_path(data_dir: &Path) -> PathBuf {
-    data_dir.join("icn.toml").with_extension("toml.genesis-tmp")
+    icn_core::config::config_file_path(data_dir).with_extension("toml.genesis-tmp")
 }
 
 /// Refuse anything at the publication temporary path that cannot be written
@@ -3709,7 +3709,7 @@ fn print_receipt(data_dir: &Path, receipt: &RuntimeRootReceipt, provenance_verif
          governance-authored ledger entries, whatever this receipt says. The\n\
          shipped systemd unit passes it (icn#2755); a hand-rolled unit or a\n\
          direct invocation must too.",
-        data_dir.join("icn.toml").display(),
+        icn_core::config::config_file_path(data_dir).display(),
         data_dir.display()
     );
 }

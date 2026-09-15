@@ -122,7 +122,7 @@ log "[1/8] init + start JWT-secured dev gateway on $GW"
 "$ICND" --init --data-dir "$OUT/data" --node-name econ-chain-demo \
   --init-gateway-port "$PORT" --init-gossip-port "$((PORT+1000))" >"$OUT/init.log" 2>&1 \
   || { cat "$OUT/init.log"; fatal "icnd --init failed"; }
-"$ICND" --config "$OUT/data/config.toml" --data-dir "$OUT/data" \
+"$ICND" --config "$OUT/data/icn.toml" --data-dir "$OUT/data" \
   --gateway-enable --gateway-bind "127.0.0.1:$PORT" --gateway-jwt-secret "$JWT_SECRET" \
   >"$OUT/gateway.log" 2>&1 &
 DPID=$!

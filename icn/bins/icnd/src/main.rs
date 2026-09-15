@@ -672,6 +672,34 @@ async fn main() -> Result<()> {
 
     // Load or create config (before tracing init so we can use tracing config)
     let mut config = if let Some(config_path) = &args.config {
+        // Name the legacy file when it is the likely cause. A node installed
+        // before icn#2755 has `config.toml` and no `icn.toml`, and the shipped
+        // unit now asks for the latter — so "Failed to load config file" would
+        // be true and useless. This does NOT read `config.toml`: there is
+        // deliberately no dual-path discovery, because a loader that searches
+        // two names answers differently depending on which files happen to
+        // exist. It only explains what an operator is looking at.
+        if !config_path.exists() {
+            if let Some(dir) = config_path.parent() {
+                let legacy = dir.join("config.toml");
+                if legacy.is_file() {
+                    anyhow::bail!(
+                        "Configuration not found at {}, but a legacy {} exists.\n\
+                         \n\
+                         `icn.toml` is the canonical native configuration (icn#2755); \
+                         `config.toml` is deprecated and is NOT auto-discovered. This \
+                         node predates that change. Either point this invocation at the \
+                         old file explicitly with `--config {}`, or provision a \
+                         `{}` — existing installs are not an upgrade target of the \
+                         Technical Alpha profile.",
+                        config_path.display(),
+                        legacy.display(),
+                        legacy.display(),
+                        config_path.display()
+                    );
+                }
+            }
+        }
         Config::from_file(config_path).context("Failed to load config file")?
     } else {
         Config::default()
