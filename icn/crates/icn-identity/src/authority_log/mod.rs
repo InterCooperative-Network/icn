@@ -210,7 +210,10 @@ mod admission;
 mod body;
 mod construct;
 mod derive;
-mod encoding;
+// Crate-visible so the GEN layer (`crate::subject_context`) can build its hash preimages with
+// *this* length-prefix writer rather than reimplementing `LP(x)`. A second implementation of the
+// framing is exactly how canonical encodings drift apart. Still crate-private on the outside.
+pub(crate) mod encoding;
 mod store;
 
 pub use admission::{admissible, admissible_bytes, AdmissionError};
