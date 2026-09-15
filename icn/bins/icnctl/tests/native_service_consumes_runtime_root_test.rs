@@ -42,16 +42,32 @@ fn icnctl_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_icnctl"))
 }
 
-/// `icnd` lives beside `icnctl` in the same target directory. `cargo test
-/// --workspace --test '*'` (what CI runs) compiles every binary before running
-/// any test, so this exists. Fail loudly rather than skipping if it does not —
-/// a skipped witness is not evidence.
+/// `icnd` lives beside `icnctl` in the same target directory.
+///
+/// `icnctl` does not depend on the `icnd` package, so a package-scoped
+/// `cargo test -p icnctl` is not required to build it — CI's
+/// `cargo test --workspace` happens to, but relying on that made the witness
+/// pass or panic depending on what else had run. Build it on demand instead, so
+/// the test is self-sufficient in either invocation. Never skip: a skipped
+/// witness is not evidence.
 fn icnd_bin() -> PathBuf {
     let p = icnctl_bin().parent().unwrap().join("icnd");
+    if p.is_file() {
+        return p;
+    }
+    let out = Command::new(env!("CARGO"))
+        .args(["build", "-p", "icnd"])
+        .output()
+        .expect("fixture: could not invoke cargo to build icnd");
+    assert!(
+        out.status.success(),
+        "fixture: `cargo build -p icnd` failed, so the witness cannot drive the \
+         real daemon:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(
         p.is_file(),
-        "fixture: {} is missing. This witness drives the real daemon; build it \
-         with `cargo build -p icnd` (CI's `cargo test --workspace` already does).",
+        "fixture: {} still missing after building icnd",
         p.display()
     );
     p
