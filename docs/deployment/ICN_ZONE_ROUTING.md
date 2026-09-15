@@ -63,13 +63,36 @@ Add a Cloudflare Redirect Rule in the `icn.zone` zone:
 5. Save and verify: `curl -I https://icn.zone` should return `301 → https://intercooperative.network/`
 
 ### Phase 2 — Short-link Worker (build when needed)
+
+> **Resolved 2026-09-15: Model B — ICN-authoritative resolution.** Step 2 below
+> previously read "Looks up code in Cloudflare KV **or** queries the ICN gateway
+> API." Those are not two spellings of one design: the first makes Cloudflare an
+> authoritative store for admission-adjacent state, and the second does not.
+> The decision, its alternatives, and the responsibility matrix behind it are in
+> [ICN_ZONE_JOIN_TRUST_BOUNDARY.md](../design/ICN_ZONE_JOIN_TRUST_BOUNDARY.md) §4.
+> **No authoritative mapping is stored at Cloudflare, and no edge cache is
+> permitted until invite revocation exists** — caching would set a revocation
+> latency floor before the revocation mechanism it trades against is built.
+
 Deploy a Cloudflare Worker to `icn.zone` that:
 1. Matches `/j/*`, `/i/*`, `/n/*` paths
-2. Looks up code in Cloudflare KV or queries the ICN gateway API
-3. Returns a 302 redirect to the resolved destination
+2. **Relays the code to the ICN gateway's read-only resolution endpoint.** No
+   Cloudflare KV. No cache. ICN answers which institution the admission context
+   belongs to; the Worker originates nothing.
+3. Returns a 302 redirect to the ICN-supplied destination, with `no-store`,
+   `Referrer-Policy: no-referrer`, and `X-Robots-Tag: noindex, nofollow`
 4. Falls through to the redirect rule for all unmatched paths
 
-Worker deployment does not require changes to the ICN Rust codebase.
+Worker deployment does not require changes to the ICN Rust codebase — true for
+the Phase 1 redirect, and **a warning sign for Phase 2**: anything that resolves
+a code needs an ICN-side endpoint that does not exist yet, and resolution logic
+living only in a Worker would be unversioned relative to the kernel it fronts.
+Phase 2 is blocked on that endpoint plus durable, revocable invite records; see
+the trust-boundary doc §3 and §9.
+
+**The route resolves to a join page, never to an outcome.** A code identifies an
+admission context; it does not grant membership. Possession must never mint a
+session, mark a code used, or mutate institutional state.
 
 ---
 

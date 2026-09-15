@@ -2364,6 +2364,21 @@ last_updated = "2026-03-15"
 owner = "matt"
 audiences = ["operators", "developers"]
 
+[docs."docs/deployment/ICN_ZONE_ROUTING.md"]
+category = "operations"
+status = "draft"
+title = "icn.zone Routing"
+description = "Runbook for the icn.zone utility-routing namespace: the root redirect to intercooperative.network, the reserved /j/ /i/ /n/ short-route prefixes, and the Cloudflare implementation layer. Phase 1 (root redirect) is a manual runbook; Phase 2 (short-link Worker) resolves codes against ICN and is blocked on a read-only resolution endpoint plus durable, revocable invite records."
+last_updated = "2026-09-15"
+owner = "matt"
+audiences = ["operators", "architects"]
+truth_class = "descriptive"
+freshness = "current"
+domain_tags = ["routing", "deployment"]
+depends_on = ["docs/design/ICN_ZONE_JOIN_TRUST_BOUNDARY.md", "docs/adr/ADR-0032-website-truth-boundary.md"]
+recommended_action = "keep"
+last_reviewed = "2026-09-15"
+
 [docs."docs/deployment/QUICK_START.md"]
 category = "guide"
 status = "living"
@@ -4792,6 +4807,23 @@ freshness = "current"
 domain_tags = ["website", "design", "accessibility"]
 recommended_action = "keep"
 last_reviewed = "2026-08-17"
+
+[docs."docs/design/ICN_ZONE_JOIN_TRUST_BOUNDARY.md"]
+category = "design"
+status = "draft"
+title = "icn.zone join route — trust boundary and contract"
+description = "The trust-boundary decision for icn.zone join routes. Establishes the invariant that a join code identifies an admission context rather than granting membership, classifies every responsibility in a /j/<code> flow as edge-safe, edge-cacheable/ICN-authoritative, or ICN-only, inventories the existing gateway invite primitive against what a public join URL requires, resolves the Cloudflare KV question in favour of ICN-authoritative resolution, threat-models the route, and defines Slice 0 (redirect plus reserved prefixes) and Slice 1 (read-only resolution, currently blocked on durable and revocable invite records). Builds nothing; no icn.zone implementation exists in the repository."
+last_updated = "2026-09-15"
+owner = "matt"
+audiences = ["architects", "developers", "designers"]
+truth_class = "descriptive"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["routing", "design", "identity", "governance"]
+depends_on = ["docs/design/PUBLIC_SURFACE_DESIGN_CONTRACT.md", "docs/spec/icn-civic-shell-v0.md", "docs/spec/member-shell-v0.md", "docs/adr/ADR-0032-website-truth-boundary.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md", "docs/deployment/ICN_ZONE_ROUTING.md"]
+recommended_action = "keep"
+last_reviewed = "2026-09-15"
 
 [docs."docs/design/PUBLIC_SURFACE_DESIGN_CONTRACT.md"]
 category = "design"
