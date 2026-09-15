@@ -1,0 +1,529 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="NORMATIVE BYTE-LEVEL CONTRACT for GEN-A (icn#2695), slice 1 of the #2694 semantic convergence ladder: the deterministic derivation that turns a named governance-domain context plus a fresh public CSPRNG salt into the 32 opaque bytes N1 already accepts as its ContextNonce, plus the two witness-independent reference hashes (subject_context_ref, initial_device_binding_ref) that later semantic facts may name. Specifies the three GEN domain separators, the exact length-prefixed preimages, the Alpha initial-device profile (exactly {Sign, Present}, position 1, no validity span), the fail-closed verifier including the load-bearing derive step that separates admissible from authorized, and fixed cross-implementation test vectors reproduced by an independent non-Rust reference. Carries the explicit unlinkability argument that IDENTITY_SEMANTICS.md invariant I4b requires of any alternative ContextNonce generation method. Outer binding protocol over N1 - no N1 wire format, canonical body, signature preimage or digest rule is changed. Library, spec and tests only: it makes NO claim of institutional recognition, membership, standing, governance participation, economic authority, delegation, session authorization, guardian recovery, replication, durability, deployment or production readiness, and introduces no registrar or global person registry. Bundle transport, durable storage and every downstream slice remain unimplemented."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>GEN-A — context-scoped Subject genesis (`SubjectContextGenesisV1`) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>GEN SUBJECT CONTEXT GENESIS</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-09-15</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="gen-a--context-scoped-subject-genesis-subjectcontextgenesisv1">GEN-A — context-scoped Subject genesis (<code>SubjectContextGenesisV1</code>)</h1>
+<p><strong>Implements:</strong> <a href="https://github.com/InterCooperative-Network/icn/issues/2695" target="_blank" rel="noopener">icn#2695</a> ·
+<strong>Parent:</strong> #2694 semantic convergence, slice 1 of 12 ·
+<strong>Code:</strong> <code>icn/crates/icn-identity/src/subject_context.rs</code> ·
+<strong>Vectors:</strong> <code>icn/crates/icn-identity/tests/gen_subject_context.rs</code></p>
+<p>This document is the <strong>byte-level contract</strong>. It is written so that an implementation in another
+language can reproduce every value in §8 from this text alone.</p>
+<hr>
+<h2 id="1-the-question-this-answers">1. The question this answers</h2>
+<blockquote>
+<p>What does it mean for a human Subject to exist <strong>as this Subject, in this ICN context</strong>, before
+any institution recognizes, enrols, authorizes or governs them?</p>
+</blockquote>
+<p>GEN-A is an <strong>outer binding protocol over N1</strong>. It derives the 32 opaque bytes N1 already accepts
+as its <code>ContextNonce</code>, hands them to N1 unchanged, and defines two witness-independent reference
+hashes that later semantic facts can name. <strong>No N1 wire format, canonical body, signature
+preimage or digest rule is altered or extended.</strong></p>
+<h2 id="2-what-a-verified-genesis-proves--and-what-it-does-not">2. What a verified genesis proves — and what it does not</h2>
+<p>A verified <code>SubjectContextGenesisV1</code> proves exactly this:</p>
+<blockquote>
+<p>A fresh N1 Subject was incepted for one explicitly named governance-domain context, with one
+narrow initial device authorization to a principal <strong>distinct from the Subject&#39;s establishment
+authority</strong>, under existing N1 authority-log semantics, without any registrar.</p>
+</blockquote>
+<p>It <strong>does not</strong> establish, imply or contribute to: institutional recognition; membership or
+standing; governance participation or voting rights; economic authority or settlement capacity;
+delegation or session authorization; device authority beyond the single <code>{Sign, Present}</code> grant
+it carries; guardian recovery; replication, finality or durability; production readiness.</p>
+<p>Each of those is a separate, later fact. A later fact may <strong>reference</strong> <code>subject_context_ref</code>;
+none of them is entailed by it.</p>
+<h3 id="21-genesis-is-a-historical-fact-not-a-current-authority-statement">2.1 Genesis is a historical fact, not a current-authority statement</h3>
+<p>Verification folds a <strong>fresh</strong> <code>AuthorityStore</code> containing only the two genesis events. That is
+deliberate — genesis is a closed historical fact — but it has a consequence a relying party must
+not get wrong:</p>
+<blockquote>
+<p>A verified bundle says the device <strong>was</strong> authorized at position 1. It does <strong>not</strong> say the
+device is authorized <strong>now</strong>.</p>
+</blockquote>
+<p>Any later <code>Revoke</code> or <code>Rotate</code> event is invisible to this verifier, because it is not in the
+bundle. A caller that needs current device authority MUST consult the Subject&#39;s live authority
+log via N1&#39;s <code>derive</code>, and MUST NOT substitute a verified genesis bundle for that check.</p>
+<p>There is <strong>no registrar</strong>. Nothing in this protocol consults a service, directory or database
+row. A Subject is established by the person&#39;s own client from material the person holds. A
+governance domain is named as a <em>context</em>, never as an issuer or an owner: the institution does
+not create the Subject, and the Subject exists whether or not any institution ever recognizes it.</p>
+<h2 id="3-primitives">3. Primitives</h2>
+<p>Reused from N1 (<code>icn/crates/icn-identity/src/authority_log/</code>), not redefined:</p>
+<pre><code class="language-text">LP(x)  := u32be(len(x)) || x          -- length-prefixed byte string
+b32(x) := 32 raw bytes, no prefix
+u8/u16be/u32be/u64be                  -- big-endian, fixed width
+H(x)   := SHA-256(x)
+</code></pre>
+<h2 id="4-constants-frozen-for-v1">4. Constants (frozen for v1)</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GEN_CONTEXT_DOMAIN</code></td>
+<td>ASCII <code>icn.gen.subject-context</code> (23 bytes)</td>
+</tr>
+<tr>
+<td><code>GEN_CONTEXT_VERSION</code></td>
+<td><code>1</code> (<code>u16be</code>)</td>
+</tr>
+<tr>
+<td><code>SUBJECT_CONTEXT_REF_DOMAIN</code></td>
+<td>ASCII <code>icn.gen.subject-context-ref</code> (27 bytes)</td>
+</tr>
+<tr>
+<td><code>SUBJECT_CONTEXT_REF_VERSION</code></td>
+<td><code>1</code> (<code>u16be</code>)</td>
+</tr>
+<tr>
+<td><code>INITIAL_DEVICE_BINDING_REF_DOMAIN</code></td>
+<td>ASCII <code>icn.gen.initial-device-binding-ref</code> (34 bytes)</td>
+</tr>
+<tr>
+<td><code>INITIAL_DEVICE_BINDING_REF_VERSION</code></td>
+<td><code>1</code> (<code>u16be</code>)</td>
+</tr>
+<tr>
+<td><code>SUBJECT_CONTEXT_GENESIS_VERSION</code></td>
+<td><code>1</code> (<code>u16</code>)</td>
+</tr>
+<tr>
+<td>context kind <code>GovernanceDomainV1</code></td>
+<td><code>0x01</code> (<code>u8</code>)</td>
+</tr>
+</tbody></table>
+<p>All three GEN domains are length-prefixed and pairwise distinct from every <code>authority_log</code>
+separator (<code>icn.authority-log</code>, <code>.sig</code>, <code>.commit</code>, <code>.kdf</code>), so a GEN preimage can never be
+reinterpreted as an N1 body, signature, commitment or KDF preimage.</p>
+<h2 id="5-context">5. Context</h2>
+<p>Exactly one context kind is defined in v1:</p>
+<pre><code class="language-text">0x01 = GovernanceDomainV1
+</code></pre>
+<p><code>context_id</code> is the <strong>exact UTF-8 byte sequence</strong> of the existing <code>GovernanceDomainId.0</code> string.
+No case folding, no Unicode normalization, no UUID canonicalization, no display-name
+substitution. An <strong>empty <code>context_id</code> is rejected</strong> at both construction and verification, even
+though the legacy <code>GovernanceDomainId</code> newtype does not itself enforce that.</p>
+<p>This is not a claim that a governance domain is ICN&#39;s final institution or entity identifier. It
+is the concrete runtime decision space ICN has today. The kind tag is inside every preimage, so a
+later GEN version may define further kinds without disturbing this one.</p>
+<blockquote>
+<p><strong>Implementation note.</strong> <code>icn-identity</code> is a <strong>kernel</strong>-class crate under
+<code>scripts/firewall-taxonomy.toml</code>; <code>icn-governance</code>, which owns <code>GovernanceDomainId</code>, is a
+<strong>domain</strong> crate that already depends on <code>icn-identity</code>. Importing the type would be both a
+dependency cycle and a meaning-firewall violation, so the context id crosses the boundary as
+validated bytes. The byte contract above is unchanged; the governance-side caller passes
+<code>domain.0</code>.</p>
+</blockquote>
+<h3 id="51-context_salt">5.1 <code>context_salt</code></h3>
+<p>32 bytes drawn from a CSPRNG, once, per (Subject, context). It is <strong>public</strong> — it travels in the
+genesis evidence — but it is the <em>entire</em> entropy source of the derived nonce. It must be
+retained in the person&#39;s private subject index and protected recovery material, and it must never
+be treated or indexed as a global identifier.</p>
+<h3 id="52-why-the-salt-is-mandatory--the-invariant-i4b-argument">5.2 Why the salt is mandatory — the invariant I4b argument</h3>
+<p><code>IDENTITY_SEMANTICS.md</code> §10 / invariant <strong>I4b</strong> requires a <code>ContextNonce</code> to be generated
+independently with CSPRNG randomness per context, <strong>prohibits deterministic derivation from a
+globally stable public value</strong>, and admits an alternative generation method only with an
+<em>explicit unlinkability argument, stated and reviewed</em>. This is that argument.</p>
+<ol>
+<li>The banned construction is <code>nonce = H(context_id)</code>. A context id is globally stable and
+public, so every human in one governance domain would publish the <strong>same</strong> nonce in their
+inception body — a free cross-subject grouping handle for anyone who sees two inception
+bodies.</li>
+<li><code>context_salt</code> is a fresh 32-byte CSPRNG draw per (Subject, context), and is the only varying
+input.</li>
+<li>With the public prefix fixed, <code>salt |-&gt; H(prefix || salt)</code> over a uniform 32-byte salt is
+computationally indistinguishable from a uniform 32-byte draw. Two Subjects in one context
+therefore publish independent, unlinkable nonces — exactly the property the direct-draw rule
+exists to guarantee.</li>
+<li>Deriving rather than drawing buys one thing a direct draw cannot: a client that retained its
+salt can <strong>reproduce</strong> the nonce after a restart, without storing the nonce separately and
+without weakening (3).</li>
+<li>An observer holding only an inception body sees the nonce alone. Recovering <code>context_id</code> from
+it requires guessing the 32-byte salt, so the nonce still names nothing and leaks no context.</li>
+</ol>
+<p>&quot;Never reused&quot; holds in the sense the rule means: a distinct intended Subject or a distinct
+context draws a distinct salt and therefore a distinct nonce. Reproducing the <em>same</em> nonce for
+the <em>same</em> intended Subject during recovery is the goal, not a violation.</p>
+<h3 id="53-one-subject-per-context-is-a-client-invariant">5.3 One Subject per context is a client invariant</h3>
+<p>There is no registrar, so no protocol oracle can prove a person did not deliberately create a
+second Subject with a second salt in the same context. Clients <strong>MUST</strong> refuse a second fresh
+genesis for an already-indexed context unless a separately specified recovery or migration flow
+authorizes it. <strong>Global uniqueness is not claimed and must not be inferred.</strong></p>
+<h2 id="6-derivations">6. Derivations</h2>
+<h3 id="61-context-nonce">6.1 Context nonce</h3>
+<pre><code class="language-text">context_preimage :=
+      LP(GEN_CONTEXT_DOMAIN)
+   || u16be(GEN_CONTEXT_VERSION)
+   || u8(context_kind)
+   || LP(context_id_utf8)
+   || b32(context_salt)
+
+context_nonce := H(context_preimage)          -- 32 bytes, handed to N1 unchanged
+</code></pre>
+<h3 id="62-n1-inception-and-the-subject">6.2 N1 inception and the Subject</h3>
+<p>The nonce is given to an N1 <code>ContinuityRoot</code> built with a caller-chosen continuity secret and
+establishment plan. N1&#39;s own rules then produce the Subject:</p>
+<pre><code class="language-text">SubjectId = event_id(inception body) = H(canonical inception body)
+</code></pre>
+<p>GEN-A does not invent an identifier and does not redesign the establishment plan.</p>
+<p><strong>Determinism requires the whole continuity configuration.</strong> The inception body commits
+<code>next_commitment</code>, which is folded backwards from the plan&#39;s horizon. So the retry/recovery
+invariant is stronger than &quot;same salt&quot;:</p>
+<pre><code class="language-text">same continuity secret + same plan/horizon + same context descriptor + same salt
+    -&gt; same context_nonce -&gt; same canonical inception body -&gt; same SubjectId
+</code></pre>
+<p>A client that reconstructs a <em>different</em> plan has <strong>not</strong> reconstructed the same Subject and must
+not claim continuity. The Alpha execution profile must pin the exact plan/horizon it uses, and
+protected recovery material must retain enough to rebuild it. N7 still owns the general recovery
+protocol.</p>
+<h3 id="63-initial-device-authorization">6.3 Initial device authorization</h3>
+<p>Exactly one N1 <code>Authorize</code> event, signed by the generation-0 authority:</p>
+<pre><code class="language-text">subject      = derived SubjectId
+position     = 1
+prev_digest  = inception event_id
+signer       = N1 generation-0 authority Principal
+device       = an independently generated device Principal
+capabilities = { Sign, Present }          -- exactly; tags 0x01, 0x03
+validity     = None
+</code></pre>
+<p><code>Encrypt</code> is not granted because nothing in this profile addresses content to the Subject yet.
+<code>Recover</code> is not granted because an app-layer label named <code>Recover</code> must never be mistaken for N1
+establishment authority.</p>
+<p>The key separation runs in <strong>both</strong> directions. The device generates its own key and never
+receives the continuity or root authority key — and genesis never receives the device&#39;s signing
+key either. The authorize event is signed by the Subject&#39;s generation-0 authority, so only the
+device&#39;s <strong>public</strong> Principal is required, and that is all the construction API accepts.</p>
+<h4 id="the-bootstrap-separation-invariant">The bootstrap separation invariant</h4>
+<pre><code class="language-text">initial_device_principal MUST NOT be a member of the inception body&#39;s initial_authority set
+</code></pre>
+<p>That set is the generation-0 establishment authority — in N1&#39;s terms, the <code>PrincipalSet</code> carried
+as <code>initial_authority</code> in the <code>Inception</code> body, whose sole member is also the inception <code>signer</code>.</p>
+<p>A capability set attenuates what a principal may <em>do</em>; it cannot attenuate what that principal
+already <em>is</em>. If the device principal is the establishment authority, the narrow
+<code>{Sign, Present}</code> credential is simultaneously the authority-log writer key, and whoever holds it
+can mint arbitrary authorize and revoke events — the grant&#39;s narrowness is illusory.</p>
+<p><strong>This is where GEN-A is deliberately stricter than N1.</strong> Such a history is entirely valid N1:
+the authorize event is admissible, its signer genuinely holds authority, and N1&#39;s fold yields a
+live device grant. Nothing in N1 objects. The Alpha profile refuses it anyway.</p>
+<pre><code class="language-text">N1-valid authority history  ≠  valid GEN-A profile
+</code></pre>
+<p>Scope: this is the GEN-A <strong>bootstrap</strong> rule, about the position-1 genesis grant. It is not a
+universal claim about every future device, nor about whether some later profile might authorize a
+principal that holds establishment authority under different semantics.</p>
+<h3 id="64-semantic-references-witness-independent">6.4 Semantic references (witness-independent)</h3>
+<pre><code class="language-text">subject_context_ref_preimage :=
+      LP(SUBJECT_CONTEXT_REF_DOMAIN)
+   || u16be(SUBJECT_CONTEXT_REF_VERSION)
+   || u8(context_kind)
+   || LP(context_id_utf8)
+   || b32(context_salt)
+   || b32(inception_event_id)
+
+subject_context_ref := H(subject_context_ref_preimage)
+
+initial_device_binding_ref_preimage :=
+      LP(INITIAL_DEVICE_BINDING_REF_DOMAIN)
+   || u16be(INITIAL_DEVICE_BINDING_REF_VERSION)
+   || b32(subject_context_ref)
+   || b32(initial_authorize_event_id)
+
+initial_device_binding_ref := H(initial_device_binding_ref_preimage)
+</code></pre>
+<p><code>subject_context_ref</code> is the basis a later recognition fact should name. It says <em>which
+context-bound Subject inception</em> is referred to and does not depend on the device grant, so
+replacing or revoking a device never disturbs it. Neither preimage contains witness bytes, so
+re-signing either body leaves both references unchanged — which matters because N1 explicitly
+permits several valid witnesses over one canonical body.</p>
+<h2 id="7-verification">7. Verification</h2>
+<p>Given a bundle and an independently supplied <code>(claimed_kind, claimed_context_id)</code>:</p>
+<ol>
+<li>Require <code>version == 1</code> and <code>kind == claimed_kind</code>.</li>
+<li>Require <code>context_id</code> non-empty and <strong>byte-identical</strong> to <code>claimed_context_id</code>.</li>
+<li>Recompute <code>context_nonce</code> from the bundle&#39;s context material (§6.1).</li>
+<li>Admit <code>inception_body_bytes</code> + <code>inception_witness</code> through N1&#39;s existing state-independent
+<code>admissible_bytes</code>.</li>
+<li>Require the body is an <code>Inception</code> whose <code>context_nonce</code> equals the recomputed bytes.</li>
+<li>Derive <code>SubjectId</code> by N1&#39;s digest rule.</li>
+<li>Admit <code>authorize_body_bytes</code> + <code>authorize_witness</code> the same way.</li>
+<li>Require the authorize body names the derived Subject, is at position <code>1</code>, has
+<code>prev_digest == inception_event_id</code>, grants exactly <code>{Sign, Present}</code>, and has no validity
+span.</li>
+<li>Require the authorized device is <strong>not</strong> a member of the decoded inception body&#39;s
+ <code>initial_authority</code> set (the bootstrap separation invariant). Read from the inception body,
+ never from a bundle-supplied assertion — a bundle may be assembled by anyone, so the
+ constructor&#39;s refusal cannot be relied on here.</li>
+<li>Ingest both events into a <strong>fresh</strong> <code>AuthorityStore</code> and run N1&#39;s existing <code>derive(subject)</code>.</li>
+<li>Require a clean <code>AuthorityView::Live</code> at frontier <code>2</code> carrying exactly one device grant, for
+the device the authorize body names, with exactly the expected capabilities, no validity
+span, and <code>granted_at == 1</code>; and require the device is absent from the derived authority set.</li>
+<li>Recompute both references (§6.4) from body/event references, witnesses excluded.</li>
+</ol>
+<p><strong>Which check is load-bearing.</strong> Step 9 is the one that enforces the separation: it holds
+before any derivation runs and reads the authority set straight out of the decoded inception
+body. The derived-authority clause in step 11 is <em>equivalent</em> for a two-event genesis bundle and
+cannot fire on its own — no establishment event can occupy position 1, so the fold never advances
+past generation 0 and the derived authority set is still the inception&#39;s <code>initial_authority</code>. It
+is kept because it states the invariant against the structure a reader cares about (&quot;the device
+is not a log writer in the derived history&quot;) and would keep holding if a later profile ever
+admitted a bundle whose prefix contains a rotation.</p>
+<p>Step 10 is load-bearing and not redundant with step 7. Admission proves only <em>&quot;some key signed
+these bytes&quot;</em> — an authorize event signed by an arbitrary key is perfectly admissible. Only the
+derived fold answers <em>&quot;did that key hold authority in this Subject&#39;s history?&quot;</em></p>
+<p>Any parse, signature, context, parent, position, capability, authority or derivation mismatch
+<strong>fails closed</strong>. There is no partial success and no &quot;verified except&quot; state.</p>
+<p>Verification returns: <code>SubjectId</code>, device Principal, both event ids, both reference hashes, the
+derived authority state, and the frontier.</p>
+<h2 id="8-test-vectors">8. Test vectors</h2>
+<p>Inputs, stated in full:</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>context_kind</code></td>
+<td><code>GovernanceDomainV1</code> (<code>0x01</code>)</td>
+</tr>
+<tr>
+<td><code>context_id</code></td>
+<td><code>coop.example.governance</code> (23 ASCII bytes)</td>
+</tr>
+<tr>
+<td><code>context_salt</code></td>
+<td><code>salt[i] = i</code> for i in 0..32 → <code>000102…1e1f</code></td>
+</tr>
+<tr>
+<td>continuity secret</td>
+<td><code>secret[i] = 0x80 + i</code> → <code>8081…9e9f</code></td>
+</tr>
+<tr>
+<td>establishment plan</td>
+<td><code>[Rotate; 4]</code> (horizon 4)</td>
+</tr>
+<tr>
+<td>device seed</td>
+<td><code>seed[i] = 0x40 + i</code> → <code>4041…5e5f</code></td>
+</tr>
+</tbody></table>
+<p>Outputs (hex):</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Bytes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>context_preimage</code> (89 B)</td>
+<td><code>0000001769636e2e67656e2e7375626a6563742d636f6e7465787400010100000017636f6f702e6578616d706c652e676f7665726e616e6365000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f</code></td>
+</tr>
+<tr>
+<td><code>context_nonce</code></td>
+<td><code>208c2b372130c8479460ddc56a0d581caa5016a47df54ed08f1357c45041e3cf</code></td>
+</tr>
+<tr>
+<td><code>initial_authority</code> pubkey</td>
+<td><code>6438475a7044bca357e049c1fcb255ce9f791ec05b44ddb06d9566b9a01636ba</code></td>
+</tr>
+<tr>
+<td><code>next_commitment</code> (C₁)</td>
+<td><code>d04408dd67899efb069fbb5930860464f34dde35816d5d469dcafc2639fcfa1a</code></td>
+</tr>
+<tr>
+<td>inception body (158 B)</td>
+<td><code>0000001169636e2e617574686f726974792d6c6f67000101016438475a7044bca357e049c1fcb255ce9f791ec05b44ddb06d9566b9a01636ba208c2b372130c8479460ddc56a0d581caa5016a47df54ed08f1357c45041e3cf00000001016438475a7044bca357e049c1fcb255ce9f791ec05b44ddb06d9566b9a01636bad04408dd67899efb069fbb5930860464f34dde35816d5d469dcafc2639fcfa1a</code></td>
+</tr>
+<tr>
+<td><strong><code>SubjectId</code></strong> = inception <code>event_id</code></td>
+<td><code>3b0e4c9ed8634dc5e3ed4a47ef09059fb99c89a0ac61a1ee6812894b8a190f5a</code></td>
+</tr>
+<tr>
+<td>device pubkey</td>
+<td><code>2543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d</code></td>
+</tr>
+<tr>
+<td>authorize body (169 B)</td>
+<td><code>0000001169636e2e617574686f726974792d6c6f670001033b0e4c9ed8634dc5e3ed4a47ef09059fb99c89a0ac61a1ee6812894b8a190f5a00000000000000013b0e4c9ed8634dc5e3ed4a47ef09059fb99c89a0ac61a1ee6812894b8a190f5a016438475a7044bca357e049c1fcb255ce9f791ec05b44ddb06d9566b9a01636ba012543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d00000002010300</code></td>
+</tr>
+<tr>
+<td>authorize <code>event_id</code></td>
+<td><code>e600a622c3a727fd48b55f31ee7deb3d91bc1be518ee38f0211b4d575f61af40</code></td>
+</tr>
+<tr>
+<td><strong><code>subject_context_ref</code></strong></td>
+<td><code>5e5f0deeb4cc8e0f1616a06509b7042828a85914597fad2b95d6a77f695faf86</code></td>
+</tr>
+<tr>
+<td><strong><code>initial_device_binding_ref</code></strong></td>
+<td><code>b2ff12700d18618947fdc6a6b02310580dd95c7b5e3b91f4cc7de338a197d3ad</code></td>
+</tr>
+</tbody></table>
+<p>These values were produced by an <strong>independent reference implementation written from this
+document</strong> (Python, sharing no code, library or constant definition with <code>icn-identity</code>) and are
+pinned as literals in <code>gen_subject_context.rs</code>. The reference is preserved and self-checking:</p>
+<pre><code class="language-bash">python3 icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py
+</code></pre>
+<p>It re-derives all eleven values from this document, reads the <code>EXPECT_*</code> literals out of the Rust test
+purely as a comparison target, and exits non-zero on any disagreement. Both implementations agree
+byte-for-byte. Witness signatures are
+deterministic per RFC 8032 but are <strong>not</strong> pinned and are <strong>not</strong> part of semantic identity.</p>
+<h3 id="81-negative-cases-covered">8.1 Negative cases covered</h3>
+<p>Empty context id (construction and verification); unsupported version; wrong context claim;
+relabelling a bundle into another context; mutated salt; trailing bytes on a canonical body; bad
+inception witness; bad authorize witness; authorize naming another Subject; wrong position; wrong
+parent; extra capability; missing capability; <code>Recover</code> capability; validity span present;
+inception body in the authorize slot and vice versa; an authorize event that is <strong>admissible but
+unauthorized</strong>; a continuity root built with a foreign nonce; <strong>the generation-0 establishment
+authority named as the initial device — refused both at construction and, for an externally
+assembled bundle, at verification, with the test first proving N1 itself accepts that history</strong>.</p>
+<p>Plus the positive structural obligations: byte-identical reproduction from the same full
+configuration; different context, salt, or plan/horizon all change the Subject; two Subjects in
+one context publish unlinkable nonces; changing the device leaves <code>subject_context_ref</code> unchanged
+while changing the device-binding reference; a second valid witness changes neither reference;
+GEN domains are pairwise distinct from each other and from N1&#39;s; no DID-string spelling enters
+canonical bytes.</p>
+<h2 id="9-privacy-and-correlation">9. Privacy and correlation</h2>
+<p>The unlinkability claim is <strong>relative to what a party has been given</strong>, and collapsing the two
+cases would overstate it. <code>context_salt</code> is never secret; it is public material that happens not
+to be disclosed to everyone.</p>
+<h3 id="91-observer-a--holds-only-n1-inception-material">9.1 Observer A — holds only N1 inception material</h3>
+<p>Sees <code>context_nonce</code> and nothing else about the context. For this observer:</p>
+<ul>
+<li>The nonce is 32 bytes indistinguishable from uniform, and <strong>names nothing</strong>.</li>
+<li>The governance domain is <strong>not recoverable</strong>: doing so means guessing the 32-byte salt.</li>
+<li>Two Subjects in one context are <strong>unlinkable</strong>, because their salts are independent draws.</li>
+<li>Two Subjects of one <em>person</em> across contexts are unlinkable for the same reason.</li>
+</ul>
+<h3 id="92-observer-b--has-been-handed-a-subjectcontextgenesisv1-bundle">9.2 Observer B — has been handed a <code>SubjectContextGenesisV1</code> bundle</h3>
+<p>Receives <code>context_id</code> and <code>context_salt</code> explicitly, and can therefore confirm the context and
+recompute the nonce. That is <strong>the point of the evidence</strong>, not a leak: a relying verifier cannot
+check a context claim it was not told. For this observer:</p>
+<ul>
+<li>The bundle&#39;s <strong>own</strong> context is revealed, deliberately.</li>
+<li>Nothing about the person&#39;s <strong>other</strong> contexts is revealed. Each context has an independent
+salt, so holding one bundle does not help recognize or link a Subject in another context.</li>
+<li>A bundle is bearer-showable: whoever holds it can present it. It still confers no authority —
+it contains no private key — but disclosure is a decision, so clients should treat the set of
+parties given a bundle as the set that knows that context binding.</li>
+</ul>
+<h3 id="93-holding-across-both">9.3 Holding across both</h3>
+<ul>
+<li><code>context_nonce</code> must never be presented as a Subject identifier or a context identifier.</li>
+<li><code>context_salt</code> is <strong>public, not secret</strong>, and must nonetheless never be globally indexed;
+publishing a salt directory would hand Observer A the capability §9.1 denies them.</li>
+<li>No protocol party receives a cross-context mapping of one human&#39;s Subjects.</li>
+<li>No global person registry, registrar, or institution-controlled human master identifier is
+introduced.</li>
+</ul>
+<h2 id="10-deliberate-scope-boundaries">10. Deliberate scope boundaries</h2>
+<p>Not in this slice, by design: bundle transport/serialization; durable or daemon-persistent
+authority storage; gateway routes; <code>SubjectRecognitionV1</code>; membership, standing or governance
+integration; session claims; N3 replication; legacy DID or member migration; institution/entity
+genesis; recovery protocol design; production cutover.</p>
+<p><code>SubjectContextGenesisV1</code> has <strong>no serde impl and no wire encoding</strong>. That is intentional: it
+makes <em>&quot;serde/JSON bytes are not the cryptographic identity of an N1 event&quot;</em> structurally true
+rather than merely tested. A strict deterministic container may be specified separately;
+verification will still consume the canonical N1 bytes carried in the bundle, never a
+re-serialization of decoded fields.</p>
+<p>The next child of #2694 is the local N1 durability slice.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
