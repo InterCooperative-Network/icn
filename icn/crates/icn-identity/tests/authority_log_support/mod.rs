@@ -10,7 +10,7 @@ use ed25519_dalek::SigningKey;
 use icn_identity::authority_log::{
     authorize_event, revoke_event, AuthorityBody, AuthorityStore, CapabilitySet, ContextNonce,
     ContinuityRoot, DeviceCapability, EstablishmentKind, EventId, PrincipalKey,
-    SignedAuthorityEvent, SubjectId, ValiditySpan,
+    SignedAuthorityEvent, SubjectId, ValiditySpan, WitnessSignature,
 };
 
 /// A subject with its continuity root and inception event, all derived from one seed byte.
@@ -164,4 +164,30 @@ pub fn bodies_of(
     s: SubjectId,
 ) -> std::collections::BTreeSet<AuthorityBody> {
     store.bodies_for(s)
+}
+
+/// A second genuinely valid witness over an event's body, under the same authority key.
+///
+/// Ed25519 signing is deterministic (RFC 8032), so re-calling `sign` reproduces the same bytes and
+/// a different key would not verify under the body's inline signer. A distinct *valid* signature
+/// therefore needs the same secret scalar with a different nonce prefix, which is what a hedged or
+/// retrying signer produces. This is the fixture for "several witnesses over one body", which the
+/// durable layer must keep separable from duplicity.
+pub fn resign(s: &Subject, event: &SignedAuthorityEvent, generation: u64) -> SignedAuthorityEvent {
+    use ed25519_dalek::hazmat::{raw_sign, ExpandedSecretKey};
+    use sha2::Sha512;
+
+    let key = s.root.authority_signing_key(generation);
+    let seed = key.to_bytes();
+    let mut expanded = ExpandedSecretKey::from(&seed);
+    expanded.hash_prefix = [0x5a; 32];
+    let signature = raw_sign::<Sha512>(
+        &expanded,
+        &event.body.signature_preimage(),
+        &key.verifying_key(),
+    );
+    SignedAuthorityEvent::new(
+        event.body.clone(),
+        WitnessSignature::from_bytes(signature.to_bytes()),
+    )
 }
