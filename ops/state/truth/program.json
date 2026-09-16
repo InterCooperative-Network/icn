@@ -106,9 +106,9 @@
           "pr": "icn#2690",
           "state": "FROZEN",
           "contract": "ops/state/truth/agents.json#declared_scope.supported_input_domain",
-          "note": "Provider-aware agent registry. Closure rule adopted icn#2689: a finding blocks freeze only if it falsifies a claimed behaviour, mis-accepts or mis-rejects an in-contract configuration, breaks a required execution surface, or makes stated semantics materially false. FROZEN at 73a49026 under that rule: 15/15 local gates, 11/11 required CI, zero unresolved findings, and the contract probed clause by clause. Not merged; merge authorization not granted.",
+          "note": "Provider-aware agent registry. Closure rule adopted icn#2689: a finding blocks freeze only if it falsifies a claimed behaviour, mis-accepts or mis-rejects an in-contract configuration, breaks a required execution surface, or makes stated semantics materially false. FROZEN under that rule, at the head the PR lifecycle block names: 15/15 local gates, 11/11 required CI, zero unresolved findings, and the contract probed clause by clause. Not merged; merge authorization not granted.",
           "freeze_note": "The exact freeze SHA is recorded on the PR, not here, and that is deliberate: I twice wrote a SHA into this file and the act of committing it moved the head, so the recorded freeze was immediately false. A freeze SHA cannot live inside the branch it freezes. This file records THAT the slice is frozen and where the head is authoritative; the PR comment records WHICH head.",
-          "freeze_head_recorded_at": "icn#2690, the comment titled FROZEN"
+          "freeze_head_recorded_at": "icn#2690, the ICN-DELIVERY-LIFECYCLE block in the pull request body \u2014 the surface ops/state/truth/delivery.json#lifecycle.state_surface names as the owner of Freeze head"
         },
         {
           "id": "icn#2632 Stage 2",
