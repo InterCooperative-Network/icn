@@ -106,7 +106,7 @@ Always try `try_read()` before `block_in_place()`. The `trust_oracle_block_in_pl
 ## Verification
 
 ```bash
-cd icn/icn
+cd "$(git rev-parse --show-toplevel)/icn"
 cargo fmt --all --check
 cargo clippy -p icn-trust -p icn-federation --all-targets -- -D warnings
 cargo test -p icn-trust --lib
