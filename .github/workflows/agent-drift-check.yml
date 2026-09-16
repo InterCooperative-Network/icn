@@ -22,12 +22,17 @@ on:
       - 'scripts/check-agent-registry.py'
       - 'scripts/tests/test_agent_registry_invariants.py'
       - 'tools/claude-code/plugins/**'
+      - 'scripts/tests/test_what_matters_now_json.py'
+      - 'scripts/tests/test_what_matters_now_drift.py'
+      - 'scripts/tests/test_what_matters_now_sprint_path.py'
       # icn#2651 stage B: the executable that owns ordinary-merge semantics, and its controls.
       - 'tools/icn-merge-pr/**'
       - 'scripts/tests/test_icn_merge_pr.py'
       - 'scripts/tests/test_icn_merge_pr_install.py'
       # icn#2661: the delivery lifecycle owner, its gate, and the provider surfaces it binds.
       - 'scripts/check-delivery-lifecycle.py'
+      - 'ops/state/truth/engineering-leverage.json'
+      - 'scripts/check-engineering-leverage.py'
       - 'scripts/tests/test_delivery_lifecycle.py'
       - '.github/copilot-instructions.md'
       - '.github/pull_request_template.md'
@@ -129,6 +134,19 @@ jobs:
       - name: Sprint-state currency + SessionStart source guard tests (Refs icn#2634)
         run: python3 scripts/tests/test_sprint_state_invariants.py
 
+      - name: Systemic-leverage policy has one canonical owner and live projections
+        run: python3 scripts/check-engineering-leverage.py
+
+      - name: Systemic-leverage classification scenarios behave as specified
+        run: python3 scripts/tests/test_engineering_leverage.py
+
+      # Registering a truth domain without regenerating the context spine must
+      # fail a gate. generated-truth.yml only warns, does not watch
+      # ops/state/truth/**, and is not required — so the enforcement lives on
+      # the required drift path and this proves it binds.
+      - name: Context spine enforcement binds on the required path
+        run: python3 scripts/tests/test_context_spine_enforcement.py
+
       # icn#2651: the canonical merge policy must not name a field that cannot hold the value it
       # is compared against, and must not duplicate values it owns. Both got past every other gate
       # because prose is not type-checked. Structured validation only — no Markdown is parsed.
@@ -180,5 +198,28 @@ jobs:
             python3 -c "import json; json.load(open('${f}'))" && echo "OK: ${f}"
           done
 
-      - name: Verify what-matters-now script runs without errors
+      # icn#2638: --json was advertised in the script's own usage header and invoked by no
+      # workflow, skill or hook, so a 100% failure rate looked like silence. The step below
+      # used to be named for the whole script while running only --drift. Each mode now has
+      # an executing consumer, because a mode with no runner is how this hid.
+      - name: what-matters-now --drift (drift gate)
         run: bash ops/scripts/what-matters-now.sh --drift
+
+      - name: what-matters-now --json is machine-readable (Refs icn#2638)
+        run: python3 scripts/tests/test_what_matters_now_json.py
+
+      # icn#2723: the step above this one is the gate itself, and it could exit
+      # non-zero with no output at all -- so a red required check said nothing.
+      # This asserts the report is actually reached and that findings aggregate.
+      - name: what-matters-now --drift reports what it found (Refs icn#2723)
+        run: python3 scripts/tests/test_what_matters_now_drift.py
+
+      # icn#2722: the sprint/policy lookups spliced the checkout path into Python
+      # source, so a path containing a legal `'` silently misreported (and could
+      # execute code). This drives the script from such a path and forbids the
+      # class structurally, so it cannot return on a new site.
+      - name: what-matters-now survives a quoted checkout path (Refs icn#2722)
+        run: python3 scripts/tests/test_what_matters_now_sprint_path.py
+
+      - name: what-matters-now human mode still renders
+        run: bash ops/scripts/what-matters-now.sh > /dev/null

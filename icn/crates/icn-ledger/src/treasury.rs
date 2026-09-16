@@ -70,13 +70,16 @@ use crate::labor_shares::{
     BondId, BondPaymentType, BondStatus, CooperativeBond, LaborShare, ScheduledPayout, ShareId,
     SurplusAllocation,
 };
+use crate::principal_rows::{
+    refuse_unless_one_spelling_per_principal, PrincipalRowsRefusal, TREASURY_KEYSPACE,
+};
 use crate::types::JournalEntry;
 use anyhow::{bail, Result};
 use icn_entity::EntityId;
 use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::info;
 
@@ -97,6 +100,28 @@ const SPENDING_RULE_PREFIX: &str = "ledger:treasury:rule:";
 const TREASURY_AUDIT_PREFIX: &str = "ledger:treasury:audit:";
 const TREASURY_IDX_COOP_PREFIX: &str = "ledger:treasury:idx:coop:";
 const TREASURY_IDX_BUDGETS_PREFIX: &str = "ledger:treasury:idx:budgets:";
+/// Persisted velocity-limit rows: `ledger:treasury:vlimit:<limit-id>`.
+const VELOCITY_LIMIT_PREFIX: &str = "ledger:treasury:vlimit:";
+
+/// Every subspace that shares the lexical parent `ledger:treasury:` with the
+/// primary treasury rows, by the exact prefix its writer produces.
+///
+/// The loader classifies a key beneath the parent as a primary row unless it
+/// begins with one of these, so a subspace missing from this list would have
+/// its rows refused as unreadable primaries (fail closed) rather than adopted
+/// as treasuries. `ledger:treasury:vlimit:` was absent from the loader's
+/// previous skip list and survived only because its values do not parse as a
+/// [`Treasury`]; it is named here so the classification is by key shape and
+/// never by whether a value happens to deserialize. The scanner descriptor
+/// `icn-ledger/treasury` claims none of these prefixes either.
+const TREASURY_SIBLING_SUBSPACES: [&str; 6] = [
+    BUDGET_PREFIX,
+    SPENDING_RULE_PREFIX,
+    TREASURY_AUDIT_PREFIX,
+    TREASURY_IDX_COOP_PREFIX,
+    TREASURY_IDX_BUDGETS_PREFIX,
+    VELOCITY_LIMIT_PREFIX,
+];
 
 // Labor share storage prefixes
 const LABOR_SHARE_PREFIX: &str = "ledger:labor_share:";
@@ -264,6 +289,96 @@ pub struct TreasuryManager {
 
     /// Surplus allocations by ID
     surplus_allocations: HashMap<String, SurplusAllocation>,
+}
+
+/// Why persisted treasury state could not be hydrated (#2627 M1).
+///
+/// Companion to [`crate::principal_rows::PrincipalRowsRefusal`], which carries
+/// the refusals every principal-keyed ledger keyspace shares — an alias pair,
+/// an unreadable key, a key whose spelling disagrees with its own value. This
+/// enum carries what is specific to the treasury layout. Carried through
+/// `anyhow` so `with_store` keeps its signature; recover it with
+/// `anyhow::Error::downcast_ref::<TreasuryHydrationRefusal>()`.
+///
+/// Payload-safe by construction: a variant carries a row count and nothing
+/// else — never a spelling, a coop id, an entity id or a stored value.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum TreasuryHydrationRefusal {
+    /// A primary row whose key names a treasury principal holds a value that
+    /// cannot be read as a [`Treasury`].
+    ///
+    /// Refused rather than skipped: were it the only row for a principal,
+    /// skipping it would turn unreadable state into absent state; were it one
+    /// of an alias pair, skipping it would make the surviving row look
+    /// unambiguous. Before M1 the loader skipped such rows silently — which
+    /// is how about half of anchor-derived cooperative treasuries dropped out
+    /// of the maps on every reload (inventory §10.1, owned by #2628); M1 makes
+    /// that state visible rather than absent, and does not repair it.
+    #[error(
+        "{}: {rows} primary treasury row(s) whose key names a treasury principal but whose \
+         value cannot be read as a treasury record; refusing to hydrate, because skipping \
+         the row would turn unreadable state into absent state",
+        TREASURY_KEYSPACE
+    )]
+    UnreadablePrimaryValue {
+        /// How many primary rows held an unreadable value.
+        rows: usize,
+    },
+
+    /// Two primary rows naming distinct principals bind one `coop_id`.
+    #[error(
+        "{}: {rows} primary treasury row(s) bind a coop_id that another primary row already \
+         binds; refusing to hydrate (fail closed) rather than let the cooperative index keep \
+         whichever row scanned last",
+        TREASURY_KEYSPACE
+    )]
+    DuplicateCoopId {
+        /// How many rows bind a `coop_id` an earlier row bound.
+        rows: usize,
+    },
+
+    /// Two primary rows naming distinct principals bind one `entity_id`.
+    #[error(
+        "{}: {rows} primary treasury row(s) bind an entity_id that another primary row \
+         already binds; refusing to hydrate (fail closed) rather than let the entity index \
+         keep whichever row scanned last",
+        TREASURY_KEYSPACE
+    )]
+    DuplicateEntityId {
+        /// How many rows bind an `entity_id` an earlier row bound.
+        rows: usize,
+    },
+
+    /// A `ledger:treasury:idx:coop:` row whose key or value cannot be read as
+    /// (coop id, treasury principal spelling).
+    #[error(
+        "{}: {rows} cooperative index row(s) (ledger:treasury:idx:coop:) whose key or value \
+         cannot be read as a coop id and a treasury principal spelling; refusing to hydrate, \
+         because an index that cannot be read cannot be checked against the primary rows",
+        TREASURY_KEYSPACE
+    )]
+    CoopIndexUnreadable {
+        /// How many index rows could not be read.
+        rows: usize,
+    },
+
+    /// A `ledger:treasury:idx:coop:` row names a primary treasury row — through
+    /// the coop id it is filed under, or through the principal its value
+    /// decodes to — under a spelling that is not that row's physical key.
+    ///
+    /// Under I7 the two spellings compare equal as `Did`, which is exactly
+    /// why the comparison here is on bytes: an index must not silently
+    /// retarget one spelling of a principal to another.
+    #[error(
+        "{}: {rows} cooperative index row(s) whose stored spelling differs from the physical \
+         key spelling of the primary treasury row it names; refusing to hydrate, because a \
+         persisted index must not retarget one spelling of a principal to another",
+        TREASURY_KEYSPACE
+    )]
+    CoopIndexSpellingMismatch {
+        /// How many index rows disagree with the primary row they name.
+        rows: usize,
+    },
 }
 
 /// Outcome of the treasury `entity_id` populate storage seam
@@ -960,140 +1075,23 @@ impl TreasuryManager {
 
     // === Persistence Methods ===
 
+    /// Rebuild the in-memory state from the store: classify first, adopt last.
+    ///
+    /// Everything the store holds is read and validated into a
+    /// [`PersistedTreasuryState`] before the first in-memory map is touched, so
+    /// a refusal on any row leaves `self` exactly as constructed — no map is
+    /// partially hydrated from the rows that came before it. The primary
+    /// treasury rows are classified through `crate::principal_rows`
+    /// ([`classify_primary_treasury_rows`]); the persisted cooperative index is
+    /// checked against them ([`validate_coop_index`]); the sibling subspaces
+    /// are read as they were before #2627 M1.
     fn load_from_store(&mut self) -> Result<()> {
-        let Some(ref store) = self.store else {
+        let Some(store) = self.store.clone() else {
             return Ok(());
         };
 
-        // Load treasuries
-        let treasury_pairs = store.scan(TREASURY_PREFIX.as_bytes())?;
-        for (key, value) in treasury_pairs {
-            let key_str = String::from_utf8_lossy(&key);
-            // Skip index entries
-            if key_str.contains(":idx:")
-                || key_str.contains(":budget:")
-                || key_str.contains(":rule:")
-                || key_str.contains(":audit:")
-            {
-                continue;
-            }
-            if let Ok(treasury) = serde_json::from_slice::<Treasury>(&value) {
-                // Rebuild the entity index for rows that carry an entity_id
-                // (including surrogate-backfilled ones). A persisted store with two
-                // treasuries bound to the SAME entity_id is inconsistent: fail
-                // closed rather than silently keep one.
-                if let Some(entity_id) = treasury.entity_id.clone() {
-                    if let Some(existing_did) = self.entity_treasuries.get(&entity_id) {
-                        if existing_did != &treasury.treasury_did {
-                            bail!(
-                                "Treasury store inconsistency: entity_id {entity_id} is bound to \
-                                 two treasuries ({existing_did} and {}); refusing to hydrate \
-                                 (fail closed)",
-                                treasury.treasury_did
-                            );
-                        }
-                    }
-                    self.entity_treasuries
-                        .insert(entity_id, treasury.treasury_did.clone());
-                }
-                // A persisted store with two treasuries sharing one coop_id is
-                // inconsistent: fail closed rather than silently collapse them into
-                // a single last-writer-wins index entry (which the apply path would
-                // then mutate ambiguously).
-                if let Some(existing_did) = self.coop_treasuries.get(&treasury.coop_id) {
-                    if existing_did != &treasury.treasury_did {
-                        bail!(
-                            "Treasury store inconsistency: coop_id {} is bound to two \
-                             treasuries ({existing_did} and {}); refusing to hydrate \
-                             (fail closed)",
-                            treasury.coop_id,
-                            treasury.treasury_did
-                        );
-                    }
-                }
-                self.coop_treasuries
-                    .insert(treasury.coop_id.clone(), treasury.treasury_did.clone());
-                self.treasury_budgets
-                    .insert(treasury.treasury_did.clone(), Vec::new());
-                self.treasury_rules
-                    .insert(treasury.treasury_did.clone(), Vec::new());
-                self.treasuries
-                    .insert(treasury.treasury_did.clone(), treasury);
-            }
-        }
-
-        // Load budgets
-        let budget_pairs = store.scan(BUDGET_PREFIX.as_bytes())?;
-        for (_, value) in budget_pairs {
-            if let Ok(budget) = serde_json::from_slice::<TreasuryBudget>(&value) {
-                self.treasury_budgets
-                    .entry(budget.treasury_did.clone())
-                    .or_default()
-                    .push(budget.id.clone());
-                self.budgets.insert(budget.id.clone(), budget);
-            }
-        }
-
-        // Load spending rules
-        let rule_pairs = store.scan(SPENDING_RULE_PREFIX.as_bytes())?;
-        for (_, value) in rule_pairs {
-            if let Ok(rule) = serde_json::from_slice::<SpendingRule>(&value) {
-                self.treasury_rules
-                    .entry(rule.treasury_did.clone())
-                    .or_default()
-                    .push(rule.id.clone());
-                self.spending_rules.insert(rule.id.clone(), rule);
-            }
-        }
-
-        // Load labor shares
-        let share_pairs = store.scan(LABOR_SHARE_PREFIX.as_bytes())?;
-        for (key, value) in share_pairs {
-            let key_str = String::from_utf8_lossy(&key);
-            // Skip index entries
-            if key_str.contains(":idx:") {
-                continue;
-            }
-            if let Ok(share) = serde_json::from_slice::<LaborShare>(&value) {
-                // Build indices
-                self.holder_shares
-                    .entry(share.holder.clone())
-                    .or_default()
-                    .push(share.id.clone());
-                self.coop_shares
-                    .entry(share.cooperative_id.clone())
-                    .or_default()
-                    .push(share.id.clone());
-                self.labor_shares.insert(share.id.clone(), share);
-            }
-        }
-
-        // Load bonds
-        let bond_pairs = store.scan(BOND_PREFIX.as_bytes())?;
-        for (key, value) in bond_pairs {
-            let key_str = String::from_utf8_lossy(&key);
-            // Skip index entries
-            if key_str.contains(":idx:") {
-                continue;
-            }
-            if let Ok(bond) = serde_json::from_slice::<CooperativeBond>(&value) {
-                // Build indices
-                self.issuer_bonds
-                    .entry(bond.issuer_id.clone())
-                    .or_default()
-                    .push(bond.id.clone());
-                self.bonds.insert(bond.id.clone(), bond);
-            }
-        }
-
-        // Load surplus allocations
-        let allocation_pairs = store.scan(SURPLUS_ALLOCATION_PREFIX.as_bytes())?;
-        for (_, value) in allocation_pairs {
-            if let Ok(allocation) = serde_json::from_slice::<SurplusAllocation>(&value) {
-                self.surplus_allocations
-                    .insert(allocation.id.clone(), allocation);
-            }
-        }
+        let state = read_persisted_state(store.as_ref())?;
+        self.adopt_persisted_state(state);
 
         info!(
             treasuries = self.treasuries.len(),
@@ -1106,6 +1104,71 @@ impl TreasuryManager {
         );
 
         Ok(())
+    }
+
+    /// Adopt a fully classified and validated [`PersistedTreasuryState`].
+    ///
+    /// Infallible by construction: every refusal has already been raised by
+    /// [`read_persisted_state`], so nothing here can fail after a map has been
+    /// mutated. Each treasury is keyed by the spelling its own row carries,
+    /// which [`classify_primary_treasury_rows`] has proven equal to the
+    /// physical key spelling, so `persist_treasury` addresses the row that
+    /// was loaded and never opens a second spelling.
+    fn adopt_persisted_state(&mut self, state: PersistedTreasuryState) {
+        for treasury in state.treasuries {
+            let treasury_did = treasury.treasury_did.clone();
+            if let Some(entity_id) = treasury.entity_id.clone() {
+                self.entity_treasuries
+                    .insert(entity_id, treasury_did.clone());
+            }
+            self.coop_treasuries
+                .insert(treasury.coop_id.clone(), treasury_did.clone());
+            self.treasury_budgets
+                .insert(treasury_did.clone(), Vec::new());
+            self.treasury_rules.insert(treasury_did.clone(), Vec::new());
+            self.treasuries.insert(treasury_did, treasury);
+        }
+
+        for budget in state.budgets {
+            self.treasury_budgets
+                .entry(budget.treasury_did.clone())
+                .or_default()
+                .push(budget.id.clone());
+            self.budgets.insert(budget.id.clone(), budget);
+        }
+
+        for rule in state.spending_rules {
+            self.treasury_rules
+                .entry(rule.treasury_did.clone())
+                .or_default()
+                .push(rule.id.clone());
+            self.spending_rules.insert(rule.id.clone(), rule);
+        }
+
+        for share in state.labor_shares {
+            self.holder_shares
+                .entry(share.holder.clone())
+                .or_default()
+                .push(share.id.clone());
+            self.coop_shares
+                .entry(share.cooperative_id.clone())
+                .or_default()
+                .push(share.id.clone());
+            self.labor_shares.insert(share.id.clone(), share);
+        }
+
+        for bond in state.bonds {
+            self.issuer_bonds
+                .entry(bond.issuer_id.clone())
+                .or_default()
+                .push(bond.id.clone());
+            self.bonds.insert(bond.id.clone(), bond);
+        }
+
+        for allocation in state.surplus_allocations {
+            self.surplus_allocations
+                .insert(allocation.id.clone(), allocation);
+        }
     }
 
     fn persist_treasury(&self, treasury: &Treasury, store: &Arc<dyn Store>) -> Result<()> {
@@ -1270,6 +1333,319 @@ impl Default for TreasuryManager {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Everything `TreasuryManager::load_from_store` reads, classified and
+/// validated before any in-memory map is touched.
+///
+/// The primary treasury rows carry the refusal machinery of #2627 M1; the
+/// other vectors are the sibling subspaces read exactly as before, so a
+/// storage error in any scan — or any refusal — surfaces before adoption
+/// begins rather than between two maps.
+struct PersistedTreasuryState {
+    /// One record per treasury principal, each proven to carry the spelling
+    /// its physical key carries.
+    treasuries: Vec<Treasury>,
+    budgets: Vec<TreasuryBudget>,
+    spending_rules: Vec<SpendingRule>,
+    labor_shares: Vec<LaborShare>,
+    bonds: Vec<CooperativeBond>,
+    surplus_allocations: Vec<SurplusAllocation>,
+}
+
+/// A primary treasury row after classification: the exact spelling its
+/// physical key carries, and the record its value holds.
+///
+/// The key spelling is kept beside the record until adoption because it is
+/// the row's identity — what `persist_treasury` will address — and the guard
+/// must group by it, not by whatever the body happens to spell.
+struct ClassifiedTreasuryRow {
+    key_spelling: String,
+    treasury: Treasury,
+}
+
+/// What one key beneath `ledger:treasury:` is, to the loader.
+enum TreasuryKey {
+    /// `ledger:treasury:<spelling>`: the authoritative treasury row, with the
+    /// spelling exactly as the key carries it.
+    Primary(String),
+    /// A row of a sibling subspace ([`TREASURY_SIBLING_SUBSPACES`]). It is not
+    /// a treasury-principal row and belongs to its own loader.
+    Sibling,
+    /// Neither: not UTF-8, not beneath the parent, or a remainder that is not
+    /// a treasury principal. Never skipped — an unreadable row is evidence.
+    Unreadable,
+}
+
+/// Classify one stored key beneath `ledger:treasury:` by its shape alone.
+///
+/// The classification is by key structure, never by whether the value
+/// happens to deserialize: a primary row whose value cannot be read is still
+/// a primary row, and a sibling row is a sibling whatever it holds. The key is
+/// decoded strictly — `persist_treasury` writes a `Did`'s `Display`, always
+/// UTF-8 — so a key that is not UTF-8 is one the writer never produced, and
+/// normalizing it would let an invalid byte pass as a spelling the guard
+/// accepts while the raw row stayed on disk under a key nothing addresses.
+fn classify_treasury_key(key: &[u8]) -> TreasuryKey {
+    let Ok(key_str) = std::str::from_utf8(key) else {
+        return TreasuryKey::Unreadable;
+    };
+    let Some(remainder) = key_str.strip_prefix(TREASURY_PREFIX) else {
+        return TreasuryKey::Unreadable;
+    };
+    if TREASURY_SIBLING_SUBSPACES
+        .iter()
+        .any(|sibling| key_str.starts_with(sibling))
+    {
+        return TreasuryKey::Sibling;
+    }
+    // The key must name a principal before its value is read. `persist_treasury`
+    // writes a `Did`'s `Display`, and a body is adopted only if its own
+    // `treasury_did` — which deserializes through `Did::from_str` — spells the
+    // same as the key, so a remainder `Did::from_str` rejects can never be one
+    // of this keyspace's rows, whatever its value holds. An anchor-derived
+    // spelling whose bytes are no Ed25519 point (inventory §10.1) fails here,
+    // as it fails `Deserialize`; before M1 such a row vanished silently.
+    if Did::from_str(remainder).is_err() {
+        return TreasuryKey::Unreadable;
+    }
+    TreasuryKey::Primary(remainder.to_string())
+}
+
+/// Read and classify every primary `ledger:treasury:<did>` row, refusing
+/// before anything is adopted (#2627 M1).
+///
+/// ```text
+/// physical rows
+/// → classify every key by shape (primary / sibling / unreadable)
+/// → read a value only behind a key that names a principal
+/// → prove one spelling per principal   (`principal_rows`)
+/// → prove the key spelling and the body spelling are the same bytes
+/// → prove one treasury per coop_id and per entity_id
+/// → only then hand the rows to the Did-keyed maps
+/// ```
+///
+/// Refusals are raised in evidence order: an unreadable key or value first,
+/// because a classification computed over an incomplete view proves nothing;
+/// then the alias collision; then the rows whose body disagrees with their
+/// key; then the institutional duplicates. Two rows naming one principal
+/// under two spellings are two treasury records that can disagree about every
+/// field, and no economics rule authorizes choosing, summing or combining
+/// them: the only correct answer is the typed refusal. No spelling is
+/// normalized, no row is re-keyed, nothing is deleted.
+fn classify_primary_treasury_rows(store: &dyn Store) -> Result<Vec<ClassifiedTreasuryRow>> {
+    let pairs = store.scan(TREASURY_PREFIX.as_bytes())?;
+
+    // `pairs` is consumed so each raw row is dropped once classified; the
+    // guard holds the parsed rows only.
+    let mut rows = Vec::with_capacity(pairs.len());
+    let mut unreadable_keys = 0usize;
+    let mut unreadable_values = 0usize;
+    for (key, value) in pairs {
+        let key_spelling = match classify_treasury_key(&key) {
+            TreasuryKey::Sibling => continue,
+            TreasuryKey::Unreadable => {
+                unreadable_keys += 1;
+                continue;
+            }
+            TreasuryKey::Primary(spelling) => spelling,
+        };
+        // Behind an accepted key, an unreadable value is refused rather than
+        // skipped: were it the only row for a principal, skipping it would turn
+        // unreadable state into absent state; were it one of an alias pair,
+        // skipping it would make the remaining row look unambiguous.
+        match serde_json::from_slice::<Treasury>(&value) {
+            Ok(treasury) => rows.push(ClassifiedTreasuryRow {
+                key_spelling,
+                treasury,
+            }),
+            Err(_) => unreadable_values += 1,
+        }
+    }
+
+    if unreadable_keys > 0 {
+        return Err(PrincipalRowsRefusal::UnreadableKey {
+            keyspace: TREASURY_KEYSPACE,
+            rows: unreadable_keys,
+        }
+        .into());
+    }
+    if unreadable_values > 0 {
+        return Err(TreasuryHydrationRefusal::UnreadablePrimaryValue {
+            rows: unreadable_values,
+        }
+        .into());
+    }
+
+    // Grouped by the stored **key**, not by the spelling inside the record:
+    // the key is what a later `persist_treasury` addresses.
+    refuse_unless_one_spelling_per_principal(
+        TREASURY_KEYSPACE,
+        rows.iter().map(|row| (row.key_spelling.as_str(), "")),
+    )?;
+
+    // Exact bytes, never `Did` equality: under I7 two spellings of one
+    // principal compare equal, and the question here is not whether the key
+    // and the body name the same principal but whether this physical row is
+    // the row `persist_treasury` claims to have written — which derives the
+    // key from `treasury.treasury_did`'s `Display`. A row that disagrees with
+    // itself is the residue of a collapse that already happened.
+    let strayed = rows
+        .iter()
+        .filter(|row| row.treasury.treasury_did.as_str() != row.key_spelling)
+        .count();
+    if strayed > 0 {
+        return Err(PrincipalRowsRefusal::KeyValueSpellingMismatch {
+            keyspace: TREASURY_KEYSPACE,
+            rows: strayed,
+        }
+        .into());
+    }
+
+    // The pre-M1 institutional guards, now over the classified set and before
+    // any map exists. Every row here names a distinct principal, so a shared
+    // coop_id or entity_id is two treasuries for one institution — a store the
+    // apply paths would mutate ambiguously. Fail closed rather than let the
+    // index keep whichever row scanned last.
+    let mut seen_coops = HashSet::new();
+    let duplicate_coops = rows
+        .iter()
+        .filter(|row| !seen_coops.insert(row.treasury.coop_id.as_str()))
+        .count();
+    if duplicate_coops > 0 {
+        return Err(TreasuryHydrationRefusal::DuplicateCoopId {
+            rows: duplicate_coops,
+        }
+        .into());
+    }
+    let mut seen_entities = HashSet::new();
+    let duplicate_entities = rows
+        .iter()
+        .filter_map(|row| row.treasury.entity_id.as_ref())
+        .filter(|entity_id| !seen_entities.insert(*entity_id))
+        .count();
+    if duplicate_entities > 0 {
+        return Err(TreasuryHydrationRefusal::DuplicateEntityId {
+            rows: duplicate_entities,
+        }
+        .into());
+    }
+
+    Ok(rows)
+}
+
+/// Check every persisted `ledger:treasury:idx:coop:<coop_id>` row against the
+/// classified primary rows (#2627 M1, idx:coop integrity).
+///
+/// The index is a write-only projection: `persist_coop_index` writes it at
+/// registration, and hydration rebuilds the coop map from the primary rows
+/// rather than from it. It is not authority, and this check gives it none.
+/// It is still persisted evidence that can preserve a representation
+/// disagreement, so before adoption every row must (a) decode — a value that
+/// is no treasury principal spelling is refused, not skipped — and (b) agree
+/// byte-for-byte with the physical key spelling of the primary row it names,
+/// whether it names it through the coop_id it is filed under or through the
+/// principal its value decodes to. An index row filed under a coop_id with no
+/// primary row and naming no known principal is an orphan: nothing consumes
+/// it, so it is tolerated and not adopted.
+fn validate_coop_index(store: &dyn Store, primaries: &[ClassifiedTreasuryRow]) -> Result<()> {
+    let pairs = store.scan(TREASURY_IDX_COOP_PREFIX.as_bytes())?;
+
+    let mut unreadable = 0usize;
+    let mut mismatched = 0usize;
+    for (key, value) in pairs {
+        let (Ok(key_str), Ok(stored_spelling)) =
+            (std::str::from_utf8(&key), std::str::from_utf8(&value))
+        else {
+            unreadable += 1;
+            continue;
+        };
+        let Some(coop_id) = key_str.strip_prefix(TREASURY_IDX_COOP_PREFIX) else {
+            unreadable += 1;
+            continue;
+        };
+        let Ok(pointed) = Did::from_str(stored_spelling) else {
+            unreadable += 1;
+            continue;
+        };
+
+        let registered_for_coop = primaries.iter().find(|row| row.treasury.coop_id == coop_id);
+        // `Did` equality here is deliberate: it finds the primary row for the
+        // principal the value names under *any* spelling, so that the exact
+        // comparison below can refuse the alias.
+        let named_by_value = primaries
+            .iter()
+            .find(|row| row.treasury.treasury_did == pointed);
+        let disagrees = |row: &ClassifiedTreasuryRow| row.key_spelling != stored_spelling;
+        if registered_for_coop.is_some_and(disagrees) || named_by_value.is_some_and(disagrees) {
+            mismatched += 1;
+        }
+    }
+
+    if unreadable > 0 {
+        return Err(TreasuryHydrationRefusal::CoopIndexUnreadable { rows: unreadable }.into());
+    }
+    if mismatched > 0 {
+        return Err(
+            TreasuryHydrationRefusal::CoopIndexSpellingMismatch { rows: mismatched }.into(),
+        );
+    }
+    Ok(())
+}
+
+/// Read every treasury subspace into a [`PersistedTreasuryState`].
+///
+/// All scans complete before the caller adopts anything. The primary rows go
+/// through [`classify_primary_treasury_rows`] and [`validate_coop_index`];
+/// the budget, rule, labor-share, bond and allocation rows are read exactly as
+/// before M1, a row that does not parse being skipped. That permissiveness is
+/// pre-existing and recorded as follow-up in the N2-A migration gate; M1
+/// classifies the primary rows only.
+fn read_persisted_state(store: &dyn Store) -> Result<PersistedTreasuryState> {
+    let primaries = classify_primary_treasury_rows(store)?;
+    validate_coop_index(store, &primaries)?;
+    let treasuries = primaries.into_iter().map(|row| row.treasury).collect();
+
+    let budgets = store
+        .scan(BUDGET_PREFIX.as_bytes())?
+        .into_iter()
+        .filter_map(|(_, value)| serde_json::from_slice::<TreasuryBudget>(&value).ok())
+        .collect();
+
+    let spending_rules = store
+        .scan(SPENDING_RULE_PREFIX.as_bytes())?
+        .into_iter()
+        .filter_map(|(_, value)| serde_json::from_slice::<SpendingRule>(&value).ok())
+        .collect();
+
+    let labor_shares = store
+        .scan(LABOR_SHARE_PREFIX.as_bytes())?
+        .into_iter()
+        .filter(|(key, _)| !String::from_utf8_lossy(key).contains(":idx:"))
+        .filter_map(|(_, value)| serde_json::from_slice::<LaborShare>(&value).ok())
+        .collect();
+
+    let bonds = store
+        .scan(BOND_PREFIX.as_bytes())?
+        .into_iter()
+        .filter(|(key, _)| !String::from_utf8_lossy(key).contains(":idx:"))
+        .filter_map(|(_, value)| serde_json::from_slice::<CooperativeBond>(&value).ok())
+        .collect();
+
+    let surplus_allocations = store
+        .scan(SURPLUS_ALLOCATION_PREFIX.as_bytes())?
+        .into_iter()
+        .filter_map(|(_, value)| serde_json::from_slice::<SurplusAllocation>(&value).ok())
+        .collect();
+
+    Ok(PersistedTreasuryState {
+        treasuries,
+        budgets,
+        spending_rules,
+        labor_shares,
+        bonds,
+        surplus_allocations,
+    })
 }
 
 /// Generate a simple unique ID suffix
@@ -2330,5 +2706,287 @@ mod tests {
             .unwrap();
         assert_eq!(notfound, TreasuryEntityIdPopulateResult::TreasuryNotFound);
         assert!(mgr.get_treasury_by_entity(&entity).is_none());
+    }
+
+    // ── #2627 M1: classify before adopt ─────────────────────────────────────
+
+    fn sled_store() -> (tempfile::TempDir, Arc<dyn Store>) {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let store: Arc<dyn Store> = Arc::new(icn_store::SledStore::open(tmp.path()).unwrap());
+        (tmp, store)
+    }
+
+    fn alias_of(did: &Did) -> Did {
+        Did::from_str(&format!(
+            "did:icn:f{}",
+            hex::encode(did.identifier_bytes().unwrap())
+        ))
+        .unwrap()
+    }
+
+    fn put_primary(store: &Arc<dyn Store>, t: &Treasury) {
+        let key = format!("{}{}", TREASURY_PREFIX, t.treasury_did);
+        store
+            .put(key.as_bytes(), &serde_json::to_vec(t).unwrap())
+            .unwrap();
+    }
+
+    #[test]
+    fn a_refused_hydration_leaves_every_map_untouched() {
+        // The maps are private, so this pin lives in-module: it calls the
+        // loader on a manager it can inspect. Rows are laid out so that a
+        // loader adopting as it scans would have hydrated a valid treasury,
+        // its budget and its index entries before reaching the alias pair.
+        let (_tmp, store) = sled_store();
+        let creator = test_did("creator");
+        let first = KeyPair::generate().unwrap().did().clone();
+        let colliding = KeyPair::generate().unwrap().did().clone();
+        // `first` sorts before the pair only if its spelling does; make the
+        // pair's spellings the byte-greatest by using the `z` spelling of
+        // `colliding` and its `f` alias, and give `first` an `F` spelling.
+        let first_upper = Did::from_str(&format!(
+            "did:icn:F{}",
+            hex::encode_upper(first.identifier_bytes().unwrap())
+        ))
+        .unwrap();
+        put_primary(
+            &store,
+            &Treasury::new(
+                first_upper.clone(),
+                "coop-1".into(),
+                "USD".into(),
+                creator.clone(),
+                None,
+            ),
+        );
+        put_primary(
+            &store,
+            &Treasury::new(
+                colliding.clone(),
+                "coop-2".into(),
+                "USD".into(),
+                creator.clone(),
+                None,
+            ),
+        );
+        put_primary(
+            &store,
+            &Treasury::new(
+                alias_of(&colliding),
+                "coop-2".into(),
+                "USD".into(),
+                creator.clone(),
+                None,
+            ),
+        );
+        let budget = TreasuryBudget::new(
+            first_upper.clone(),
+            "ops".into(),
+            100,
+            "USD".into(),
+            None,
+            creator.clone(),
+            None,
+        );
+        store
+            .put(
+                format!("{}{}", BUDGET_PREFIX, budget.id).as_bytes(),
+                &serde_json::to_vec(&budget).unwrap(),
+            )
+            .unwrap();
+
+        let mut mgr = TreasuryManager::new();
+        mgr.store = Some(store);
+        let err = mgr.load_from_store().expect_err("the alias pair refuses");
+        assert!(
+            err.downcast_ref::<PrincipalRowsRefusal>().is_some(),
+            "{err}"
+        );
+
+        assert!(mgr.treasuries.is_empty(), "treasuries partially adopted");
+        assert!(
+            mgr.coop_treasuries.is_empty(),
+            "coop index partially adopted"
+        );
+        assert!(mgr.entity_treasuries.is_empty());
+        assert!(
+            mgr.treasury_budgets.is_empty(),
+            "budget index partially adopted"
+        );
+        assert!(mgr.treasury_rules.is_empty());
+        assert!(mgr.budgets.is_empty(), "budgets adopted before the refusal");
+        assert!(mgr.spending_rules.is_empty());
+    }
+
+    #[test]
+    fn a_refused_coop_index_leaves_every_map_untouched() {
+        // The index is validated after the primary rows classify cleanly, so
+        // this is the last refusal before adoption; it must still adopt nothing.
+        let (_tmp, store) = sled_store();
+        let creator = test_did("creator");
+        let did = KeyPair::generate().unwrap().did().clone();
+        put_primary(
+            &store,
+            &Treasury::new(did.clone(), "coop-1".into(), "USD".into(), creator, None),
+        );
+        store
+            .put(
+                format!("{TREASURY_IDX_COOP_PREFIX}coop-1").as_bytes(),
+                alias_of(&did).as_str().as_bytes(),
+            )
+            .unwrap();
+
+        let mut mgr = TreasuryManager::new();
+        mgr.store = Some(store);
+        let err = mgr.load_from_store().expect_err("the index disagrees");
+        assert!(matches!(
+            err.downcast_ref::<TreasuryHydrationRefusal>(),
+            Some(TreasuryHydrationRefusal::CoopIndexSpellingMismatch { rows: 1 })
+        ));
+        assert!(mgr.treasuries.is_empty());
+        assert!(mgr.coop_treasuries.is_empty());
+        assert!(mgr.treasury_budgets.is_empty());
+    }
+
+    #[test]
+    fn treasury_keys_classify_by_shape_alone() {
+        let did = KeyPair::generate().unwrap().did().clone();
+        let primary = format!("{TREASURY_PREFIX}{did}");
+        assert!(matches!(
+            classify_treasury_key(primary.as_bytes()),
+            TreasuryKey::Primary(ref s) if s == did.as_str()
+        ));
+
+        for sibling in TREASURY_SIBLING_SUBSPACES {
+            let key = format!("{sibling}{did}:anything");
+            assert!(
+                matches!(classify_treasury_key(key.as_bytes()), TreasuryKey::Sibling),
+                "{sibling} is a sibling subspace whatever follows it"
+            );
+        }
+
+        for unreadable in [
+            TREASURY_PREFIX.to_string(),
+            format!("{TREASURY_PREFIX}did:icn:"),
+            format!("{TREASURY_PREFIX}did:icn:zNOTAKEY"),
+            format!("{TREASURY_PREFIX}{did}junk"),
+            format!("{TREASURY_PREFIX}idx:other:{did}"),
+            format!("ledger:other:{did}"),
+        ] {
+            assert!(
+                matches!(
+                    classify_treasury_key(unreadable.as_bytes()),
+                    TreasuryKey::Unreadable
+                ),
+                "{unreadable} must be unreadable, not a primary or a sibling"
+            );
+        }
+        let mut non_utf8 = primary.into_bytes();
+        non_utf8.push(0xFF);
+        assert!(matches!(
+            classify_treasury_key(&non_utf8),
+            TreasuryKey::Unreadable
+        ));
+    }
+
+    #[test]
+    fn the_sibling_list_names_every_prefix_the_writers_produce() {
+        // Every `ledger:treasury:`-rooted prefix constant in this module and
+        // its submodules is either the primary prefix or in the sibling list.
+        // A writer that gains a new subspace must add it here, or its rows
+        // will refuse hydration as unreadable primaries — deliberately.
+        for prefix in [
+            BUDGET_PREFIX,
+            SPENDING_RULE_PREFIX,
+            TREASURY_AUDIT_PREFIX,
+            TREASURY_IDX_COOP_PREFIX,
+            TREASURY_IDX_BUDGETS_PREFIX,
+            VELOCITY_LIMIT_PREFIX,
+        ] {
+            assert!(prefix.starts_with(TREASURY_PREFIX));
+            assert!(TREASURY_SIBLING_SUBSPACES.contains(&prefix), "{prefix}");
+        }
+        assert_eq!(TREASURY_SIBLING_SUBSPACES.len(), 6);
+    }
+
+    #[test]
+    fn the_scanner_descriptor_claims_exactly_the_primary_row_shape() {
+        // Gate ↔ loader agreement, pinned against the ledger's own constants:
+        // the registered prefix is the primary prefix run through the DID
+        // scheme, so it matches every key `persist_treasury` writes and no
+        // key of any sibling subspace; the key ends with the spelling; the
+        // disposition is the loader's — fail closed, established in code.
+        use icn_store::did_collision_scan::{
+            n2a_keyspaces, MergeDisposition, PrincipalRegion, RuleBasis,
+        };
+        let descriptor = n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == TREASURY_KEYSPACE)
+            .expect("registered");
+
+        assert_eq!(
+            descriptor.prefix,
+            format!("{TREASURY_PREFIX}did:icn:").as_bytes(),
+            "the descriptor claims the primary rows through the DID scheme"
+        );
+        let did = KeyPair::generate().unwrap().did().clone();
+        let written = format!("{}{}", TREASURY_PREFIX, did);
+        assert!(written.as_bytes().starts_with(descriptor.prefix));
+        for sibling in TREASURY_SIBLING_SUBSPACES {
+            assert!(
+                !sibling.as_bytes().starts_with(descriptor.prefix)
+                    && !descriptor.prefix.starts_with(sibling.as_bytes()),
+                "{sibling} must be neither inside nor around the descriptor prefix"
+            );
+        }
+        assert!(descriptor.did_ends_key, "nothing follows the spelling");
+        assert!(!descriptor.slash_ends_did);
+        assert!(matches!(
+            descriptor.principal_region,
+            PrincipalRegion::WholeKey
+        ));
+        assert_eq!(descriptor.disposition, MergeDisposition::FailClosed);
+        assert_eq!(descriptor.basis, RuleBasis::Established);
+        assert!(descriptor.inventory_rows.contains(&10));
+        assert!(descriptor.inventory_rows.contains(&41));
+    }
+
+    #[test]
+    fn the_refusal_texts_carry_no_spelling_no_coop_id_and_no_value() {
+        let (_tmp, store) = sled_store();
+        let creator = test_did("creator");
+        let did = KeyPair::generate().unwrap().did().clone();
+        let alias = alias_of(&did);
+        put_primary(
+            &store,
+            &Treasury::new(
+                did.clone(),
+                "secret-coop".into(),
+                "USD".into(),
+                creator.clone(),
+                Some("secret description".into()),
+            ),
+        );
+        store
+            .put(
+                format!("{TREASURY_IDX_COOP_PREFIX}secret-coop").as_bytes(),
+                alias.as_str().as_bytes(),
+            )
+            .unwrap();
+
+        let text = TreasuryManager::with_store(store)
+            .err()
+            .expect("index mismatch refuses")
+            .to_string();
+        assert!(text.contains(TREASURY_KEYSPACE));
+        for leaked in [
+            did.as_str(),
+            alias.as_str(),
+            "secret-coop",
+            "secret description",
+        ] {
+            assert!(!text.contains(leaked), "leaked {leaked:?} in {text}");
+        }
+        assert_eq!(text.lines().count(), 1);
     }
 }

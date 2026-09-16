@@ -139,7 +139,9 @@ sudo deploy/install.sh
 
 6. **Initialize identity**:
    ```bash
-   sudo -u icn icnctl --data-dir /var/lib/icn id init
+   sudo -u icn icnd --init --data-dir /var/lib/icn
+   # writes identity.age, icn.toml and genesis.json. `icnctl id init` does NOT
+   # write icn.toml, and icnd.service will not start without it (icn#2755).
    ```
 
 7. **Start service**:

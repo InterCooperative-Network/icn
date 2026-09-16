@@ -34,7 +34,7 @@ import { execFileSync } from "child_process";
  * ICN_ROOT, one layer down: an unchecked environment variable must never be able to
  * misattribute a session to the wrong lane.
  */
-const GIT_SANITISED_ENV: NodeJS.ProcessEnv = (() => {
+export const GIT_SANITISED_ENV: NodeJS.ProcessEnv = (() => {
   const e = { ...process.env };
   for (const k of [
     "GIT_DIR",

@@ -121,7 +121,7 @@ async fn build_services(
     let own_did = bundle.did().clone();
 
     // Open trust store
-    let trust_store_path = config.store_path().join("trust");
+    let trust_store_path = config.trust_store_path();
     std::fs::create_dir_all(&trust_store_path)?;
     let trust_store: Arc<dyn icn_store::Store> =
         Arc::new(icn_store::SledStore::open(&trust_store_path)?);
@@ -379,7 +379,8 @@ async fn build_services(
 /// Creates:
 /// 1. Data directory structure
 /// 2. Age-encrypted keystore with a new Ed25519 identity
-/// 3. `config.toml` with sane defaults for the node
+/// 3. `icn.toml` with sane defaults for the node (the canonical native
+///    configuration path; see `icn_core::config::config_file_path`)
 /// 4. `genesis.json` sealing the initial network identity and seed peers
 ///
 /// Uses `ICN_KEYSTORE_PASSPHRASE` env var or prompts interactively.
@@ -393,7 +394,11 @@ fn handle_init(args: &Args) -> Result<()> {
         .with_context(|| format!("Failed to create data directory: {}", data_dir.display()))?;
 
     let keystore_path = data_dir.join("identity.age");
-    let config_path = data_dir.join("config.toml");
+    // The canonical native configuration path, owned by `icn-core` rather than
+    // re-derived here. `icnd --init` previously wrote `config.toml`, which
+    // startup never loads — so the file this command created was not the file
+    // the daemon read (icn#2755).
+    let config_path = icn_core::config::config_file_path(&data_dir);
 
     // Check if already initialized
     if keystore_path.exists() {
@@ -562,8 +567,139 @@ async fn main() -> Result<()> {
         .install_default()
         .map_err(|_| anyhow::anyhow!("Failed to install default crypto provider"))?;
 
+    // Exclusion BEFORE the mutable configuration is consumed.
+    //
+    // Taking it after `Config::from_file` would be too late for the race it
+    // exists to prevent: a daemon can read a configuration that a runtime-root
+    // ceremony is about to replace, and then keep running with the node-DID
+    // fallback that ceremony removes — durable state saying READY while the live
+    // process uses the treasury it superseded. Excluding only from the point
+    // *after* the read does not help; the stale value is already in hand.
+    //
+    // The identity both actors can know before that read is the directory
+    // holding the configuration file: runtime-root provisioning publishes
+    // `<data_dir>/icn.toml`, so a ceremony rooted there is exactly the writer of
+    // the bytes about to be consumed.
+    //
+    // This is the *reader's* share. A daemon only reads a configuration, so
+    // several may hold one directory at once — the shipped two-node demo keeps
+    // both node configurations in `config/` with different data roots — while a
+    // ceremony publishing there takes the exclusive side and is refused.
+    //
+    // It is held for the whole life of the process, not merely across the read;
+    // see the storage lock below for why releasing it afterwards would put the
+    // race straight back.
+    //
+    // The `if_manageable` form returns `None` only when the *filesystem* is
+    // read-only — a ConfigMap mount, say — where nothing can be published by
+    // anybody. A directory this process merely may not write is a different
+    // statement and fails closed: see `DataDirLock` for why, and for the
+    // deliberate consequence that a daemon will not start over a configuration
+    // directory owned by a more privileged account.
+    let pre_config_lock = match &args.config {
+        // `--validate-config` parses, prints a verdict and exits: it starts no
+        // daemon and retains no interpretation of these bytes, so there is
+        // nothing for a ceremony to invalidate.
+        //
+        // It does still *read* the file, though, and `Config::to_file` rewrites
+        // it with a plain `fs::write`. Overlapping a `federation add`/`remove`/
+        // `set` it could read inside the truncate window and reject a perfectly
+        // valid configuration on timing alone — so it joins the reader domain
+        // rather than skipping it.
+        //
+        // Joining only, never creating. The original exemption existed because
+        // taking a creating lock made this command unusable wherever the
+        // account can read a configuration directory it may not write — a
+        // root-owned `/etc/icn` inspected by a service or CI account, which is
+        // an ordinary layout. That case is preserved: with no lock file to
+        // join, validation proceeds exactly as it did before this domain
+        // existed, rather than refusing a read it is entitled to make.
+        Some(config_path) if args.validate_config => {
+            let resolved =
+                std::fs::canonicalize(config_path).unwrap_or_else(|_| config_path.clone());
+            let root = resolved
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            let lock_path = icn_core::DataDirLock::config_lock_path(&root);
+            // Only absence means "nothing to join"; an unreadable answer is not
+            // evidence that no lock exists.
+            match std::fs::symlink_metadata(&lock_path) {
+                Ok(_) => Some(
+                    icn_core::DataDirLock::acquire_config_shared_without_creating(
+                        &root,
+                        "the daemon validating a configuration",
+                    )?,
+                ),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => {
+                    return Err(e).with_context(|| {
+                        format!(
+                            "Could not determine whether the configuration lock {} exists",
+                            lock_path.display()
+                        )
+                    })
+                }
+            }
+        }
+        Some(config_path) => {
+            // Canonicalize the FILE first, then take its parent.
+            //
+            // Directory canonicalization inside `lock_path` does not help when
+            // the *file component* is the alias: `icnd --config
+            // /tmp/link.toml` pointing at `/data/icn.toml` would otherwise
+            // derive `/tmp` as the root and lock something a ceremony owning
+            // `/data` never contends with — while `Config::from_file` follows
+            // the link and consumes the ceremony-managed bytes anyway.
+            //
+            // Resolving the link makes both actors derive one identity from the
+            // same file. If it cannot be resolved the literal path is used; a
+            // path that does not resolve is not one a ceremony is managing.
+            let resolved =
+                std::fs::canonicalize(config_path).unwrap_or_else(|_| config_path.clone());
+            let root = resolved
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            icn_core::DataDirLock::acquire_config_shared_if_manageable(&root, "the daemon")?
+        }
+        // With no `--config` there is no configuration file for a ceremony to
+        // replace, so there is nothing to exclude before the default is built.
+        None => None,
+    };
+
     // Load or create config (before tracing init so we can use tracing config)
     let mut config = if let Some(config_path) = &args.config {
+        // Name the legacy file when it is the likely cause. A node installed
+        // before icn#2755 has `config.toml` and no `icn.toml`, and the shipped
+        // unit now asks for the latter — so "Failed to load config file" would
+        // be true and useless. This does NOT read `config.toml`: there is
+        // deliberately no dual-path discovery, because a loader that searches
+        // two names answers differently depending on which files happen to
+        // exist. It only explains what an operator is looking at.
+        if !config_path.exists() {
+            if let Some(dir) = config_path.parent() {
+                let legacy = dir.join("config.toml");
+                if legacy.is_file() {
+                    anyhow::bail!(
+                        "Configuration not found at {}, but a legacy {} exists.\n\
+                         \n\
+                         `icn.toml` is the canonical native configuration (icn#2755); \
+                         `config.toml` is deprecated and is NOT auto-discovered. This \
+                         node predates that change. Either point this invocation at the \
+                         old file explicitly with `--config {}`, or provision a \
+                         `{}` — existing installs are not an upgrade target of the \
+                         Technical Alpha profile.",
+                        config_path.display(),
+                        legacy.display(),
+                        legacy.display(),
+                        config_path.display()
+                    );
+                }
+            }
+        }
         Config::from_file(config_path).context("Failed to load config file")?
     } else {
         Config::default()
@@ -713,6 +849,88 @@ async fn main() -> Result<()> {
     std::fs::create_dir_all(&config.data_dir)?;
 
     tracing::info!("Data directory: {:?}", config.data_dir);
+
+    // Take the data-directory lock for the daemon's lifetime, before the N2-A
+    // gate and before any store is opened.
+    //
+    // The gate alone does not exclude a concurrent maintenance ceremony: it
+    // takes sled locks and releases them when it returns, and a ceremony that
+    // closes its own handles mid-run leaves windows in which nothing is locked.
+    // Worse, the configuration above was already loaded — so without this a
+    // daemon could read a configuration a ceremony is about to replace, pass the
+    // gate in one of those windows, and then run with the node-DID fallback that
+    // ceremony exists to remove, while durable state said otherwise.
+    //
+    // Held until this guard drops at process exit; the kernel releases it if the
+    // process dies, so a crash cannot strand the directory.
+    //
+    // Both locks are retained for the daemon's lifetime, and they protect
+    // different things:
+    //
+    // * the configuration lock (`pre_config_lock`, taken above) protects the
+    //   bytes this process has already interpreted;
+    // * this one protects the state this process is about to mutate.
+    //
+    // They are not the same directory whenever `data_dir` points somewhere
+    // other than beside the configuration file — `--config /A/icn.toml
+    // --data-dir /B`, or any configuration like the shipped
+    // `config/icn-alpha.toml`, whose `data_dir` is `/tmp/icn-alpha`. Releasing
+    // the configuration lock here, as an earlier revision did, left a running
+    // daemon acting on an interpretation that a ceremony rooted at `/A` was
+    // free to republish underneath it — the stale-configuration race this
+    // protocol exists to prevent, reintroduced in the one case where the
+    // storage lock cannot stand in for it.
+    //
+    // They are separate lock *files*, so holding both is safe even when the two
+    // roots coincide: `File::try_lock` is `flock(2)`, which is per
+    // open-file-description, and a second handle on one path would conflict
+    // with the first inside this very process.
+    //
+    // Nothing here can deadlock. Every acquisition is non-blocking, so two
+    // daemons taking these roots in opposite orders get an immediate refusal on
+    // one side rather than a hang.
+    let _config_root_lock = pre_config_lock;
+    // The daemon is the other party to this exclusion domain, and its
+    // acquisition creates the lock: retained after release, mode 0600. Launched
+    // as `root` against a service-owned root whose lock is absent — including a
+    // start that then fails opening stores — it would leave a file the `icn`
+    // account cannot reopen, and this crate fails closed on exactly that, so
+    // the service would refuse to start until an operator repaired it.
+    //
+    // `icnctl`'s creating acquisitions have asked this question for several
+    // commits; the daemon's did not, because the rule lived in `icnctl`. It now
+    // lives beside the lock and both binaries ask it.
+    icn_core::refuse_if_new_files_would_not_belong_to_the_data_root_account(&config.data_dir)?;
+    let _data_dir_lock = icn_core::DataDirLock::acquire(&config.data_dir, "the daemon")?;
+
+    // N2-A startup gate (#2627). `Did` equality now names the principal, not
+    // the spelling (I7), so the first start of this binary over a store holding
+    // alias-spelled rows of one principal would fold them together and orphan
+    // the losers on write-back. This is the fail-closed check the migration
+    // record places *inside the binary*: it runs before the first store is
+    // opened — the ledger, trust and parameter stores below, then everything
+    // the supervisor opens — and refuses to start rather than trust a scan run
+    // earlier. It writes nothing to any store; its receipt lives beside them.
+    // There is no bypass flag: a refusal names the store and keyspace, and the
+    // disposition belongs to the domain that owns it.
+    {
+        let data_dir = config.data_dir.clone();
+        let receipt = tokio::task::spawn_blocking(move || {
+            icn_store::n2a_startup_gate::enforce(&data_dir, std::time::SystemTime::now())
+        })
+        .await
+        .context("N2-A startup gate task failed")?
+        // `anyhow::Error::new` keeps `GateRefusal` recoverable by `downcast_ref`
+        // and preserves its source chain; formatting it into a string discarded
+        // both, leaving an operator with prose where a typed refusal had been.
+        .map_err(anyhow::Error::new)?;
+        tracing::info!(
+            generation = receipt.generation,
+            stores = receipt.stores.len(),
+            "N2-A startup gate: clear; receipt at {}",
+            icn_store::n2a_startup_gate::receipt_path(&config.data_dir).display()
+        );
+    }
     tracing::info!("Log level: {}", config.observability.log_level);
 
     if config.gateway.enabled {

@@ -2,6 +2,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 mod institution_bootstrap;
+mod institution_runtime_root;
 
 use anyhow::{bail, Context, Result};
 use rust_i18n::t;
@@ -229,7 +230,9 @@ enum Commands {
 #[derive(Subcommand, Debug)]
 enum CoopMaintenanceCommands {
     /// Read-only inventory of cooperative IDs against the canonical
-    /// `coop_id` ↔ `EntityId` mapping (#2082 lane). Writes nothing.
+    /// `coop_id` ↔ `EntityId` mapping (#2082 lane). Binds nothing and writes no
+    /// store row; the N2-A gate it runs first leaves its own receipt beside the
+    /// stores (#2627 M4d).
     ///
     /// Classifies each stored cooperative ID as already-bound,
     /// mappable-unbound, mappable-reverse-conflict, non-mappable, or
@@ -247,7 +250,9 @@ enum CoopMaintenanceCommands {
     },
 
     /// Read-only report of `UnknownLegacy` / untrusted `coop_id` ↔ `EntityId`
-    /// bindings that would be repair candidates (#2082 lane). Writes nothing.
+    /// bindings that would be repair candidates (#2082 lane). Binds nothing and
+    /// writes no store row; the N2-A gate it runs first leaves its own receipt
+    /// beside the stores (#2627 M4d).
     ///
     /// Looks inside the *bound* rows and classifies each stored cooperative ID
     /// as trusted, not-bound, untrusted-provenance (`UnknownLegacy`),
@@ -291,7 +296,9 @@ enum CoopMaintenanceCommands {
 enum TreasuryMaintenanceCommands {
     /// Read-only plan of which legacy treasuries (`entity_id: None`) could have
     /// their `entity_id` populated from a trusted, non-ambiguous `coop_id` ↔
-    /// `EntityId` binding (#2082 lane). Writes nothing.
+    /// `EntityId` binding (#2082 lane). Binds nothing and writes no store row; the
+    /// N2-A gate it runs first leaves its own receipt beside the stores
+    /// (#2627 M4d).
     ///
     /// Hydrates treasuries from the local ledger store and classifies each as
     /// would-populate, already-bound, no-mapping, untrusted-provenance,
@@ -2222,8 +2229,79 @@ fn get_keystore_path(data_dir: &Path) -> PathBuf {
     data_dir.join("identity.age")
 }
 
+/// The base store directory, resolved through the layout's owner in `icn-core`
+/// rather than re-derived here.
 fn get_store_path(data_dir: &Path) -> PathBuf {
-    data_dir.join("store")
+    icn_core::config::store_path(data_dir)
+}
+
+/// Refuse to touch a data directory the N2-A startup gate would refuse to open
+/// (#2627 M4d).
+///
+/// `icnd` runs this gate in `main` before it opens a single store, so the daemon
+/// can never fold alias-spelled rows of one principal and orphan the losers on
+/// write-back. `icnctl` opens the *same* sled databases beneath the same data
+/// directory — and its maintenance commands are documented to run with the
+/// daemon stopped, which is precisely the window in which nothing else has
+/// checked them. Without this, the guarantee held only for whichever binary an
+/// operator happened to reach for.
+///
+/// This is not a second implementation of the rule. It calls the same
+/// [`icn_store::n2a_startup_gate::enforce`] the daemon calls, so the two can
+/// never drift into disagreeing about what is safe to open, and a refusal
+/// carries the same typed `GateRefusal` with the store, keyspace and principal
+/// fingerprints already in it.
+///
+/// A path that does not exist yet is **not** a refusal: it holds no rows, so
+/// there is nothing to fold and nothing to audit. `init-coop` on a fresh machine
+/// takes that arm; the same command over an existing data directory does not.
+///
+/// A path that *exists but is not a directory* is a different case and is
+/// deliberately **not** skipped here: it is a misconfigured `--data-dir`, and
+/// letting it through quietly would answer a question nobody asked. It falls
+/// through to `enforce`, whose own first check refuses it by name.
+///
+/// Two consequences are deliberate and stated rather than hidden. The gate
+/// writes its own receipt beside the stores, so a command that was documented
+/// as read-only now leaves that one file — the gate's own record of what it
+/// inspected, never a domain store write. And the gate opens each sled root
+/// exclusively while it audits, so a running daemon makes it refuse; the
+/// message below keeps the existing "stop the daemon first" guidance rather
+/// than replacing it with a bare lock error.
+fn enforce_n2a_gate(dir: &Path, what: &str) -> Result<()> {
+    if !dir.exists() {
+        return Ok(());
+    }
+    icn_store::n2a_startup_gate::enforce(dir, std::time::SystemTime::now())
+        .map(|_| ())
+        .map_err(|refusal| {
+            // Only `Blocked` means "this directory holds principal-bearing rows".
+            // The other variants mean the gate could not reach a verdict at all —
+            // most often because the daemon is running and holds the same
+            // exclusive lock the audit needs, which is the likeliest operator
+            // mistake here and used to produce a clear "stop the daemon first"
+            // message. Asserting the collision cause for every variant would
+            // send an operator hunting for an alias pair that does not exist.
+            let headline = match &refusal {
+                icn_store::n2a_startup_gate::GateRefusal::Blocked { .. } => format!(
+                    "N2-A startup gate refused {what} at {}: this data directory holds \
+                     principal-bearing rows a key-equality binary cannot open safely. \
+                     Run `did-collision-scan <store>` on the store paths named below \
+                     for the row-level report — it takes a database path, not the \
+                     directory above it. Disposition belongs to the domain that owns \
+                     the keyspace (#2627).",
+                    dir.display()
+                ),
+                _ => format!(
+                    "N2-A startup gate refused {what} at {}: the gate could not verify \
+                     this data directory, so it refuses rather than guess. If the daemon \
+                     is running, stop it first — the audit needs the same exclusive lock. \
+                     The cause below says which check could not complete (#2627).",
+                    dir.display()
+                ),
+            };
+            anyhow::Error::new(refusal).context(headline)
+        })
 }
 
 /// Dispatch cooperative maintenance subcommands.
@@ -2276,7 +2354,7 @@ fn treasury_entity_backfill_report(data_dir: &Path, json: bool) -> Result<()> {
     use icn_store::Store;
     use std::sync::Arc;
 
-    let ledger_store_path = get_store_path(data_dir).join("ledger");
+    let ledger_store_path = icn_core::config::ledger_store_path(data_dir);
 
     // Read-only contract: never create a database. A missing ledger store means
     // there are no persisted treasuries to inspect — report an empty plan rather
@@ -2427,7 +2505,7 @@ fn treasury_entity_backfill_apply(
     use icn_store::Store;
     use std::sync::Arc;
 
-    let ledger_store_path = get_store_path(data_dir).join("ledger");
+    let ledger_store_path = icn_core::config::ledger_store_path(data_dir);
 
     // Read-only contract — apply included: never create a database. A missing
     // ledger store means there are no persisted treasuries, so there is nothing
@@ -3175,8 +3253,10 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| "en".to_string());
     rust_i18n::set_locale(&locale);
 
-    // Initialize simple logging
-    icn_obs::init()?;
+    // Diagnostics to stderr, not stdout. `icnctl`'s stdout is its result — and
+    // for `--json` subcommands it is a document a caller pipes into a parser —
+    // so tracing lines interleaved into it make that document unparseable.
+    icn_obs::init_to_stderr()?;
 
     let data_dir = get_data_dir(args.data_dir)?;
 
@@ -3235,10 +3315,18 @@ async fn main() -> Result<()> {
             members,
             yes,
             no_start,
-        } => handle_init_coop_command(&data_dir, name, members, yes, no_start).await?,
+        } => {
+            // Opens `<data_dir>/store` and writes trust edges; gate first.
+            enforce_n2a_gate(&data_dir, "init-coop")?;
+            handle_init_coop_command(&data_dir, name, members, yes, no_start).await?
+        }
 
-        Commands::Coop(coop_cmd) => handle_coop_maintenance_command(coop_cmd, &data_dir)?,
+        Commands::Coop(coop_cmd) => {
+            enforce_n2a_gate(&data_dir, "coop maintenance")?;
+            handle_coop_maintenance_command(coop_cmd, &data_dir)?
+        }
         Commands::Treasury(treasury_cmd) => {
+            enforce_n2a_gate(&data_dir, "treasury maintenance")?;
             handle_treasury_maintenance_command(treasury_cmd, &data_dir)?
         }
 
@@ -3314,6 +3402,95 @@ async fn main() -> Result<()> {
 
 fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
+
+    // Subcommands that rewrite `identity.age` join the data-directory exclusion
+    // domain. Classified by what each actually writes, not by living under `id`.
+    //
+    // `id rotate` rewrites the keystore in place and took no lock at all.
+    // Runtime-root provisioning proves founding authority by unlocking that
+    // keystore early and commits its receipt at the very end, so a rotation
+    // landing anywhere in between made the ceremony commit a receipt naming a
+    // node DID the daemon no longer has — and the daemon roots its trust graph
+    // at the new one, so the treasury that receipt vouches for is unreachable.
+    // Re-reading the DID after the commit would not close that; the identity
+    // must not be able to change during the transaction.
+    //
+    // Two separate questions, because a command can answer no to the first and
+    // yes to the second:
+    //
+    //   1. can it change the DID, or replace the key material the receipt
+    //      names?  — `rotate` and `import` yes; `upgrade-pq`, recovery setup
+    //      and the device commands no, they preserve the DID.
+    //   2. can it rewrite `identity.age` while a ceremony is reading it?  —
+    //      all of them yes.
+    //
+    // The second is enough on its own, on this evidence: `AgeKeyStore`
+    // persists the *whole* file with a plain `std::fs::write` (truncate in
+    // place, no temp-and-rename), and provisioning re-opens and re-reads that
+    // keystore at its verification step, immediately before the receipt is
+    // committed. So a DID-preserving rewrite can still be observed torn there,
+    // and the transaction's outcome would depend on arrival order. That is why
+    // `upgrade-pq` is here, and why the recovery and device commands that call
+    // `update_did_document` take the same lock at their own handlers.
+    //
+    // `init` is deliberately **not** here. It refuses when a keystore already
+    // exists, so it cannot replace an established identity underneath a
+    // ceremony — and a ceremony requires that keystore to exist before it
+    // starts. Putting it behind a *creating* lock would also leave a retained
+    // `.icn-data-dir.lock` in every freshly initialised root, which is the
+    // inspection-poisoning property the previous commit just removed, moved
+    // into the setup path.
+    //
+    // Held for the whole subcommand and non-blocking, so a rotation during a
+    // ceremony refuses rather than interleaving, and a ceremony started while
+    // one of these holds the root refuses too.
+    let mutates_identity = match cmd {
+        IdCommands::Rotate { .. } | IdCommands::Import { .. } => true,
+        // Creates only when absent; read-only otherwise.
+        IdCommands::Init | IdCommands::Show | IdCommands::Export { .. } => false,
+        // Preserves the DID but rewrites the same file.
+        #[cfg(feature = "post-quantum")]
+        IdCommands::UpgradePq => true,
+    };
+    let _identity_lock = if mutates_identity {
+        // The lock is *created* here, retained after release, and mode 0600. Run
+        // under `sudo` against a service-owned root it would be root-owned, and
+        // the daemon's account could no longer open it — a mistaken maintenance
+        // command turned into a permanent startup failure. The ceremony refuses
+        // that before it creates anything; so must every other creating holder.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
+        Some(icn_core::DataDirLock::acquire(
+            data_dir,
+            "this identity command",
+        )?)
+    } else {
+        None
+    };
+
+    // `mutates_identity` above is the *tearing* question — can this command
+    // rewrite `identity.age` while something else is reading it. This is the
+    // separate *authority* question: can it replace the node DID that a
+    // committed runtime root is bound to.
+    //
+    // The two sets differ, which is why this is not folded into the match
+    // above. `upgrade-pq` rewrites the keystore but preserves the DID, so it
+    // takes the lock and is not refused here.
+    //
+    // Ordering matters twice over. It runs AFTER the lock, so the state it
+    // reads cannot change under it; and BEFORE the `match cmd` below, so the
+    // refusal happens before any identity mutation rather than partway
+    // through one.
+    let changes_node_did = matches!(cmd, IdCommands::Rotate { .. } | IdCommands::Import { .. });
+    if changes_node_did {
+        let command = match cmd {
+            IdCommands::Rotate { .. } => "`icnctl id rotate`",
+            IdCommands::Import { .. } => "`icnctl id import`",
+            _ => unreachable!("guarded by changes_node_did"),
+        };
+        institution_runtime_root::refuse_node_did_change_if_runtime_root_exists(data_dir, command)?;
+    }
 
     match cmd {
         IdCommands::Init => {
@@ -3564,6 +3741,29 @@ async fn handle_recovery_command(
     endpoint: &str,
 ) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
+
+    // `Setup` calls `update_did_document`, which rewrites `identity.age` with a
+    // plain `fs::write`. A runtime-root ceremony reading that keystore for its
+    // authority proof can observe the write torn, so this joins the same
+    // exclusion domain. The rest of these commands talk to a running daemon
+    // over RPC and write nothing here.
+    let _identity_lock = match cmd {
+        RecoveryCommands::Setup { .. } => {
+            // The lock is *created* here, retained after release, and mode 0600. Run
+            // under `sudo` against a service-owned root it would be root-owned, and
+            // the daemon's account could no longer open it — a mistaken maintenance
+            // command turned into a permanent startup failure. The ceremony refuses
+            // that before it creates anything; so must every other creating holder.
+            institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+                data_dir,
+            )?;
+            Some(icn_core::DataDirLock::acquire(
+                data_dir,
+                "this recovery command",
+            )?)
+        }
+        _ => None,
+    };
 
     match cmd {
         // Setup and Config are local-only operations (modify keystore's DID document)
@@ -4229,6 +4429,120 @@ async fn handle_network_command(
     Ok(())
 }
 
+/// A managed ICN configuration opened for local read-modify-write, under the
+/// exclusive configuration lock.
+///
+/// # Why this is a type and not a pair of calls
+///
+/// The hazard these writers have is not the write, it is the *span*. A command
+/// that loads `icn.toml`, decides what to change, and writes the whole file
+/// back is holding a snapshot; if a runtime-root ceremony publishes its
+/// `[cooperative]` section into that file in between, the writer's `to_file`
+/// silently reverts it from the stale snapshot. Depending on arrival order the
+/// ceremony then either fails verification and leaves the root permanently
+/// `INCOMPLETE`, or commits a receipt moments before the stale write removes
+/// the treasury linkage that receipt asserts.
+///
+/// Taking the lock only around `to_file` does not fix that — the snapshot was
+/// already stale by then. The lock has to cover load-through-write, which is
+/// exactly the extent of this value's lifetime: `open` acquires it and loads,
+/// `commit` writes and drops it.
+///
+/// Making it a type rather than a documented convention means a caller cannot
+/// load the configuration outside the lock and still reach `commit`: there is
+/// no other constructor that yields a `Config` here.
+///
+/// # What this is deliberately not applied to
+///
+/// Only writers of *managed ICN configuration* that read-modify-write take
+/// this. Read-only commands do not: creating a coordination artifact on a
+/// reader is the inspection-poisoning property the ceremony work already had to
+/// remove once, and a lock file left behind by `federation list` would
+/// reintroduce it. `icnd init` also does not — it constructs a fresh `Config`
+/// from defaults rather than reading one back, so it holds no snapshot to go
+/// stale, and locking it would leave a retained lock in every freshly
+/// initialised root. Writers of unrelated files (`genesis.json`) are out of
+/// scope by definition.
+struct ManagedConfigEdit {
+    /// Held for the whole edit. `commit` takes `self` by value and performs the
+    /// write in its body, so the lock is necessarily still held when `to_file`
+    /// runs — no field-drop-order reasoning is required for that guarantee.
+    _lock: icn_core::DataDirLock,
+    path: std::path::PathBuf,
+    config: icn_core::config::Config,
+}
+
+impl ManagedConfigEdit {
+    /// Acquire the exclusive configuration lock, then load.
+    ///
+    /// `missing` decides what an absent configuration means for this caller:
+    /// `federation add` starts from defaults, `remove` and `set` refuse.
+    fn open(config_root: &Path, holder: &str, missing: MissingConfig) -> Result<Self> {
+        // `.icn-config.lock` is created here, retained after release, and mode
+        // 0600 — the same durable coordination artifact as the storage lock, so
+        // it needs the same question asked first. A federation edit run through
+        // `sudo` against a service-owned root would otherwise leave a file the
+        // daemon's account cannot reopen even read-only, and the service stops
+        // starting. The audit that added this guard to the identity, recovery
+        // and device writers swept `DataDirLock::acquire` and missed
+        // `acquire_config`; both create.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            config_root,
+        )?;
+        // Acquired BEFORE the load. This ordering is the entire guarantee.
+        let lock = icn_core::DataDirLock::acquire_config(config_root, holder)?;
+        let path = icn_core::config::config_file_path(config_root);
+        // The lock names a *directory*; `from_file` and `to_file` follow a
+        // link. A symlinked `icn.toml` therefore puts the bytes being edited
+        // under one directory's lock while this holds another's, so a daemon or
+        // an inspection holding the target's lock does not contend and the file
+        // can be truncated underneath it. Refused rather than resolved: the
+        // ceremony already refuses a hard-linked configuration for the same
+        // reason — a second name for the bytes is a second identity outside
+        // this exclusion domain — and resolving instead would silently move
+        // which directory this command coordinates on.
+        #[cfg(unix)]
+        if let Ok(meta) = std::fs::symlink_metadata(&path) {
+            if meta.file_type().is_symlink() {
+                bail!(
+                    "Refusing to edit {}: it is a symbolic link. The configuration lock is \
+                     taken on the directory holding this name, but reads and writes would \
+                     follow the link elsewhere — so this edit would not contend with a daemon \
+                     or an inspection coordinating on the target. Edit the configuration where \
+                     it actually lives, or replace the link with a regular file.",
+                    path.display()
+                );
+            }
+        }
+        let config = if path.exists() {
+            icn_core::config::Config::from_file(&path)?
+        } else {
+            match missing {
+                MissingConfig::StartFromDefaults => icn_core::config::Config::default(),
+                MissingConfig::Refuse => {
+                    bail!("No configuration file found at {}", path.display())
+                }
+            }
+        };
+        Ok(Self {
+            _lock: lock,
+            path,
+            config,
+        })
+    }
+
+    /// Write the edited configuration and release the lock.
+    fn commit(self) -> Result<()> {
+        self.config.to_file(&self.path)
+    }
+}
+
+/// What an absent managed configuration means to a particular writer.
+enum MissingConfig {
+    StartFromDefaults,
+    Refuse,
+}
+
 async fn handle_federation_command(
     cmd: FederationCommands,
     data_dir: &Path,
@@ -4236,7 +4550,7 @@ async fn handle_federation_command(
 ) -> Result<()> {
     use icn_core::config::{Config, FederationConfig};
 
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
 
     match cmd {
         FederationCommands::Status => {
@@ -4333,22 +4647,24 @@ async fn handle_federation_command(
                 bail!("Trust score must be between 0.0 and 1.0");
             }
 
-            // Load existing config
-            let mut config = if config_path.exists() {
-                Config::from_file(&config_path)?
-            } else {
-                Config::default()
-            };
+            // Lock, then load. `federation add` is a read-modify-write of managed
+            // configuration, so the exclusive lock has to span both — see
+            // `ManagedConfigEdit`.
+            let mut edit = ManagedConfigEdit::open(
+                data_dir,
+                "icnctl federation add",
+                MissingConfig::StartFromDefaults,
+            )?;
 
             // Check if already exists
-            if config.network.bootstrap_peers.contains(&peer_url) {
+            if edit.config.network.bootstrap_peers.contains(&peer_url) {
                 println!("Peer already configured: {peer_url}");
                 return Ok(());
             }
 
             // Add peer
-            config.network.bootstrap_peers.push(peer_url.clone());
-            config.to_file(&config_path)?;
+            edit.config.network.bootstrap_peers.push(peer_url.clone());
+            edit.commit()?;
 
             println!("✓ Added bootstrap peer: {peer_url}");
             println!("  Initial trust: {trust:.2}");
@@ -4358,24 +4674,24 @@ async fn handle_federation_command(
         }
 
         FederationCommands::Remove { did } => {
-            // Load existing config
-            let mut config = if config_path.exists() {
-                Config::from_file(&config_path)?
-            } else {
-                bail!("No configuration file found at {}", config_path.display());
-            };
+            // Lock, then load — same read-modify-write hazard as `add`.
+            let mut edit = ManagedConfigEdit::open(
+                data_dir,
+                "icnctl federation remove",
+                MissingConfig::Refuse,
+            )?;
 
             // Find and remove peer by DID
-            let original_len = config.network.bootstrap_peers.len();
-            config
+            let original_len = edit.config.network.bootstrap_peers.len();
+            edit.config
                 .network
                 .bootstrap_peers
                 .retain(|url| !url.contains(&did));
 
-            if config.network.bootstrap_peers.len() == original_len {
+            if edit.config.network.bootstrap_peers.len() == original_len {
                 println!("No peer found with DID: {did}");
             } else {
-                config.to_file(&config_path)?;
+                edit.commit()?;
                 println!("✓ Removed bootstrap peer: {did}");
             }
         }
@@ -4442,12 +4758,16 @@ async fn handle_federation_command(
         }
 
         FederationCommands::Set { key, value } => {
-            // Load existing config
-            let mut config = if config_path.exists() {
-                Config::from_file(&config_path)?
-            } else {
-                Config::default()
-            };
+            // Lock, then load — same read-modify-write hazard as `add`.
+            let mut edit = ManagedConfigEdit::open(
+                data_dir,
+                "icnctl federation set",
+                MissingConfig::StartFromDefaults,
+            )?;
+            // Borrowed for the duration of the match below so the existing
+            // per-key assignments read unchanged; the borrow ends before
+            // `commit` consumes the edit.
+            let config = &mut edit.config;
 
             // Clone value for display after potential move
             let display_value = value.clone();
@@ -4498,7 +4818,7 @@ async fn handle_federation_command(
                 }
             }
 
-            config.to_file(&config_path)?;
+            edit.commit()?;
             println!("✓ Set federation.{key} = {display_value}");
         }
 
@@ -5957,6 +6277,47 @@ struct DeviceAddRequest {
 fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
     let keystore_path = get_keystore_path(data_dir);
 
+    // Only `Approve` and `Revoke` call `update_did_document`, which rewrites
+    // `identity.age` with a plain `fs::write`.
+    //
+    // An earlier version took the lock for the whole handler and justified it on
+    // cost -- "the lock is cheap". Cost was the wrong axis. `acquire` *creates*
+    // the lock file and it is retained after release, so a read-only
+    // `device list` run under `sudo` against a service-owned root leaves a
+    // root-owned 0600 `.icn-data-dir.lock` behind. The daemon's service account
+    // then cannot open it, and this crate's own fail-closed rule refuses to
+    // start rather than proceeding unlocked: a single mistaken inspection turns
+    // into a permanent startup failure. That is the same inspection-poisoning
+    // defect already removed from `id init`; a reader must never be able to lock
+    // a root out of running.
+    //
+    // `Add` writes a `device-add-*.json` request beside the keystore but never
+    // rewrites the keystore, so it does not need this lock either.
+    //
+    // Unlocked readers can therefore observe a keystore mid-rewrite. They fail
+    // rather than misreport: `identity.age` is authenticated, so a torn read
+    // does not decrypt. Do not "repair" that by relocking the read paths.
+    let mutates_identity = match cmd {
+        DeviceCommands::Approve { .. } | DeviceCommands::Revoke { .. } => true,
+        DeviceCommands::List | DeviceCommands::Add { .. } => false,
+    };
+    let _identity_lock = if mutates_identity {
+        // The lock is *created* here, retained after release, and mode 0600. Run
+        // under `sudo` against a service-owned root it would be root-owned, and
+        // the daemon's account could no longer open it — a mistaken maintenance
+        // command turned into a permanent startup failure. The ceremony refuses
+        // that before it creates anything; so must every other creating holder.
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
+        Some(icn_core::DataDirLock::acquire(
+            data_dir,
+            "this device command",
+        )?)
+    } else {
+        None
+    };
+
     match cmd {
         DeviceCommands::List => {
             // Check if keystore exists
@@ -6697,33 +7058,636 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     }
 
     // Optional: verify ledger integrity
+    let mut ledger_check: Option<LedgerCheck> = None;
     if verify_ledger {
         println!();
         println!("[Extra] Verifying ledger integrity...");
-        verify_ledger_in_backup(restore_dir)?;
+        // The restored tree is a data directory like any other: a backup whose
+        // ledger the gate would refuse is not one that "can be safely restored",
+        // which is exactly what this command is about to print.
+        // ORDER IS LOAD-BEARING. Decide whether the ARCHIVE carried a ledger
+        // database before anything opens anything. `enforce_n2a_gate` discovers
+        // sled roots by `child.join("conf").is_file()` and opens each one with
+        // `SledStore::open`, which CREATES — so for a directory holding `conf` but
+        // no `db` (an interrupted sled init) the gate itself materialises the
+        // database, and a presence check running afterwards would find one and
+        // certify it. The evidence has to be taken from the extracted tree first.
+        assert_backup_carried_a_ledger(restore_dir)?;
+        // Then prove the database can be READ AS WRITTEN, still before the gate.
+        // `sled::open` recovers a damaged `db` into a fresh empty database rather
+        // than failing, and its own `was_recovered()` signal is only false on the
+        // FIRST open — the gate's open would persist the repair and turn the
+        // signal true, leaving a corrupt ledger to be certified as `✓ Ledger
+        // empty` (#2732).
+        assert_ledger_recovered_as_written(restore_dir)?;
+        enforce_n2a_gate(restore_dir, "backup verification")?;
+        ledger_check = Some(verify_ledger_in_backup(restore_dir, &metadata)?);
     }
 
     // Temp directory auto-cleaned on drop
+    //
+    // The banner is decided by what was actually established, not by having
+    // reached the end of the function. When `--verify-ledger` was requested, the
+    // ledger's COMPLETENESS is a separate claim from its validity, and this
+    // command cannot establish it (icn#2746) — so it must not render as PASSED.
+    let ledger_completeness = ledger_check
+        .as_ref()
+        .map(|c| c.completeness)
+        .unwrap_or(icn_governance::verify::VerificationStatus::NotApplicable);
+    // Fail and Unresolved are DIFFERENT verdicts and must stay different.
+    // "we know entries are missing" and "we cannot tell whether any are" carry
+    // opposite operator actions, and collapsing them would report a known
+    // incomplete ledger as merely unproven the moment icn#2786 makes the
+    // extent commitment real.
+    let completeness_failed =
+        verify_ledger && ledger_completeness == icn_governance::verify::VerificationStatus::Fail;
+    let completeness_unproven = verify_ledger
+        && ledger_completeness == icn_governance::verify::VerificationStatus::Unresolved;
+
+    if verify_ledger {
+        // The structured result, so an operator can tell the three questions
+        // apart instead of inferring them from one banner.
+        let observed = ledger_check.as_ref().map(|c| c.entries).unwrap_or(0);
+        println!();
+        println!("Ledger result:");
+        println!("  entries observed:         {observed}");
+        println!("  observed entries valid:   yes");
+        println!(
+            "  expected extent available: {}",
+            match ledger_check.as_ref().and_then(|c| c.expected_entries) {
+                Some(n) => format!("yes ({n})"),
+                None => "no".to_string(),
+            }
+        );
+        println!(
+            "  ledger completeness:      {}",
+            match ledger_completeness {
+                icn_governance::verify::VerificationStatus::Pass => "verified",
+                icn_governance::verify::VerificationStatus::Fail => "failed",
+                _ => "unresolved",
+            }
+        );
+    }
+
     println!();
     println!("═══════════════════════════════════════");
-    println!("✓ BACKUP VERIFICATION PASSED");
+    if completeness_failed {
+        println!("✗ BACKUP VERIFICATION FAILED");
+    } else if completeness_unproven {
+        println!("⚠ BACKUP VERIFICATION UNRESOLVED");
+    } else {
+        println!("✓ BACKUP VERIFICATION PASSED");
+    }
     println!("═══════════════════════════════════════");
     println!();
-    println!("This backup can be safely restored.");
+    // Say what was verified, not more. Without `--verify-ledger` this command
+    // has checked metadata, extraction, a whole-directory checksum and the
+    // presence of `identity.age` — it has not read the ledger and has not run
+    // the N2-A principal audit, so "can be safely restored" claimed a guarantee
+    // it never established (#2717). The bare command's *checks* are unchanged;
+    // only the claim is narrowed to them.
+    if verify_ledger {
+        // Name exactly what was established, and widen it only as far as the
+        // checks actually widened. Entry validity is now decided by
+        // `icn_ledger::entry_validation` — the owner `Ledger::validate_entry`
+        // consults on append — so "empty-entry rejection" moves out of the
+        // NOT-performed list and into the claim. Nothing else does (icn#2736).
+        let entries = ledger_check.as_ref().map(|c| c.entries).unwrap_or(0);
+        let currencies = ledger_check
+            .as_ref()
+            .map(|c| c.currencies_balanced)
+            .unwrap_or(0);
+        if entries > 0 {
+            println!("Verified: archive integrity; that all {entries} ledger entries are valid");
+            println!("under icn-ledger's own entry validation (at least one account delta,");
+            println!("and the double-entry invariant per entry under checked i64, across");
+            println!(
+                "{currencies} currencies); and the N2-A principal audit of the restored tree."
+            );
+        } else {
+            // Reachable only for a journal with no entries at all. Every
+            // `AccountDelta` carries a currency and an entry with none is now
+            // refused, so a non-empty journal always yields a computed balance.
+            println!("Verified: archive integrity and the N2-A principal audit of the");
+            println!("restored tree. The ledger contains no entries, so no entry was");
+            println!("validated and no double-entry balance was computed.");
+        }
+        // "amount signs" STAYS in this list. Delegation did not make signs a
+        // checked property, and dropping the token would have been a silent
+        // widening in the one sentence an operator reads as the not-verified set
+        // — the sharper because `icn-ledger` DOES own a sign check
+        // (`entry::validate_positive_amounts`, reached by `JournalEntryBuilder`),
+        // which this command does not run. "Valid under icn-ledger's own entry
+        // validation" must therefore say plainly that signs are not part of it.
+        println!("NOT verified: amount signs, content hashes, signatures,");
+        println!("provenance, parent existence. Freeze state, credit limits and");
+        println!("progressive limits are append-time policy — evaluated against live");
+        println!("ledger state and the current clock — so they are not properties of a");
+        println!("backup at rest and are deliberately not checked here.");
+        if completeness_failed {
+            let (expected, observed) = ledger_check
+                .as_ref()
+                .map(|c| (c.expected_entries.unwrap_or(0), c.entries))
+                .unwrap_or((0, 0));
+            println!();
+            // Say which direction the mismatch runs. "Missing" and "surplus"
+            // are different incidents — loss versus injected or duplicated
+            // rows — and send recovery and incident response different ways.
+            println!("Ledger completeness FAILED. This backup commits to {expected} journal");
+            if observed < expected {
+                println!(
+                    "entries and {observed} were found: {} are MISSING. This is not the",
+                    expected - observed
+                );
+                println!("absence of evidence — it is evidence of loss.");
+            } else {
+                println!(
+                    "entries and {observed} were found: {} are SURPLUS. The journal holds",
+                    observed - expected
+                );
+                println!("entries the backup does not account for — treat as possible injected");
+                println!("or duplicated rows, not as loss.");
+            }
+        } else if completeness_unproven {
+            // The specific overclaim icn#2746 is about. "All N entries are
+            // valid" is a statement about the entries that are HERE; it was
+            // being read as a statement that N is all there ever were.
+            println!();
+            println!("Ledger completeness was NOT verified. This backup carries no");
+            println!("independent commitment to the expected journal extent, so a ledger");
+            println!("that silently lost entries before the backup was taken is");
+            println!("indistinguishable from one that always held this many. The count");
+            println!("above describes what is present, not that nothing is missing.");
+        }
+    } else {
+        println!("Verified: archive integrity, checksum, and required files.");
+        println!("NOT verified: ledger contents and the N2-A principal audit.");
+        println!("Re-run with --verify-ledger to check those before relying on this backup.");
+    }
+
+    if completeness_failed {
+        let (expected, observed) = ledger_check
+            .as_ref()
+            .map(|c| (c.expected_entries.unwrap_or(0), c.entries))
+            .unwrap_or((0, 0));
+        bail!(
+            concat!(
+                "FAILED: this backup commits to {} journal entries and {} were ",
+                "found. The journal does not match the extent this backup ",
+                "committed to, so it is not the ledger that was backed up. A ",
+                "shortfall is loss; a surplus is unaccounted-for rows, which is ",
+                "a different incident — the summary above says which this is."
+            ),
+            expected,
+            observed
+        );
+    }
+
+    if completeness_unproven {
+        // Fail closed. `--verify-ledger` is a verification that was ASKED FOR;
+        // completeness is part of what an operator reads it as establishing, and
+        // it could not be established. Exiting 0 here renders uncertainty as
+        // success, which is the same overclaim this command was corrected for in
+        // #2717 (requested-but-unperformable verification must not count toward
+        // PASSED).
+        bail!(
+            concat!(
+                "UNRESOLVED: --verify-ledger established that the {} journal entries ",
+                "present are valid, but could NOT establish that the journal is ",
+                "complete, because this backup carries no independent commitment to ",
+                "its expected extent (icn#2746). Nothing here is evidence of damage; ",
+                "it is the absence of evidence of completeness, and it is reported ",
+                "rather than assumed away."
+            ),
+            ledger_check.as_ref().map(|c| c.entries).unwrap_or(0)
+        );
+    }
 
     Ok(())
 }
 
-/// Verify ledger integrity in a restored backup directory
-fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
+/// Refuse a ledger path that leaves the extracted tree, before anything follows it.
+///
+/// The archive is untrusted input — judging it is this command's entire job — and
+/// `Path::exists`, `Path::is_file` and `sled::open` all FOLLOW symlinks. A
+/// crafted archive carrying `store/ledger` as a symlink to a sled database
+/// elsewhere on the machine therefore reads as a present, complete ledger:
+/// `calculate_dir_checksum` walks with `follow_links(false)` and hashes only
+/// `is_file()` entries, so the symlink is skipped and the checksum matches; the
+/// marker checks below follow it and find `conf` and `db`; and the recovery open
+/// then opens the external database. `sled::open` writes — it grows the backing
+/// file, may write a snapshot, and rewrites the configuration — so verification
+/// would mutate a database outside the directory it extracted, on nothing more
+/// than an operator running `verify-backup` on a hostile file.
+///
+/// Reproduced before this check existed: the victim database's `db` was rewritten
+/// and a `snap.*` appeared, on an archive whose only payload was the symlink.
+///
+/// `enforce_n2a_gate` already refuses symlinks — `find_sled_roots` uses
+/// `file_type()`, which does not follow them, and errors rather than skipping
+/// (`icn/crates/icn-store/src/did_collision_scan.rs:1463`). That refusal was
+/// enough while the gate held the FIRST open of the extracted tree. icn#2732 had
+/// to move an open in front of the gate to catch sled's recovery signal before
+/// the gate's own open destroys it, and that reordering stepped the new open past
+/// this guard. Moving a check earlier also moves it past whatever used to protect
+/// it, so the guard has to move with it.
+///
+/// Every component from the extraction root down is checked with
+/// `symlink_metadata`, which does not follow, because a link anywhere along the
+/// path escapes just as effectively as one at the leaf. A component that does not
+/// exist is not this function's business — absence is the presence check's
+/// verdict to give, and giving it here would produce two different messages for
+/// one condition.
+///
+/// The path alone is NOT enough, and a first version of this check that stopped
+/// there was still escapable. An archive can keep `store/ledger` a real directory
+/// and make its CHILDREN links: `conf`, `db`, or anything under `blobs/`. The
+/// marker checks follow those with `is_file()`, and `sled::open` opens exactly
+/// those paths — reproduced, with the external database's `db` rewritten through
+/// a symlinked child while the directory itself was genuinely local. So the whole
+/// subtree is walked, no-follow, and any link anywhere in it is refused. sled
+/// decides for itself which files under this directory to open; the safe
+/// assumption is all of them.
+fn assert_ledger_path_is_contained(restore_dir: &Path, ledger_db_path: &Path) -> Result<()> {
+    let relative = ledger_db_path
+        .strip_prefix(restore_dir)
+        .context("ledger path is not under the extraction root")?;
+
+    let mut walked = restore_dir.to_path_buf();
+    for component in relative.components() {
+        walked.push(component);
+        let metadata = match std::fs::symlink_metadata(&walked) {
+            Ok(metadata) => metadata,
+            // Absent: let `assert_backup_carried_a_ledger` say so.
+            Err(_) => return Ok(()),
+        };
+        if metadata.file_type().is_symlink() {
+            bail!(
+                "FAILED: this backup places a symbolic link at {}, inside the path \
+                 its ledger database must occupy. Ledger verification was NOT \
+                 performed, and nothing was opened.\n\
+                 \n\
+                 A link there would make verification read — and, because \
+                 `sled::open` writes, MODIFY — a database outside the archive being \
+                 verified, while reporting the result as though it came from the \
+                 backup. A backup written by `icnctl backup` never contains one.",
+                walked.display()
+            );
+        }
+    }
+
+    // The directory is local. Everything sled may open UNDER it must be too.
+    for entry in walkdir::WalkDir::new(ledger_db_path)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+    {
+        if entry.file_type().is_symlink() {
+            bail!(
+                "FAILED: this backup places a symbolic link at {}, inside its \
+                 ledger database directory. Ledger verification was NOT performed, \
+                 and nothing was opened.\n\
+                 \n\
+                 The directory itself is local, but sled opens the files inside it \
+                 — and writes to them — so a link there reaches outside the archive \
+                 exactly as a linked directory would. A backup written by \
+                 `icnctl backup` never contains one.",
+                entry.path().display()
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Prove the ARCHIVE carried a ledger database, before anything opens the tree.
+///
+/// Must be called before `enforce_n2a_gate`. The gate discovers sled roots by the
+/// presence of `conf` and opens each with `SledStore::open`, which calls
+/// `sled::open` — a CREATING open. So for a directory holding `conf` but no `db`,
+/// the gate materialises the database itself, and any later presence check finds
+/// one and certifies a ledger the backup never contained (#2717).
+///
+/// A live sled database directory holds `conf`, `db` and `blobs`; requiring `db`
+/// as well as `conf` is what distinguishes a restored database from an
+/// interrupted initialisation. This deliberately stays a pure filesystem check
+/// and opens nothing. It therefore cannot detect a `db` that is present but
+/// unreadable — sled recovers such a directory into an empty database — which is
+/// why [`assert_ledger_recovered_as_written`] runs immediately after it and
+/// before the gate (icn#2732).
+fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
+
+    // Containment FIRST, because every check below this line follows symlinks.
+    assert_ledger_path_is_contained(restore_dir, &ledger_db_path)?;
+
+    if !ledger_db_path.exists() {
+        bail!(
+            "FAILED: --verify-ledger was requested but no ledger database exists \
+             in this backup at {}. Ledger verification was NOT performed.\n\
+             \n\
+             A node that has never started has no ledger yet — `icnd` creates it, \
+             not `icnctl id init`. If this is a pre-first-start backup, verify it \
+             without --verify-ledger; there is deliberately no flag to make \
+             --verify-ledger pass without reading a ledger.",
+            ledger_db_path.display()
+        );
+    }
+
+    for marker in ["conf", "db"] {
+        if !ledger_db_path.join(marker).is_file() {
+            bail!(
+                "FAILED: {} exists but holds no ledger database (missing `{}`), so \
+                 nothing from this backup could be verified. Ledger verification \
+                 was NOT performed.\n\
+                 \n\
+                 A data directory carries a partial ledger directory like this when \
+                 the node was interrupted while creating it. Opening it would have \
+                 created a new empty database and verified that instead of the \
+                 backup's.",
+                ledger_db_path.display(),
+                marker
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Prove the archive's ledger database was read AS WRITTEN, not silently replaced.
+///
+/// Ordering is load-bearing in BOTH directions, and neither neighbour is
+/// interchangeable with this one.
+///
+/// **After [`assert_backup_carried_a_ledger`]**, because this opens the database
+/// and that check must stay a pure filesystem check: a directory holding `conf`
+/// but no `db` has to bail before anything performs a creating open, or the open
+/// manufactures the database the caller was about to certify (icn#2717).
+///
+/// **Before `enforce_n2a_gate`**, because the evidence is destroyed by being
+/// observed. `sled::open` is a CREATING open with no read-only mode: handed a
+/// `db` it cannot parse it does not fail, it allocates a fresh meta page and
+/// returns an empty database, and the journal scan then honestly reports zero
+/// rows. `Db::was_recovered()` is `false` for exactly that case — sled clears it
+/// when it has to allocate `META_PID` or `COUNTER_PID` instead of recovering
+/// them. But that allocation is PERSISTED, so the *second* open of the same
+/// damaged directory legitimately recovers what the first one created and
+/// reports `true`. Measured on a backup whose ledger `db` was truncated: open 1
+/// `false`, open 2 `true`, open 3 `true`. `enforce_n2a_gate` opens every sled
+/// root it discovers, so a check placed after it reads `true` and certifies the
+/// corruption. This must be the FIRST open of the extracted tree.
+///
+/// A genuinely empty but readable ledger reports `true` — it has a meta page to
+/// recover — so the signal separates "this backup holds an honestly empty
+/// ledger" from "this backup's ledger could not be inspected as written", which
+/// is the distinction icn#2732 exists to restore. Those are very different facts
+/// for an operator holding a backup they may need to restore.
+///
+/// What the signal establishes is bounded, and the bound is worth stating.
+/// `was_recovered()` answers whether sled RECOVERED the database or REPLACED it.
+/// It is not a whole-database integrity check and this refusal does not claim to
+/// be one: it cannot establish that every row a backup once held is still
+/// readable. Deciding that needs a count or manifest recorded when the backup was
+/// taken and cross-checked here, which is a backup-format change icn#2732
+/// deliberately does not make. What is closed here is the specific false
+/// conclusion that a replaced database is an empty one.
+///
+/// What the signal does NOT establish is the CAUSE. A truncated copy, a failed
+/// transfer, tampering, and a ledger whose first writes were never durably
+/// flushed are byte-indistinguishable here, and the message must not pick one of
+/// them. It reports what was established — the database was replaced rather than
+/// recovered — and declines to name why.
+///
+/// This is a mechanism, not a reading of sled's log output. The warning sled
+/// prints on a damaged configuration is human-oriented text with no stability
+/// guarantee; `was_recovered()` is the library's own answer to the question
+/// being asked.
+///
+/// The checksum in `backup_metadata.json` cannot substitute for this: it is
+/// computed over the data directory at backup time, so a ledger already damaged
+/// when the backup was taken checksums consistently and passes.
+///
+/// The store is dropped before returning — sled holds an exclusive flock and the
+/// gate's own open comes next.
+fn assert_ledger_recovered_as_written(restore_dir: &Path) -> Result<()> {
+    use icn_store::SledStore;
+
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
+
+    // An open that fails outright is also "could not be inspected as written",
+    // and saying so here names the check the operator asked for. Without this the
+    // same damage surfaced as an N2-A startup-gate refusal, which is true but
+    // sends the reader looking for a principal-collision problem they do not have.
+    //
+    // This branch is the REALISTIC one, not the exotic one. A ledger that has
+    // been opened more than once carries a `snap.*`, and with a snapshot present
+    // sled reports damage as `Corruption` instead of recovering into an empty
+    // database — so any node that has ever restarted arrives here rather than at
+    // the `was_recovered()` refusal below.
+    //
+    // It therefore names a cause even less than that refusal may.
+    // `SledStore::open` is a bare `sled::open`, so this context attaches to every
+    // `sled::Error` — a permission failure, ENOSPC, a descriptor limit or another
+    // process holding the flock reach it exactly as damaged bytes do. Telling an
+    // operator their backup may have been tampered with because the file was not
+    // readable would be a fabricated conclusion. Say what happened, and let
+    // sled's own error say why through the cause chain below.
+    let store = SledStore::open(&ledger_db_path).with_context(|| {
+        format!(
+            "FAILED: the ledger database in this backup at {} could not be opened, \
+             so nothing in it could be verified. Ledger verification was NOT \
+             performed.\n\
+             \n\
+             The archive carried both `conf` and `db`, so this is not the \
+             missing-ledger case. What stopped the open is not narrowed here: \
+             sled's own error is reported below, and the possibilities include \
+             damaged contents as well as conditions that say nothing about the \
+             archive at all, such as a permission problem or another process \
+             holding the database lock.\n\
+             \n\
+             Do not rely on this backup as an empty ledger.",
+            ledger_db_path.display()
+        )
+    })?;
+    let recovered = store.db().was_recovered();
+    drop(store);
+
+    if !recovered {
+        bail!(
+            "FAILED: the ledger database in this backup could not be read as \
+             written. sled did not recover the database at {}; it initialised a \
+             new, empty one in its place, so a scan of it would report this \
+             backup's ledger as empty no matter what the backup actually \
+             contained. Ledger verification was NOT performed.\n\
+             \n\
+             The archive carried both `conf` and `db`, so this is not the \
+             missing-ledger case. What it IS cannot be narrowed further from the \
+             archive alone: a truncated or partially written copy, a failed \
+             transfer, tampering, and a ledger whose first writes were never \
+             durably flushed all leave bytes sled reports the same way. The \
+             backup's own checksum cannot distinguish them either — it is computed \
+             over the data directory at backup time, so a ledger already damaged \
+             when the backup was taken checksums consistently and passes.\n\
+             \n\
+             What this backup's ledger held is therefore not established by this \
+             archive. It may have held nothing; it may have held entries that \
+             cannot be recovered. Do not rely on it as an empty ledger.",
+            ledger_db_path.display()
+        );
+    }
+
+    Ok(())
+}
+
+/// Render an untrusted journal key: bounded, with every non-printable byte
+/// escaped.
+///
+/// The key comes out of the archive being verified, which is untrusted input by
+/// definition — that is what this command exists to judge. Printing it verbatim
+/// let a crafted backup inject newlines and ANSI escapes into this command's own
+/// diagnostics, up to and including repainting a forged success banner over a
+/// failing run. Bounded because a key can also be arbitrarily long.
+fn render_row_key(key: &[u8]) -> String {
+    const MAX: usize = 80;
+    let mut out = String::with_capacity(MAX);
+    for &b in key.iter().take(MAX) {
+        if (0x20..=0x7e).contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("\\x{b:02x}"));
+        }
+    }
+    if key.len() > MAX {
+        out.push_str(&format!("...(+{} more bytes)", key.len() - MAX));
+    }
+    out
+}
+
+/// Sanitize a composed diagnostic line before it reaches the operator.
+///
+/// Applied at the OUTPUT BOUNDARY rather than per field, on purpose. A journal
+/// row carries several attacker-influenced values — the key, every
+/// `AccountDelta::currency`, the `account_id` embedded in a `net_change` error,
+/// and whatever a serde error quotes back — and escaping them one at a time
+/// requires enumerating all of them correctly, forever. icn#2717 escaped the key
+/// and left the currency, which is exactly that failure.
+///
+/// PERMITLIST, not a denylist. An earlier version escaped `char::is_control()`,
+/// which is false for U+202E and the U+2066..U+2069 isolates — Unicode format
+/// characters that visually reorder or conceal the rest of the line without
+/// being "control" at all. Enumerating the bidi and format ranges would be
+/// another denylist, and this function exists because the previous one was
+/// incomplete. `ops/state/truth/policy.json` states the rule directly: a denylist
+/// admits any state nobody enumerated.
+///
+/// So printable ASCII passes and everything else is escaped to `\u{...}`. A
+/// legitimately non-ASCII currency renders escaped, which for a diagnostic is the
+/// correct trade: it shows the operator the actual bytes rather than a rendering
+/// of them. Already-escaped input passes through unchanged, so this composes with
+/// [`render_row_key`] without double-escaping.
+fn sanitize_diagnostic(line: &str) -> String {
+    const MAX: usize = 240;
+    let mut out = String::with_capacity(line.len().min(MAX));
+    for ch in line.chars().take(MAX) {
+        if matches!(ch, ' '..='~') {
+            out.push(ch);
+        } else {
+            out.push_str(&format!("\\u{{{:04x}}}", ch as u32));
+        }
+    }
+    if line.chars().count() > MAX {
+        out.push_str("...");
+    }
+    out
+}
+
+/// What `verify_ledger_in_backup` actually established.
+///
+/// Returned rather than inferred so the operator-facing summary reports coverage
+/// from evidence and never from the absence of an error. `currencies_balanced`
+/// counts only currencies `icn_ledger::entry_validation` summed to zero, so the
+/// summary can name the breadth of the double-entry claim instead of asserting
+/// it flatly.
+struct LedgerCheck {
+    entries: usize,
+    currencies_balanced: usize,
+    /// The extent this backup committed to when it was written, if any.
+    ///
+    /// Always `None` today: no such commitment exists. See
+    /// [`expected_ledger_extent`].
+    expected_entries: Option<usize>,
+    /// Whether this backup's journal is *complete*, as distinct from whether
+    /// the entries it still holds are valid. Reuses `icn-governance`'s
+    /// verification vocabulary so "could not decide" cannot render as a pass.
+    completeness: icn_governance::verify::VerificationStatus,
+}
+
+/// The expected journal extent committed by this backup, if it carries one.
+///
+/// Always `None`, because nothing commits one yet — and that is the finding, not
+/// an oversight (icn#2746).
+///
+/// A ledger `db` truncated to a partial length reopens cleanly: sled recovers
+/// the surviving prefix and returns fewer rows with no error. Nothing in the
+/// artifact distinguishes "this ledger has always held N entries" from "this
+/// ledger held more and silently recovered to N":
+///
+/// * `was_recovered()` is true for healthy recovery too, so it does not
+///   discriminate (and icn#2745 already spends it on the replaced-database case);
+/// * a full scan completes successfully, just short;
+/// * there is no reference length to compare the `db` file against;
+/// * the archive checksum is computed over the data directory *at backup time*,
+///   so a ledger already damaged when the backup was taken checksums
+///   consistently.
+///
+/// Counting rows at backup time does not close this either. If the damage
+/// precedes the backup, the count records the already-reduced extent and later
+/// compares equal to itself. It would only detect damage occurring *after*
+/// capture — and that case is already caught, by the whole-directory checksum
+/// this command recomputes in step [3/4].
+///
+/// Detection therefore requires a commitment that advances when a journal append
+/// succeeds and survives loss of the journal itself, so that losing the data
+/// cannot also erase the evidence the data existed. That owner does not exist
+/// yet; until it does, completeness is `Unresolved` and this command says so
+/// rather than certifying it.
+fn expected_ledger_extent(_metadata: &BackupMetadata) -> Option<usize> {
+    None
+}
+
+/// Verify ledger integrity in a restored backup directory.
+fn verify_ledger_in_backup(restore_dir: &Path, metadata: &BackupMetadata) -> Result<LedgerCheck> {
     use icn_store::{SledStore, Store};
 
-    // Check if ledger store exists
-    let ledger_db_path = restore_dir.join("ledger");
+    // `backup` archives the data directory at archive root
+    // (`append_dir_all(".", data_dir)`), so the canonical `{data_dir}/store/ledger`
+    // restores to `{restore_dir}/store/ledger`. This resolved `{restore_dir}/ledger`
+    // — one level too high — so the invariant check below never opened a database
+    // and every `--verify-ledger` run reported success without reading a ledger
+    // (#2717). Resolved through the layout's owner so a fourth caller cannot
+    // re-derive it.
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
     if !ledger_db_path.exists() {
-        println!("  ⚠ No ledger database found (may be new node)");
-        return Ok(());
+        // Fail closed. The caller passed `--verify-ledger`, so this is a
+        // verification that was ASKED FOR and could not be performed; counting it
+        // toward `BACKUP VERIFICATION PASSED` is the overclaim this issue is
+        // about. The message names the path so "this backup has no ledger" stays
+        // distinguishable from "the verifier looked in the wrong place".
+        bail!(
+            "FAILED: --verify-ledger was requested but no ledger database exists \
+             in this backup at {}. Ledger verification was NOT performed.\n\
+             \n\
+             A node that has never started has no ledger yet — `icnd` creates it, \
+             not `icnctl id init`. If this is a pre-first-start backup, verify it \
+             without --verify-ledger; there is deliberately no flag to make \
+             --verify-ledger pass without reading a ledger.",
+            ledger_db_path.display()
+        );
     }
+
+    // Presence is established by `assert_backup_carried_a_ledger` BEFORE the N2-A
+    // gate runs, because the gate's own creating open would otherwise manufacture
+    // the database this function is about to read. One owner, one point in time.
 
     // Open the ledger store in read-only mode
     let store = SledStore::open(&ledger_db_path).context("Failed to open ledger store")?;
@@ -6731,75 +7695,169 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     // Count entries using the correct ledger journal prefix
     let entry_prefix = b"ledger:journal:";
     let entries = store.scan(entry_prefix)?;
-    println!("  Found {} ledger entries", entries.len());
+    let entry_count = entries.len();
+    println!("  Found {entry_count} ledger entries");
 
-    // Verify double-entry invariant: Σ debits == Σ credits per currency
-    // This means: sum of (debit - credit) per currency should be 0
-    let mut currency_sums: std::collections::HashMap<String, i128> =
-        std::collections::HashMap::new();
-    let mut parse_errors = 0usize;
+    // Decide each row's validity by asking icn-ledger, not by re-deriving its
+    // rules here. See the call site below for why that owner exists (icn#2736).
+    let mut invalid_rows: Vec<String> = Vec::new();
+    let mut invalid_row_count = 0usize;
+    let mut currencies_seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    // Deserialize each row into the PERSISTED LEDGER TYPE, not an untyped
+    // `serde_json::Value`.
+    //
+    // An untyped parse accepted rows the ledger itself cannot load: `{}` is valid
+    // JSON, so it parsed, carried no accounts, contributed nothing to the sums and
+    // was skipped in silence — a wholly corrupt ledger then summed to "no
+    // currencies" and the command reported success. A field-subset check was tried
+    // first and was still too weak: `JournalEntry` also requires `timestamp`,
+    // `author`, `parents` and `provenance`, and `AccountDelta` requires
+    // `account_id`, none of which a subset check inspects.
+    //
+    // The version-skew objection to typed deserialization is real but points the
+    // other way. `JournalEntry` is strict — those fields have no serde defaults —
+    // so a row it cannot load is a row `icn-ledger` cannot load, which means the
+    // backup is not restorable by this binary. Reporting PASSED for it would be
+    // this command's original defect in a new place. The message below therefore
+    // separates corruption from a version the current binary cannot read, rather
+    // than the check quietly accepting both.
+    let mut undecodable: Vec<String> = Vec::new();
 
-    for (_key, value) in entries {
-        // Try to deserialize entry and extract account deltas
-        match serde_json::from_slice::<serde_json::Value>(&value) {
-            Ok(entry) => {
-                if let Some(accounts) = entry.get("accounts").and_then(|a| a.as_array()) {
-                    for account in accounts {
-                        if let Some(currency) = account.get("currency").and_then(|c| c.as_str()) {
-                            // AccountDelta uses separate debit and credit fields (both Option<i64>)
-                            let debit = account.get("debit").and_then(|d| d.as_i64()).unwrap_or(0);
-                            let credit =
-                                account.get("credit").and_then(|c| c.as_i64()).unwrap_or(0);
+    for (key, value) in entries {
+        let row = render_row_key(&key);
 
-                            // Use checked arithmetic to prevent overflow
-                            let net =
-                                (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
-                                    anyhow::anyhow!(
-                                        "Arithmetic overflow computing net for currency {currency}"
-                                    )
-                                })?;
-
-                            let sum = currency_sums.entry(currency.to_string()).or_insert(0);
-                            *sum = sum.checked_add(net).ok_or_else(|| {
-                                anyhow::anyhow!("Arithmetic overflow summing currency {currency}")
-                            })?;
-                        }
-                    }
-                }
+        let entry = match serde_json::from_slice::<icn_ledger::JournalEntry>(&value) {
+            Ok(entry) => entry,
+            Err(e) => {
+                undecodable.push(sanitize_diagnostic(&format!("{row}: {e}")));
+                continue;
             }
-            Err(_) => {
-                parse_errors += 1;
-            }
-        }
-    }
+        };
 
-    if parse_errors > 0 {
-        println!("  ⚠ {parse_errors} entries could not be parsed");
-    }
-
-    // Check invariant
-    let mut all_balanced = true;
-    for (currency, sum) in &currency_sums {
-        if *sum != 0 {
-            println!("  ✗ Currency {currency} has imbalance: {sum}");
-            all_balanced = false;
-        }
-    }
-
-    if all_balanced {
-        if currency_sums.is_empty() {
-            println!("  ✓ Ledger empty (no currencies)");
+        // Ask icn-ledger whether this entry is valid. Do not re-derive the rule.
+        //
+        // `icn_ledger::entry_validation::inspect_entry` is the SAME owner
+        // `Ledger::validate_entry` consults on append, so the two cannot answer
+        // differently — which they twice did while this command kept its own copy
+        // (icn#2717): it summed balances across the whole journal where the ledger
+        // sums per entry, and it accumulated in a widened `i128` where the ledger
+        // uses checked `i64`, so a row the ledger rejects as an overflow reached
+        // zero here and was certified. A third divergence was already latent and is
+        // closed by the same move: an entry with an empty `accounts` array balances
+        // vacuously under a balance-only check, and the mirrored code passed it over
+        // while `validate_entry` rejects it on its first line (icn#2736).
+        //
+        // The owner is a free function over `&JournalEntry`: it opens nothing, locks
+        // nothing and reads no clock, so consulting it costs this command none of the
+        // read-only posture icn#2717 established. Deliberately NOT delegated to is
+        // the rest of `validate_entry` — freeze state, credit limits, progressive
+        // limits — which is evaluated against live ledger state and `SystemTime::now()`.
+        // Those are append-time policy, not properties of an archived journal;
+        // re-running them offline would reject entries that were valid when appended.
+        let intrinsics = icn_ledger::entry_validation::inspect_entry(&entry);
+        if intrinsics.is_valid() {
+            // Only currencies the owner actually summed to zero. Coverage is
+            // reported from evidence, never inferred from the absence of an error.
+            currencies_seen.extend(intrinsics.currencies_balanced().iter().cloned());
         } else {
-            println!(
-                "  ✓ Double-entry invariant verified for {} currencies",
-                currency_sums.len()
-            );
+            // Detail lines are per DEFECT; a row invalid in two currencies
+            // contributes two. Counting rows separately stops the report claiming
+            // "2 of 1 ledger row(s)" — an impossible statement about the
+            // operator's own data.
+            for defect in intrinsics.defects() {
+                invalid_rows.push(sanitize_diagnostic(&format!("{row}: {defect}")));
+            }
+            invalid_row_count += 1;
         }
-    } else {
-        bail!("FAILED: Ledger double-entry invariant violated");
     }
 
-    Ok(())
+    if !undecodable.is_empty() {
+        bail!(
+            "FAILED: {} of {} ledger row(s) could not be decoded as journal entries, \
+             so the double-entry invariant could NOT be verified over this ledger. \
+             The rows are either corrupt or were written by a version this binary \
+             cannot read; either way the ledger would not load on restore.\n\
+             \n\
+             First: {}",
+            undecodable.len(),
+            entry_count,
+            undecodable[0]
+        );
+    }
+
+    if !invalid_rows.is_empty() {
+        for row in invalid_rows.iter().take(5) {
+            println!("  ✗ {row}");
+        }
+        // "do not balance" was accurate while balance was the only rule checked.
+        // The owner also rejects an entry carrying no account deltas, which does
+        // not "fail to balance" — it has nothing to balance — so the sentence has
+        // to name the actual verdict rather than the rule it used to be about.
+        bail!(
+            "FAILED: {} of {} ledger row(s) are not valid journal entries. Each \
+             was rejected by icn-ledger's own entry validation — the same owner \
+             `Ledger::validate_entry` consults on append — so these rows would \
+             not have been accepted into a ledger, and a journal containing them \
+             is not a valid ledger even if the totals happen to cancel across rows.",
+            invalid_row_count,
+            entry_count
+        );
+    }
+
+    if entry_count == 0 {
+        println!("  ✓ Ledger empty (no entries)");
+    } else {
+        // Every surviving entry passed the owner, and the owner rejects an entry
+        // with no account deltas — so a non-empty journal that reaches here has
+        // at least one `AccountDelta`, and every `AccountDelta` carries a
+        // currency. `currencies_seen` therefore cannot be empty at this point.
+        // Before icn#2736 it could, and the summary needed a third arm for
+        // "entries read, nothing summed"; delegation removed that state rather
+        // than the wording papering over it.
+        debug_assert!(
+            !currencies_seen.is_empty(),
+            "a validated non-empty journal always yields at least one currency"
+        );
+        println!(
+            "  ✓ {} entries valid under icn-ledger's entry validation; \
+             double-entry invariant holds per entry across {} currencies",
+            entry_count,
+            currencies_seen.len()
+        );
+    }
+
+    // Validity and completeness are different claims. Everything above decides
+    // whether the entries that are HERE are valid; none of it can decide whether
+    // any are MISSING. Keep them separate so the second cannot be read off the
+    // first (icn#2746).
+    use icn_governance::verify::VerificationStatus;
+    let expected_entries = expected_ledger_extent(metadata);
+    let completeness = match expected_entries {
+        // No commitment exists to compare against. Fail closed to Unresolved:
+        // "could not decide" must never render as "verified".
+        None => VerificationStatus::Unresolved,
+        // A MISMATCH is evidence: the journal is not the one this backup
+        // committed to, whichever direction it runs.
+        Some(expected) if expected != entry_count => VerificationStatus::Fail,
+        // Equality is NOT evidence of completeness — only the absence of one
+        // disproof. This command checks no content hashes, signatures,
+        // provenance or parent existence, so an archive that drops one original
+        // row and adds one well-formed row has the same cardinality and would
+        // otherwise read as verified.
+        //
+        // So a cardinality commitment can refute completeness and can never
+        // establish it, and `Pass` stays unreachable until icn#2786 chooses a
+        // commitment that actually binds identity (a digest accumulator over
+        // entry ids, say) rather than a count.
+        Some(_) => VerificationStatus::Unresolved,
+    };
+
+    Ok(LedgerCheck {
+        entries: entry_count,
+        currencies_balanced: currencies_seen.len(),
+        expected_entries,
+        completeness,
+    })
 }
 
 /// Calculate SHA256 checksum of all files in a directory
@@ -7526,11 +8584,22 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
         }
 
         SnapshotCommands::Verify { snapshot } => {
-            let snapshot_name = snapshot.unwrap_or_else(|| "state.snapshot".to_string());
+            // Same containment boundary as `delete`. `verify` only reads, but it
+            // reached the filesystem through the identical unvalidated join, and
+            // it distinguished "no such file" from "file present but
+            // unchecksummed" — an existence oracle for paths outside the store.
+            // One rule for what a snapshot identifier is, enforced in one place
+            // (#2779).
+            let snapshot_name = match snapshot {
+                Some(raw) => icn_snapshot::SnapshotName::parse(&raw)
+                    .map_err(|e| anyhow::anyhow!("{e}"))
+                    .context("Refusing to verify: not a valid snapshot identifier")?,
+                None => icn_snapshot::SnapshotName::primary(),
+            };
             println!("{} {snapshot_name}", t!("cli.snapshot.verify.verifying"));
 
             // Verify the snapshot (main or timestamped)
-            let verify_result = if snapshot_name == "state.snapshot" {
+            let verify_result = if snapshot_name.is_primary() {
                 icn_snapshot::verify_snapshot(&store_dir)
             } else {
                 icn_snapshot::verify_timestamped_snapshot(&store_dir, &snapshot_name)
@@ -7541,7 +8610,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                     println!("✓ {}", t!("cli.snapshot.verify.valid"));
 
                     // Load and display info
-                    let load_result = if snapshot_name == "state.snapshot" {
+                    let load_result = if snapshot_name.is_primary() {
                         icn_snapshot::load_snapshot(&store_dir)
                     } else {
                         icn_snapshot::load_timestamped_snapshot(&store_dir, &snapshot_name)
@@ -7579,10 +8648,22 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
         }
 
         SnapshotCommands::Delete { snapshot } => {
+            // The operator's string becomes a filesystem path exactly once, and
+            // only after `SnapshotName` has proven it names a single file inside
+            // the store (#2779). Validation runs before the announcement, so a
+            // refused argument is never reported as being acted on.
+            // The context stays neutral on purpose: `parse` also refuses an
+            // in-store name that simply is not a snapshot (`foo.txt`), and
+            // calling that "outside the snapshot store" would tell the operator
+            // the wrong reason. The variant-specific message carries the detail.
+            let snapshot = icn_snapshot::SnapshotName::parse(&snapshot)
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .context("Refusing to delete: not a valid snapshot identifier")?;
+
             println!("{} {snapshot}", t!("cli.snapshot.delete.deleting"));
 
-            let snapshot_path = store_dir.join(&snapshot);
-            let checksum_path = store_dir.join(format!("{snapshot}.sha256"));
+            let snapshot_path = snapshot.path_in(&store_dir);
+            let checksum_path = snapshot.checksum_path_in(&store_dir);
 
             if !snapshot_path.exists() {
                 bail!("Snapshot not found: {}", snapshot_path.display());
@@ -8095,22 +9176,29 @@ async fn handle_init_coop_command(
         println!("Step 1: Creating new identity");
         std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
-        print!("Choose a passphrase: ");
-        io::stdout().flush()?;
-        let passphrase1 = rpassword::read_password()?;
-
-        print!("Confirm passphrase: ");
-        io::stdout().flush()?;
-        let passphrase2 = rpassword::read_password()?;
-
-        if passphrase1 != passphrase2 {
-            bail!("Passphrases do not match");
-        }
-        if passphrase1.len() < 8 {
+        // Sourced through the shared helper, so `ICN_KEYSTORE_PASSPHRASE` and
+        // the legacy `ICN_PASSPHRASE` work here exactly as they already do on
+        // the existing-identity branch above and in `id init` (#2727). This
+        // branch used to call `rpassword` directly, which made the one command
+        // intended for first-run setup the one command that could not be run
+        // without a terminal.
+        //
+        // On the environment arm the helper returns the configured value
+        // without asking for a second entry, so its "passphrases do not match"
+        // check is vacuous there *by construction* — confirming a variable
+        // against itself would prove nothing. A human at a terminal is still
+        // prompted twice and still rejected on a mismatch.
+        //
+        // The minimum length is enforced HERE rather than inside the helper on
+        // purpose. `id init` shares that helper and has deliberately never
+        // imposed a minimum, so moving this rule down would quietly change an
+        // unrelated command's contract. Checking the returned value — instead
+        // of the prompt's input — is what keeps the rule binding on the
+        // environment arm as well as the interactive one.
+        let passphrase = Zeroizing::new(confirm_passphrase()?);
+        if passphrase.len() < 8 {
             bail!("Passphrase must be at least 8 characters");
         }
-
-        let passphrase = Zeroizing::new(passphrase1.into_bytes());
 
         // Initialize keystore (generates keypair internally)
         let keystore = AgeKeyStore::init(&keystore_path, &passphrase)?;
@@ -8178,7 +9266,7 @@ async fn handle_init_coop_command(
     println!();
 
     // Step 4: Create configuration file
-    let config_path = data_dir.join("icn.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     if !config_path.exists() {
         println!("Step 3: Creating configuration");
         let config_content = format!(
@@ -8347,9 +9435,16 @@ token_expiry_hours = 24
     println!();
 
     // Step 7: Create trust edges for initial members
-    let store_path = get_store_path(data_dir);
-    std::fs::create_dir_all(&store_path)?;
-    let store = SledStore::open(&store_path).context("Failed to open store")?;
+    //
+    // The daemon reads trust state from `<data_dir>/store/trust`. This opened
+    // `<data_dir>/store` — the directory that *contains* the per-domain stores —
+    // so every bootstrap edge the wizard reported creating went into a separate
+    // sled database `icnd` never opens, and the node started with an empty trust
+    // graph (#2718). The path is now resolved through the same `icn-core` helper
+    // the daemon uses, so the two cannot drift apart again.
+    let trust_store_path = icn_core::config::trust_store_path(data_dir);
+    std::fs::create_dir_all(&trust_store_path)?;
+    let store = SledStore::open(&trust_store_path).context("Failed to open trust store")?;
     let store = Arc::new(store);
     let mut trust_graph = TrustGraph::new(store, my_did.clone());
 
@@ -9065,14 +10160,14 @@ async fn handle_steward_command(
             println!("======================\n");
 
             // Read config to check if steward is enabled
-            let config_path = data_dir.join("config.toml");
+            let config_path = icn_core::config::config_file_path(data_dir);
             if config_path.exists() {
                 let config_content = std::fs::read_to_string(&config_path)?;
                 if config_content.contains("steward") && config_content.contains("enabled = true") {
                     println!("Status:     ENABLED");
                 } else {
                     println!("Status:     DISABLED");
-                    println!("\nTo enable steward mode, add to config.toml:");
+                    println!("\nTo enable steward mode, add to icn.toml:");
                     println!("  [steward]");
                     println!("  enabled = true");
                     println!("  vui_threshold = 3");
@@ -9080,7 +10175,7 @@ async fn handle_steward_command(
                     return Ok(());
                 }
             } else {
-                println!("Status:     DISABLED (no config.toml found)");
+                println!("Status:     DISABLED (no icn.toml found)");
                 return Ok(());
             }
 
@@ -9114,9 +10209,9 @@ async fn handle_steward_command(
             println!("=====================\n");
 
             // Read config
-            let config_path = data_dir.join("config.toml");
+            let config_path = icn_core::config::config_file_path(data_dir);
             if !config_path.exists() {
-                println!("No config.toml found at {}", config_path.display());
+                println!("No icn.toml found at {}", config_path.display());
                 println!("\nDefault steward configuration:");
                 print_default_steward_config();
                 return Ok(());
@@ -9162,12 +10257,12 @@ async fn handle_steward_command(
                         token_validity / 86400
                     );
                 } else {
-                    println!("No [steward] section in config.toml");
+                    println!("No [steward] section in icn.toml");
                     println!("\nDefault configuration:");
                     print_default_steward_config();
                 }
             } else {
-                println!("No [steward] section in config.toml");
+                println!("No [steward] section in icn.toml");
                 println!("\nDefault configuration:");
                 print_default_steward_config();
             }
@@ -9494,7 +10589,7 @@ async fn handle_steward_command(
             // Note: In a full implementation, this would query the steward network
             // For now, we just validate the input and print a placeholder
             println!("\n⚠️  VUI registry check requires running steward daemon.");
-            println!("   Start daemon with steward enabled in config.toml");
+            println!("   Start daemon with steward enabled in icn.toml");
         }
 
         StewardCommands::StartEnrollment {
@@ -12190,7 +13285,7 @@ async fn handle_preflight_command(
 
     // Check 3: Config file (optional)
     check_count += 1;
-    let config_path = data_dir.join("config.toml");
+    let config_path = icn_core::config::config_file_path(data_dir);
     print!("  [{}] Config file... ", if skip_keystore { 2 } else { 4 });
     if config_path.exists() {
         // Try to parse it
@@ -12726,5 +13821,113 @@ mod audit_verify_tests {
                 .any(|c| c.name == "Journal provenance matches decision" && !c.passed),
             "mismatched decision_hash must fail check 13"
         );
+    }
+}
+
+/// #2749 review tranche: local configuration writers and the `.icn-config.lock`
+/// exclusion domain.
+#[cfg(test)]
+mod managed_config_edit_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::{ManagedConfigEdit, MissingConfig};
+    use std::path::Path;
+
+    /// Write a configuration that already carries a `[cooperative]` linkage,
+    /// standing in for one a runtime-root ceremony has published.
+    fn config_with_cooperative(root: &Path) {
+        let config = icn_core::Config {
+            data_dir: root.to_path_buf(),
+            ..Default::default()
+        };
+        let mut doc: toml::Value = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
+        let table = doc.as_table_mut().unwrap();
+        let mut coop = toml::value::Table::new();
+        coop.insert("id".into(), toml::Value::String("coop-under-test".into()));
+        coop.insert(
+            "treasury_did".into(),
+            toml::Value::String("did:icn:treasury-under-test".into()),
+        );
+        table.insert("cooperative".into(), toml::Value::Table(coop));
+        std::fs::write(root.join("icn.toml"), toml::to_string(&doc).unwrap()).unwrap();
+    }
+
+    /// The edit holds the exclusive configuration lock for its whole lifetime —
+    /// load through write, not merely around the write.
+    ///
+    /// That span is the property: a writer that loaded before a ceremony
+    /// published and wrote afterwards would revert `[cooperative]` from its
+    /// stale snapshot. Taking the lock only around `to_file` would not prevent
+    /// it, because the snapshot is already stale by then.
+    #[test]
+    fn an_open_edit_excludes_another_writer_for_its_whole_lifetime() {
+        let dir = tempfile::TempDir::new().unwrap();
+        config_with_cooperative(dir.path());
+
+        let edit = ManagedConfigEdit::open(dir.path(), "witness writer A", MissingConfig::Refuse)
+            .expect("the first writer must be admitted");
+
+        // A second writer, while the first is still open — i.e. exactly the
+        // window in which a stale snapshot would be formed.
+        let second = ManagedConfigEdit::open(dir.path(), "witness writer B", MissingConfig::Refuse);
+        assert!(
+            second.is_err(),
+            "a second configuration writer must be refused while an edit is open"
+        );
+
+        // And admitted again once the first commits and releases.
+        edit.commit().expect("the first writer must commit");
+        ManagedConfigEdit::open(dir.path(), "witness writer C", MissingConfig::Refuse)
+            .expect("a writer must be admitted once the lock is released");
+    }
+
+    /// A legitimate edit preserves a `[cooperative]` linkage it did not author.
+    ///
+    /// `Config` round-trips the whole file, so this is not free: a writer that
+    /// dropped unknown or unmodified sections would lose the treasury linkage
+    /// even without any concurrency.
+    #[test]
+    fn an_edit_preserves_the_cooperative_linkage_it_did_not_author() {
+        let dir = tempfile::TempDir::new().unwrap();
+        config_with_cooperative(dir.path());
+
+        let mut edit =
+            ManagedConfigEdit::open(dir.path(), "witness federation add", MissingConfig::Refuse)
+                .unwrap();
+        edit.config
+            .network
+            .bootstrap_peers
+            .push("icn://did:icn:peer@10.0.0.1:9000".to_string());
+        edit.commit().unwrap();
+
+        let written = std::fs::read_to_string(dir.path().join("icn.toml")).unwrap();
+        let doc: toml::Value = toml::from_str(&written).unwrap();
+        let coop = doc
+            .get("cooperative")
+            .expect("the cooperative linkage must survive an unrelated edit");
+        assert_eq!(
+            coop.get("treasury_did").and_then(|v| v.as_str()),
+            Some("did:icn:treasury-under-test"),
+            "the treasury linkage must survive an unrelated edit"
+        );
+        // ...and the writer's own change must be there too.
+        assert!(
+            written.contains("icn://did:icn:peer@10.0.0.1:9000"),
+            "the writer's own change must be present: {written}"
+        );
+    }
+
+    /// `MissingConfig` is the only thing that decides what an absent
+    /// configuration means, and it decides it *under* the lock.
+    #[test]
+    fn an_absent_configuration_is_refused_or_defaulted_per_caller() {
+        let dir = tempfile::TempDir::new().unwrap();
+        assert!(
+            ManagedConfigEdit::open(dir.path(), "witness remove", MissingConfig::Refuse).is_err(),
+            "a writer that requires an existing configuration must refuse"
+        );
+        // The refusal must not have retained the lock.
+        ManagedConfigEdit::open(dir.path(), "witness add", MissingConfig::StartFromDefaults)
+            .expect("a writer that starts from defaults must be admitted");
     }
 }

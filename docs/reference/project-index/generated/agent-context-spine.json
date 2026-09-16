@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-09-01T03:15:37+00:00",
-  "source_commit": "c55a1cadf01902b1d78c420d7e7bb2d2f700e3f1",
+  "generated": "2026-09-11T08:34:20+00:00",
+  "source_commit": "fbd337ff3dd1cb08f5896af3a21c94dfe0193b2e",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -36,7 +36,7 @@
   ],
   "counts": {
     "nodes": 145,
-    "edges": 92
+    "edges": 93
   },
   "nodes": [
     {
@@ -2004,7 +2004,7 @@
       "match_kind": "prefix",
       "description": "Code-quality brief for changes under `scripts/`.",
       "review_focus": [
-        "Python standard library by default; declared dependencies in scripts/requirements.txt",
+        "Python standard library only; dependency-free",
         "Deterministic output; --check drift mode stays correct",
         "No overclaim language emitted into generated artifacts"
       ],
@@ -2720,6 +2720,26 @@
       ]
     },
     {
+      "id": "truth_source:engineering_leverage",
+      "type": "truth_source",
+      "name": "engineering_leverage",
+      "owner": "ops/state/truth/engineering-leverage.json",
+      "description": "Systemic-leverage behaviour: the causal escalation an engineering agent performs after ESTABLISHING a defect (symptom / reproduction / immediate cause / enabling mechanism / local repair / regression witness), the closed disposition vocabulary NOW | FOLLOW_UP | ARCHITECTURAL | NONE, and the evidence-backed catalogue of recurring defect classes with their preferred structural responses",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/truth/engineering-leverage.json",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
       "id": "truth_source:identity_semantics",
       "type": "truth_source",
       "name": "identity_semantics",
@@ -2859,26 +2879,6 @@
         },
         {
           "source": "ops/state/truth/delivery.json",
-          "kind": "truth-owner"
-        }
-      ]
-    },
-    {
-      "id": "truth_source:program_structure",
-      "type": "truth_source",
-      "name": "program_structure",
-      "owner": "ops/state/truth/program.json",
-      "description": "NARROW DOMAIN: the Organizational Technical Alpha programme STRUCTURE and status routing -- waves, lanes, bounded slices, the semantic-alpha vertical order, and the semantic distinctions that must not collapse. It owns SEQUENCING AND ROUTING ONLY and never restates a fact another owner holds: identity semantics live in docs/architecture/IDENTITY_SEMANTICS.md, live PR/issue state is a live query, and per-PR lifecycle belongs to pr_delivery_lifecycle. icn#2689 remains the human-facing router and checkpoint log; this file is the machine-readable structure behind it, so a cold-start agent can reconstruct the programme without chat history. Read the owner for the current value -- this map routes the question, it does not answer it.",
-      "stability": "evolving",
-      "source_of_truth": "ops/state/truth/sources.json",
-      "status": "present",
-      "evidence": [
-        {
-          "source": "ops/state/truth/sources.json",
-          "kind": "truth-domain"
-        },
-        {
-          "source": "ops/state/truth/program.json",
           "kind": "truth-owner"
         }
       ]
@@ -3143,6 +3143,14 @@
       "type": "depends_on",
       "evidence": {
         "source": "icn/crates/icn-testkit/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icnctl",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/bins/icnctl/Cargo.toml"
       }
     },
     {

@@ -58,6 +58,7 @@ pub mod credit_policy;
 pub mod dispute;
 pub mod dynamic_limits;
 pub mod entry;
+pub mod entry_validation;
 #[allow(missing_docs)]
 pub mod error;
 pub mod events;
@@ -74,6 +75,7 @@ pub mod merge;
 pub mod obligation;
 pub mod oracle;
 pub mod patronage;
+pub mod principal_rows;
 pub mod progressive_limits;
 pub mod quarantine;
 pub mod settlement;
@@ -92,12 +94,13 @@ pub use dynamic_limits::{
     AccountLimitState, DynamicCreditLimitManager, DynamicLimitConfig, LimitChangeEvent,
     LimitChangeReason,
 };
+pub use entry_validation::{inspect_entry, EntryDefect, EntryIntrinsics};
 pub use error::{LedgerError, Result};
 pub use fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
 };
 pub use freeze::{FreezeManager, FrozenMember, UnfreezeEvent};
-pub use ledger::{ForkStats, Ledger, PaginationCursor};
+pub use ledger::{ForkStats, Ledger, PaginationCursor, DEFAULT_MIN_TRUST_FOR_ENTRY};
 pub use membership::{MembershipStore, SledMembershipStore};
 pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
 pub use obligation::{Obligation, ObligationId, ObligationRegistry, ObligationState};

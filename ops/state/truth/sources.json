@@ -36,6 +36,13 @@
       "not_owned_here": "Merge requirements and merge-mutation semantics stay with merge_policy (ops/state/truth/policy.json#merge) and its executable, tools/icn-merge-pr",
       "checker": "scripts/check-delivery-lifecycle.py"
     },
+    "engineering_leverage": {
+      "owner": "ops/state/truth/engineering-leverage.json",
+      "stability": "slow-changing",
+      "description": "Systemic-leverage behaviour: the causal escalation an engineering agent performs after ESTABLISHING a defect (symptom / reproduction / immediate cause / enabling mechanism / local repair / regression witness), the closed disposition vocabulary NOW | FOLLOW_UP | ARCHITECTURAL | NONE, and the evidence-backed catalogue of recurring defect classes with their preferred structural responses",
+      "not_owned_here": "Lifecycle states, the blocker predicate, freeze entry and follow-up ledger mechanics stay with pr_delivery_lifecycle (ops/state/truth/delivery.json). A systemic-leverage finding is never authority to widen an acceptance contract, reopen a frozen PR, or satisfy the blocker predicate; if the two disagree, delivery.json wins",
+      "checker": "scripts/check-engineering-leverage.py"
+    },
     "agent_operating_contract": {
       "owner": "AGENTS.md",
       "sections": [

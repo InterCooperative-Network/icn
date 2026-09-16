@@ -19,6 +19,25 @@ pub enum InstitutionCommands {
         #[command(subcommand)]
         command: InstitutionBootstrapCommands,
     },
+
+    /// Provision the institutional runtime root: durable cooperative state, a
+    /// distinct genesis trust-root Principal, a distinct treasury Principal,
+    /// the trust relationships the ledger's author path needs, and the
+    /// configuration linkage that makes the daemon consume that treasury
+    /// (#2744).
+    ///
+    /// This is **not** canonical Institution genesis under
+    /// `docs/architecture/IDENTITY_SEMANTICS.md`: it creates no `EntityId` and
+    /// persists no signed founding act.
+    ///
+    /// Unlike `bootstrap`, which drives a *running* node's gateway and
+    /// therefore needs the institution to already exist in order to
+    /// authenticate, this is a local ceremony run with the daemon stopped.
+    #[command(name = "runtime-root")]
+    RuntimeRoot {
+        #[command(subcommand)]
+        command: crate::institution_runtime_root::InstitutionRuntimeRootCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -203,6 +222,11 @@ pub async fn handle_institution_command(cmd: InstitutionCommands, data_dir: &Pat
                 }
             }
         },
+        InstitutionCommands::RuntimeRoot { command } => {
+            crate::institution_runtime_root::handle_institution_runtime_root_command(
+                command, data_dir,
+            )?
+        }
     }
 
     Ok(())
@@ -1375,6 +1399,28 @@ async fn get_bootstrap_gateway_token(
         .context("Failed to verify auth challenge")?;
 
     if !verify_resp.status().is_success() {
+        // A 403 here is the gateway working as designed, not a misconfiguration
+        // to hunt: `verify_challenge` fails closed on a caller-supplied
+        // `coop_id` unless a dev posture is enabled (icn#2075). Proving you own
+        // a DID does not authorize that DID to act for an arbitrary
+        // cooperative. Say so, rather than leaving an operator to infer it from
+        // a bare status code.
+        //
+        // Deliberately not a pre-flight refusal: this command cannot know the
+        // gateway's posture without asking it, and a dev/demo deployment where
+        // self-asserted coop authority *is* enabled must keep working.
+        if verify_resp.status().as_u16() == 403 && !local_mint {
+            bail!(
+                "The gateway refused this cooperative claim (403).\n\
+                 Proving this node owns its DID does not authorize it to act for cooperative \
+                 {coop_id}: production gateways fail closed on a self-asserted coop claim \
+                 (icn#2075), and nothing has issued this node a trusted grant for it.\n\
+                 Provisioning a runtime root does not issue one either — hosting a founding is \
+                 not membership in the cooperative founded.\n\
+                 Use trusted local issuance (`--local-mint`, which signs with this node's own \
+                 gateway secret) or obtain a token through a trusted issuance path."
+            );
+        }
         bail!(
             "Failed to get bootstrap auth token: {}",
             verify_resp.status()

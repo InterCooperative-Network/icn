@@ -454,4 +454,134 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::BAD_REQUEST);
     }
+
+    /// A second, equally valid textual encoding of the principal `did` names.
+    ///
+    /// `did:icn:` identifiers are multibase, so one set of 32 identifier bytes
+    /// has a base58btc spelling and a base16 spelling. Both parse; both decode
+    /// to one principal. This is the construction the ledger, federation and
+    /// CCL I7 proofs use.
+    fn alternate_spelling(did: &icn_identity::Did) -> icn_identity::Did {
+        let bytes = did.identifier_bytes().unwrap();
+        let alias =
+            icn_identity::Did::from_str(&format!("did:icn:f{}", hex::encode(bytes))).unwrap();
+        assert_ne!(
+            did.as_str(),
+            alias.as_str(),
+            "the two spellings must differ, or the test proves nothing"
+        );
+        assert_eq!(did, &alias, "the two spellings must name one principal");
+        alias
+    }
+
+    /// The production exploit path for #2627 M3.
+    ///
+    /// Both authorization gates on `PUT /v1/members/{coop_id}/{did}/profile`
+    /// compare `Did`s, which name principals since I7, so an alternate spelling
+    /// of an enrolled member is correctly authorized. Downstream,
+    /// `update_display_name` decided holder existence with an exact-key lookup
+    /// on the spelling and derived the new holder's durable id from the
+    /// spelling's bytes — so before M3 the authorized alias request minted a
+    /// *second* weak `CommonsHolderRecord` for one principal (inventory #65).
+    #[actix_web::test]
+    async fn an_alias_spelled_profile_update_cannot_mint_a_second_weak_holder() {
+        let coop_manager = Arc::new(CoopManager::new());
+        let commons_manager = create_test_commons_manager();
+
+        let coop_id = "test-coop";
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let a = keypair.did().clone();
+        let b = alternate_spelling(&a);
+
+        coop_manager
+            .create_coop(
+                coop_id.to_string(),
+                "Test".to_string(),
+                a.clone(),
+                icn_time::current_timestamp_secs(),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(coop_manager))
+                .app_data(web::Data::new(commons_manager.clone()))
+                .service(update_member_profile),
+        )
+        .await;
+
+        // The member enrolls a display name under the spelling they were added
+        // with. This mints the one weak holder they are entitled to.
+        let req = test::TestRequest::put()
+            .uri(&format!("/{coop_id}/{a}/profile"))
+            .set_json(UpdateProfileRequest {
+                display_name: "Alice".to_string(),
+            })
+            .to_request();
+        req.extensions_mut()
+            .insert(create_test_claims(&a.to_string(), vec!["coop:write"]));
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+
+        let first = commons_manager
+            .get_holder_by_did(&a)
+            .await
+            .unwrap()
+            .expect("the first spelling minted a weak holder");
+
+        // The same principal, spelled the other way, in both the path and the
+        // JWT subject.
+        let req = test::TestRequest::put()
+            .uri(&format!("/{coop_id}/{b}/profile"))
+            .set_json(UpdateProfileRequest {
+                display_name: "Mallory".to_string(),
+            })
+            .to_request();
+        req.extensions_mut()
+            .insert(create_test_claims(&b.to_string(), vec!["coop:write"]));
+        let resp = test::call_service(&app, req).await;
+
+        // The two gates upstream of the mint accept the alias — that is I7
+        // behaving correctly, and is why the defect is reachable at all.
+        assert_ne!(
+            resp.status(),
+            actix_web::http::StatusCode::FORBIDDEN,
+            "the self-service gate compares principals and must accept the alias"
+        );
+        assert_ne!(
+            resp.status(),
+            actix_web::http::StatusCode::NOT_FOUND,
+            "the membership gate compares principals and must accept the alias"
+        );
+        // The mint below them refuses. The route maps the refusal through the
+        // pre-existing `InternalError` arm; M3 does not restate that mapping.
+        assert!(
+            resp.status().is_server_error(),
+            "the alias request must not succeed, got {}",
+            resp.status()
+        );
+
+        // No mutation happened: the first holder is untouched and no second
+        // holder exists under the alias.
+        let after = commons_manager
+            .get_holder_by_did(&a)
+            .await
+            .unwrap()
+            .expect("the first holder survives a refused alias request");
+        assert_eq!(after.id(), first.id(), "the first holder was not re-keyed");
+        assert_eq!(
+            after.display_name.as_deref(),
+            Some("Alice"),
+            "a refused request must not have written a display name"
+        );
+        assert!(
+            commons_manager
+                .get_holder_by_did(&b)
+                .await
+                .unwrap()
+                .is_none(),
+            "no second holder may exist for this principal"
+        );
+    }
 }

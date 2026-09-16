@@ -16,6 +16,7 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     # Job-level elevation: the "Create issue on failure" step (github-script
     # → issues.create / createComment) needs issues:write. Kept here, not at
     # workflow level, so the top-level contents:read default stays minimal.
@@ -37,11 +38,20 @@ jobs:
           cargo install cargo-deny --locked
           cargo install cargo-outdated --locked
 
+      # Each gate runs independently and reports its own outcome. Before this,
+      # `cargo audit` exiting non-zero ended the job, so `cargo deny check`
+      # never ran at all — the deny gates were silently skipped for every week
+      # the audit was red (2026-08-17 onward). continue-on-error keeps the step
+      # from ending the job; the aggregation step below is what actually fails.
       - name: Run cargo-audit
+        id: audit
+        continue-on-error: true
         run: cargo audit
         working-directory: ./icn
 
       - name: Run cargo-deny full check
+        id: deny
+        continue-on-error: true
         run: cargo deny check
         working-directory: ./icn
 
@@ -49,6 +59,27 @@ jobs:
         run: cargo outdated --workspace --depth 1
         working-directory: ./icn
         continue-on-error: true  # Informational only
+
+      # The real gate. Runs even when an earlier step failed, so a single run
+      # reports the full set of security results rather than only the first
+      # failure. Any non-success outcome fails the job.
+      - name: Security gate result
+        if: always()
+        env:
+          AUDIT: ${{ steps.audit.outcome }}
+          DENY: ${{ steps.deny.outcome }}
+        run: |
+          echo "cargo audit ......... ${AUDIT}"
+          echo "cargo deny check .... ${DENY}"
+          failed=0
+          for result in "${AUDIT}" "${DENY}"; do
+            [ "${result}" = "success" ] || failed=1
+          done
+          if [ "${failed}" -ne 0 ]; then
+            echo "::error::One or more security gates failed. Every gate above ran independently; fix each non-success result."
+            exit 1
+          fi
+          echo "All security gates passed."
 
       - name: Create issue on failure
         if: failure()

@@ -599,17 +599,50 @@ jobs:
           cargo install cargo-audit --locked
           cargo install cargo-deny --locked
 
+      # Each gate runs independently and reports its own outcome. Before this,
+      # `cargo audit` exiting non-zero ended the job, so neither cargo-deny gate
+      # ran — an advisory failure silently took the licenses gate with it.
+      # continue-on-error keeps a step from ending the job; the aggregation step
+      # below is what actually fails.
       - name: Run cargo-audit
+        id: audit
+        continue-on-error: true
         run: cargo audit
         working-directory: ./icn
 
       - name: Run cargo-deny advisories check
+        id: deny_advisories
+        continue-on-error: true
         run: cargo deny check advisories
         working-directory: ./icn
 
       - name: Run cargo-deny licenses check
+        id: deny_licenses
+        continue-on-error: true
         run: cargo deny check licenses
         working-directory: ./icn
+
+      # The real gate. Runs even when an earlier step failed, so a single run
+      # reports every security result rather than only the first failure.
+      - name: Security gate result
+        if: always()
+        env:
+          AUDIT: ${{ steps.audit.outcome }}
+          DENY_ADVISORIES: ${{ steps.deny_advisories.outcome }}
+          DENY_LICENSES: ${{ steps.deny_licenses.outcome }}
+        run: |
+          echo "cargo audit ..................... ${AUDIT}"
+          echo "cargo deny check advisories ..... ${DENY_ADVISORIES}"
+          echo "cargo deny check licenses ....... ${DENY_LICENSES}"
+          failed=0
+          for result in "${AUDIT}" "${DENY_ADVISORIES}" "${DENY_LICENSES}"; do
+            [ "${result}" = "success" ] || failed=1
+          done
+          if [ "${failed}" -ne 0 ]; then
+            echo "::error::One or more security gates failed. Every gate above ran independently; fix each non-success result."
+            exit 1
+          fi
+          echo "All security gates passed."
 
   build:
     name: Build Release
@@ -681,9 +714,15 @@ jobs:
       # incl. docs-only — examples/ are not covered by tsc (rootDir: src). Needs
       # only python3 (preinstalled). See sdk/typescript/check_sdk_doc_terms.py and
       # docs/adr/ADR-0006.
+      #
+      # Independent of the build/typecheck/test chain below: a vocabulary nit in
+      # an example must not skip `npm run build`, `typecheck:examples` and
+      # `npm test` on a required check. continue-on-error records the outcome
+      # without ending the job; the gate at the end of this job is what fails.
       - name: SDK docs use canonical ICN ledger primitives (no pay/balance/escrow as current)
+        id: sdk_doc_terms
+        continue-on-error: true
         run: python3 check_sdk_doc_terms.py --sdk-root .
-        continue-on-error: false
 
       - name: Free disk space
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
@@ -717,6 +756,20 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         # All SDK tests use mockFetch — no gateway required. Gate is blocking.
         run: npm test
+
+      # Fails the job on a docs-vocabulary violation. Runs with always() so the
+      # vocabulary result is reported even when the build/test chain above has
+      # already failed — one run, both signals.
+      - name: SDK gate result
+        if: always()
+        env:
+          DOC_TERMS: ${{ steps.sdk_doc_terms.outcome }}
+        run: |
+          echo "SDK docs vocabulary ..... ${DOC_TERMS}"
+          if [ "${DOC_TERMS}" != "success" ]; then
+            echo "::error::SDK docs/examples use non-canonical ledger vocabulary. See sdk/typescript/check_sdk_doc_terms.py and docs/adr/ADR-0006."
+            exit 1
+          fi
 
   web-ui:
     name: Web UI

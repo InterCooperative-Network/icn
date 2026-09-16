@@ -18,9 +18,13 @@
 
 use crate::balance::compute_all_balances;
 use crate::ledger::{Ledger, BALANCE_PREFIX, CLEARED_VOLUME_PREFIX};
+use crate::principal_rows::{
+    refuse_unless_one_spelling_per_principal, PrincipalRowsRefusal, BALANCE_KEYSPACE,
+    CLEARED_VOLUME_KEYSPACE,
+};
 use crate::types::AccountBalances;
 use anyhow::Result;
-use icn_identity::Did;
+use icn_identity::{identifier_bytes_of_spelling, Did};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
@@ -147,9 +151,16 @@ pub(crate) fn recompute_balances(ledger: &mut Ledger) -> Result<()> {
         );
     }
 
-    // Safe to apply - journal hasn't changed during our computation
-    ledger.cached_balances = balances;
-    ledger.cleared_volume_index = cleared_volumes;
+    // Safe to apply - journal hasn't changed during our computation.
+    //
+    // The recomputed maps are keyed by the spelling the *journal entries*
+    // carry, which need not be the spelling the persisted row uses. Writing
+    // them straight back would put the same principal's state under a second
+    // key and strand the first row, manufacturing the collision the loader
+    // refuses. Adopt the stored spelling wherever the store already has one.
+    ledger.cached_balances = adopt_stored_balance_spellings(&ledger.cached_balances, balances);
+    ledger.cleared_volume_index =
+        adopt_stored_volume_spellings(&ledger.cleared_volume_index, cleared_volumes);
     save_cached_balances(ledger)?;
     save_cleared_volume_index(ledger)?;
 
@@ -210,8 +221,62 @@ pub(crate) fn load_cached_balances(ledger: &mut Ledger) -> Result<()> {
     let prefix = BALANCE_PREFIX.as_bytes();
     let pairs = ledger.store.scan(prefix)?;
 
-    for (_key, value) in pairs {
-        let balances: AccountBalances = serde_json::from_slice(&value)?;
+    // Read every row, and classify the whole keyspace, before one of them
+    // reaches `cached_balances`. `HashMap::insert` would otherwise collapse two
+    // spellings of one principal into a single entry whose key came from one
+    // row and whose value came from another — see `crate::principal_rows`.
+    // `pairs` is consumed, not borrowed: each raw key and value is dropped as
+    // soon as it has been parsed into the classification representation, so
+    // the guard holds the parsed rows only, never a second copy of the scan.
+    let mut rows = Vec::with_capacity(pairs.len());
+    let mut unsplittable = 0usize;
+    for (key, value) in pairs {
+        // The key decides the row's fate first: a row whose key is not the
+        // writer's shape is refused as such, and its value is never read, so
+        // a malformed value beside an unreadable key cannot turn the typed
+        // refusal into a parse error.
+        match balance_key_spelling(&key) {
+            Some(spelling) => {
+                let balances: AccountBalances = serde_json::from_slice(&value)?;
+                rows.push((spelling, balances));
+            }
+            None => unsplittable += 1,
+        }
+    }
+
+    // A key that is not the shape `save_cached_balances` writes is evidence
+    // of corruption or tampering, and a classification computed without it
+    // proves nothing; refuse before the guard runs.
+    if unsplittable > 0 {
+        return Err(PrincipalRowsRefusal::UnreadableKey {
+            keyspace: BALANCE_KEYSPACE,
+            rows: unsplittable,
+        }
+        .into());
+    }
+
+    refuse_unless_one_spelling_per_principal(
+        BALANCE_KEYSPACE,
+        rows.iter().map(|(spelling, _)| (spelling.as_str(), "")),
+    )?;
+
+    // A row whose key names the account differently from the row's own
+    // `account_id` is the residue of a rebuild that already collapsed two
+    // spellings and wrote the survivor's balances under the loser's key.
+    // Loading it would adopt one row's money under another row's name.
+    let strayed = rows
+        .iter()
+        .filter(|(spelling, balances)| balances.account_id.as_str() != spelling)
+        .count();
+    if strayed > 0 {
+        return Err(PrincipalRowsRefusal::KeyValueSpellingMismatch {
+            keyspace: BALANCE_KEYSPACE,
+            rows: strayed,
+        }
+        .into());
+    }
+
+    for (_spelling, balances) in rows {
         ledger
             .cached_balances
             .insert(balances.account_id.clone(), balances);
@@ -219,6 +284,84 @@ pub(crate) fn load_cached_balances(ledger: &mut Ledger) -> Result<()> {
 
     debug!("Loaded {} cached balances", ledger.cached_balances.len());
     Ok(())
+}
+
+/// Re-key a recomputed balance map onto the spellings the store already holds.
+///
+/// `HashMap::get_key_value` finds the entry by principal (I7 equality) and
+/// hands back the *stored* key, so the write-back that follows addresses the
+/// row that already exists instead of opening a second one. The row's own
+/// `account_id` is moved with it, because a row whose key and contents spell
+/// the account differently is exactly what `load_cached_balances` refuses.
+fn adopt_stored_balance_spellings(
+    stored: &HashMap<Did, AccountBalances>,
+    computed: HashMap<Did, AccountBalances>,
+) -> HashMap<Did, AccountBalances> {
+    computed
+        .into_iter()
+        .map(|(did, mut balances)| match stored.get_key_value(&did) {
+            Some((stored_did, _)) => {
+                balances.account_id = stored_did.clone();
+                (stored_did.clone(), balances)
+            }
+            None => (did, balances),
+        })
+        .collect()
+}
+
+/// The cleared-volume counterpart of [`adopt_stored_balance_spellings`].
+///
+/// The currency travels with the principal because it is part of the row
+/// identity, not part of the account.
+fn adopt_stored_volume_spellings(
+    stored: &HashMap<(Did, String), i64>,
+    computed: HashMap<(Did, String), i64>,
+) -> HashMap<(Did, String), i64> {
+    computed
+        .into_iter()
+        .map(|(key, volume)| match stored.get_key_value(&key) {
+            Some((stored_key, _)) => (stored_key.clone(), volume),
+            None => (key, volume),
+        })
+        .collect()
+}
+
+/// The DID spelling inside a `ledger:balance:` key, or `None` for a key the
+/// writer could not have produced.
+///
+/// `save_cached_balances` builds the key with `serde_json::to_string`, so the
+/// remainder is exactly that one encoding of one JSON string. Two things are
+/// therefore not this keyspace's shape and are refused rather than adopted:
+///
+/// * a remainder that is not a JSON string at all — a bare spelling without
+///   the quotes, a truncated or foreign key. A bare spelling *decodes*, so a
+///   lenient parser would have handed the guard a row nothing in this crate
+///   wrote;
+/// * a remainder that decodes but is not the canonical encoding — JSON admits
+///   `\u003a` for `:`, say. Such a key is a second *byte row* for the same
+///   spelling: the guard, which groups by spelling, would see one row where
+///   the store holds two with possibly conflicting balances, the map would
+///   keep one, and the non-canonical row would survive every write-back. The
+///   row identity here is the byte key, so the decoded spelling must
+///   re-encode to exactly the bytes that were read.
+fn balance_key_spelling(key: &[u8]) -> Option<String> {
+    let remainder = key.strip_prefix(BALANCE_PREFIX.as_bytes())?;
+    let remainder = std::str::from_utf8(remainder).ok()?;
+    let spelling = serde_json::from_str::<String>(remainder).ok()?;
+    if serde_json::to_string(&spelling).ok()? != remainder {
+        return None;
+    }
+    // The spelling must name a principal at the level the row's own value
+    // demands: `AccountBalances::account_id` is a `Did` that only ever
+    // deserializes through `Did::from_str`, and the row is adopted only if it
+    // spells the same as this key. A key that `Did::from_str` rejects can
+    // therefore never be adopted whatever its value holds, so it is decided
+    // here — before the value is read — rather than by a parse error from a
+    // value the loader had no business reading. (The `principal_rows` guard
+    // groups by identifier bytes, the scanner's rule; this stricter level is
+    // the writer's, and every row that passes here passes the guard's.)
+    Did::from_str(&spelling).ok()?;
+    Some(spelling)
 }
 
 /// Save cached balances to storage
@@ -238,6 +381,46 @@ pub(crate) fn save_cached_balances(ledger: &Ledger) -> Result<()> {
     Ok(())
 }
 
+/// Split a `ledger:cleared_volume:<did>:<currency>` key into its spelling and
+/// currency, exactly, or `None` for a key the writer could not have produced.
+///
+/// `save_cleared_volume_index` writes `{did}:{currency}` with `Display`, and a
+/// currency is not validated against a charset anywhere in this crate, so the
+/// currency may hold anything — including `:`. The boundary is therefore found
+/// from the DID side, and it is found by **decoding**, not by an alphabet: a
+/// `did:icn:` spelling is the scheme, one multibase sigil and a body, and some
+/// accepted bodies contain `:` themselves (the Identity base is unencoded;
+/// Base45's alphabet includes `:`; a future base may too). So every `:` after
+/// the scheme is tried in order, and the spelling ends at the first one whose
+/// prefix decodes to a 32-byte identifier — the same decode `Did` equality and
+/// the N2-A scanner use. An earlier colon inside the body leaves a prefix that
+/// decodes to fewer bytes or not at all; a later colon inside the currency is
+/// never reached because the true boundary comes first; and a key with no
+/// boundary at all — one that ends at the spelling, or whose spelling or
+/// currency is not UTF-8 — is not this keyspace's shape and is handed back as
+/// unreadable rather than adopted under an invented currency. For every
+/// spelling whose base has a colon-free alphabet this is the first-colon split
+/// the previous implementation performed, so existing rows re-read unchanged.
+pub(crate) fn split_cleared_volume_key(key: &[u8]) -> Option<(&str, &str)> {
+    const DID_SCHEME: &[u8] = b"did:icn:";
+
+    let rest = key.strip_prefix(CLEARED_VOLUME_PREFIX.as_bytes())?;
+    rest.strip_prefix(DID_SCHEME)?;
+
+    let mut search_from = DID_SCHEME.len();
+    while let Some(offset) = rest[search_from..].iter().position(|&b| b == b':') {
+        let split = search_from + offset;
+        if let Ok(spelling) = std::str::from_utf8(&rest[..split]) {
+            if identifier_bytes_of_spelling(spelling).is_ok() {
+                let currency = std::str::from_utf8(&rest[split + 1..]).ok()?;
+                return Some((spelling, currency));
+            }
+        }
+        search_from = split + 1;
+    }
+    None
+}
+
 /// Load cleared volume index from storage
 ///
 /// # Arguments
@@ -249,25 +432,56 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
     let prefix = CLEARED_VOLUME_PREFIX.as_bytes();
     let pairs = ledger.store.scan(prefix)?;
 
+    // Split every key before adopting any row, so the keyspace is classified
+    // whole. A key that cannot be split into the shape the writer produces is
+    // counted and refused: the previous code adopted such a row under an
+    // empty currency, turning a corrupt key into an account with a phantom
+    // currency, and before that dropped it silently.
+    // `pairs` is consumed: the raw key is dropped once its spelling and
+    // currency have been copied out, and the value bytes are moved into the
+    // row rather than borrowed, so nothing keeps the whole scan alive. The
+    // value is still parsed after the guard, exactly as before.
+    let mut rows = Vec::with_capacity(pairs.len());
+    let mut unsplittable = 0usize;
     for (key, value) in pairs {
-        // Key format: "ledger:cleared_volume:{did}:{currency}"
-        let key_str = String::from_utf8_lossy(&key);
-        if let Some(rest) = key_str.strip_prefix(CLEARED_VOLUME_PREFIX) {
-            // Parse the composite key - format is "did:currency"
-            // Use rfind to find the last colon, since DIDs can contain colons
-            if let Some(last_colon) = rest.rfind(':') {
-                let did_str = &rest[..last_colon];
-                let currency = &rest[last_colon + 1..];
-
-                if let Ok(did) = serde_json::from_str::<Did>(&format!("\"{did_str}\"")) {
-                    if let Ok(volume) = serde_json::from_slice::<i64>(&value) {
-                        ledger
-                            .cleared_volume_index
-                            .insert((did, currency.to_string()), volume);
-                    }
-                }
-            }
+        // The boundary search accepts any prefix that decodes to 32 bytes —
+        // the identifier the guard groups by. Rebuilding the `Did` is stricter
+        // (an Ed25519 point), so it is done here, before the guard: a spelling
+        // that decodes but cannot be rebuilt is a row the loader cannot adopt
+        // and is counted as unreadable rather than surfacing later as an
+        // untyped parse error. Parsed directly, not through a JSON round trip:
+        // an Identity-base spelling carries a raw NUL sigil, which JSON forbids
+        // inside a string even though `Did::from_str` accepts it.
+        match split_cleared_volume_key(&key).and_then(|(did_str, currency)| {
+            Did::from_str(did_str)
+                .ok()
+                .map(|did| (did, currency.to_string()))
+        }) {
+            Some((did, currency)) => rows.push((did, currency, value)),
+            None => unsplittable += 1,
         }
+    }
+
+    // Reported before the guard runs: a keyspace holding a row the writer
+    // could not have produced is evidence of corruption or tampering, and a
+    // classification computed without that row proves nothing.
+    if unsplittable > 0 {
+        return Err(PrincipalRowsRefusal::UnreadableKey {
+            keyspace: CLEARED_VOLUME_KEYSPACE,
+            rows: unsplittable,
+        }
+        .into());
+    }
+
+    refuse_unless_one_spelling_per_principal(
+        CLEARED_VOLUME_KEYSPACE,
+        rows.iter()
+            .map(|(did, currency, _)| (did.as_str(), currency.as_str())),
+    )?;
+
+    for (did, currency, value) in rows {
+        let volume: i64 = serde_json::from_slice(&value)?;
+        ledger.cleared_volume_index.insert((did, currency), volume);
     }
 
     debug!(
@@ -293,4 +507,72 @@ pub(crate) fn save_cleared_volume_index(ledger: &Ledger) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod key_shape_tests {
+    use super::*;
+    use icn_identity::KeyPair;
+
+    fn key(rest: &str) -> Vec<u8> {
+        format!("{CLEARED_VOLUME_PREFIX}{rest}").into_bytes()
+    }
+
+    /// A real base58 spelling: the boundary is found by decoding, so a
+    /// made-up string that decodes to the wrong length would never split.
+    fn spelling() -> String {
+        KeyPair::generate().unwrap().did().as_str().to_string()
+    }
+
+    /// Identity base: the sigil is NUL and the body is the raw identifier,
+    /// which here contains colons.
+    const IDENTITY_BODY: &str = "ab:cd:ef:gh:ij:kl:mn:op:qr:st:uv";
+
+    #[test]
+    fn an_ordinary_spelling_splits_at_the_currency_delimiter() {
+        let did = spelling();
+        let k = key(&format!("{did}:USD"));
+        let (found, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(found, did);
+        assert_eq!(currency, "USD");
+    }
+
+    #[test]
+    fn a_colon_bearing_currency_keeps_its_colons() {
+        let did = spelling();
+        let k = key(&format!("{did}:USD:SPOT:T+2"));
+        let (found, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(found, did);
+        assert_eq!(currency, "USD:SPOT:T+2");
+    }
+
+    #[test]
+    fn an_identity_base_body_containing_colons_is_split_after_its_32_bytes() {
+        assert_eq!(IDENTITY_BODY.len(), 32);
+        let k = key(&format!("did:icn:\u{0}{IDENTITY_BODY}:EUR:SPOT"));
+        let (found, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(found, format!("did:icn:\u{0}{IDENTITY_BODY}"));
+        assert_eq!(currency, "EUR:SPOT");
+    }
+
+    #[test]
+    fn a_key_that_ends_at_the_spelling_is_not_this_keyspaces_shape() {
+        assert!(split_cleared_volume_key(&key(&spelling())).is_none());
+        let identity = key(&format!("did:icn:\u{0}{IDENTITY_BODY}"));
+        assert!(split_cleared_volume_key(&identity).is_none());
+    }
+
+    #[test]
+    fn an_identity_body_not_followed_by_the_delimiter_is_not_split() {
+        let k = key(&format!("did:icn:\u{0}{IDENTITY_BODY}XUSD"));
+        assert!(split_cleared_volume_key(&k).is_none());
+    }
+
+    #[test]
+    fn a_key_without_the_scheme_or_with_invalid_utf8_is_not_split() {
+        assert!(split_cleared_volume_key(&key("garbage:USD")).is_none());
+        let mut bad_currency = key(&format!("{}:", spelling()));
+        bad_currency.extend([0xff, 0xfe]);
+        assert!(split_cleared_volume_key(&bad_currency).is_none());
+    }
 }

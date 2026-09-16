@@ -4,4 +4,7 @@ pub mod store;
 
 pub use handle::CommonsHandle;
 pub use inner::CommonsInner;
-pub use store::{CommonsStore, CommonsStoreBackend, InMemoryCommonsStore, SledCommonsStore};
+pub use store::{
+    CommonsStore, CommonsStoreBackend, HolderIndexDefect, HolderMintClassification,
+    InMemoryCommonsStore, SledCommonsStore,
+};

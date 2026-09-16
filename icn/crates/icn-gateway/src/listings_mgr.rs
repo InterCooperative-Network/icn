@@ -656,15 +656,105 @@ impl InMemoryListingsStore {
 /// When the schema changes, increment this version and add migration logic.
 const SLED_KEY_VERSION: &str = "v1";
 
+/// The value every `interest_idx` row the writer produces carries.
+///
+/// The row is a uniqueness marker, not a pointer: it holds this sentinel and
+/// never the interest id. A row under the namespace carrying anything else was
+/// not written by [`SledListingsStore::add_interest_if_not_duplicate`], so it is
+/// evidence this code cannot interpret rather than evidence it may skip
+/// (#2627 M4b).
+const INTEREST_INDEX_PRESENT: &[u8] = b"1";
+
+/// Why a physical `interest_idx` row could not be proven to name — or not to
+/// name — a given principal.
+///
+/// Every arm is a state the writer cannot produce. They are named individually
+/// so a refusal says which one occurred without quoting the row: the reason
+/// class reaches the HTTP body, and a DID spelling or an interest message must
+/// not (#2627 M4b).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UniquenessEvidenceDefect {
+    /// The key is not UTF-8, so it holds no readable spelling.
+    KeyNotUtf8,
+    /// The key does not begin with the namespace it was scanned under.
+    KeyOutsideNamespace,
+    /// Nothing frames a listing id and a spelling apart.
+    ListingFramingMissing,
+    /// The framed listing component is not the writer's UUID rendering.
+    ListingFramingUnparsable,
+    /// The trailing component names no ICN principal.
+    SpellingNamesNoPrincipal,
+    /// The row carries a value the writer never writes.
+    UnrecognisedValue,
+    /// A canonical interest row under this listing did not decode.
+    CanonicalInterestUnreadable,
+    /// A canonical interest row filed under this listing names another one.
+    CanonicalInterestNamesAnotherListing,
+}
+
+impl UniquenessEvidenceDefect {
+    /// A stable, payload-free label. Safe to return to a caller.
+    fn reason_class(self) -> &'static str {
+        match self {
+            Self::KeyNotUtf8 => "uniqueness-key-not-utf8",
+            Self::KeyOutsideNamespace => "uniqueness-key-outside-namespace",
+            Self::ListingFramingMissing => "uniqueness-key-listing-framing-missing",
+            Self::ListingFramingUnparsable => "uniqueness-key-listing-framing-unparsable",
+            Self::SpellingNamesNoPrincipal => "uniqueness-key-names-no-principal",
+            Self::UnrecognisedValue => "uniqueness-row-value-unrecognised",
+            Self::CanonicalInterestUnreadable => "canonical-interest-unreadable",
+            Self::CanonicalInterestNamesAnotherListing => "canonical-interest-listing-mismatch",
+        }
+    }
+}
+
+/// Whether a principal already holds an interest in one listing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PrincipalStanding {
+    /// No canonical interest and no uniqueness row names this principal.
+    ProvenAbsent,
+    /// Something already names this principal: it may not express interest again.
+    AlreadyPresent,
+}
+
 /// Sled-backed persistent listings store
 pub struct SledListingsStore {
     db: Arc<sled::Db>,
+    /// Serialises the whole express-interest transaction: classify the
+    /// principal, claim the spelling key, write the canonical interest.
+    ///
+    /// The `compare_and_swap` below is atomic on its own, but only for the
+    /// *exact spelling* it is handed. Proving a principal absent requires
+    /// reading rows that a concurrent alias-spelled request could add between
+    /// the read and the CAS, and no single sled operation covers both. This
+    /// mutex closes that window; it does not replace the CAS, which still
+    /// decides the same-spelling race unconditionally (#2627 M4b).
+    ///
+    /// Scope: one lock per store instance, which is one serialisation domain
+    /// per database because `sled::Config::open` takes an exclusive `flock` on
+    /// the database file, so no second process — and no second `sled::open` in
+    /// this one — can hold the same database open. `icn_gateway::server` builds
+    /// exactly one `SledListingsStore`, owned by the one `ListingsManager` as a
+    /// `Box`, so that instance is the only writer.
+    ///
+    /// The bound of that, stated exactly: constructing a *second* store over a
+    /// clone of the same `Arc<sled::Db>` would give it a second lock and leave
+    /// only the CAS between the two, so the alias guard is instance-scoped
+    /// while the same-spelling guard is not. Nothing in production does — the
+    /// single construction site is `icn_gateway::server` — and the two facts
+    /// this rests on are pinned rather than asserted:
+    /// `sled_refuses_a_second_open_of_one_database` and
+    /// `two_store_instances_over_one_database_keep_the_cas_guarantee`.
+    interest_uniqueness: std::sync::Mutex<()>,
 }
 
 impl SledListingsStore {
     /// Create a new Sled-backed listings store
     pub fn new(db: Arc<sled::Db>) -> Self {
-        Self { db }
+        Self {
+            db,
+            interest_uniqueness: std::sync::Mutex::new(()),
+        }
     }
 
     /// Generate a versioned key for listings
@@ -707,6 +797,112 @@ impl SledListingsStore {
     #[inline]
     fn interest_index_prefix(listing_id: &ListingId) -> String {
         format!("{SLED_KEY_VERSION}:interest_idx:{}:", listing_id.0)
+    }
+
+    /// The namespace every interest index key begins with, across all listings.
+    #[inline]
+    fn interest_index_namespace() -> String {
+        format!("{SLED_KEY_VERSION}:interest_idx:")
+    }
+
+    /// Split an interest index key into the listing it belongs to and the DID
+    /// spelling it files, following the writer's layout rather than counting
+    /// delimiters.
+    ///
+    /// [`Self::interest_index_key`] builds `namespace ‖ listing ‖ ':' ‖ spelling`
+    /// where the listing is a `Uuid` in canonical form — 36 characters of hex
+    /// and hyphens, containing no `':'` — and the spelling is a `Did` rendered
+    /// by `Display`, which begins `did:icn:` and therefore does. So the first
+    /// `':'` after the namespace is the framing, and *everything* after it is
+    /// the spelling, taken whole to the end of the key.
+    ///
+    /// Splitting the whole key on `':'` and requiring four components — what
+    /// this replaced — counted the DID's own colons as key structure and so
+    /// rejected every row the writer produces (#2627 M4b).
+    fn parse_interest_index_key(
+        key: &[u8],
+    ) -> std::result::Result<(Uuid, &str), UniquenessEvidenceDefect> {
+        let text = std::str::from_utf8(key).map_err(|_| UniquenessEvidenceDefect::KeyNotUtf8)?;
+        let rest = text
+            .strip_prefix(Self::interest_index_namespace().as_str())
+            .ok_or(UniquenessEvidenceDefect::KeyOutsideNamespace)?;
+        let (listing, spelling) = rest
+            .split_once(':')
+            .ok_or(UniquenessEvidenceDefect::ListingFramingMissing)?;
+        let listing = Uuid::parse_str(listing)
+            .map_err(|_| UniquenessEvidenceDefect::ListingFramingUnparsable)?;
+        Ok((listing, spelling))
+    }
+
+    /// Decide whether `from_did`'s principal already holds an interest in
+    /// `listing_id`, from the canonical interest rows and the uniqueness
+    /// projection that must agree with them.
+    ///
+    /// The canonical fact is the `v1:interest:` row: it carries a real [`Did`],
+    /// so comparing it with `==` compares *principals* — the same rule
+    /// [`InMemoryListingsStore::add_interest_if_not_duplicate`] already applies.
+    /// The `interest_idx` row is keyed by one spelling, so it cannot answer the
+    /// principal question by lookup; it is read here so that a row naming this
+    /// principal still suppresses a second interest even when its canonical row
+    /// is missing. A live write must never repair that state by treating the
+    /// missing row as absence (#2627 M4b).
+    ///
+    /// Evidence that cannot be decoded is refused, never skipped: a row this
+    /// code cannot read is a row it cannot prove *does not* name the principal.
+    fn classify_principal_for_listing(
+        &self,
+        listing_id: &ListingId,
+        from_did: &Did,
+    ) -> Result<PrincipalStanding> {
+        let refuse = |defect: UniquenessEvidenceDefect| {
+            anyhow::anyhow!(
+                "cannot prove listing-interest uniqueness for this listing (reason: {})",
+                defect.reason_class()
+            )
+        };
+
+        // The canonical interest facts. A row that does not decode, or that is
+        // filed here while naming another listing, makes the question
+        // unanswerable rather than answered "absent".
+        for item in self
+            .db
+            .scan_prefix(Self::interest_prefix(listing_id).as_bytes())
+        {
+            let (_, value) = item?;
+            let interest: ListingInterest = icn_encoding::decode_versioned(&value)
+                .map_err(|_| refuse(UniquenessEvidenceDefect::CanonicalInterestUnreadable))?;
+            if interest.listing_id != *listing_id {
+                return Err(refuse(
+                    UniquenessEvidenceDefect::CanonicalInterestNamesAnotherListing,
+                ));
+            }
+            // Principal equality, not spelling equality (#2627 I7).
+            if interest.from_did == *from_did {
+                return Ok(PrincipalStanding::AlreadyPresent);
+            }
+        }
+
+        // The uniqueness projection. Each row must decode to a principal; one
+        // that names this principal suppresses the write whether or not its
+        // canonical row survived.
+        for item in self
+            .db
+            .scan_prefix(Self::interest_index_prefix(listing_id).as_bytes())
+        {
+            let (key, value) = item?;
+            if value.as_ref() != INTEREST_INDEX_PRESENT {
+                return Err(refuse(UniquenessEvidenceDefect::UnrecognisedValue));
+            }
+            let (_, spelling) = Self::parse_interest_index_key(&key).map_err(refuse)?;
+            let filed: Did = spelling
+                .parse()
+                .map_err(|_| refuse(UniquenessEvidenceDefect::SpellingNamesNoPrincipal))?;
+            if filed == *from_did {
+                return Ok(PrincipalStanding::AlreadyPresent);
+            }
+        }
+
+        Ok(PrincipalStanding::ProvenAbsent)
     }
 
     /// Save a listing
@@ -822,11 +1018,30 @@ impl SledListingsStore {
         Ok(interests)
     }
 
-    /// Atomically add interest if user hasn't already expressed interest.
+    /// Add interest if this **principal** has not already expressed interest.
     /// Returns Ok(true) if added, Ok(false) if duplicate.
     ///
-    /// Uses a separate versioned index key with compare-and-swap to ensure
-    /// atomicity: if CAS succeeds, we know no other concurrent request got there first.
+    /// # What decides a duplicate
+    ///
+    /// The stored index key is `v1:interest_idx:<listing>:<spelling>`, and a
+    /// `did:icn:` identifier has many accepted spellings of the same 32 bytes.
+    /// The `compare_and_swap` below therefore answers "has this *spelling*
+    /// claimed the listing", which is not the one-interest-per-member rule: one
+    /// principal arriving under two spellings hit two different keys and got two
+    /// canonical interests (#2627 M4b).
+    ///
+    /// So the decision is made against the canonical `v1:interest:` rows, whose
+    /// `from_did` is a real [`Did`] and therefore compares by principal, with the
+    /// uniqueness rows read as well so a row naming this principal still
+    /// suppresses a write when its canonical row is gone. The CAS is kept
+    /// unchanged behind that check: it remains the unconditional, storage-level
+    /// decider of the same-spelling race, and the persisted bytes are exactly
+    /// what they were.
+    ///
+    /// The classification and the write are serialised by
+    /// [`Self::interest_uniqueness`], because a concurrent alias-spelled request
+    /// could otherwise pass the same check before either CAS lands. See that
+    /// field for the scope that lock covers and why it is the whole database.
     pub fn add_interest_if_not_duplicate(
         &self,
         interest: &ListingInterest,
@@ -834,15 +1049,35 @@ impl SledListingsStore {
     ) -> Result<bool> {
         let listing_id = interest.listing_id;
 
-        // Use an index key to track which DIDs have expressed interest
-        // This allows atomic CAS without scanning all interests
+        // Held across classify → claim → write. Poisoning fails closed: a panic
+        // under this lock leaves state this code cannot reason about, and
+        // guessing is worse than refusing.
+        let _uniqueness = self
+            .interest_uniqueness
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Listing interest uniqueness lock poisoned"))?;
+
+        if self.classify_principal_for_listing(&listing_id, from_did)?
+            == PrincipalStanding::AlreadyPresent
+        {
+            return Ok(false);
+        }
+
+        // The index key claims this exact spelling. It is no longer what avoids
+        // a scan — the classification above reads the listing's canonical rows,
+        // because a spelling-keyed lookup cannot answer a question about a
+        // principal. What it still does, and what nothing else here can, is
+        // settle the same-spelling race in one atomic storage operation, below
+        // whatever serialises the classification (#2627 M4b).
         let index_key = Self::interest_index_key(&listing_id, from_did);
 
         // Atomically try to set the index key (only succeeds if not present)
         // compare_and_swap(key, old, new) - if old matches current value, set to new
-        let cas_result =
-            self.db
-                .compare_and_swap(index_key.as_bytes(), None::<&[u8]>, Some(b"1"))?;
+        let cas_result = self.db.compare_and_swap(
+            index_key.as_bytes(),
+            None::<&[u8]>,
+            Some(INTEREST_INDEX_PRESENT),
+        )?;
 
         if cas_result.is_err() {
             // Key already existed - duplicate interest
@@ -889,11 +1124,20 @@ impl SledListingsStore {
     ///
     /// This function has a TOCTOU (time-of-check-time-of-use) race condition:
     /// between checking if an interest exists and removing the orphaned index,
-    /// another thread could insert a new interest. This is acceptable because:
+    /// another thread could insert a new interest. It does not take the
+    /// uniqueness lock, so the race is real. It is acceptable because:
     /// 1. This is a maintenance task meant for off-peak/quiescent periods
-    /// 2. Worst case: an index is removed for a just-created interest, which
-    ///    only affects duplicate detection (the interest data remains intact)
-    /// 3. The next express_interest call will recreate the index
+    /// 2. Worst case: an index row is removed for a just-created interest.
+    ///    Uniqueness is unaffected — the canonical `v1:interest:` row decides,
+    ///    and it is untouched here (#2627 M4b).
+    ///
+    /// What that costs is *evidence*, not safety: the row is not recreated. A
+    /// later `express_interest` for that principal is answered `AlreadyPresent`
+    /// from the canonical row and returns before reaching the CAS, so the
+    /// N2-A gate simply has one fewer uniqueness row to read for that pair.
+    /// Before M4b this pass could recognise no production row at all, so the
+    /// race was unreachable; it is reachable now, and recorded rather than
+    /// closed (migration gate §11.9).
     ///
     /// For production at scale, consider running this in a transaction or
     /// during scheduled maintenance windows when write traffic is minimal.
@@ -901,32 +1145,63 @@ impl SledListingsStore {
     /// # Returns
     ///
     /// The number of orphaned index keys that were cleaned up.
+    ///
+    /// # What counts as orphaned
+    ///
+    /// The row's value is a sentinel, never an interest id, so the canonical row
+    /// cannot be resolved by lookup — it is found by scanning the listing's
+    /// interests for one whose `from_did` renders to the **byte-identical**
+    /// spelling. That is the writer's own contract: the key is built from
+    /// `ListingInterest.from_did`, so index `A` implies a primary spelling `A`.
+    /// Matching by principal instead would retain a row whose own primary is
+    /// gone because a *differently spelled* interest for the same principal
+    /// survives, which is a state the writer never produced.
+    ///
+    /// A row whose key or value this code cannot read is **skipped, not
+    /// deleted** — the existing contract, and the safe default for a maintenance
+    /// pass, since deleting nothing loses nothing. Refusing on unreadable
+    /// evidence is the *live write path's* job
+    /// ([`Self::classify_principal_for_listing`]); the two must not be
+    /// confused (#2627 M4b).
     pub fn cleanup_orphaned_interest_indexes(&self) -> Result<usize> {
-        let index_prefix = format!("{SLED_KEY_VERSION}:interest_idx:");
+        let index_prefix = Self::interest_index_namespace();
         let mut cleaned = 0;
 
         for item in self.db.scan_prefix(index_prefix.as_bytes()) {
-            let (key, _) = item?;
-            let key_str = String::from_utf8_lossy(&key);
+            let (key, value) = item?;
 
-            // Parse the index key to extract listing_id and from_did
-            // Format: v1:interest_idx:{listing_id}:{from_did}
-            let parts: Vec<&str> = key_str.split(':').collect();
-            if parts.len() != 4 {
+            // Parse by the writer's framing, not by counting ':' — a DID
+            // spelling contains its own colons, so splitting the whole key on
+            // ':' rejected every row the writer produces and made this pass a
+            // no-op in production (#2627 M4b).
+            let (listing_id, from_did_str) = match Self::parse_interest_index_key(&key) {
+                Ok(parsed) => parsed,
+                Err(defect) => {
+                    tracing::warn!(
+                        reason = defect.reason_class(),
+                        "Skipping unreadable interest index key; not treating it as orphaned"
+                    );
+                    continue;
+                }
+            };
+
+            if value.as_ref() != INTEREST_INDEX_PRESENT {
+                tracing::warn!(
+                    reason = UniquenessEvidenceDefect::UnrecognisedValue.reason_class(),
+                    "Skipping interest index row with an unrecognised value; not treating it as orphaned"
+                );
                 continue;
             }
 
-            let listing_id_str = parts[2];
-            let from_did_str = parts[3];
-
-            // Check if any interest exists for this listing_id from this from_did
-            let interest_prefix = format!("{SLED_KEY_VERSION}:interest:{listing_id_str}:");
+            // Check if any interest exists for this listing_id from this exact
+            // spelling.
+            let interest_prefix = format!("{SLED_KEY_VERSION}:interest:{listing_id}:");
             let mut has_matching_interest = false;
 
             for interest_item in self.db.scan_prefix(interest_prefix.as_bytes()) {
                 let (_, value) = interest_item?;
                 if let Ok(interest) = icn_encoding::decode_versioned::<ListingInterest>(&value) {
-                    if interest.from_did.to_string() == from_did_str {
+                    if interest.from_did.as_str() == from_did_str {
                         has_matching_interest = true;
                         break;
                     }
@@ -935,7 +1210,7 @@ impl SledListingsStore {
 
             if !has_matching_interest {
                 tracing::info!(
-                    index_key = %key_str,
+                    listing_id = %listing_id,
                     "Cleaning up orphaned interest index key"
                 );
                 self.db.remove(key)?;

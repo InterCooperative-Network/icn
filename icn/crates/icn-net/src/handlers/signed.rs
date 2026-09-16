@@ -2018,6 +2018,11 @@ mod tests {
         fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
             self.inner.delete(key)
         }
+        /// This fixture injects failures on `flush` only; deletions pass
+        /// straight through, so the inner store's atomicity is the one in force.
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+            self.inner.delete_atomic(keys)
+        }
         fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
             self.inner.scan(prefix)
         }

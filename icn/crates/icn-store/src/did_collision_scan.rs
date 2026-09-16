@@ -46,6 +46,7 @@
 //! sort after every ASCII one, so the survivor is attacker-selectable. The
 //! ordinals are preserved so a reader can see which row would win.
 
+use anyhow::Context as _;
 use std::collections::BTreeMap;
 
 /// The identity of a principal-canonical shape.
@@ -133,13 +134,30 @@ pub enum RuleBasis {
     AwaitingDomainSignOff,
 }
 
+impl RuleBasis {
+    /// A short stable label for reports.
+    pub fn label(self) -> &'static str {
+        match self {
+            RuleBasis::Established => "established",
+            RuleBasis::AwaitingDomainSignOff => "awaiting-domain-sign-off",
+        }
+    }
+}
+
 /// One durable keyspace to scan.
 ///
 /// A descriptor names the prefix to read and the disposition that applies to a
-/// collision found under it. It deliberately does **not** describe how to parse
-/// the key beyond its prefix: DID spellings are located by scanning for the
-/// `did:icn:` scheme, which is layout-independent and so cannot drift out of
-/// step with a keyspace that changes its separator.
+/// collision found under it. By default it describes no more of the key than
+/// that: DID spellings are located by scanning for the `did:icn:` scheme, which
+/// is layout-independent and so cannot drift out of step with a keyspace that
+/// changes its separator.
+///
+/// That default holds wherever every key component is protocol-generated. It
+/// fails where a key carries an identifier another domain chose, because the
+/// scheme scan cannot tell a principal-bearing component from an opaque one
+/// that merely contains the same text. [`KeyspaceDescriptor::principal_region`]
+/// is the narrow exception: a layout may state where its principal lives, and
+/// nothing more.
 #[derive(Debug, Clone)]
 pub struct KeyspaceDescriptor {
     /// Stable identifier used in reports, e.g. `icn-net/replay_max_seq`.
@@ -161,19 +179,114 @@ pub struct KeyspaceDescriptor {
     /// `replay_max_seq:<did>:junk` looked like a clean spelling plus residual
     /// key material. Stating it per keyspace keeps the scanner from having to
     /// reimplement each grammar while still catching the case.
+    ///
+    /// Read only under [`PrincipalRegion::WholeKey`], for the same reason as
+    /// [`KeyspaceDescriptor::slash_ends_did`].
     pub did_ends_key: bool,
     /// Whether this keyspace's own parser treats `/` as ending a DID.
     ///
     /// `/` is the only separator that is also a multibase body character, so
     /// where a spelling may be followed by one is a property of the individual
-    /// key layout — not something the scanner can infer. No registered keyspace
-    /// currently puts `/` immediately after a DID (`trust/edges/<a>:<b>` uses
-    /// `:`; `trust/sequences/issuer/<did>` ends there), so every descriptor sets
-    /// this `false` and `<did>/junk` is correctly unreadable rather than a
-    /// readable principal with residual bytes the real loader would reject.
+    /// key layout — not something the scanner can infer.
+    ///
+    /// Read only under [`PrincipalRegion::WholeKey`], and no whole-key keyspace
+    /// puts `/` immediately after a DID (`trust/edges/<a>:<b>` uses `:`;
+    /// `trust/sequences/issuer/<did>` ends there), so every descriptor sets this
+    /// `false` and `<did>/junk` is correctly unreadable rather than a readable
+    /// principal with residual bytes the real loader would reject.
+    ///
+    /// `federation/attestations/<did>/<source>` and
+    /// `idx_agreement_party/<did>/<agreement id>` do put `/` after a spelling,
+    /// and are not exceptions to that: each declares an anchored region, which
+    /// takes its terminator from the region itself. Saying it here as well
+    /// would be two owners for one fact, so
+    /// `a_descriptor_with_an_anchored_region_leaves_the_whole_key_flags_off`
+    /// pins that anchored descriptors leave this `false`.
     pub slash_ends_did: bool,
+    /// Which part of a key of this layout may carry a principal spelling.
+    pub principal_region: PrincipalRegion,
     /// Why that rule, in one line — so a report explains itself.
     pub rationale: &'static str,
+}
+
+/// Where in a stored key a keyspace's principal spellings can appear.
+///
+/// The scan locates spellings by their `did:icn:` scheme, which is
+/// layout-independent — and therefore cannot tell a principal-bearing key
+/// component from a domain identifier that merely *contains* that text. For
+/// most keyspaces every component is protocol-generated and the distinction
+/// does not arise. Where a key ends in an opaque identifier chosen by another
+/// domain it does, and getting it wrong is not cosmetic: a scan that
+/// canonicalized a DID inside such an identifier would group two rows the
+/// owning store holds apart, and would call a row unreadable that the store
+/// reads without difficulty. The scan and the store would then disagree about
+/// what a collision *is* (icn#2704).
+///
+/// This describes key structure, not federation behaviour: any layout of the
+/// same shape can declare it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrincipalRegion {
+    /// Every `did:icn:` occurrence anywhere in the key names a principal.
+    ///
+    /// Correct wherever the whole key is built from protocol-generated
+    /// components, which is every registered keyspace but the two federation
+    /// layouts that end in an identifier another domain chose.
+    WholeKey,
+    /// Exactly one spelling, starting immediately after
+    /// [`KeyspaceDescriptor::prefix`] and ending at the first `terminator`
+    /// that leaves a decodable spelling behind. Everything from that
+    /// terminator onward is an opaque discriminator: it is carried into the
+    /// canonical shape byte-for-byte and never parsed, so two discriminators
+    /// are the same one only when their bytes are equal.
+    ///
+    /// The spelling may itself contain the terminator — `Base64` bodies
+    /// contain `/` — so the boundary is decided by decoding, not by finding
+    /// the first occurrence.
+    ///
+    /// A row whose anchor does not hold a decodable spelling is **unreadable**
+    /// rather than principal-free: the layout says one belongs there, so its
+    /// absence is a row no migration can classify, exactly as the owning
+    /// store cannot read it.
+    AnchoredThenOpaque {
+        /// The byte that must follow the spelling.
+        terminator: u8,
+    },
+    /// Exactly one **length-framed, tag-discriminated** region, starting
+    /// immediately after [`KeyspaceDescriptor::prefix`]: a big-endian `u32`
+    /// length field, then that many bytes of region, then an opaque tail. The
+    /// region's first byte is a variant tag; only `principal_tag` introduces a
+    /// principal spelling, and the spelling is the rest of the region exactly —
+    /// its extent is stated by the length field, not inferred from the
+    /// alphabet.
+    ///
+    /// Two facts make this layout need its own rule rather than reuse of the
+    /// two above. Searching for a terminator byte would run through the
+    /// binary length field and through an opaque tail whose bytes are
+    /// arbitrary, so no terminator names the boundary. And treating the whole
+    /// key as principal-bearing would carry the length field into the
+    /// canonical shape verbatim — a field *derived from the spelling*, so two
+    /// spellings of one principal would differ in it, land in different
+    /// shapes, and form no collision group at all. That is a silent
+    /// false-clear, which is worse than a refusal.
+    ///
+    /// The region including its own framing is therefore what the canonical
+    /// shape replaces: the length field and tag are derivable from the
+    /// spelling and are not discriminators, while the tail after the region
+    /// is carried byte-for-byte and never parsed.
+    ///
+    /// A region under any other tag names **no principal** — it holds a value
+    /// some other domain chose, and one that happens to spell `did:icn:` is
+    /// still that domain's value. A row whose framing does not parse, or
+    /// whose `principal_tag` region holds no decodable spelling, is
+    /// **unreadable** rather than principal-free: the layout says a principal
+    /// belongs there, so its absence is a row no migration can classify.
+    LengthPrefixedTagged {
+        /// The tag under which the region holds a principal spelling. Every
+        /// other tag names a value some other domain chose, which this
+        /// registry does not decode — the discrimination that keeps an
+        /// entity id spelling `did:icn:` from being read as a principal.
+        principal_tag: u8,
+    },
 }
 
 /// A DID spelling found inside a stored key.
@@ -372,18 +485,7 @@ pub fn find_embedded_dids_with(key: &[u8], slash_ends_did: bool) -> Vec<Embedded
         }
 
         let start = i;
-        let mut limit = i + needle.len();
-        // Bounded, because backtracking retries the decode once per byte
-        // removed. A 32-byte identifier is longest in `Base2` — one character
-        // per bit, 256 plus a sigil — so nothing beyond this can decode to one,
-        // and without the bound a single key carrying tens of thousands of
-        // base58 characters would make the audit quadratic in a length the
-        // writer of that row chose.
-        const MAX_IDENTIFIER_CHARS: usize = 300;
-        let ceiling = key.len().min(limit + MAX_IDENTIFIER_CHARS);
-        while limit < ceiling && is_multibase_body_byte(key[limit]) {
-            limit += 1;
-        }
+        let limit = munch(key, i + needle.len());
 
         // Maximal munch, then validate and back off.
         //
@@ -400,7 +502,8 @@ pub fn find_embedded_dids_with(key: &[u8], slash_ends_did: bool) -> Vec<Embedded
         // contains, while a spelling followed by `/suffix` still terminates at
         // the spelling. Only if nothing decodes is the whole run reported as
         // one unreadable token — a fact the scan must surface, never skip.
-        let (end, identifier) = resolve_spelling(key, start, limit, slash_ends_did);
+        let (end, identifier) =
+            resolve_spelling(key, start, limit, Remainder::WholeKeyRun { slash_ends_did });
 
         let spelling = String::from_utf8_lossy(&key[start..end]).into_owned();
         found.push(EmbeddedDid {
@@ -416,8 +519,196 @@ pub fn find_embedded_dids_with(key: &[u8], slash_ends_did: bool) -> Vec<Embedded
     found
 }
 
+/// The longest run of multibase body bytes starting at `from`, bounded.
+///
+/// Bounded because backtracking retries the decode once per byte removed. A
+/// 32-byte identifier is longest in `Base2` — one character per bit, 256 plus
+/// a sigil — so nothing beyond this can decode to one, and without the bound a
+/// single key carrying tens of thousands of base58 characters would make the
+/// audit quadratic in a length the writer of that row chose.
+fn munch(key: &[u8], from: usize) -> usize {
+    const MAX_IDENTIFIER_CHARS: usize = 300;
+    let ceiling = key.len().min(from + MAX_IDENTIFIER_CHARS);
+    let mut limit = from;
+    while limit < ceiling && is_multibase_body_byte(key[limit]) {
+        limit += 1;
+    }
+    limit
+}
+
+/// The one spelling a [`PrincipalRegion::AnchoredThenOpaque`] layout carries.
+///
+/// The spelling starts at `start` — immediately after the keyspace prefix —
+/// and ends at the first `terminator` that leaves a decodable spelling behind.
+/// Everything after that is the discriminator, and is never searched: a
+/// `did:icn:` occurrence inside it belongs to the domain that chose the
+/// identifier, not to this keyspace's key structure.
+///
+/// Always returns one token. A row of this layout that carries no readable
+/// spelling at its anchor is unreadable, not principal-free — the layout says
+/// one belongs there.
+fn anchored_spelling(key: &[u8], start: usize, terminator: u8) -> EmbeddedDid {
+    // Where an unreadable token ends: the first terminator after the anchor,
+    // or the end of the key. Reported so the row is accounted for; an
+    // unreadable row never reaches the shape that would use these bounds.
+    let opaque_at = || {
+        key[start.min(key.len())..]
+            .iter()
+            .position(|b| *b == terminator)
+            .map_or(key.len(), |off| start + off)
+    };
+    let unreadable = |end: usize| EmbeddedDid {
+        offset: start,
+        end,
+        spelling: String::from_utf8_lossy(&key[start.min(key.len())..end]).into_owned(),
+        identifier: None,
+    };
+
+    if start >= key.len() || !key[start..].starts_with(DID_PREFIX.as_bytes()) {
+        return unreadable(opaque_at());
+    }
+
+    let body = start + DID_PREFIX.len();
+    let (end, identifier) = resolve_spelling(
+        key,
+        start,
+        munch(key, body),
+        Remainder::Terminated(terminator),
+    );
+    match identifier {
+        Some(bytes) => EmbeddedDid {
+            offset: start,
+            end,
+            spelling: String::from_utf8_lossy(&key[start..end]).into_owned(),
+            identifier: Some(bytes),
+        },
+        None => unreadable(opaque_at()),
+    }
+}
+
+/// The principal spellings `descriptor`'s own key structure puts in `key`.
+fn principal_spellings(descriptor: &KeyspaceDescriptor, key: &[u8]) -> Vec<EmbeddedDid> {
+    match descriptor.principal_region {
+        PrincipalRegion::WholeKey => find_embedded_dids_with(key, descriptor.slash_ends_did),
+        PrincipalRegion::AnchoredThenOpaque { terminator } => {
+            // The scan reads this keyspace by prefix, so the anchor is always
+            // in place. A key that somehow is not under the prefix cannot be
+            // parsed by this layout's rule, and saying so is the fail-closed
+            // answer.
+            let start = if key.starts_with(descriptor.prefix) {
+                descriptor.prefix.len()
+            } else {
+                key.len()
+            };
+            vec![anchored_spelling(key, start, terminator)]
+        }
+        PrincipalRegion::LengthPrefixedTagged { principal_tag } => length_prefixed_tagged_spelling(
+            key,
+            descriptor.prefix.len(),
+            principal_tag,
+            key.starts_with(descriptor.prefix),
+        ),
+    }
+}
+
+/// The principal a [`PrincipalRegion::LengthPrefixedTagged`] key carries, if
+/// its tag says it carries one.
+///
+/// Returns an empty vector when the region is well-formed under another tag —
+/// that row genuinely names no principal — and a single unreadable
+/// [`EmbeddedDid`] when the framing does not parse or the principal-tagged
+/// region holds no decodable spelling.
+fn length_prefixed_tagged_spelling(
+    key: &[u8],
+    start: usize,
+    principal_tag: u8,
+    under_prefix: bool,
+) -> Vec<EmbeddedDid> {
+    /// Width of the big-endian length field. Fixed rather than a descriptor
+    /// field: one layout declares this region, it frames with a `u32`, and a
+    /// configurable width would buy a hand-rolled accumulator — and its
+    /// silent truncation above eight bytes — for no present caller.
+    const LEN_WIDTH: usize = 4;
+
+    // The region spans its own framing: the length field is derived from the
+    // spelling, so it must be replaced along with it or two spellings of one
+    // principal would never share a canonical shape.
+    let unreadable = |end: usize| {
+        vec![EmbeddedDid {
+            offset: start.min(key.len()),
+            end,
+            spelling: String::from_utf8_lossy(&key[start.min(key.len())..end]).into_owned(),
+            identifier: None,
+        }]
+    };
+
+    if !under_prefix {
+        return unreadable(key.len());
+    }
+    let Some(rest) = key.get(start..) else {
+        return unreadable(key.len());
+    };
+    let Some(len_bytes) = rest
+        .get(..LEN_WIDTH)
+        .and_then(|b| <[u8; 4]>::try_from(b).ok())
+    else {
+        return unreadable(key.len());
+    };
+    // A `u32` length can never overflow `usize` on any target this builds for,
+    // so the region end is computed without a widening step to get wrong.
+    let region_len = u32::from_be_bytes(len_bytes) as usize;
+    let region_start = start + LEN_WIDTH;
+    let Some(region_end) = region_start.checked_add(region_len) else {
+        return unreadable(key.len());
+    };
+    let Some(region) = key.get(region_start..region_end) else {
+        return unreadable(key.len());
+    };
+    let Some((tag, body)) = region.split_first() else {
+        return unreadable(region_end);
+    };
+    if *tag != principal_tag {
+        // Another variant's value. The layout does not claim a principal here,
+        // so the row is principal-free rather than unreadable.
+        return Vec::new();
+    }
+
+    // The length field says exactly where the spelling ends, so there is no
+    // maximal-munch backtracking to do: the bytes either decode whole or the
+    // row is unreadable.
+    let identifier = std::str::from_utf8(body)
+        .ok()
+        .and_then(|s| identifier_bytes_of_spelling(s).ok());
+    match identifier {
+        Some(bytes) => vec![EmbeddedDid {
+            offset: start,
+            end: region_end,
+            spelling: String::from_utf8_lossy(body).into_owned(),
+            identifier: Some(bytes),
+        }],
+        None => unreadable(region_end),
+    }
+}
+
+/// What a layout permits immediately after a spelling.
+///
+/// The candidate run is always the longest sequence of multibase body bytes,
+/// because the alphabet alone cannot say where a spelling ends. What differs
+/// between layouts is which shorter-than-maximal match is legitimate, and that
+/// is a statement about the key structure rather than about the alphabet.
+#[derive(Debug, Clone, Copy)]
+enum Remainder {
+    /// The spelling runs to the end of the candidate run, or — where this
+    /// layout's own parser says so — up to a `/`.
+    WholeKeyRun { slash_ends_did: bool },
+    /// The spelling must be followed by exactly this byte. Nothing else is a
+    /// spelling of this layout, including running to the end of the key.
+    Terminated(u8),
+}
+
 /// Find the longest prefix of `key[start..limit]` that decodes to a 32-byte
-/// identifier, returning its end offset and the bytes.
+/// identifier and leaves a remainder `remainder` permits, returning its end
+/// offset and the bytes.
 ///
 /// When nothing decodes, the full run is returned with `None` so the caller
 /// reports one unreadable token rather than silently dropping the row.
@@ -425,7 +716,7 @@ fn resolve_spelling(
     key: &[u8],
     start: usize,
     limit: usize,
-    slash_ends_did: bool,
+    remainder: Remainder,
 ) -> (usize, Option<[u8; 32]>) {
     let mut end = limit;
     while end > start {
@@ -445,7 +736,17 @@ fn resolve_spelling(
                 // identifier and reject it, so calling the prefix readable would
                 // report a principal for a row the real loader cannot read, and
                 // quietly lower the unreadable count that exists to fail closed.
-                if end < limit && !(slash_ends_did && key.get(end) == Some(&b'/')) {
+                let permitted = match remainder {
+                    Remainder::WholeKeyRun { slash_ends_did } => {
+                        end == limit || (slash_ends_did && key.get(end) == Some(&b'/'))
+                    }
+                    // An anchored spelling is followed by its discriminator, so
+                    // running to the end of the key is not a spelling of this
+                    // layout either — the owning store could not have written
+                    // it, and a migration cannot classify what it finds.
+                    Remainder::Terminated(byte) => key.get(end) == Some(&byte),
+                };
+                if !permitted {
                     return (limit, None);
                 }
                 return (end, Some(bytes));
@@ -489,7 +790,7 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
     let rows_scanned = rows.len();
 
     for (scan_ordinal, (key, value_len)) in rows.into_iter().enumerate() {
-        let embedded = find_embedded_dids_with(&key, descriptor.slash_ends_did);
+        let embedded = principal_spellings(descriptor, &key);
 
         if embedded.is_empty() {
             rows_without_did += 1;
@@ -514,8 +815,13 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
         };
 
         // The keyspace says its keys end with the DID, so anything after the
-        // last spelling is material its own parser would refuse.
-        if descriptor.did_ends_key {
+        // last spelling is material its own parser would refuse. Read only for
+        // a whole-key scan: an anchored region already decided where its one
+        // spelling ends and what may follow it, and consulting a second rule
+        // there would make the descriptor answer the same question twice.
+        if matches!(descriptor.principal_region, PrincipalRegion::WholeKey)
+            && descriptor.did_ends_key
+        {
             if let Some(last) = embedded.last() {
                 if last.end != key.len() {
                     rows_unreadable += 1;
@@ -655,6 +961,38 @@ pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
     })
 }
 
+/// What a collision inside a deferred namespace does to a key-equality
+/// binary that is about to start.
+///
+/// Deferral says who owns the *merge rule*. It says nothing about whether the
+/// binary's own load path is lossy, and that is a fact about the loader, not a
+/// judgement about the domain: a loader that folds alias rows into one
+/// principal-keyed map and writes the survivor back has already merged them,
+/// whoever was supposed to decide. So each deferral records, separately from
+/// its gate, whether an observed collision may be started over.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeferredCollisionPosture {
+    /// The runtime tolerates alias rows without loss: it reads them on demand,
+    /// refuses conflicting acts at the point of use, and writes no merged
+    /// survivor back. A collision is reported so the owning gate sees it, and
+    /// does not block startup.
+    ReportOnly,
+    /// The load path collapses alias rows into one in-memory entry and a later
+    /// write-back orphans the losers. No rule authorizes that merge, so a
+    /// collision must stop the binary before its loader runs.
+    BlockStartup,
+}
+
+impl DeferredCollisionPosture {
+    /// A short stable label for reports.
+    pub fn label(self) -> &'static str {
+        match self {
+            DeferredCollisionPosture::ReportOnly => "report-only",
+            DeferredCollisionPosture::BlockStartup => "block-startup",
+        }
+    }
+}
+
 /// A namespace deliberately left outside this tranche, behind a named gate.
 ///
 /// Deferral is not coverage and it is not a clean result. It is a recorded
@@ -664,8 +1002,12 @@ pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
 /// "blocked", and the gate would be unusable; with it, an accidental omission
 /// still blocks while a reviewed exclusion does not.
 ///
-/// A deferred namespace is **never inspected**: only the fact that it exists,
-/// how many principal-bearing rows it holds, and which gate owns it.
+/// A deferred namespace is **never dispositioned** here: no merge rule is
+/// asserted for it. Its rows are still grouped by principal, because whether
+/// two stored rows name one principal is a fact about the data that the owning
+/// gate needs to see, and looking away from it would let the collision reach
+/// the loader unexamined. The [`DeferredCollisionPosture`] says what the
+/// binary does with that fact.
 #[derive(Debug, Clone)]
 pub struct DeferredNamespace {
     /// Stable identifier used in reports.
@@ -676,13 +1018,20 @@ pub struct DeferredNamespace {
     pub gate: &'static str,
     /// Inventory rows this namespace corresponds to.
     pub inventory_rows: &'static [u32],
+    /// What an observed collision does to a starting key-equality binary.
+    pub posture: DeferredCollisionPosture,
+    /// Why that posture, in one line, citing the loader behaviour it rests on.
+    pub posture_rationale: &'static str,
 }
 
-/// The namespaces N2-A deliberately does not scan, each behind a named gate.
+/// The namespaces N2-A deliberately does not disposition, each behind a named
+/// gate.
 ///
-/// Both entries are decisions recorded elsewhere, not judgements made here:
+/// The entries are decisions recorded elsewhere, not judgements made here:
 /// governance votes are behind the §7.5 membership/vote migration gate, and the
-/// security namespace belongs to its own dedicated workflow.
+/// security and auth-challenge namespaces belong to the dedicated security
+/// workflow. The posture on each is a statement about that namespace's *load
+/// path* in this checkout, and cites it.
 pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
     vec![
         DeferredNamespace {
@@ -690,20 +1039,110 @@ pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
             prefix: b"gov:vote:",
             gate: "IDENTITY_SEMANTICS §7.5 membership/vote migration gate",
             inventory_rows: &[23],
+            posture: DeferredCollisionPosture::ReportOnly,
+            posture_rationale: "Votes are read per proposal on demand and tallied through \
+                                VoteTally::try_from_votes, which fails closed on conflicting \
+                                rows for one principal (#2641/#2677); nothing at startup \
+                                rebuilds or writes vote rows back, so alias rows survive intact \
+                                for the §7.5 gate to disposition.",
         },
         DeferredNamespace {
             name: "rpc/auth-challenges",
             prefix: b"auth:challenge:",
             gate: "dedicated security workflow (TTL-bounded; contents not inspected)",
             inventory_rows: &[29],
+            posture: DeferredCollisionPosture::ReportOnly,
+            posture_rationale: "A challenge row is a TTL-bounded nonce, not durable state. \
+                                Collapsing two spellings at load drops an in-flight nonce, which \
+                                the client re-requests; nothing is written back. Blocking here \
+                                would also trap a daemon that alone expires these rows.",
         },
         DeferredNamespace {
             name: "security/misbehavior",
             prefix: b"security:",
             gate: "dedicated security workflow (contents not inspected)",
             inventory_rows: &[5, 6, 7, 8, 38],
+            posture: DeferredCollisionPosture::BlockStartup,
+            posture_rationale: "MisbehaviorDetector::load_from_store inserts every row into \
+                                principal-keyed maps, so under key-equality Did the later \
+                                spelling's reputation, ban, quarantine and violation rows \
+                                overwrite the earlier one's, and save_to_store at shutdown \
+                                writes the survivor back and orphans the losers. No domain rule \
+                                authorizes that merge (#2676).",
         },
     ]
+}
+
+/// One deferred namespace's rows, grouped by principal, with its posture.
+///
+/// The embedded [`KeyspaceReport`] carries [`MergeDisposition::FailClosed`] and
+/// [`RuleBasis::AwaitingDomainSignOff`] by construction: that is the honest
+/// statement of a namespace nobody has dispositioned, and it keeps the report's
+/// own `must_fail_closed` from ever reading as authority this scan does not
+/// have. Whether the namespace *blocks* is decided by [`DeferredReport::blocks`]
+/// from the posture, not from the report's disposition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeferredReport {
+    pub name: String,
+    pub gate: String,
+    pub posture: DeferredCollisionPosture,
+    pub posture_rationale: String,
+    pub report: KeyspaceReport,
+}
+
+impl DeferredReport {
+    /// Whether this namespace holds something a starting binary may not open.
+    ///
+    /// Only a `BlockStartup` posture can block, and it blocks on exactly what a
+    /// registered keyspace would: a principal named by more than one row, or a
+    /// row whose principal cannot be read at all.
+    pub fn blocks(&self) -> bool {
+        self.posture == DeferredCollisionPosture::BlockStartup
+            && (!self.report.collision_groups.is_empty() || self.report.rows_unreadable > 0)
+    }
+
+    /// Principal-bearing rows under this namespace, readable or not.
+    pub fn did_bearing_rows(&self) -> usize {
+        self.report.rows_with_readable_did + self.report.rows_unreadable
+    }
+}
+
+/// Group every deferred namespace's rows by principal. Read-only.
+///
+/// Uses the same engine as a registered keyspace, so a group here is exactly a
+/// group the key-equality `Did` would form — the point being that "deferred"
+/// must never come to mean "unexamined".
+pub fn scan_deferred(
+    store: &dyn Store,
+    deferrals: &[DeferredNamespace],
+) -> anyhow::Result<Vec<DeferredReport>> {
+    let mut out = Vec::with_capacity(deferrals.len());
+    for d in deferrals {
+        let descriptor = KeyspaceDescriptor {
+            name: d.name,
+            prefix: d.prefix,
+            inventory_rows: d.inventory_rows,
+            // No rule is asserted for a deferred namespace, and none may be
+            // inferred from this report.
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::AwaitingDomainSignOff,
+            // The scan does not own these grammars, so it is permissive about
+            // what follows a spelling; a spelling that does not decode is still
+            // unreadable, whatever follows it.
+            slash_ends_did: false,
+            did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale: d.gate,
+        };
+        out.push(DeferredReport {
+            name: d.name.to_string(),
+            gate: d.gate.to_string(),
+            posture: d.posture,
+            posture_rationale: d.posture_rationale.to_string(),
+            report: scan_keyspace(store, &descriptor)?,
+        });
+    }
+    Ok(out)
 }
 
 /// Principal-bearing rows per deferred namespace. Counts only.
@@ -828,6 +1267,9 @@ pub struct CoverageAudit {
     pub overview: StoreOverview,
     /// Principal-bearing rows per deliberately deferred namespace.
     pub deferred: Vec<(String, usize)>,
+    /// Every deferred namespace's rows grouped by principal, with the posture
+    /// that says what a starting binary does about a collision there.
+    pub deferred_reports: Vec<DeferredReport>,
     /// Principal-bearing rows under no registered keyspace and no named gate.
     pub uncovered: BTreeMap<String, usize>,
     /// Principal-bearing rows in named trees `Store::scan` cannot reach.
@@ -840,14 +1282,23 @@ impl CoverageAudit {
         self.uncovered.values().sum()
     }
 
-    /// Rows a named gate defers. Deferred is neither scanned nor cleared.
+    /// Rows a named gate defers. Deferred is neither dispositioned nor cleared.
     pub fn deferred_did_rows(&self) -> usize {
         self.deferred.iter().map(|(_, n)| *n).sum()
     }
 
+    /// Deferred namespaces whose posture forbids starting over what they hold.
+    pub fn blocking_deferred(&self) -> Vec<&DeferredReport> {
+        self.deferred_reports
+            .iter()
+            .filter(|d| d.blocks())
+            .collect()
+    }
+
     /// The store is clear only when every principal-bearing row it holds was
-    /// accounted for, and every keyspace that accounted for one can be migrated
-    /// without a human deciding an outcome.
+    /// accounted for, every keyspace that accounted for one can be migrated
+    /// without a human deciding an outcome, and no deferred namespace holds a
+    /// collision its own loader would silently merge.
     ///
     /// A principal-bearing row is accounted for in exactly one of three ways,
     /// and there is deliberately no fourth:
@@ -855,7 +1306,9 @@ impl CoverageAudit {
     /// 1. a registered keyspace interpreted it, so the collision result speaks
     ///    for it;
     /// 2. a named gate defers it — [`n2a_deferred_namespaces`] says which, and
-    ///    that exclusion was reviewed;
+    ///    that exclusion was reviewed — but its rows are still grouped, and a
+    ///    collision under a `BlockStartup` posture blocks exactly as an unruled
+    ///    collision in a registered keyspace does;
     /// 3. nothing did, which **blocks** — a row nobody has classified is
     ///    precisely the row that collapses unexamined on the first start of a
     ///    key-equality binary.
@@ -866,7 +1319,10 @@ impl CoverageAudit {
     /// exists to prevent, and one that already happened once (§5 rows #71 and
     /// #36 were live and unregistered).
     pub fn is_clear(&self) -> bool {
-        self.report.is_clear() && self.unreachable_did_rows == 0 && self.uncovered_did_rows() == 0
+        self.report.is_clear()
+            && self.unreachable_did_rows == 0
+            && self.uncovered_did_rows() == 0
+            && self.blocking_deferred().is_empty()
     }
 }
 
@@ -884,9 +1340,157 @@ pub fn audit_store(
         report: scan_store(store, descriptors)?,
         overview: store_overview(store)?,
         deferred: deferred_did_row_counts(store, deferrals)?,
+        deferred_reports: scan_deferred(store, deferrals)?,
         uncovered: uncovered_did_key_shapes(store, descriptors, deferrals)?,
         unreachable_did_rows,
     })
+}
+
+/// One sled database's full audit: the coverage audit plus the per-tree facts
+/// that established whether every principal-bearing row was reachable.
+///
+/// This is the unit both the offline `did-collision-scan` tool and the
+/// in-process startup gate ([`crate::n2a_startup_gate`]) render. They share it
+/// so that the verdict an operator reads from a scan and the verdict a binary
+/// enforces at startup are one computation, not two that can drift.
+#[derive(Debug, Clone)]
+pub struct SledStoreAudit {
+    pub audit: CoverageAudit,
+    /// Row count per sled tree, including the default tree.
+    pub trees: Vec<(String, usize)>,
+    /// Rows per tree whose key embeds a `did:icn:` spelling.
+    pub did_rows: Vec<(String, usize)>,
+}
+
+impl SledStoreAudit {
+    /// The gate. Not recomputed by any renderer.
+    pub fn is_clear(&self) -> bool {
+        self.audit.is_clear()
+    }
+}
+
+/// Audit one opened sled database against the canonical N2-A registries.
+/// Read-only.
+///
+/// [`Store::scan`] reads only sled's default tree, so every tree is counted as
+/// well: a principal-bearing row in a named tree is one the scan could not
+/// examine, and it is reported as *unreachable* — which blocks — rather than
+/// as absent.
+pub fn audit_sled_store(store: &crate::SledStore) -> anyhow::Result<SledStoreAudit> {
+    let trees = store.tree_row_counts()?;
+    let did_rows = store.did_bearing_rows_per_tree()?;
+    let unreachable: usize = did_rows
+        .iter()
+        .filter(|(name, _)| name != "__sled__default")
+        .map(|(_, n)| *n)
+        .sum();
+
+    let audit = audit_store(
+        store as &dyn Store,
+        &n2a_keyspaces(),
+        &n2a_deferred_namespaces(),
+        unreachable,
+    )?;
+
+    Ok(SledStoreAudit {
+        audit,
+        trees,
+        did_rows,
+    })
+}
+
+/// Collect every sled database root beneath `dir`, in path order.
+///
+/// A directory is a root when it holds sled's `conf` file, which sled writes
+/// on creation for every database, empty or not. A root is recorded **and**
+/// walked through, because a database can hold databases: `icnctl init-coop`
+/// opens `<data_dir>/store` itself as a database, while `icnd` keeps
+/// `store/ledger`, `store/trust`, `store/cooperative`, … beneath it. Stopping
+/// at the first `conf` would leave every nested domain database unaudited and
+/// let a CLEAR receipt be written over a blocker the daemon opens moments
+/// later. Sled's own subdirectory (`blobs/`) carries no `conf`, so nothing
+/// inside a database is mistaken for one, and the walk is bounded in depth so
+/// a stray cycle cannot make it endless.
+///
+/// **The sweep is all-or-nothing.** An unreadable directory, an unreadable
+/// entry, a symlink, or the depth bound each return an error rather than a
+/// shorter list. A caller cannot tell a partial list from a complete one, and
+/// the startup gate treats the list as the full set of databases: a directory
+/// that is searchable but not readable would otherwise let an omitted database
+/// pass as absent and earn a CLEAR receipt, which is precisely the lossy merge
+/// the gate exists to prevent.
+///
+/// This is how a caller finds the databases a deployment actually keeps, rather
+/// than the ones it expected: a deployment holds one database per domain under
+/// its store directory plus several at the data-directory level, and any store
+/// added after this list was written is found the same way. Enumerating by
+/// `conf` also means a directory that is *not* a database is never opened,
+/// because `sled::open` on such a directory creates one.
+pub fn find_sled_roots(dir: &std::path::Path) -> anyhow::Result<Vec<std::path::PathBuf>> {
+    const MAX_DEPTH: usize = 4;
+
+    fn walk(
+        dir: &std::path::Path,
+        depth: usize,
+        out: &mut Vec<std::path::PathBuf>,
+    ) -> anyhow::Result<()> {
+        if depth > MAX_DEPTH {
+            // Silently stopping here would report the databases found so far as
+            // if they were all of them.
+            anyhow::bail!(
+                "sled discovery hit its depth bound of {MAX_DEPTH} at {}; the sweep is \
+                 incomplete and its result cannot be treated as the full set",
+                dir.display()
+            );
+        }
+
+        let entries = std::fs::read_dir(dir)
+            .with_context(|| format!("cannot enumerate {}", dir.display()))?;
+
+        for entry in entries {
+            let entry =
+                entry.with_context(|| format!("cannot read an entry of {}", dir.display()))?;
+            let child = entry.path();
+
+            // `file_type` does not follow symlinks, unlike `Path::is_dir`. A
+            // symlinked directory is refused rather than skipped or followed:
+            // following it lets the walk leave the intended subtree, and
+            // skipping it would omit a database the daemon can still open —
+            // which is the fail-open this whole function must not have.
+            let file_type = entry
+                .file_type()
+                .with_context(|| format!("cannot stat {}", child.display()))?;
+            if file_type.is_symlink() {
+                anyhow::bail!(
+                    "sled discovery found a symlink at {}; refusing to decide whether it \
+                     names a database inside or outside this data directory",
+                    child.display()
+                );
+            }
+            if !file_type.is_dir() {
+                continue;
+            }
+
+            // Record a database and keep walking beneath it: a root can hold
+            // roots (see the doc comment), and a database's own subdirectories
+            // hold no `conf`, so descending never lists one twice.
+            if child.join("conf").is_file() {
+                out.push(child.clone());
+            }
+            walk(&child, depth + 1, out)?;
+        }
+        Ok(())
+    }
+
+    let mut out = Vec::new();
+    if dir.join("conf").is_file() {
+        out.push(dir.to_path_buf());
+    }
+    walk(dir, 0, &mut out)?;
+    // Deterministic order: a receipt that lists stores must list them the same
+    // way on every run, whatever order the filesystem returned them in.
+    out.sort();
+    Ok(out)
 }
 
 /// The non-security-sensitive durable keyspaces N2-A must clear before `Did`
@@ -922,6 +1526,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Replay floor. A lower survivor weakens the guard, so the merge keeps the \
                         maximum, which can only reject more than any single row did.",
         },
@@ -933,6 +1538,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Finalized-sequence set. Dropping a spelling's rows would re-open replay \
                         for the sequences it recorded, so the merge is a union.",
         },
@@ -944,6 +1550,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Two rows can assert different regimes for one sender, which is a \
                         contradiction no domain rule resolves. The live loader already declines \
                         to collapse these (#2644); a migration must not decide it either.",
@@ -956,6 +1563,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Outgoing sequence high-water for a (sender, recipient) pair. A lower \
                         survivor is a nonce regression, so the merge keeps the maximum.",
         },
@@ -967,6 +1575,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Accumulated balances. Overwriting drops a spelling's recorded position \
                         entirely, so the merge sums rather than elects a survivor.",
         },
@@ -978,6 +1587,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Accumulated cleared volume per (account, currency). Currency stays in the \
                         canonical shape, so only same-currency rows merge, and they sum.",
         },
@@ -989,6 +1599,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Freeze records. Unfreeze deletes one spelling only, so electing a \
                         survivor can fail open; the merge is a union of the freezes.",
         },
@@ -1000,6 +1611,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Trust edges keyed by (source, target). A dropped spelling takes its edges \
                         with it, so the merge unions the edge sets.",
         },
@@ -1011,6 +1623,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Journal entries are content-addressed by entry hash; DIDs appear inside \
                         the value, not the key. Scanned to confirm the key carries no spelling.",
         },
@@ -1019,12 +1632,22 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"trust/sequences/receiver/",
             inventory_rows: &[71],
             disposition: MergeDisposition::MaxMonotonic,
-            basis: RuleBasis::Established,
+            // Asserted by precedent, not implemented: `SequenceTracker`
+            // (`apps/trust-app/src/sequence.rs`) reads and writes the exact
+            // spelling and folds nothing, so two spellings of one issuer are
+            // two independent replay floors and the issuer may submit under
+            // whichever is lower. `replay_max_seq` earns `Established` because
+            // its loader performs the fold (#2644); this one does not, so a
+            // collision here must refuse until a trust-domain loader does.
+            basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Last-seen attestation sequence per issuer — a replay floor. A lower \
-                        survivor accepts stale attestations, so the merge keeps the maximum, \
-                        matching the established replay_max_seq precedent.",
+                        survivor accepts stale attestations, so the merge would keep the \
+                        maximum, as replay_max_seq does; but the receiver tracker reads and \
+                        writes the exact spelling and implements no fold, so the rule is \
+                        asserted, not established.",
         },
         KeyspaceDescriptor {
             name: "trust-app/sequences_issuer",
@@ -1034,6 +1657,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "This node's own outgoing attestation sequence. A lower survivor re-issues \
                         a sequence number already used, which the uniqueness invariant forbids, \
                         so the merge keeps the maximum.",
@@ -1046,10 +1670,306 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Cooperative membership. Merging two rows decides who is a member of an \
                         institution, which is an institutional judgement no identity-layer rule \
                         authorizes; it is also adjacent to the separate §7.5 membership gate. \
                         Fail closed pending a governance-domain decision.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-federation/attestations",
+            prefix: b"federation/attestations/",
+            inventory_rows: &[27, 59],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            // `federation/attestations/<member-did>/<source_coop_id>`. The
+            // member spelling is anchored right after the prefix; the source is
+            // a federation-domain identifier this crate does not own and must
+            // not parse. Nothing constrains a cooperative from choosing an id
+            // that contains `did:icn:`, and `AttestationStore` compares source
+            // ids as exact strings — so a whole-key scan would both group rows
+            // the store holds apart and call rows unreadable that it reads
+            // fine (#2704 review). The whole-key flags below say nothing here.
+            slash_ends_did: false,
+            did_ends_key: false,
+            principal_region: PrincipalRegion::AnchoredThenOpaque { terminator: b'/' },
+            rationale: "Federated trust attestations keyed by (member principal, source \
+                        cooperative); the source stays in the canonical shape, so rows from \
+                        different cooperatives about one principal are the ordinary union and \
+                        never a group. Two rows from one cooperative about one principal can \
+                        only differ by disagreeing, and no federation-domain rule authorizes \
+                        choosing or combining them. The live store already refuses to read, \
+                        write or sweep over such a pair (#2703); a migration must not decide \
+                        it either.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-federation/agreement_party_index",
+            prefix: b"idx_agreement_party/",
+            inventory_rows: &[28],
+            disposition: MergeDisposition::Equivalent,
+            basis: RuleBasis::Established,
+            // `idx_agreement_party/<party-did>/<agreement id>`: the attestation
+            // layout's shape. The party spelling is anchored right after the
+            // prefix and ends at the `/`; the agreement id is an identifier the
+            // agreement's creator chose (`AgreementId::new` takes any string),
+            // which this crate does not own and must not parse, and which
+            // `AgreementStore` compares as exact bytes — its own parser anchors
+            // the split on the id the row's value names (#2707). The whole-key
+            // flags below say nothing here.
+            slash_ends_did: false,
+            did_ends_key: false,
+            principal_region: PrincipalRegion::AnchoredThenOpaque { terminator: b'/' },
+            rationale: "Secondary index projected from the canonical federation/agreements/ rows: \
+                        key = (party spelling, agreement id), value = agreement id. The id stays \
+                        in the canonical shape, so one party in two agreements is two shapes and \
+                        never a group. The store answers a party lookup from the canonical \
+                        parties under Did equality and can recompute the projection (#2707), so \
+                        two spellings of one party for one agreement are two derivations of one \
+                        canonical fact and keeping any one loses nothing. A projection row can \
+                        never create, omit, preserve or alter membership on its own.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-gateway/adr0014_grant_by_grantee",
+            prefix: b"adr0014:grant:by_grantee:",
+            inventory_rows: &[25],
+            disposition: MergeDisposition::Equivalent,
+            basis: RuleBasis::Established,
+            // `adr0014:grant:by_grantee:` ‖ u32-BE len ‖ tag ‖ grantee bytes
+            // ‖ u64-BE valid_from ‖ 36-byte grant id. The length field, not a
+            // delimiter, ends the grantee region — a terminator search would
+            // run through the binary length bytes and through a `valid_from`
+            // whose bytes are arbitrary. The tag, not the look of the bytes,
+            // says whether a principal is there: tag 0x02 is an `Entity` id
+            // the granting domain chose, and one that spells `did:icn:` is
+            // still an entity id. The whole-key flags say nothing here.
+            slash_ends_did: false,
+            did_ends_key: false,
+            principal_region: PrincipalRegion::LengthPrefixedTagged {
+                principal_tag: 0x01,
+            },
+            rationale: "Secondary index projected from the canonical \
+                        adr0014:grant:<uuid> records: key = (grantee region, valid_from, grant \
+                        id), value = grant id. valid_from and the grant id stay in the canonical \
+                        shape, so one principal holding two grants is two shapes and never a \
+                        group — a principal may legitimately hold several. Two spellings of one \
+                        principal for one grant are two derivations of one canonical fact: \
+                        ReceiptStore answers a grantee lookup by reading the whole projection, \
+                        decoding every Person-tagged spelling to its principal, and proving each \
+                        candidate against the primary AuthorityGrant record before returning it \
+                        (#2627 M2), so keeping any one row loses nothing. A projection row can \
+                        never create or hide authority on its own. Entity-tagged rows carry no \
+                        principal and are outside the I7 boundary.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-commons/holder_by_did",
+            // `commons/holders/by_did/<spelling>` is the whole key: the writer
+            // appends the DID and nothing else (`CommonsStore::put_holder`), so
+            // `did_ends_key` states the writer's exact shape. The two sibling
+            // holder subspaces are outside this prefix rather than members of
+            // it — `commons/holders/<hex holder id>` and
+            // `commons/holders/by_anchor/<hex anchor id>` are both keyed by
+            // opaque hex and carry no spelling in the key at all, so neither
+            // can be swallowed by this descriptor and neither is cleared by it.
+            // A `did:icn:` that appears in a sibling's stored *value* is not
+            // key material and is invisible to a key scan.
+            prefix: b"commons/holders/by_did/",
+            inventory_rows: &[67],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale:
+                "Holder-by-DID index over the weak-holder identity contract. A weak holder's \
+                        durable id is SHA-256 of the textual spelling it was minted from, so two \
+                        spellings of one principal name two independent CommonsHolderRecords \
+                        with their own status, personhood level, affiliations and baseline \
+                        rights — and the index rows that reach them cannot be merged without \
+                        first deciding which holder survives, which is a question about a \
+                        member's standing that no identity-layer rule answers. Two rows \
+                        pointing at one holder id are refused on the same ground: no domain \
+                        rule authorizes collapsing the spellings, and a rebuild must not pick. \
+                        The weak-holder mint reached by profile updates \
+                        refuses to create this state (icn_commons::store::classify_holder_mint, \
+                        #2627 M3), and the anchor-keyed enrollment path is refused one layer \
+                        earlier, before any anchor exists to derive a holder from \
+                        (icn_commons::store::classify_anchor_enrollment, #2627 M4a). A migration \
+                        must not decide the collision either. Already-derived duplicate holders \
+                        are not dispositioned here.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-commons/anchor_by_did",
+            // `commons/anchors/by_did/<spelling>` is the whole key: both
+            // writers append the DID and nothing else, so `did_ends_key`
+            // states their exact shape. The sibling anchor subspace
+            // `commons/anchors/<hex anchor id>` is outside this prefix rather
+            // than a member of it — it is keyed by opaque hex and carries no
+            // spelling in the key at all, so it cannot be swallowed by this
+            // descriptor and is not cleared by it.
+            //
+            // A healthy store holds TWO rows per anchor and that is not a
+            // collision: `put_anchor` files it under `anchor.to_did()`, which
+            // is a function of the random anchor id, and
+            // `put_anchor_did_index` files the same anchor under the
+            // enrollment spelling. Those two DIDs name different principals,
+            // so they land in different collision groups. What this descriptor
+            // refuses is two rows naming ONE principal.
+            prefix: b"commons/anchors/by_did/",
+            inventory_rows: &[66],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale:
+                "Anchor-by-DID index over the PersonhoodAnchor namespace. An anchor's id is \
+                        SHA-256(\"icn-anchor-v1\" || vui || genesis) over a fresh random \
+                        genesis, and the Commons holder id is that anchor id verbatim, so two \
+                        enrollments of one principal produce two independent anchors with their \
+                        own status, attestations and POP level, and two independent holders. \
+                        Merging the index rows that reach them would first have to decide which \
+                        anchor survives, and no rule in the repository decides that. \
+                        RuleBasis::Established here records only that fail closed is what the \
+                        enrollment constructor implements \
+                        (icn_commons::store::classify_anchor_enrollment, #2627 M4a); no merge \
+                        rule is authorized and none is proposed. What is refused is a second \
+                        anchor per PRINCIPAL. The durable index is rotation-blind, so no claim \
+                        is made about one anchor per human, and none is made about the identity \
+                        semantics of an anchor, which IDENTITY_SEMANTICS.md classifies as a \
+                        legacy and ambiguous carrier. Every enrollment writes two rows that \
+                        reach one anchor id, and they are clear because their spellings decode \
+                        to two DIFFERENT principals — not because they share an anchor id, \
+                        which this scan never reads. Two rows naming ONE principal are grouped \
+                        and refused however they resolve. A migration must not decide the collision either. \
+                        Already-derived duplicate anchors are not dispositioned here.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-ledger/treasury",
+            // `ledger:treasury:<did>` is the authoritative treasury record and
+            // the only row beneath `ledger:treasury:` keyed by the treasury
+            // principal alone. The lexical parent is shared with the budget,
+            // rule, audit, index and velocity-limit subspaces, whose keys
+            // carry no treasury principal in this position (two of them —
+            // `audit:` and `idx:budgets:` — embed the spelling as key
+            // structure further along), so the registered prefix runs through
+            // the DID scheme and claims only the primary rows: a sibling row
+            // is outside this descriptor, not a member of it, and a sibling
+            // that carries a spelling stays *uncovered* until its own
+            // disposition is argued. The whole-key tokenizer finds the one
+            // spelling at the prefix boundary; `did_ends_key` says nothing
+            // may follow it, which is the writer's exact shape (#2627 M1).
+            prefix: b"ledger:treasury:did:icn:",
+            inventory_rows: &[10, 41],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale:
+                "Authoritative treasury record keyed by the treasury principal. Two rows for \
+                        one principal are two treasury records that can disagree about every \
+                        field — cooperative, currency, creator, activity — and no economics rule \
+                        authorizes choosing, summing or combining them. The live loader classifies \
+                        every primary row and refuses to hydrate over such a pair \
+                        (icn_ledger::principal_rows, #2627 M1); a migration must not decide it \
+                        either.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-gateway/listing_interest_uniqueness",
+            // `v1:interest_idx:<listing uuid>:<did spelling>`. The prefix stops
+            // at the namespace because the listing id varies, so it cannot run
+            // through the DID scheme the way `ledger:treasury:` does. It does
+            // not need to: `v1:interest:` and `v1:listing:` do not begin with
+            // `v1:interest_idx:`, so the sibling rows stay outside this
+            // descriptor rather than being claimed by it.
+            //
+            // The listing component is a `Uuid` rendered canonically — hex and
+            // hyphens — so it cannot spell `did:icn:`, and the whole-key
+            // tokenizer therefore finds exactly the one spelling that is
+            // actually a principal. Because the shape carries every non-DID
+            // byte verbatim, the listing id stays in the canonical shape and
+            // the collision unit is the pair (listing, principal): two
+            // spellings of one principal on ONE listing group, and the same
+            // principal on two listings does not.
+            prefix: b"v1:interest_idx:",
+            inventory_rows: &[26],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            // The spelling is the last component: the writer appends the DID
+            // and nothing else, so anything trailing it is material the
+            // gateway's own parser would not have produced.
+            did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale:
+                "Uniqueness rows for listing interests, keyed by (listing, DID spelling) with a \
+                        constant sentinel value. The row is not a lookup projection that a reader \
+                        could recompute and discard: a sled compare-and-swap on this key IS the \
+                        one-interest-per-member rule, so two spellings of one principal under one \
+                        listing are two independent permissions to create a canonical \
+                        `v1:interest:` row, and merging them would have to decide which of two \
+                        interests — each with its own message and offer — survives. No exchange \
+                        rule authorizes that choice. The live writer classifies the listing's \
+                        canonical interests by principal and refuses a second one \
+                        (icn_gateway::listings_mgr, #2627 M4b); a migration must not decide it \
+                        either. Already-persisted duplicate interests are not dispositioned here.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-governance-actor/action_item_by_assignee",
+            // `action_item_by_assignee:<assignee spelling>:<domain id>:<item
+            // uuid>`. The spelling is anchored immediately after the prefix and
+            // ends at the first `:` that leaves a decodable spelling behind.
+            //
+            // That boundary is exact for every spelling this keyspace may hold,
+            // which is not quite the same as every spelling `Did::from_str`
+            // accepts: the identity base (multibase code `\0`) passes its bytes
+            // through unmodified, so a principal whose identifier bytes are
+            // printable ASCII containing `:` has an accepted spelling no `:`
+            // framing can carry. This scan and the store agree to refuse it —
+            // the tokenizer admits neither `\0` nor `:` as body bytes, so such a
+            // row is unreadable here, and the store refuses to write one at all
+            // (`assignee_spelling_is_framable`, #2627 M4c). Agreement is the
+            // point: a row one layer reads and the other cannot is how a gate
+            // starts lying.
+            //
+            // The residual must be opaque rather than scanned, and the reason
+            // is the same one #2704 established: the domain id is chosen by
+            // whoever created the item (`GovernanceDomainId` wraps any
+            // `String`, filled from a `/domains/{domain_id}/…` path segment),
+            // it may contain `:`, and it may itself BE a `did:icn:` spelling.
+            // A whole-key scan would read such a domain id as a second
+            // principal, canonicalize it, and group two rows the store holds
+            // apart. The whole-key flags below therefore say nothing here.
+            //
+            // The canonical `action_item:<domain>:<item>` rows are a lexical
+            // neighbour, not a member: `action_item:` and
+            // `action_item_by_assignee:` differ at their eleventh byte, so
+            // neither prefix reaches the other and this descriptor claims only
+            // the projection.
+            prefix: b"action_item_by_assignee:",
+            inventory_rows: &[81],
+            disposition: MergeDisposition::Equivalent,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            did_ends_key: false,
+            principal_region: PrincipalRegion::AnchoredThenOpaque { terminator: b':' },
+            rationale:
+                "Secondary index projected from the canonical action_item:<domain>:<item> rows: \
+                        key = (assignee spelling, domain id, item id), value = a constant \
+                        sentinel. The domain and item ids stay in the canonical shape, so one \
+                        person holding two action items is two shapes and never a group — a \
+                        person normally holds many. Two spellings of one principal on ONE item \
+                        are two derivations of one canonical fact: the store answers a \
+                        by-assignee lookup by reading the whole projection, decoding every \
+                        anchored spelling to its principal, and proving each candidate against \
+                        the canonical row — that it exists, that it is filed under the \
+                        coordinates the row named, and that its own assignee is that principal \
+                        under Did equality — before returning it, de-duplicated by (domain, \
+                        item) (#2627 M4c), so keeping any one row loses nothing and the store \
+                        can recompute the projection from the canonical rows. A projection row \
+                        can never create, omit, preserve or alter an assignment on its own. \
+                        Assignment is not authority: the action-item routes authorize by \
+                        domain membership and creator identity, never by this index.",
         },
     ]
 }
@@ -1058,6 +1978,33 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
 mod tests {
     use super::*;
     use crate::SledStore;
+
+    /// The whole-key layouts in registry order: the twelve the §3 evidence was
+    /// gathered with, unchanged, then the Commons holder-by-DID index
+    /// (#2627 M3), the Commons anchor-by-DID index (#2627 M4a), the treasury
+    /// primary rows (#2627 M1) and the listing-interest uniqueness rows
+    /// (#2627 M4b). Registry order is not merge order — treasury registered
+    /// first but sits second-to-last here — so this list is the order itself,
+    /// pinned, and every addition appends to the tail of the registry rather
+    /// than reordering what preceded it.
+    const WHOLE_KEY_NAMES: [&str; 16] = [
+        "icn-net/replay_max_seq",
+        "icn-net/replay_finalized",
+        "icn-net/replay_sender_regime",
+        "icn-net/outgoing_seq",
+        "icn-ledger/balance",
+        "icn-ledger/cleared_volume",
+        "icn-ledger/frozen",
+        "icn-trust/edges",
+        "icn-ledger/journal",
+        "trust-app/sequences_receiver",
+        "trust-app/sequences_issuer",
+        "icn-coop/member",
+        "icn-commons/holder_by_did",
+        "icn-commons/anchor_by_did",
+        "icn-ledger/treasury",
+        "icn-gateway/listing_interest_uniqueness",
+    ];
 
     /// Build a `did:icn:` spelling of `bytes` in the given multibase base.
     fn spell(bytes: &[u8; 32], base: multibase::Base) -> String {
@@ -1090,6 +2037,7 @@ mod tests {
             basis,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "test fixture",
         }
     }
@@ -1759,12 +2707,18 @@ mod tests {
             "icn-net/outgoing_seq",
             "icn-trust/edges",
             "trust-app/sequences_issuer",
+            "trust-app/sequences_receiver",
         ] {
             assert!(
                 pending.contains(&expected),
                 "{expected} has no domain sign-off and must not be automatable"
             );
         }
+        assert_eq!(
+            pending.len(),
+            7,
+            "the sign-off set is pinned exactly: {pending:?}"
+        );
     }
 
     #[test]
@@ -1778,7 +2732,8 @@ mod tests {
         assert!(names.contains(&"rpc/auth-challenges"));
 
         // Every deferral must name the gate that owns it, so the exclusion is
-        // auditable rather than merely convenient.
+        // auditable rather than merely convenient — and must say what a
+        // starting binary does about a collision there, and why.
         for d in n2a_deferred_namespaces() {
             assert!(!d.gate.is_empty(), "{} must name its gate", d.name);
             assert!(
@@ -1786,7 +2741,280 @@ mod tests {
                 "{} must cite inventory",
                 d.name
             );
+            assert!(
+                !d.posture_rationale.is_empty(),
+                "{} must justify its collision posture",
+                d.name
+            );
         }
+    }
+
+    #[test]
+    fn a_collision_in_a_block_startup_deferred_namespace_blocks() {
+        // The security namespace is deferred for *disposition*, not for
+        // detection: its loader folds alias rows into one principal-keyed map
+        // and its shutdown save writes the survivor back. A collision there is
+        // exactly the silent merge the gate exists to stop.
+        let (a, b) = two_spellings(131);
+        let store = store_with(&[
+            (&format!("security:reputation:{a}"), b"v"),
+            (&format!("security:reputation:{b}"), b"v"),
+        ]);
+
+        let a_ = audit(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+        );
+
+        assert_eq!(a_.uncovered_did_rows(), 0, "deferred is not uncovered");
+        assert_eq!(a_.deferred_did_rows(), 2);
+        let blocking = a_.blocking_deferred();
+        assert_eq!(blocking.len(), 1);
+        assert_eq!(blocking[0].name, "security/misbehavior");
+        assert_eq!(blocking[0].report.collision_groups.len(), 1);
+        assert!(!a_.is_clear(), "a lossy loader's collision must block");
+    }
+
+    #[test]
+    fn a_block_startup_deferred_namespace_without_collisions_does_not_block() {
+        // Control: the posture blocks on a collision, not on the namespace's
+        // mere presence. Two different principals under the security prefix
+        // are two rows, not a group.
+        let one = spell(&principal(132), multibase::Base::Base58Btc);
+        let two = spell(&principal(133), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("security:banned:{one}"), b"v"),
+            (&format!("security:banned:{two}"), b"v"),
+        ]);
+
+        let a_ = audit(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+        );
+
+        assert_eq!(a_.deferred_did_rows(), 2);
+        assert!(a_.blocking_deferred().is_empty());
+        assert!(a_.is_clear());
+    }
+
+    #[test]
+    fn a_collision_in_a_report_only_deferred_namespace_is_visible_but_does_not_block() {
+        // Votes stay behind §7.5 and their loader writes nothing back, so a
+        // collision is reported for that gate to see and does not stop the
+        // binary. "Reported" is the load-bearing word: it must appear in the
+        // audit, not vanish into a row count.
+        let (a, b) = two_spellings(134);
+        let store = store_with(&[
+            (&format!("gov:vote:proposal-1:{a}"), b"v"),
+            (&format!("gov:vote:proposal-1:{b}"), b"v"),
+        ]);
+
+        let a_ = audit(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+        );
+
+        let votes = a_
+            .deferred_reports
+            .iter()
+            .find(|d| d.name == "governance/votes")
+            .expect("vote namespace is reported");
+        assert_eq!(votes.posture, DeferredCollisionPosture::ReportOnly);
+        assert_eq!(
+            votes.report.collision_groups.len(),
+            1,
+            "the collision is visible in the deferred report"
+        );
+        assert!(!votes.blocks());
+        assert!(a_.blocking_deferred().is_empty());
+        assert!(a_.is_clear());
+    }
+
+    #[test]
+    fn an_unreadable_row_in_a_block_startup_deferred_namespace_blocks() {
+        // A row whose principal cannot be read cannot be classified, so it
+        // blocks under a blocking posture exactly as it would in a registered
+        // keyspace.
+        let store = store_with(&[("security:quarantine:did:icn:zNOTAKEY", b"v")]);
+
+        let a_ = audit(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+        );
+
+        let security = a_
+            .deferred_reports
+            .iter()
+            .find(|d| d.name == "security/misbehavior")
+            .expect("security namespace is reported");
+        assert_eq!(security.report.rows_unreadable, 1);
+        assert!(security.blocks());
+        assert!(!a_.is_clear());
+    }
+
+    #[test]
+    fn deferred_reports_assert_no_merge_rule() {
+        // A deferred report must never read as authority: whatever a renderer
+        // does with its disposition, it says FAIL-CLOSED and unsigned-off.
+        let one = spell(&principal(135), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("auth:challenge:{one}"), b"v")]);
+
+        for d in scan_deferred(&store, &n2a_deferred_namespaces()).unwrap() {
+            assert_eq!(
+                d.report.disposition,
+                MergeDisposition::FailClosed,
+                "{}",
+                d.name
+            );
+            assert_eq!(
+                d.report.basis,
+                RuleBasis::AwaitingDomainSignOff,
+                "{}",
+                d.name
+            );
+        }
+    }
+
+    #[test]
+    fn sled_discovery_refuses_an_unreadable_directory_rather_than_shortening() {
+        // The failure this pins: a directory that is searchable but not
+        // readable. `read_dir` fails, and a walker that returned what it had so
+        // far would report the databases it did find as if they were all of
+        // them — so the startup gate would audit a subset, find it clean, and
+        // write a CLEAR receipt over a store it never opened.
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path();
+
+        let visible = data_dir.join("visible");
+        std::fs::create_dir_all(&visible).unwrap();
+        std::fs::write(visible.join("conf"), b"x").unwrap();
+
+        let hidden = data_dir.join("hidden");
+        std::fs::create_dir_all(hidden.join("db")).unwrap();
+        std::fs::write(hidden.join("db").join("conf"), b"x").unwrap();
+
+        // Searchable but not readable: `hidden/db` can still be opened by path,
+        // which is exactly why omitting it is unsafe rather than harmless.
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&hidden, std::fs::Permissions::from_mode(0o111)).unwrap();
+
+        let result = find_sled_roots(data_dir);
+
+        // Restore before asserting, so a failure cannot leave an unreadable
+        // directory behind for the tempdir cleanup to trip over.
+        std::fs::set_permissions(&hidden, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let err = result.expect_err("an unreadable directory must refuse, not shorten the list");
+        assert!(
+            format!("{err:#}").contains("cannot enumerate"),
+            "the refusal must name the enumeration failure, got: {err:#}"
+        );
+    }
+
+    #[test]
+    fn sled_discovery_refuses_a_symlink_rather_than_following_or_skipping_it() {
+        // Following would let the sweep leave the data directory; skipping
+        // would omit a database the daemon can still open through the link.
+        // Neither is safe, so the sweep declines to decide.
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path();
+
+        let real = tmp.path().join("elsewhere");
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::write(real.join("conf"), b"x").unwrap();
+
+        std::os::unix::fs::symlink(&real, data_dir.join("linked")).unwrap();
+
+        let err = find_sled_roots(data_dir).expect_err("a symlink must refuse");
+        assert!(
+            format!("{err:#}").contains("symlink"),
+            "the refusal must name the symlink, got: {err:#}"
+        );
+    }
+
+    #[test]
+    fn audit_sled_store_uses_the_canonical_registries_and_every_tree() {
+        // The shared entry point both the offline tool and the startup gate
+        // render: it must consult the real registries, and a principal row in
+        // a named tree must surface as unreachable rather than as absent.
+        let (a, b) = two_spellings(136);
+        let store = store_with(&[
+            (&format!("ledger:balance:\"{a}\""), b"v"),
+            (&format!("ledger:balance:\"{b}\""), b"v"),
+        ]);
+        let named = store.db().open_tree(b"aside").unwrap();
+        named
+            .insert(format!("x:{a}").as_bytes(), b"v".as_slice())
+            .unwrap();
+
+        let audit = audit_sled_store(&store).unwrap();
+
+        let balance = audit
+            .audit
+            .report
+            .keyspaces
+            .iter()
+            .find(|k| k.keyspace == "icn-ledger/balance")
+            .expect("registry keyspace scanned");
+        assert_eq!(balance.collision_groups.len(), 1);
+        assert!(balance.must_fail_closed(), "balance rule is not signed off");
+        assert_eq!(audit.audit.unreachable_did_rows, 1);
+        assert!(audit
+            .trees
+            .iter()
+            .any(|(name, n)| name == "aside" && *n == 1));
+        assert!(!audit.is_clear());
+    }
+
+    #[test]
+    fn find_sled_roots_finds_databases_at_any_level_including_inside_one() {
+        let base = tempfile::tempdir().unwrap();
+        let data_dir = base.path();
+
+        // `store/` is itself a database (as `icnctl init-coop` leaves it), and
+        // holds a database, a non-database directory, and a database nested
+        // inside a non-database; one more database sits at the data-dir level.
+        for rel in [
+            "store",
+            "store/ledger",
+            "commons.sled",
+            "store/deeper/nested",
+        ] {
+            let path = data_dir.join(rel);
+            std::fs::create_dir_all(&path).unwrap();
+            let db = sled::open(&path).unwrap();
+            db.insert(b"k", b"v").unwrap();
+            db.flush().unwrap();
+        }
+        std::fs::create_dir_all(data_dir.join("store/not-a-db")).unwrap();
+        std::fs::write(data_dir.join("identity.age"), b"not a database").unwrap();
+
+        let roots = find_sled_roots(data_dir).expect("a readable fixture tree enumerates");
+        let rel: Vec<String> = roots
+            .iter()
+            .map(|r| r.strip_prefix(data_dir).unwrap().display().to_string())
+            .collect();
+
+        assert_eq!(
+            rel,
+            vec![
+                "commons.sled",
+                "store",
+                "store/deeper/nested",
+                "store/ledger"
+            ],
+            "path-ordered; a non-database directory is walked through, not listed; \
+             a database inside a database is listed; a database's own \
+             subdirectories (`blobs/`) are never listed as databases"
+        );
+        assert!(
+            data_dir.join("store/blobs").is_dir(),
+            "the fixture must exercise sled's own subdirectory"
+        );
     }
 
     #[test]
@@ -1854,10 +3082,129 @@ mod tests {
         // Pins the registry: if a future keyspace does put `/` after a DID it
         // must say so deliberately, rather than inheriting a permissive default
         // that would make `<did>/junk` look readable.
+        //
+        // `federation/attestations/` and `idx_agreement_party/` do put `/`
+        // after a spelling, and do *not* appear here: each declares an anchored
+        // region instead, which ends the spelling at the terminator by
+        // construction. Saying it twice would be two owners for one fact.
         for d in n2a_keyspaces() {
             assert!(
                 !d.slash_ends_did,
                 "{} claims `/` ends a DID; confirm its parser really does",
+                d.name
+            );
+        }
+    }
+
+    #[test]
+    fn the_anchored_layouts_are_the_registered_three_in_registry_order() {
+        // Pins which registered layouts end their one spelling at a terminator
+        // and carry the remainder as an opaque discriminator. The first two are
+        // federation keyspaces of the shape `<prefix><did>/<domain id>`, and
+        // they are pinned together because they differ in exactly the fact
+        // the disposition records: an attestation pair is two claims and fails
+        // closed; a party-index pair is two derivations of one canonical
+        // agreement row and is equivalent. A new anchored layout must be added
+        // here deliberately, with its own disposition argued (#2704, #2707).
+        //
+        // The third is the governance action-item assignee projection
+        // (#2627 M4c), and it is the first anchored layout whose terminator is
+        // `:` rather than `/` — the separator is a property of the individual
+        // key layout, and pinning it here is what stops one layout's separator
+        // being assumed for another's.
+        let anchored: Vec<(&str, u8, MergeDisposition)> = n2a_keyspaces()
+            .iter()
+            .filter_map(|d| match d.principal_region {
+                PrincipalRegion::AnchoredThenOpaque { terminator } => {
+                    Some((d.name, terminator, d.disposition))
+                }
+                PrincipalRegion::WholeKey | PrincipalRegion::LengthPrefixedTagged { .. } => None,
+            })
+            .collect();
+        assert_eq!(
+            anchored,
+            vec![
+                (
+                    "icn-federation/attestations",
+                    b'/',
+                    MergeDisposition::FailClosed
+                ),
+                (
+                    "icn-federation/agreement_party_index",
+                    b'/',
+                    MergeDisposition::Equivalent
+                ),
+                (
+                    "icn-governance-actor/action_item_by_assignee",
+                    b':',
+                    MergeDisposition::Equivalent
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_length_prefixed_layout_is_the_one_adr0014_projection() {
+        // Pins the third layout the registry knows: a length-framed,
+        // tag-discriminated region. It exists because neither of the other two
+        // can read a binary key — a terminator search runs through the length
+        // bytes, and a whole-key scan carries the spelling-derived length
+        // field into the canonical shape and so groups nothing. A second such
+        // layout must be added here deliberately, with its framing and its
+        // disposition argued (#2627 M2).
+        let framed: Vec<(&str, u8, MergeDisposition)> = n2a_keyspaces()
+            .iter()
+            .filter_map(|d| match d.principal_region {
+                PrincipalRegion::LengthPrefixedTagged { principal_tag } => {
+                    Some((d.name, principal_tag, d.disposition))
+                }
+                PrincipalRegion::WholeKey | PrincipalRegion::AnchoredThenOpaque { .. } => None,
+            })
+            .collect();
+        assert_eq!(
+            framed,
+            vec![(
+                "icn-gateway/adr0014_grant_by_grantee",
+                0x01,
+                MergeDisposition::Equivalent
+            )]
+        );
+    }
+
+    #[test]
+    fn the_whole_key_layouts_are_the_pre_existing_keyspaces_unchanged() {
+        // The anchored region is an addition, not a reinterpretation: every
+        // keyspace registered before it still scans its whole key, in the
+        // order it always had, so no existing descriptor's semantics moved
+        // when the two federation layouts were added — nor when the treasury
+        // primary rows were registered after them as the thirteenth
+        // whole-key layout (#2627 M1), nor when the Commons holder-by-DID
+        // index joined them as the fourteenth (#2627 M3), nor when the
+        // Commons anchor-by-DID index joined them as the fifteenth
+        // (#2627 M4a), nor when the listing-interest uniqueness rows joined
+        // them as the sixteenth (#2627 M4b).
+        let whole_key: Vec<&str> = n2a_keyspaces()
+            .iter()
+            .filter(|d| matches!(d.principal_region, PrincipalRegion::WholeKey))
+            .map(|d| d.name)
+            .collect();
+        assert_eq!(whole_key, WHOLE_KEY_NAMES);
+    }
+
+    #[test]
+    fn a_descriptor_with_an_anchored_region_leaves_the_whole_key_flags_off() {
+        // `slash_ends_did` and `did_ends_key` describe a whole-key scan, and
+        // `build_report` reads neither under an anchored region. A descriptor
+        // that set one anyway would be asserting something nothing acts on,
+        // which is how a registry starts lying.
+        for d in n2a_keyspaces() {
+            if matches!(d.principal_region, PrincipalRegion::WholeKey) {
+                continue;
+            }
+            assert!(
+                !d.slash_ends_did && !d.did_ends_key,
+                "{} declares an anchored region; the whole-key flags do not \
+                 apply and must stay false",
                 d.name
             );
         }
@@ -2036,6 +3383,7 @@ mod tests {
         let one = spell(&principal(171), multibase::Base::Base58Btc);
         let strict = KeyspaceDescriptor {
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             ..descriptor(MergeDisposition::Sum)
         };
 
@@ -2079,6 +3427,7 @@ mod tests {
             "trust-app/sequences_issuer",
             "trust-app/sequences_receiver",
             "icn-coop/member",
+            "icn-ledger/treasury", // `ledger:treasury:<did>`, nothing after
         ] {
             assert_eq!(ends(n), Some(true), "{n} keys end with the DID");
         }
@@ -2120,8 +3469,1885 @@ mod tests {
         // inspection belongs to the dedicated security workflow.
         assert!(!names.iter().any(|n| n.contains("misbehavior")));
         assert!(!names.iter().any(|n| n.contains("challenge")));
-        // The governance vote keyspace is behind the separate §7.5 gate.
-        assert!(!names.iter().any(|n| n.contains("governance")));
+
+        // Votes and membership are behind the separate IDENTITY_SEMANTICS
+        // §7.5 gate and are not migrated as part of N2-A.
+        //
+        // Until #2627 M4c this was checked by refusing any name containing
+        // "governance" at all, which was a sound proxy only while the registry
+        // held no governance keyspace. The action-item assignee projection is
+        // a governance keyspace that is emphatically *not* a vote or a
+        // membership row — it is a derived lookup index over action items —
+        // so the proxy is replaced by the invariant it stood for, and the one
+        // governance keyspace that may be registered is named here. A second
+        // one must be added deliberately, with its §7.5 relationship argued.
+        // Not a blanket "member" check: `icn-coop/member` is a registered
+        // cooperative-membership keyspace and always was. What §7.5 gates is
+        // GOVERNANCE membership and votes, which the governance allowlist
+        // below states directly rather than by substring.
         assert!(!names.iter().any(|n| n.contains("vote")));
+        assert!(!names.iter().any(|n| n.contains("ballot")));
+        let governance: Vec<&&str> = names.iter().filter(|n| n.contains("governance")).collect();
+        assert_eq!(
+            governance,
+            vec![&"icn-governance-actor/action_item_by_assignee"],
+            "the only registered governance keyspace is the action-item assignee \
+             projection (#2627 M4c); votes and membership stay behind §7.5"
+        );
+        // And it does not reach vote or membership rows: it claims exactly the
+        // projection prefix, which no vote keyspace begins with.
+        let action_items = n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-governance-actor/action_item_by_assignee")
+            .expect("registered above");
+        assert_eq!(action_items.prefix, b"action_item_by_assignee:");
+        for vote_key in [
+            "gov:vote:p1:did:icn:z1",
+            "vote:p1:did:icn:z1",
+            "index:votes:p1",
+        ] {
+            assert!(
+                !vote_key.as_bytes().starts_with(action_items.prefix),
+                "{vote_key} must stay outside the action-item descriptor"
+            );
+        }
+    }
+    // ----- federation/attestations (#2703) -----------------------------------
+    //
+    // Fixtures write the exact bytes `icn_federation::AttestationStore` writes:
+    // `federation/attestations/<did spelling>/<source_coop_id>`. They use the
+    // real registry rather than a test descriptor, so what they prove is what
+    // the shipped scan — and, through `audit_store`, the startup gate — does.
+
+    fn federation_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-federation/attestations")
+            .expect("federation/attestations/ is registered (#2703)")
+    }
+
+    fn attestation_key(spelling: &str, source: &str) -> String {
+        format!("federation/attestations/{spelling}/{source}")
+    }
+
+    #[test]
+    fn federation_alias_rows_from_one_source_are_a_blocking_collision() {
+        // The #2703 hazard: one principal, two spellings, one source
+        // cooperative. Two persisted claims that can only differ by disagreeing.
+        let (a, b) = two_spellings(61);
+        let store = store_with(&[
+            (&attestation_key(&a, "food-coop"), b"{}"),
+            (&attestation_key(&b, "food-coop"), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(report.collision_groups[0].rows.len(), 2);
+        assert_eq!(report.collision_groups[0].representation_counts, vec![2]);
+        assert_eq!(report.disposition, MergeDisposition::FailClosed);
+        assert!(report.must_fail_closed(), "no rule may elect a survivor");
+
+        // And the whole-store verdict the gate consumes says the same.
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(!audit.is_clear());
+        assert_eq!(
+            audit.uncovered_did_rows(),
+            0,
+            "the rows are classified, not merely unaccounted for"
+        );
+        assert_eq!(
+            audit
+                .report
+                .blocking_keyspaces()
+                .iter()
+                .map(|k| k.keyspace.as_str())
+                .collect::<Vec<_>>(),
+            vec!["icn-federation/attestations"]
+        );
+    }
+
+    #[test]
+    fn federation_alias_rows_from_different_sources_are_the_union_not_a_group() {
+        // Same principal, two spellings, two source cooperatives. The source
+        // stays in the canonical shape, so these are two different claims and
+        // the store treats them as its ordinary union.
+        let (a, b) = two_spellings(62);
+        let store = store_with(&[
+            (&attestation_key(&a, "food-coop"), b"{}"),
+            (&attestation_key(&b, "housing-coop"), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "two (principal, source) tuples"
+        );
+        assert!(report.collision_groups.is_empty());
+        assert!(report.is_automatable());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn federation_rows_for_distinct_principals_do_not_collide() {
+        let one = spell(&principal(63), multibase::Base::Base58Btc);
+        let two = spell(&principal(64), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&attestation_key(&one, "food-coop"), b"{}"),
+            (&attestation_key(&two, "food-coop"), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn federation_rows_are_covered_by_the_registry_not_reported_as_uncovered() {
+        // Before registration a populated attestation row could only surface
+        // as an *uncovered* shape — blocking, but unclassified. Now it is a
+        // registered keyspace's row and appears nowhere else.
+        let one = spell(&principal(65), multibase::Base::Base58Btc);
+        let store = store_with(&[(&attestation_key(&one, "food-coop"), b"{}")]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.uncovered.is_empty(), "{:?}", audit.uncovered);
+        assert_eq!(audit.deferred_did_rows(), 0);
+        let ks = audit
+            .report
+            .keyspaces
+            .iter()
+            .find(|k| k.keyspace == "icn-federation/attestations")
+            .unwrap();
+        assert_eq!(ks.rows_scanned, 1);
+        assert_eq!(ks.rows_with_readable_did, 1);
+        assert_eq!(ks.inventory_rows, vec![27, 59]);
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn federation_source_after_the_slash_is_key_structure_not_a_bad_spelling() {
+        // The layout's `/` is the one remainder the descriptor explains. A
+        // source id made entirely of multibase-alphabet characters — every
+        // real one is — must not be swallowed into the spelling or turn the
+        // row unreadable.
+        for base in [
+            multibase::Base::Base58Btc,
+            multibase::Base::Base16Lower,
+            multibase::Base::Base64,
+            multibase::Base::Base64Url,
+        ] {
+            let one = spell(&principal(66), base);
+            let store = store_with(&[(&attestation_key(&one, "abc123XYZ-_"), b"{}")]);
+            let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+            assert_eq!(report.rows_with_readable_did, 1, "{base:?}");
+            assert_eq!(report.rows_unreadable, 0, "{base:?}");
+            assert_eq!(report.distinct_principals, 1, "{base:?}");
+        }
+    }
+
+    #[test]
+    fn federation_malformed_spelling_is_unreadable_and_blocks() {
+        // Two ways a key can fail to name a principal: junk where the spelling
+        // goes, and a valid spelling with bytes glued on before the `/`. The
+        // store's loader rejects both; the scan must not report either as a
+        // readable principal, or the unreadable count that exists to fail
+        // closed would be quietly lowered.
+        let one = spell(&principal(67), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            ("federation/attestations/did:icn:!!!!/food-coop", b"{}"),
+            (
+                &format!("federation/attestations/{one}junk/food-coop"),
+                b"{}",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 2);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert!(report.must_fail_closed());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(!audit.is_clear());
+    }
+
+    #[test]
+    fn federation_scan_order_pins_the_last_writer_survivor() {
+        // Reported so an operator can see which row an unguarded rebuild would
+        // have kept — and so the report is a function of the store, not of
+        // insertion order.
+        let (a, b) = two_spellings(68);
+        let forward = store_with(&[
+            (&attestation_key(&a, "food-coop"), b"{}"),
+            (&attestation_key(&b, "food-coop"), b"{}"),
+        ]);
+        let reversed = store_with(&[
+            (&attestation_key(&b, "food-coop"), b"{}"),
+            (&attestation_key(&a, "food-coop"), b"{}"),
+        ]);
+
+        let f = scan_keyspace(&forward, &federation_descriptor()).unwrap();
+        let r = scan_keyspace(&reversed, &federation_descriptor()).unwrap();
+        assert_eq!(
+            f, r,
+            "same rows, same report, whatever order they were written"
+        );
+        let survivor = f.collision_groups[0].last_writer_survivor().unwrap();
+        let mut sorted = [a.clone(), b.clone()];
+        sorted.sort();
+        assert_eq!(survivor.spellings, vec![sorted[1].clone()]);
+    }
+
+    // ----- the source is a discriminator, not a spelling (#2704 review, P2) --
+    //
+    // `AttestationStore` compares `source_coop_id` as exact bytes, and nothing
+    // in the federation domain forbids a cooperative identifier that contains
+    // `did:icn:`. A scan that canonicalized inside the source would disagree
+    // with the store in both directions at once: grouping rows the store holds
+    // apart, and calling rows unreadable that the store reads without trouble.
+
+    #[test]
+    fn a_source_id_containing_two_spellings_of_one_did_is_still_two_sources() {
+        // Two source identifiers that are different strings are two claims,
+        // even when the text inside them names one principal. Only the
+        // federation domain could say otherwise, and it has not.
+        let member = spell(&principal(70), multibase::Base::Base58Btc);
+        let (source_a, source_b) = two_spellings(71);
+        let store = store_with(&[
+            (
+                &attestation_key(&member, &format!("coop-{source_a}")),
+                b"{}",
+            ),
+            (
+                &attestation_key(&member, &format!("coop-{source_b}")),
+                b"{}",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "one member, two source ids — two (principal, source) tuples"
+        );
+        assert!(
+            report.collision_groups.is_empty(),
+            "grouping these would be a source-id normalization rule nobody wrote"
+        );
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn a_source_id_that_is_itself_a_valid_spelling_is_still_just_a_source() {
+        let member = spell(&principal(72), multibase::Base::Base58Btc);
+        let (source_a, source_b) = two_spellings(73);
+        let store = store_with(&[
+            (&attestation_key(&member, &source_a), b"{}"),
+            (&attestation_key(&member, &source_b), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn a_malformed_did_inside_a_source_id_leaves_the_row_readable() {
+        // The store reads this row: it rebuilds the key from the value and
+        // compares bytes. Reporting it unreadable would refuse a start over a
+        // store that is fine — a scan stricter than the loader it stands for.
+        let member = spell(&principal(74), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&attestation_key(&member, "did:icn:!!!!"), b"{}"),
+            (&attestation_key(&member, "coop/did:icn:zzz"), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0, "the source is never parsed");
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn the_same_member_and_the_same_exact_source_collide_however_the_source_reads() {
+        // The collision unit is unchanged by any of the above: one principal,
+        // one *byte-identical* source, two spellings of the member.
+        let (a, b) = two_spellings(75);
+        let source = format!("coop-{}", spell(&principal(76), multibase::Base::Base58Btc));
+        let store = store_with(&[
+            (&attestation_key(&a, &source), b"{}"),
+            (&attestation_key(&b, &source), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(
+            report.collision_groups[0].representation_counts,
+            vec![2],
+            "two spellings at the one principal position"
+        );
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn a_member_segment_that_names_no_principal_is_unreadable_not_absent() {
+        // Three ways the anchor fails, and none of them is "this row has no
+        // principal": the layout says one belongs there, and `AttestationStore`
+        // refuses every one of these rows. Counting them as principal-free
+        // would be non-blocking — a start over state nobody can classify.
+        let one = spell(&principal(77), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            ("federation/attestations/did:icn:!!!!/food-coop", b"{}"),
+            (
+                &format!("federation/attestations/{one}junk/food-coop"),
+                b"{}",
+            ),
+            ("federation/attestations/not-a-did-at-all/food-coop", b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 3);
+        assert_eq!(report.rows_unreadable, 3);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert_eq!(report.rows_without_did, 0, "no row here lacks a principal");
+        assert!(report.must_fail_closed());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(!audit.is_clear());
+    }
+
+    #[test]
+    fn a_member_spelling_with_no_source_after_it_is_unreadable() {
+        // `AttestationStore` always writes the terminator and a source, so a
+        // key that stops at the spelling is one no revocation, lookup or sweep
+        // could attribute to a source cooperative.
+        let one = spell(&principal(78), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("federation/attestations/{one}"), b"{}"),
+            (&attestation_key(&one, ""), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(
+            report.rows_unreadable, 1,
+            "the terminated row is readable; the bare spelling is not"
+        );
+        assert_eq!(report.rows_with_readable_did, 1);
+    }
+
+    /// A seed whose `Base64` spelling actually contains `/`.
+    ///
+    /// Searched rather than hard-coded so the hard case is *exercised*: a test
+    /// that merely says "Base64 bodies can contain `/`" proves nothing if the
+    /// one spelling it happens to build does not.
+    fn seed_whose_base64_spelling_contains_a_slash() -> u8 {
+        (0u8..=255)
+            .find(|s| spell(&principal(*s), multibase::Base::Base64).contains('/'))
+            .expect("some seed's Base64 body contains `/`")
+    }
+
+    #[test]
+    fn a_member_spelling_containing_the_terminator_still_ends_at_the_right_slash() {
+        // The case an alphabet alone cannot decide. A `Base64` body legally
+        // contains `/`, so the first `/` after the prefix is not the end of the
+        // spelling — only decoding says where it ends. Getting this wrong would
+        // cut a real spelling in half and report a principal nobody wrote.
+        let one = spell(
+            &principal(seed_whose_base64_spelling_contains_a_slash()),
+            multibase::Base::Base64,
+        );
+        assert!(
+            one[8..].contains('/'),
+            "fixture guard: this spelling must contain `/`"
+        );
+
+        for source in ["food-coop", "a/b", "did:icn:zzz", ""] {
+            let store = store_with(&[(&attestation_key(&one, source), b"{}")]);
+            let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+            assert_eq!(report.rows_with_readable_did, 1, "source {source:?}");
+            assert_eq!(report.rows_unreadable, 0, "source {source:?}");
+            assert_eq!(report.distinct_principals, 1, "source {source:?}");
+        }
+
+        // And the spelling ended where the source began, not somewhere inside
+        // it: two rows differing only in the source are two tuples, and the
+        // same source twice under one spelling is one row.
+        let store = store_with(&[
+            (&attestation_key(&one, "food-coop"), b"{}"),
+            (&attestation_key(&one, "housing-coop"), b"{}"),
+        ]);
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn the_scanner_and_the_store_agree_on_where_the_member_spelling_ends() {
+        // Every base the production parser accepts. The `/`-in-the-body case
+        // has its own fixture above, which searches for a spelling that really
+        // contains one rather than assuming this seed's does.
+        for base in [
+            multibase::Base::Base58Btc,
+            multibase::Base::Base16Lower,
+            multibase::Base::Base64,
+            multibase::Base::Base64Url,
+            multibase::Base::Base32Lower,
+        ] {
+            for source in ["food-coop", "a/b", "did:icn:zzz", ""] {
+                let one = spell(&principal(79), base);
+                let store = store_with(&[(&attestation_key(&one, source), b"{}")]);
+                let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+                assert_eq!(
+                    report.rows_with_readable_did, 1,
+                    "{base:?} spelling with source {source:?}"
+                );
+                assert_eq!(report.rows_unreadable, 0, "{base:?} / {source:?}");
+                assert_eq!(report.distinct_principals, 1, "{base:?} / {source:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_row_that_is_not_under_the_prefix_cannot_be_parsed_by_this_layout() {
+        // `scan_keyspace` reads by prefix so this cannot arise there. The rule
+        // is stated anyway: an anchored parser handed a key it does not
+        // describe reports an unreadable row, never a confident one.
+        let one = spell(&principal(80), multibase::Base::Base58Btc);
+        let report = build_report(
+            &federation_descriptor(),
+            vec![(format!("elsewhere/{one}/food-coop").into_bytes(), 2)],
+        );
+        assert_eq!(report.rows_unreadable, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
+    }
+
+    // ----- idx_agreement_party/ (#2627 row #28, #2707) -----------------------
+    //
+    // Fixtures write the exact bytes `icn_federation::agreement::AgreementStore`
+    // writes: `idx_agreement_party/<did spelling>/<agreement id>` valued by the
+    // agreement id. They use the real registry entry rather than a test
+    // descriptor, so what they prove is what the shipped scan — and, through
+    // `audit_store`, the startup gate — does.
+    //
+    // The layout has the attestation layout's shape — one anchored spelling,
+    // the terminator, an opaque discriminator another domain chose — under the
+    // opposite disposition. An attestation pair is two persisted claims and
+    // fails closed; a party-index pair for one agreement is two derivations of
+    // one canonical `federation/agreements/` row, which the store proves
+    // membership from on every read, so keeping any one loses nothing.
+
+    fn party_index_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-federation/agreement_party_index")
+            .expect("idx_agreement_party/ is registered (#2627 row #28)")
+    }
+
+    fn party_index_key(spelling: &str, agreement_id: &str) -> String {
+        format!("idx_agreement_party/{spelling}/{agreement_id}")
+    }
+
+    #[test]
+    fn party_index_rows_are_readable_through_their_agreement_id_suffix() {
+        // `/` follows the spelling and a generated agreement id
+        // (`agr-<uuid>`) is made entirely of multibase body bytes. A whole-key
+        // scan of this layout would swallow the id into the candidate run and
+        // report the row unreadable; the anchored region ends the spelling at
+        // the terminator and never reads what follows.
+        let one = spell(&principal(81), multibase::Base::Base58Btc);
+        let store = store_with(&[(
+            &party_index_key(&one, "agr-0b1a4c1e-6b0d-4c1c-9a1d-3f6e2d1c0b9a"),
+            b"agr-0b1a4c1e-6b0d-4c1c-9a1d-3f6e2d1c0b9a",
+        )]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert_eq!(report.rows_with_readable_did, 1);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn party_index_alias_rows_for_one_agreement_are_equivalent_and_automatable() {
+        // One party, two spellings, one agreement: two derivations of one
+        // canonical fact. The scan sees the group; the registry says it needs
+        // no human to resolve; the whole-store verdict the gate consumes is
+        // clear with the rows classified rather than unaccounted for.
+        let (a, b) = two_spellings(82);
+        let store = store_with(&[
+            (&party_index_key(&a, "agr-1"), b"agr-1"),
+            (&party_index_key(&b, "agr-1"), b"agr-1"),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(report.collision_groups[0].rows.len(), 2);
+        assert_eq!(report.collision_groups[0].representation_counts, vec![2]);
+        assert_eq!(report.disposition, MergeDisposition::Equivalent);
+        assert_eq!(report.basis, RuleBasis::Established);
+        assert!(
+            report.is_automatable(),
+            "a projection collision needs no adjudication"
+        );
+        assert!(!report.must_fail_closed());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(
+            audit.is_clear(),
+            "an equivalent group does not block a start"
+        );
+        assert_eq!(
+            audit.uncovered_did_rows(),
+            0,
+            "the rows are classified, not unaccounted for"
+        );
+        assert!(audit.report.blocking_keyspaces().is_empty());
+    }
+
+    #[test]
+    fn party_index_rows_for_different_agreements_never_group() {
+        // The agreement id stays in the canonical shape: one party in two
+        // agreements is two facts, not a collision — under one spelling or
+        // under two.
+        let one = spell(&principal(83), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&party_index_key(&one, "agr-1"), b"agr-1"),
+            (&party_index_key(&one, "agr-2"), b"agr-2"),
+        ]);
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(
+            report.distinct_principals, 2,
+            "two (party, agreement) tuples"
+        );
+        assert!(report.collision_groups.is_empty());
+
+        // Same principal, alternate spellings, different agreements: the one
+        // fact that differs from the alias-pair fixture is the discriminator,
+        // and that is enough to keep them apart.
+        let (a, b) = two_spellings(84);
+        let store = store_with(&[
+            (&party_index_key(&a, "agr-1"), b"agr-1"),
+            (&party_index_key(&b, "agr-2"), b"agr-2"),
+        ]);
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(
+            report.collision_groups.is_empty(),
+            "grouping these would erase which agreement each row belongs to"
+        );
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn party_index_rows_for_distinct_principals_do_not_collide() {
+        let one = spell(&principal(85), multibase::Base::Base58Btc);
+        let two = spell(&principal(86), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&party_index_key(&one, "agr-1"), b"agr-1"),
+            (&party_index_key(&two, "agr-1"), b"agr-1"),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn party_index_rows_are_covered_by_the_registry_not_reported_as_uncovered() {
+        // Before registration a populated party-index row could only surface
+        // as an *uncovered* shape — blocking, but unclassified. Now it is a
+        // registered keyspace's row and appears nowhere else.
+        let one = spell(&principal(87), multibase::Base::Base58Btc);
+        let store = store_with(&[(&party_index_key(&one, "agr-1"), b"agr-1")]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.uncovered.is_empty(), "{:?}", audit.uncovered);
+        assert_eq!(audit.deferred_did_rows(), 0);
+        let ks = audit
+            .report
+            .keyspaces
+            .iter()
+            .find(|k| k.keyspace == "icn-federation/agreement_party_index")
+            .unwrap();
+        assert_eq!(ks.rows_scanned, 1);
+        assert_eq!(ks.rows_with_readable_did, 1);
+        assert_eq!(ks.inventory_rows, vec![28]);
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn a_party_segment_that_names_no_principal_is_unreadable_not_absent() {
+        // Three ways the anchor fails, and none of them is "this row has no
+        // principal": the layout says one belongs there, and `AgreementStore`
+        // refuses every one of these rows as malformed. The scan must not
+        // lower the unreadable count — which exists to fail closed — by
+        // calling `<did>junk` a readable prefix plus residue.
+        let one = spell(&principal(88), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (
+                &party_index_key("did:icn:zthisnamesnoprincipal", "agr-1"),
+                b"agr-1",
+            ),
+            (&party_index_key("did:icn:!!!!", "agr-1"), b"agr-1"),
+            (&format!("idx_agreement_party/{one}junk/agr-1"), b"agr-1"),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 3);
+        assert_eq!(report.rows_unreadable, 3);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert_eq!(report.rows_without_did, 0, "no row here lacks a principal");
+        assert!(report.must_fail_closed());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(!audit.is_clear());
+    }
+
+    #[test]
+    fn a_party_spelling_with_no_agreement_id_after_it_is_unreadable() {
+        // `AgreementStore` always writes the terminator and the agreement id,
+        // so a key that stops at the spelling is one no lookup, replacement or
+        // rebuild could attribute to an agreement. A terminated key with an
+        // empty id is readable to the scan — the anchor holds a spelling and
+        // the terminator follows it — and is refused by the store, whose
+        // parser knows the id may not be empty: the loader is the stricter
+        // layer there, exactly as §10.6 of the migration gate describes for
+        // the ledger.
+        let one = spell(&principal(89), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("idx_agreement_party/{one}"), b"agr-1"),
+            (&party_index_key(&one, ""), b""),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(
+            report.rows_unreadable, 1,
+            "the terminated row is readable; the bare spelling is not"
+        );
+        assert_eq!(report.rows_with_readable_did, 1);
+    }
+
+    // ----- the agreement id is a discriminator, not a spelling ----------------
+    //
+    // `AgreementId::new` accepts any string and `AgreementStore` compares ids
+    // as exact bytes, anchoring its own parse on the id the row's value names.
+    // Nothing in the federation domain forbids an id that contains — or is —
+    // a `did:icn:` spelling. A scan that canonicalized inside the id would
+    // disagree with the store in both directions at once: grouping rows the
+    // store holds apart, and calling rows unreadable that the store reads.
+
+    #[test]
+    fn an_agreement_id_containing_a_did_spelling_is_a_discriminator_not_a_principal() {
+        let party = spell(&principal(90), multibase::Base::Base58Btc);
+        let (other_a, other_b) = two_spellings(91);
+        let store = store_with(&[
+            (
+                &party_index_key(&party, &format!("agr-{other_a}")),
+                format!("agr-{other_a}").as_bytes(),
+            ),
+            (
+                &party_index_key(&party, &format!("agr-{other_b}")),
+                format!("agr-{other_b}").as_bytes(),
+            ),
+            (&party_index_key(&party, &other_a), other_a.as_bytes()),
+            (&party_index_key(&party, "did:icn:!!!!"), b"did:icn:!!!!"),
+            (&party_index_key(&party, "a/b"), b"a/b"),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 5);
+        assert_eq!(
+            report.rows_unreadable, 0,
+            "the agreement id is never parsed"
+        );
+        assert_eq!(report.rows_with_readable_did, 5);
+        assert_eq!(
+            report.distinct_principals, 5,
+            "one party, five agreement ids — five (party, agreement) tuples"
+        );
+        assert!(
+            report.collision_groups.is_empty(),
+            "grouping these would be an agreement-id normalization rule nobody wrote"
+        );
+        assert!(report.is_automatable());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn the_same_party_and_the_same_exact_agreement_id_collide_however_the_id_reads() {
+        // The collision unit is unchanged by any of the above: one principal,
+        // one *byte-identical* agreement id, two spellings of the party — and,
+        // unlike the attestation layout, the group is equivalent.
+        let (a, b) = two_spellings(92);
+        let id = format!("agr-{}", spell(&principal(93), multibase::Base::Base58Btc));
+        let store = store_with(&[
+            (&party_index_key(&a, &id), id.as_bytes()),
+            (&party_index_key(&b, &id), id.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(
+            report.collision_groups[0].representation_counts,
+            vec![2],
+            "two spellings at the one principal position"
+        );
+        assert_eq!(report.disposition, MergeDisposition::Equivalent);
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn a_party_spelling_containing_the_terminator_still_ends_at_the_right_slash() {
+        // A `Base64` body legally contains `/`, so the first `/` after the
+        // prefix is not the end of the spelling — only decoding says where it
+        // ends. This is the case the store's own parser handles by anchoring
+        // on the id its value names, and the scan must agree with it.
+        let one = spell(
+            &principal(seed_whose_base64_spelling_contains_a_slash()),
+            multibase::Base::Base64,
+        );
+        assert!(
+            one[8..].contains('/'),
+            "fixture guard: this spelling must contain `/`"
+        );
+
+        for id in ["agr-1", "a/b", "did:icn:zzz", ""] {
+            let store = store_with(&[(&party_index_key(&one, id), id.as_bytes())]);
+            let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+            assert_eq!(report.rows_with_readable_did, 1, "agreement id {id:?}");
+            assert_eq!(report.rows_unreadable, 0, "agreement id {id:?}");
+            assert_eq!(report.distinct_principals, 1, "agreement id {id:?}");
+        }
+
+        let store = store_with(&[
+            (&party_index_key(&one, "agr-1"), b"agr-1"),
+            (&party_index_key(&one, "agr-2"), b"agr-2"),
+        ]);
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn the_scanner_and_the_store_agree_on_where_the_party_spelling_ends() {
+        // Every base the production parser accepts, against ids of every shape
+        // the store admits. The `/`-in-the-body case has its own fixture above.
+        for base in [
+            multibase::Base::Base58Btc,
+            multibase::Base::Base16Lower,
+            multibase::Base::Base64,
+            multibase::Base::Base64Url,
+            multibase::Base::Base32Lower,
+        ] {
+            for id in ["agr-1", "a/b", "did:icn:zzz", ""] {
+                let one = spell(&principal(94), base);
+                let store = store_with(&[(&party_index_key(&one, id), id.as_bytes())]);
+                let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+                assert_eq!(
+                    report.rows_with_readable_did, 1,
+                    "{base:?} spelling with agreement id {id:?}"
+                );
+                assert_eq!(report.rows_unreadable, 0, "{base:?} / {id:?}");
+                assert_eq!(report.distinct_principals, 1, "{base:?} / {id:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn party_index_scan_order_does_not_change_the_report() {
+        // The report is a function of the store, not of insertion order — and
+        // for an equivalent group the survivor is reported, never elected.
+        let (a, b) = two_spellings(95);
+        let forward = store_with(&[
+            (&party_index_key(&a, "agr-1"), b"agr-1"),
+            (&party_index_key(&b, "agr-1"), b"agr-1"),
+        ]);
+        let reversed = store_with(&[
+            (&party_index_key(&b, "agr-1"), b"agr-1"),
+            (&party_index_key(&a, "agr-1"), b"agr-1"),
+        ]);
+
+        let f = scan_keyspace(&forward, &party_index_descriptor()).unwrap();
+        let r = scan_keyspace(&reversed, &party_index_descriptor()).unwrap();
+        assert_eq!(
+            f, r,
+            "same rows, same report, whatever order they were written"
+        );
+        assert_eq!(f.collision_groups.len(), 1);
+        assert!(f.is_automatable());
+    }
+
+    // ----- ledger:treasury:<did> (#2627 M1) ----------------------------------
+    //
+    // Fixtures write the exact bytes `TreasuryManager::persist_treasury`
+    // writes: `ledger:treasury:<did spelling>`, nothing after. They use the
+    // real registry descriptor, so what they prove is what the shipped scan —
+    // and, through `audit_store`, the startup gate — does. The loader-side
+    // pin, against the ledger's own prefix constants, is in `icn-ledger`
+    // (`treasury.rs` tests); the loader fixtures are
+    // `icn-ledger/tests/treasury_principal_rows.rs`.
+
+    fn treasury_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-ledger/treasury")
+            .expect("the treasury keyspace is registered")
+    }
+
+    fn treasury_row(spelling: &str) -> String {
+        format!("ledger:treasury:{spelling}")
+    }
+
+    const TREASURY_SIBLING_PREFIXES: [&str; 6] = [
+        "ledger:treasury:budget:",
+        "ledger:treasury:rule:",
+        "ledger:treasury:audit:",
+        "ledger:treasury:idx:coop:",
+        "ledger:treasury:idx:budgets:",
+        "ledger:treasury:vlimit:",
+    ];
+
+    fn anchor_by_did_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-commons/anchor_by_did")
+            .expect("the Commons anchor-by-DID keyspace is registered")
+    }
+
+    #[test]
+    fn the_anchor_index_descriptor_claims_the_index_and_not_the_anchor_primaries() {
+        // `commons/anchors/` is a lexical PREFIX of `commons/anchors/by_did/`,
+        // so a descriptor registered one segment too short would claim the
+        // opaque-hex anchor primaries as well. Those keys carry no spelling,
+        // so widening produces no collision and no CLEAR/BLOCK difference —
+        // the behavioural fixtures cannot see it. It is still wrong: a
+        // descriptor must claim only the bytes it structurally owns, or the
+        // registry stops describing the store. This pins the width directly.
+        let d = anchor_by_did_descriptor();
+        assert_eq!(d.prefix, b"commons/anchors/by_did/");
+
+        let primary = b"commons/anchors/".as_slice();
+        assert!(
+            d.prefix.starts_with(primary) && d.prefix != primary,
+            "the index prefix must run strictly past the anchor primary prefix"
+        );
+        // A primary row is not claimed by this descriptor.
+        let primary_row = format!("commons/anchors/{}", hex::encode([7u8; 32]));
+        assert!(
+            !primary_row.as_bytes().starts_with(d.prefix),
+            "an anchor primary must fall outside the index descriptor"
+        );
+        // An index row is.
+        let index_row = format!(
+            "commons/anchors/by_did/{}",
+            spell(&principal(7), multibase::Base::Base58Btc)
+        );
+        assert!(index_row.as_bytes().starts_with(d.prefix));
+
+        assert_eq!(d.disposition, MergeDisposition::FailClosed);
+        assert_eq!(d.basis, RuleBasis::Established);
+        assert!(d.did_ends_key, "nothing follows the spelling");
+        assert!(!d.slash_ends_did);
+        assert!(matches!(d.principal_region, PrincipalRegion::WholeKey));
+        assert_eq!(d.inventory_rows, &[66]);
+    }
+
+    fn anchor_index_row(spelling: &str) -> String {
+        format!("commons/anchors/by_did/{spelling}")
+    }
+
+    #[test]
+    fn two_anchor_index_rows_for_one_principal_are_a_blocking_collision() {
+        let (a, b) = two_spellings(66);
+        let store = store_with(&[
+            (&anchor_index_row(&a), b"00"),
+            (&anchor_index_row(&b), b"01"),
+        ]);
+
+        let report = scan_keyspace(&store, &anchor_by_did_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert!(!report.is_automatable());
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn the_two_rows_one_healthy_enrollment_writes_are_not_a_collision() {
+        // The control the whole descriptor depends on: `put_anchor` files an
+        // anchor under `Did::from_anchor_id`, a function of the random anchor
+        // id, and `put_anchor_did_index` files the same anchor under the
+        // enrollment spelling. Those name different principals. If the scanner
+        // grouped them, every enrolled node would refuse to start.
+        let enrolment = spell(&principal(66), multibase::Base::Base58Btc);
+        let derived = spell(&principal(200), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&anchor_index_row(&enrolment), b"00"),
+            (&anchor_index_row(&derived), b"00"),
+        ]);
+
+        let report = scan_keyspace(&store, &anchor_by_did_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn the_treasury_descriptor_runs_through_the_did_scheme_and_claims_no_sibling() {
+        // The registered prefix is the primary prefix plus the DID scheme, so
+        // it matches every key the writer produces and no key beneath any
+        // sibling subspace — a sibling prefix is neither inside nor around
+        // it. The authoritative version of this pin, against the ledger's own
+        // constants, is in `icn-ledger`; this one keeps the registry honest
+        // on its own.
+        let d = treasury_descriptor();
+        assert_eq!(d.prefix, b"ledger:treasury:did:icn:");
+        for sibling in TREASURY_SIBLING_PREFIXES {
+            assert!(
+                !sibling.as_bytes().starts_with(d.prefix)
+                    && !d.prefix.starts_with(sibling.as_bytes()),
+                "{sibling}"
+            );
+        }
+        assert_eq!(d.disposition, MergeDisposition::FailClosed);
+        assert_eq!(d.basis, RuleBasis::Established);
+        assert!(d.did_ends_key, "nothing follows the spelling");
+        assert!(!d.slash_ends_did);
+        assert!(matches!(d.principal_region, PrincipalRegion::WholeKey));
+        assert_eq!(d.inventory_rows, &[10, 41]);
+    }
+
+    #[test]
+    fn treasury_alias_rows_are_a_blocking_collision() {
+        let (a, b) = two_spellings(50);
+        let store = store_with(&[(&treasury_row(&a), b"{}"), (&treasury_row(&b), b"{}")]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(report.collision_groups[0].representation_counts, vec![2]);
+        assert!(!report.is_automatable());
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn treasury_rows_for_distinct_principals_do_not_collide() {
+        let one = spell(&principal(51), multibase::Base::Base58Btc);
+        let two = spell(&principal(52), multibase::Base::Base16Lower);
+        let store = store_with(&[(&treasury_row(&one), b"{}"), (&treasury_row(&two), b"{}")]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn treasury_sibling_rows_are_outside_the_descriptor_not_members_of_it() {
+        // Every sibling subspace beneath the lexical parent, including the two
+        // that embed a spelling as key structure — spelled here as the *alias*
+        // of the primary row's principal, which is the strongest way to show
+        // the descriptor never reads them as a second spelling of that row.
+        let (a, b) = two_spellings(53);
+        let store = store_with(&[
+            (&treasury_row(&a), b"{}"),
+            ("ledger:treasury:budget:budget-1", b"{}"),
+            ("ledger:treasury:rule:rule-1", b"{}"),
+            ("ledger:treasury:idx:coop:food-coop", a.as_bytes()),
+            ("ledger:treasury:vlimit:vlimit-1", b"{}"),
+            (
+                &format!("ledger:treasury:audit:{b}:1700000000:audit-1"),
+                b"{}",
+            ),
+            (
+                &format!("ledger:treasury:idx:budgets:{b}:budget-1"),
+                b"budget-1",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1, "only the primary row is a member");
+        assert_eq!(report.distinct_principals, 1);
+        assert!(
+            report.collision_groups.is_empty(),
+            "a sibling's spelling is key structure there, never a treasury alias"
+        );
+
+        // The two siblings that carry a spelling are what they were before
+        // M1 — principal-bearing rows under no registered keyspace. The
+        // descriptor does not claim a disposition it has not argued; they
+        // stay uncovered until their own registration (follow-up).
+        let uncovered =
+            uncovered_did_key_shapes(&store, &n2a_keyspaces(), &n2a_deferred_namespaces()).unwrap();
+        assert_eq!(uncovered.len(), 2, "{uncovered:?}");
+        assert_eq!(
+            uncovered.get("ledger:treasury:audit:<did>:1700000000:audit-1"),
+            Some(&1)
+        );
+        assert_eq!(
+            uncovered.get("ledger:treasury:idx:budgets:<did>:budget-1"),
+            Some(&1)
+        );
+    }
+
+    #[test]
+    fn a_did_looking_coop_id_in_the_treasury_index_is_not_a_treasury_spelling() {
+        // Opaque-discriminator control. The cooperative index is keyed by a
+        // coop id the ledger never validates, so one can be a DID spelling —
+        // even an alias of the primary row's principal. To this descriptor it
+        // is not a member (one row scanned, no group). Carrying a spelling
+        // under no registered prefix, it surfaces as uncovered — unclassified,
+        // exactly as before M1 — and never as a treasury collision.
+        let (a, b) = two_spellings(54);
+        let store = store_with(&[
+            (&treasury_row(&a), b"{}"),
+            (&format!("ledger:treasury:idx:coop:{b}"), a.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert!(report.collision_groups.is_empty());
+
+        let uncovered =
+            uncovered_did_key_shapes(&store, &n2a_keyspaces(), &n2a_deferred_namespaces()).unwrap();
+        assert_eq!(uncovered.get("ledger:treasury:idx:coop:<did>"), Some(&1));
+        assert_eq!(uncovered.len(), 1);
+    }
+
+    #[test]
+    fn a_treasury_key_with_material_after_the_spelling_is_unreadable() {
+        // `did_ends_key`: the writer puts nothing after the spelling, and the
+        // loader's `Did::from_str` consumes the whole remainder, so trailing
+        // material is a row neither can read.
+        let one = spell(&principal(55), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("ledger:treasury:{one}junk"), b"{}"),
+            (&format!("ledger:treasury:{one}:x"), b"{}"),
+            ("ledger:treasury:did:icn:zNOTAKEY", b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 3);
+        assert_eq!(report.rows_unreadable, 3);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn treasury_rows_are_covered_by_the_registry_not_reported_as_uncovered() {
+        // Before this registration an ordinary treasury row could only
+        // surface as an uncovered shape — blocking, and unclassified.
+        let one = spell(&principal(56), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&treasury_row(&one), b"{}"),
+            ("ledger:treasury:idx:coop:food-coop", one.as_bytes()),
+        ]);
+
+        let uncovered =
+            uncovered_did_key_shapes(&store, &n2a_keyspaces(), &n2a_deferred_namespaces()).unwrap();
+        assert!(uncovered.is_empty(), "{uncovered:?}");
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn treasury_scan_order_pins_the_last_writer_survivor() {
+        // What the pre-M1 loader elected: `Store::scan` is lexicographic, so
+        // the base58 (`z`) row scans after the base16 (`f`) row whichever was
+        // written first, and its value was the one that survived the fold.
+        let (z, f) = two_spellings(57);
+        let store = store_with(&[(&treasury_row(&z), b"{}"), (&treasury_row(&f), b"{}")]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+        let group = &report.collision_groups[0];
+        assert_eq!(group.rows.len(), 2);
+        assert_eq!(group.last_writer_survivor().unwrap().spellings, vec![z]);
+    }
+
+    // ---- ADR-0014 by-grantee projection (#2627 M2) ----
+    //
+    // Same shape as the party index above — a projection whose alias rows are
+    // equivalent derivations of one canonical row — but a *binary* layout: the
+    // grantee region is length-framed and tag-discriminated, so neither the
+    // whole-key tokenizer nor a terminator search can read it. These fixtures
+    // pin the structural rule, not ADR-0014's authority semantics.
+
+    fn grant_by_grantee_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-gateway/adr0014_grant_by_grantee")
+            .expect("adr0014:grant:by_grantee: is registered (#2627 row #25)")
+    }
+
+    fn store_with_raw(rows: &[(Vec<u8>, &[u8])]) -> SledStore {
+        let store = SledStore::temporary().unwrap();
+        for (key, value) in rows {
+            store.put(key, value).unwrap();
+        }
+        store
+    }
+
+    /// Reproduce `ReceiptStore::grant_by_grantee_key` byte-for-byte.
+    fn grantee_key(tag: u8, body: &[u8], valid_from: u64, grant_id: &str) -> Vec<u8> {
+        let mut region = vec![tag];
+        region.extend_from_slice(body);
+        let mut key = b"adr0014:grant:by_grantee:".to_vec();
+        key.extend_from_slice(&(region.len() as u32).to_be_bytes());
+        key.extend_from_slice(&region);
+        key.extend_from_slice(&valid_from.to_be_bytes());
+        key.extend_from_slice(grant_id.as_bytes());
+        key
+    }
+
+    fn person_key(spelling: &str, valid_from: u64, grant_id: &str) -> Vec<u8> {
+        grantee_key(0x01, spelling.as_bytes(), valid_from, grant_id)
+    }
+
+    const GRANT_A: &str = "11111111-1111-4111-8111-111111111111";
+    const GRANT_B: &str = "22222222-2222-4222-8222-222222222222";
+
+    #[test]
+    fn a_person_grant_row_is_readable_through_its_binary_framing() {
+        // The length field ends the spelling and the 8-byte `valid_from` plus
+        // 36-byte grant id after it are never parsed. A whole-key scan would
+        // swallow part of that tail into the candidate run.
+        let one = spell(&principal(91), multibase::Base::Base58Btc);
+        let store = store_with_raw(&[(person_key(&one, 1_000, GRANT_A), GRANT_A.as_bytes())]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert_eq!(report.rows_with_readable_did, 1);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn grantee_alias_rows_for_one_grant_are_equivalent_and_automatable() {
+        // One principal, two spellings, one grant: two derivations of one
+        // canonical `adr0014:grant:<uuid>` record. The varying u32 length
+        // field must not keep them apart — that is what the region-spanning
+        // canonical shape buys.
+        let (a, b) = two_spellings(92);
+        let store = store_with_raw(&[
+            (person_key(&a, 1_000, GRANT_A), GRANT_A.as_bytes()),
+            (person_key(&b, 1_000, GRANT_A), GRANT_A.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert!(
+            report.is_automatable(),
+            "an equivalent projection pair needs no human to resolve"
+        );
+    }
+
+    #[test]
+    fn control_two_grants_for_one_principal_are_two_shapes_not_a_collision() {
+        // A principal may legitimately hold several distinct grants. The grant
+        // id stays in the canonical shape, so this must never group.
+        let (a, b) = two_spellings(93);
+        let store = store_with_raw(&[
+            (person_key(&a, 1_000, GRANT_A), GRANT_A.as_bytes()),
+            (person_key(&b, 2_000, GRANT_B), GRANT_B.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(
+            report.collision_groups.is_empty(),
+            "two grants for one principal are two grants"
+        );
+    }
+
+    #[test]
+    fn control_two_principals_stay_separate() {
+        let one = spell(&principal(94), multibase::Base::Base58Btc);
+        let two = spell(&principal(95), multibase::Base::Base58Btc);
+        let store = store_with_raw(&[
+            (person_key(&one, 1_000, GRANT_A), GRANT_A.as_bytes()),
+            (person_key(&two, 1_000, GRANT_A), GRANT_A.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn an_entity_row_that_spells_a_did_is_not_a_principal() {
+        // Tag 0x02 is an entity id the granting domain chose. Its bytes are
+        // not this registry's to decode, however much they look like a DID.
+        let looks_like = spell(&principal(96), multibase::Base::Base58Btc);
+        let store = store_with_raw(&[(
+            grantee_key(0x02, looks_like.as_bytes(), 1_000, GRANT_A),
+            GRANT_A.as_bytes(),
+        )]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert_eq!(
+            report.rows_with_readable_did, 0,
+            "an entity id is not a principal"
+        );
+        assert_eq!(report.rows_unreadable, 0, "and it is not unreadable either");
+        assert_eq!(report.distinct_principals, 0);
+    }
+
+    #[test]
+    fn a_person_row_whose_spelling_names_no_principal_is_unreadable() {
+        let store = store_with_raw(&[(
+            person_key("did:icn:not-a-spelling!!", 1_000, GRANT_A),
+            GRANT_A.as_bytes(),
+        )]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_unreadable, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
+    }
+
+    #[test]
+    fn broken_binary_framing_is_unreadable_not_principal_free() {
+        // A truncated length field, a length that overruns the key, and an
+        // unknown tag are three different ways to be a row this writer could
+        // not have produced. The first two cannot be classified at all; the
+        // third names no principal by the layout's own rule.
+        let one = spell(&principal(97), multibase::Base::Base58Btc);
+
+        let mut truncated = b"adr0014:grant:by_grantee:".to_vec();
+        truncated.extend_from_slice(&[0u8, 0u8]);
+
+        let mut overrun = b"adr0014:grant:by_grantee:".to_vec();
+        overrun.extend_from_slice(&u32::MAX.to_be_bytes());
+        overrun.extend_from_slice(b"\x01did:icn:z");
+
+        for (label, key) in [("truncated", truncated), ("overrun", overrun)] {
+            let store = store_with_raw(&[(key, GRANT_A.as_bytes())]);
+            let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+            assert_eq!(report.rows_unreadable, 1, "{label} must be unreadable");
+        }
+
+        // An undefined tag is well-framed and simply carries no principal.
+        let store = store_with_raw(&[(
+            grantee_key(0x09, one.as_bytes(), 1_000, GRANT_A),
+            GRANT_A.as_bytes(),
+        )]);
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.rows_with_readable_did, 0);
+    }
+
+    #[test]
+    fn every_framing_boundary_is_classified_and_none_panics() {
+        // The region is consumed from binary framing, so each way the framing
+        // can be wrong gets its own row. None may panic or slice unchecked,
+        // and a broken Person region must never fall through to being read as
+        // another tag's opaque value.
+        let pfx = b"adr0014:grant:by_grantee:";
+
+        // No length field at all.
+        let no_len = pfx.to_vec();
+        // A length field one byte short of its width.
+        let mut short_len = pfx.to_vec();
+        short_len.extend_from_slice(&[0u8, 0, 0]);
+        // A zero-length region: framed, but not even a tag inside.
+        let mut zero_len = pfx.to_vec();
+        zero_len.extend_from_slice(&0u32.to_be_bytes());
+        zero_len.extend_from_slice(&1_000u64.to_be_bytes());
+        zero_len.extend_from_slice(GRANT_A.as_bytes());
+        // Person tag with an empty body.
+        let mut empty_person = pfx.to_vec();
+        empty_person.extend_from_slice(&1u32.to_be_bytes());
+        empty_person.push(0x01);
+        empty_person.extend_from_slice(&1_000u64.to_be_bytes());
+        empty_person.extend_from_slice(GRANT_A.as_bytes());
+        // Person tag whose body is not UTF-8.
+        let mut bad_utf8 = pfx.to_vec();
+        bad_utf8.extend_from_slice(&4u32.to_be_bytes());
+        bad_utf8.extend_from_slice(&[0x01, 0xff, 0xfe, 0xfd]);
+        bad_utf8.extend_from_slice(&1_000u64.to_be_bytes());
+        bad_utf8.extend_from_slice(GRANT_A.as_bytes());
+        // A length field claiming the whole address space.
+        let mut huge = pfx.to_vec();
+        huge.extend_from_slice(&u32::MAX.to_be_bytes());
+        huge.push(0x01);
+
+        for (label, key) in [
+            ("no length field", no_len),
+            ("short length field", short_len),
+            ("zero-length region", zero_len),
+            ("empty person body", empty_person),
+            ("non-utf8 person body", bad_utf8),
+            ("huge declared length", huge),
+        ] {
+            let store = store_with_raw(&[(key, GRANT_A.as_bytes())]);
+            let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+            assert_eq!(report.rows_scanned, 1, "{label}");
+            assert_eq!(
+                report.rows_unreadable, 1,
+                "{label} must be unreadable, not silently principal-free"
+            );
+            assert_eq!(report.rows_with_readable_did, 0, "{label}");
+        }
+    }
+
+    #[test]
+    fn a_person_grant_row_is_never_reported_as_uncovered() {
+        // Before registration a single ordinary Person grant produced an
+        // uncovered shape, which the startup gate treats as a blocker.
+        let one = spell(&principal(98), multibase::Base::Base58Btc);
+        let store = store_with_raw(&[(person_key(&one, 1_000, GRANT_A), GRANT_A.as_bytes())]);
+
+        let shapes =
+            uncovered_did_key_shapes(&store, &n2a_keyspaces(), &n2a_deferred_namespaces()).unwrap();
+        assert!(
+            shapes.is_empty(),
+            "the registered prefix must claim this row; got {shapes:?}"
+        );
+    }
+    // ----- v1:interest_idx: (#2627 M4b) -------------------------------------
+    //
+    // Fixtures write the exact bytes `icn_gateway::listings_mgr` writes:
+    // `v1:interest_idx:<listing uuid>:<did spelling>` with the sentinel value.
+    // They use the real registry rather than a test descriptor, so what they
+    // prove is what the shipped scan — and, through `audit_store`, the startup
+    // gate — does.
+
+    fn interest_uniqueness_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-gateway/listing_interest_uniqueness")
+            .expect("the listing-interest uniqueness keyspace is registered (#2627 M4b)")
+    }
+
+    /// A listing id in the writer's rendering: a canonical `Uuid`, which is the
+    /// framing the key's structure relies on.
+    fn listing(n: u8) -> String {
+        format!("00000000-0000-4000-8000-0000000000{n:02x}")
+    }
+
+    fn interest_index_row(listing_id: &str, spelling: &str) -> String {
+        format!("v1:interest_idx:{listing_id}:{spelling}")
+    }
+
+    #[test]
+    fn the_interest_uniqueness_descriptor_claims_the_index_and_not_its_siblings() {
+        let d = interest_uniqueness_descriptor();
+        assert_eq!(d.prefix, b"v1:interest_idx:");
+        assert_eq!(d.disposition, MergeDisposition::FailClosed);
+        assert_eq!(d.basis, RuleBasis::Established);
+        assert!(d.did_ends_key, "the writer appends the spelling and stops");
+        assert!(!d.slash_ends_did);
+        assert!(matches!(d.principal_region, PrincipalRegion::WholeKey));
+        assert_eq!(d.inventory_rows, &[26]);
+
+        // The canonical interest rows and the listing rows are lexical
+        // neighbours, not members. `v1:interest:` is a prefix of neither
+        // direction of this descriptor: it does not start with
+        // `v1:interest_idx:`, and widening the descriptor to `v1:interest`
+        // would swallow it.
+        let primary = format!("v1:interest:{}:{}", listing(1), listing(2));
+        let listing_row = format!("v1:listing:{}", listing(1));
+        for sibling in [&primary, &listing_row] {
+            assert!(
+                !sibling.as_bytes().starts_with(d.prefix),
+                "{sibling} must fall outside the uniqueness descriptor"
+            );
+        }
+        // And an index row is claimed.
+        let row = interest_index_row(
+            &listing(1),
+            &spell(&principal(1), multibase::Base::Base58Btc),
+        );
+        assert!(row.as_bytes().starts_with(d.prefix));
+    }
+
+    #[test]
+    fn two_spellings_of_one_principal_on_one_listing_are_a_blocking_collision() {
+        let (a, b) = two_spellings(26);
+        let l = listing(1);
+        let store = store_with(&[
+            (&interest_index_row(&l, &a), b"1"),
+            (&interest_index_row(&l, &b), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert!(!report.is_automatable());
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn one_principal_on_two_listings_is_not_a_collision() {
+        // The control the collision unit depends on. Uniqueness is per listing,
+        // so a member acting on two listings is two facts. A descriptor that
+        // dropped the listing id from the canonical shape would group these and
+        // refuse to start every gateway holding an ordinary exchange.
+        let (a, b) = two_spellings(26);
+        let store = store_with(&[
+            (&interest_index_row(&listing(1), &a), b"1"),
+            (&interest_index_row(&listing(2), &b), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "the listing id stays in the canonical shape, so these are two shapes"
+        );
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn two_distinct_principals_on_one_listing_are_not_a_collision() {
+        let l = listing(1);
+        let store = store_with(&[
+            (
+                &interest_index_row(&l, &spell(&principal(26), multibase::Base::Base58Btc)),
+                b"1",
+            ),
+            (
+                &interest_index_row(&l, &spell(&principal(27), multibase::Base::Base58Btc)),
+                b"1",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn a_malformed_spelling_makes_an_interest_uniqueness_row_unreadable() {
+        let l = listing(1);
+        let store = store_with(&[
+            (&interest_index_row(&l, "did:icn:!!!not-multibase"), b"1"),
+            (
+                &interest_index_row(&l, &spell(&principal(26), multibase::Base::Base58Btc)),
+                b"1",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_unreadable, 1);
+        assert!(
+            report.must_fail_closed(),
+            "an unreadable row must block regardless of the collision count"
+        );
+    }
+
+    #[test]
+    fn material_after_the_spelling_makes_an_interest_uniqueness_row_unreadable() {
+        // The writer appends the spelling and stops, so trailing bytes are a
+        // key its own parser would not have produced. `did_ends_key` is what
+        // catches it: without that flag the tokenizer's candidate run would end
+        // at the separator and report a clean spelling with residual material.
+        let l = listing(1);
+        let spelling = spell(&principal(26), multibase::Base::Base58Btc);
+        let store = store_with(&[(
+            &format!("{}:trailing", interest_index_row(&l, &spelling)),
+            b"1",
+        )]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_unreadable, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn a_row_whose_listing_framing_is_not_a_uuid_still_scans_by_its_spelling() {
+        // The scan reads key structure, not the gateway's domain rules: it does
+        // not parse the listing component, so a row whose framing the gateway
+        // would reject is still grouped by whatever precedes the spelling,
+        // byte-for-byte. It therefore cannot be merged with a well-framed row —
+        // which is the property that matters here — and the gateway's own
+        // loader is what refuses the framing (#2627 M4b).
+        let spelling = spell(&principal(26), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&interest_index_row("not-a-uuid", &spelling), b"1"),
+            (&interest_index_row(&listing(1), &spelling), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "different framing is a different shape, so no group forms"
+        );
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn an_unregistered_interest_uniqueness_row_would_be_uncovered() {
+        // What registration bought. Before this descriptor these rows carried a
+        // spelling under no registered prefix, so the gate blocked them as an
+        // uncovered shape; the descriptor is what turns that liveness wall into
+        // a proven boundary. With it registered, a healthy store clears.
+        let l = listing(1);
+        let row = interest_index_row(&l, &spell(&principal(26), multibase::Base::Base58Btc));
+        let store = store_with(&[(&row, b"1")]);
+
+        let unregistered: Vec<KeyspaceDescriptor> = n2a_keyspaces()
+            .into_iter()
+            .filter(|d| d.name != "icn-gateway/listing_interest_uniqueness")
+            .collect();
+        let shapes = uncovered_did_key_shapes(&store, &unregistered, &[]).unwrap();
+        assert_eq!(
+            shapes.values().sum::<usize>(),
+            1,
+            "without the descriptor the row is uncovered: {shapes:?}"
+        );
+
+        let shapes = uncovered_did_key_shapes(&store, &n2a_keyspaces(), &[]).unwrap();
+        assert!(
+            shapes.is_empty(),
+            "with it registered the row is covered; got {shapes:?}"
+        );
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(
+            audit.is_clear(),
+            "one healthy uniqueness row must not block startup: {audit:?}"
+        );
+    }
+
+    #[test]
+    fn an_alias_pair_on_one_listing_blocks_the_whole_store_audit() {
+        let (a, b) = two_spellings(26);
+        let l = listing(1);
+        let store = store_with(&[
+            (&interest_index_row(&l, &a), b"1"),
+            (&interest_index_row(&l, &b), b"1"),
+        ]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+
+        assert!(
+            !audit.is_clear(),
+            "two spellings of one principal on one listing must refuse startup"
+        );
+    }
+    // ----- action_item_by_assignee: (#2627 M4c) ------------------------------
+    //
+    // Fixtures write the exact bytes `SledActionItemStore::assignee_idx_key`
+    // writes: `action_item_by_assignee:<spelling>:<domain id>:<item uuid>`
+    // with the sentinel value. They use the real registry rather than a test
+    // descriptor, so what they prove is what the shipped scan — and, through
+    // `audit_store`, the startup gate — does.
+
+    fn action_item_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-governance-actor/action_item_by_assignee")
+            .expect("the action-item assignee projection is registered (#2627 M4c)")
+    }
+
+    /// An item id in the writer's rendering: a canonical `Uuid`.
+    fn item(n: u8) -> String {
+        format!("00000000-0000-4000-8000-0000000000{n:02x}")
+    }
+
+    fn assignee_index_row(spelling: &str, domain: &str, item_id: &str) -> String {
+        format!("action_item_by_assignee:{spelling}:{domain}:{item_id}")
+    }
+
+    #[test]
+    fn the_action_item_descriptor_claims_the_projection_and_not_its_siblings() {
+        let d = action_item_descriptor();
+        assert_eq!(d.prefix, b"action_item_by_assignee:");
+        assert_eq!(d.disposition, MergeDisposition::Equivalent);
+        assert_eq!(d.basis, RuleBasis::Established);
+        assert_eq!(d.inventory_rows, &[81]);
+        assert!(!d.did_ends_key, "an opaque residual follows the spelling");
+        assert!(!d.slash_ends_did);
+        assert!(matches!(
+            d.principal_region,
+            PrincipalRegion::AnchoredThenOpaque { terminator: b':' }
+        ));
+
+        // The canonical action-item rows are a lexical neighbour, not a member:
+        // `action_item:` and `action_item_by_assignee:` diverge at their
+        // eleventh byte. Widening this prefix to `action_item` would swallow
+        // every canonical obligation in the store.
+        let canonical = format!("action_item:coop-a:{}", item(1));
+        assert!(
+            !canonical.as_bytes().starts_with(d.prefix),
+            "the canonical row must fall outside the projection descriptor"
+        );
+        assert!(
+            canonical.as_bytes().starts_with(b"action_item"),
+            "and it would be claimed by a widened prefix — which is the point"
+        );
+        let row = assignee_index_row(
+            &spell(&principal(81), multibase::Base::Base58Btc),
+            "coop-a",
+            &item(1),
+        );
+        assert!(row.as_bytes().starts_with(d.prefix));
+    }
+
+    #[test]
+    fn two_spellings_on_one_action_item_are_one_equivalent_group() {
+        // One principal, two spellings, one canonical action item: two
+        // derivations of one fact. The store proves every candidate against
+        // the canonical row before returning it, so keeping either row loses
+        // nothing and no human has to choose.
+        let (a, b) = two_spellings(81);
+        let store = store_with(&[
+            (&assignee_index_row(&a, "coop-a", &item(1)), b"1"),
+            (&assignee_index_row(&b, "coop-a", &item(1)), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert!(
+            report.is_automatable(),
+            "an equivalent projection pair needs no human to resolve"
+        );
+        assert!(!report.must_fail_closed());
+    }
+
+    #[test]
+    fn control_one_person_with_two_items_is_two_shapes_not_a_collision() {
+        // The collision unit is (principal, domain, item), never the principal
+        // alone. A person normally holds many action items, and reducing the
+        // unit to the principal would call every busy member a collision.
+        let (a, b) = two_spellings(82);
+        let store = store_with(&[
+            (&assignee_index_row(&a, "coop-a", &item(1)), b"1"),
+            (&assignee_index_row(&b, "coop-a", &item(2)), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(
+            report.collision_groups.is_empty(),
+            "two items for one person are two items"
+        );
+    }
+
+    #[test]
+    fn control_one_item_id_in_two_domains_is_two_shapes_not_a_collision() {
+        // The domain id stays in the canonical shape too: an item id repeated
+        // across domains names two canonical rows.
+        let (a, b) = two_spellings(83);
+        let store = store_with(&[
+            (&assignee_index_row(&a, "coop-a", &item(1)), b"1"),
+            (&assignee_index_row(&b, "coop-b", &item(1)), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn control_two_principals_on_one_item_are_two_shapes_not_a_collision() {
+        let store = store_with(&[
+            (
+                &assignee_index_row(
+                    &spell(&principal(84), multibase::Base::Base58Btc),
+                    "coop-a",
+                    &item(1),
+                ),
+                b"1",
+            ),
+            (
+                &assignee_index_row(
+                    &spell(&principal(85), multibase::Base::Base58Btc),
+                    "coop-a",
+                    &item(1),
+                ),
+                b"1",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn a_domain_id_that_is_itself_a_did_spelling_stays_a_domain_id() {
+        // The reason this layout must be anchored rather than whole-key. A
+        // `GovernanceDomainId` wraps any `String` and comes from a
+        // `/domains/{domain_id}/…` path segment, so a domain id can contain
+        // `:` and can BE a spelling. A whole-key scan would read it as a second
+        // principal and canonicalize it, grouping two rows the store holds
+        // apart (#2704's lesson).
+        let assignee = spell(&principal(86), multibase::Base::Base58Btc);
+        let domain_one = spell(&principal(87), multibase::Base::Base58Btc);
+        let domain_two = spell(&principal(87), multibase::Base::Base16Lower);
+        let store = store_with(&[
+            (&assignee_index_row(&assignee, &domain_one, &item(1)), b"1"),
+            (&assignee_index_row(&assignee, &domain_two, &item(1)), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.rows_with_readable_did, 2);
+        // `distinct_principals` counts canonical shapes. Two rows that agree on
+        // the assignee but differ in their opaque residual are two shapes, and
+        // that is exactly the proof: had the scan canonicalized the domain id,
+        // the two spellings of principal 87 would have collapsed into one
+        // shape and the rows would have formed a group.
+        assert_eq!(
+            report.distinct_principals, 2,
+            "two different domain ids are two different opaque discriminators, \
+             even when they spell one principal"
+        );
+        assert!(
+            report.collision_groups.is_empty(),
+            "a domain id is carried byte-for-byte and never normalized: {report:?}"
+        );
+    }
+
+    #[test]
+    fn a_row_whose_anchor_holds_no_spelling_is_unreadable_not_principal_free() {
+        // The layout says a principal belongs at the anchor, so its absence is
+        // a row no migration can classify — exactly as the store's own reader
+        // refuses a query over it rather than shortening the answer.
+        let store = store_with(&[(
+            &assignee_index_row("did:icn:znotaspelling", "coop-a", &item(1)),
+            b"1",
+        )]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert_eq!(report.rows_unreadable, 1);
+        assert!(
+            report.must_fail_closed(),
+            "an unreadable row blocks whatever the disposition says"
+        );
+    }
+
+    #[test]
+    fn an_unregistered_action_item_row_would_be_uncovered() {
+        // What registration bought. Before this descriptor these rows carried a
+        // spelling under no registered prefix, so the gate blocked them as an
+        // uncovered shape; the descriptor is what turns that liveness wall into
+        // a proven boundary.
+        let row = assignee_index_row(
+            &spell(&principal(81), multibase::Base::Base58Btc),
+            "coop-a",
+            &item(1),
+        );
+        let store = store_with(&[(&row, b"1")]);
+
+        let unregistered: Vec<KeyspaceDescriptor> = n2a_keyspaces()
+            .into_iter()
+            .filter(|d| d.name != "icn-governance-actor/action_item_by_assignee")
+            .collect();
+        let shapes = uncovered_did_key_shapes(&store, &unregistered, &[]).unwrap();
+        assert_eq!(
+            shapes.values().sum::<usize>(),
+            1,
+            "without the descriptor the row is uncovered: {shapes:?}"
+        );
+
+        let shapes = uncovered_did_key_shapes(&store, &n2a_keyspaces(), &[]).unwrap();
+        assert!(
+            shapes.is_empty(),
+            "the registered prefix must claim this row; got {shapes:?}"
+        );
+    }
+
+    #[test]
+    fn an_alias_pair_on_one_action_item_leaves_the_store_audit_clear() {
+        // The disposition contract, at the level the gate actually reads: two
+        // spellings of one principal on one canonical item are `Equivalent`,
+        // so a store holding them starts. This is the fixture that
+        // discriminates the disposition — with it changed to `FailClosed` the
+        // same store refuses.
+        let (a, b) = two_spellings(81);
+        let store = store_with(&[
+            (&assignee_index_row(&a, "coop-a", &item(1)), b"1"),
+            (&assignee_index_row(&b, "coop-a", &item(1)), b"1"),
+        ]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+
+        assert!(
+            audit.is_clear(),
+            "an equivalent projection pair must not block a start: {audit:?}"
+        );
+    }
+
+    #[test]
+    fn an_action_item_row_naming_no_principal_blocks_the_whole_store_audit() {
+        let store = store_with(&[(
+            &assignee_index_row("did:icn:znotaspelling", "coop-a", &item(1)),
+            b"1",
+        )]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+
+        assert!(
+            !audit.is_clear(),
+            "a row that names no principal must refuse startup"
+        );
     }
 }

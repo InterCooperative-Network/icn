@@ -6,6 +6,16 @@
 //!
 //! The filter tracks all DIDs that are reachable from our own DID via the
 //! trust graph (direct or transitive within 2 hops).
+//!
+//! # Completeness invariant
+//!
+//! A negative answer is only sound when the filter is known to hold the
+//! *complete* authoritative set for the query. Non-emptiness does not imply
+//! completeness: a filter holding one incrementally-added DID knows nothing
+//! about what is absent. The filter therefore carries explicit `authoritative`
+//! state, established only by [`ReachabilityFilter::rebuild`] and revoked by
+//! any incremental mutation, and [`ReachabilityFilter::is_known_unreachable`]
+//! is the only query permitted to drive a rejection. See icn#2750.
 
 use bloomfilter::Bloom;
 use icn_identity::Did;
@@ -26,6 +36,12 @@ pub struct ReachabilityFilter {
     count: std::sync::atomic::AtomicUsize,
     /// Generation counter (incremented on rebuild)
     generation: std::sync::atomic::AtomicU64,
+    /// Whether the filter currently holds a complete enumeration of the
+    /// reachable set, and may therefore be trusted to answer "definitely not
+    /// reachable". Only `rebuild` establishes this; every incremental mutation
+    /// revokes it. Written under the `filter` lock so it cannot disagree with
+    /// the contents it describes.
+    authoritative: std::sync::atomic::AtomicBool,
 }
 
 impl ReachabilityFilter {
@@ -47,14 +63,24 @@ impl ReachabilityFilter {
             filter: Mutex::new(filter),
             count: std::sync::atomic::AtomicUsize::new(0),
             generation: std::sync::atomic::AtomicU64::new(0),
+            // A fresh filter has enumerated nothing, so it may not reject.
+            authoritative: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
-    /// Check if a DID might be reachable (has trust path)
+    /// Raw Bloom membership: has this DID ever been entered into the filter?
+    ///
+    /// **This is a hint, not a verdict, and `false` is NOT grounds to return
+    /// 0.0.** On a fresh or incrementally-maintained filter `false` means only
+    /// "never entered here", which is indistinguishable from "this filter has
+    /// enumerated nothing". Rejecting on it is icn#2750.
+    ///
+    /// Route every rejection through [`Self::is_known_unreachable`], which is
+    /// the only query that also establishes the filter was entitled to answer.
     ///
     /// Returns:
-    /// - `false` = definitely NOT reachable, safe to return 0.0 immediately
-    /// - `true` = possibly reachable, need to compute actual score
+    /// - `false` = absent from this filter (meaningful only if authoritative)
+    /// - `true` = possibly present; compute the actual score
     #[inline]
     pub fn may_be_reachable(&self, did: &Did) -> bool {
         if let Ok(filter) = self.filter.lock() {
@@ -65,12 +91,84 @@ impl ReachabilityFilter {
         }
     }
 
-    /// Add a DID to the set of reachable targets
+    /// Whether the filter currently holds a complete enumeration and may
+    /// therefore be trusted to answer "definitely not reachable".
+    ///
+    /// True only between a [`Self::rebuild`] and the next mutation.
+    ///
+    /// This is a point-in-time observation for diagnostics and tests. Do NOT
+    /// combine it with [`Self::may_be_reachable`] to decide a rejection — that
+    /// pair is not atomic, and the gap between them is a real race. Use
+    /// [`Self::is_known_unreachable`].
+    #[inline]
+    pub fn is_authoritative(&self) -> bool {
+        self.authoritative
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// The only query permitted to drive a rejection.
+    ///
+    /// Returns `true` only when the filter is authoritative *and* the DID is
+    /// absent from it — i.e. when the filter actually knows the DID is not
+    /// reachable, rather than merely not having heard of it. A non-authoritative
+    /// filter answers `false` for every DID, which forces the caller onto the
+    /// full computation and can only cost time, never correctness.
+    ///
+    /// Callers must not reconstruct this from [`Self::may_be_reachable`] and a
+    /// liveness proxy such as [`Self::is_empty`]; that substitution is icn#2750.
+    #[inline]
+    pub fn is_known_unreachable(&self, did: &Did) -> bool {
+        // Read the authority flag UNDER the same lock that guards the contents
+        // it describes. Every writer (`add_reachable`, `rebuild`, `clear`) sets
+        // it while holding this lock, so this pair is atomic with respect to
+        // them.
+        //
+        // Composing `is_authoritative() && !may_be_reachable()` instead is a
+        // time-of-check/time-of-use hole that reinstates the exact defect this
+        // type exists to prevent: a concurrent `clear()` can revoke authority
+        // and empty the filter between the flag load and the lookup, and the
+        // stale `true` then rejects a target from a filter that explicitly
+        // knows nothing.
+        match self.filter.lock() {
+            Ok(filter) => {
+                self.authoritative
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                    && !filter.check(&did.to_string())
+            }
+            // A poisoned lock is not knowledge. Never reject on it.
+            Err(_) => false,
+        }
+    }
+
+    /// Add a DID to the set of reachable targets.
+    ///
+    /// This revokes authoritative status. Learning that one more DID *is*
+    /// reachable says nothing about what remains absent, and incremental
+    /// maintenance is not completeness-preserving even for in-process writes:
+    /// adding `own -> source` does not back-fill the targets that `source`
+    /// already reaches, so whether a 2-hop target is present depends on the
+    /// order the edges happened to arrive in. Only a full [`Self::rebuild`]
+    /// can re-establish the invariant.
     pub fn add_reachable(&self, did: &Did) {
         if let Ok(mut filter) = self.filter.lock() {
             filter.set(&did.to_string());
             self.count
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.authoritative
+                .store(false, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// Revoke authoritative status without discarding the contents.
+    ///
+    /// For a refresh that is about to re-enumerate: if it fails partway, the
+    /// PREVIOUS snapshot must not still be marked authoritative, or a stale
+    /// filter keeps rejecting targets that storage has since gained.
+    pub fn revoke_authority(&self) {
+        // Under the lock, like every other writer of this flag.
+        if let Ok(_filter) = self.filter.lock() {
+            self.authoritative
+                .store(false, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
@@ -88,6 +186,12 @@ impl ReachabilityFilter {
                 filter.set(&did.to_string());
                 count += 1;
             }
+
+            // The caller enumerated the authoritative set, so negative answers
+            // are now sound. Set under the same lock as the contents, so the
+            // flag can never describe a filter it does not match.
+            self.authoritative
+                .store(true, std::sync::atomic::Ordering::Relaxed);
         }
 
         self.count
@@ -102,10 +206,15 @@ impl ReachabilityFilter {
         );
     }
 
-    /// Clear the filter
+    /// Clear the filter, revoking authoritative status.
+    ///
+    /// An empty filter is not an authoritative claim that nothing is
+    /// reachable; it is the absence of a claim.
     pub fn clear(&self) {
         if let Ok(mut filter) = self.filter.lock() {
             *filter = Bloom::new_for_fp_rate(Self::DEFAULT_CAPACITY, Self::FALSE_POSITIVE_RATE);
+            self.authoritative
+                .store(false, std::sync::atomic::Ordering::Relaxed);
         }
         self.count.store(0, std::sync::atomic::Ordering::Relaxed);
         self.generation
