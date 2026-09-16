@@ -1,0 +1,19 @@
+# Python dependencies for the repository's standalone validators in scripts/.
+#
+# These validators were stdlib-only by convention, and that convention held until one of them
+# needed to prove a claim the standard library cannot: `check-agent-registry.py` certifies that
+# a registered provider definition is one a provider can actually LOAD, and YAML parse validity
+# is owned by a YAML parser (icn#2632, maintainer decision).
+#
+# The dependency is declared here rather than provisioned only in CI, because
+# `ops/scripts/drift-check.sh` and `scripts/check-preflight-consistency.sh` both run that
+# checker locally and are documented as runnable standalone. A gate that only works in CI is
+# not a gate a contributor can run before pushing.
+#
+#   python3 -m pip install -r scripts/requirements.txt
+#
+# Every other validator in scripts/ remains stdlib-only. Adding to this file is a decision, not
+# a convenience: prefer the standard library, and reach for a dependency only when another
+# layer genuinely owns the semantics being checked.
+
+PyYAML>=6.0

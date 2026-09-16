@@ -4,9 +4,40 @@ This repo defines custom Copilot agents under `.github/agents/`.
 
 ## How selection works
 
-- `infer: true` agents may be auto-selected by Copilot based on the prompt.
-- Most ICN specialists are **infer: false** (manual) to avoid "wrong agent drift."
-- The **icn-orchestrator** is `infer: true` and is the default router.
+GitHub has **retired `infer`**. Per
+[custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration)
+(verified 2026-08-30):
+
+- `disable-model-invocation` replaces it, defaults to **false**, and **takes precedence**
+  when both keys are present.
+- The retired `infer` defaults to **true**.
+- So an agent declaring **neither** key **is** automatically invocable. Silence is not
+  "manual" here — it is the opposite.
+
+Effective automatic invocation is therefore:
+
+```
+disable-model-invocation when present (inverted)
+  else the retired `infer`
+  else true
+```
+
+This is a projection, not a per-file claim: `ops/state/truth/agents.json` records each
+agent's derived `automatic_invocation`, and `scripts/check-agent-registry.py` re-derives it
+from this directory on every run, so the two cannot disagree (icn#2632).
+
+Which agents this currently yields is **not restated anywhere in this file**. A count and a list in prose is
+an unpinned copy: make an agent manual, update `agents.json` as the checker requires, and
+this file would still assert the old answer with nothing to catch it. An earlier revision
+of this README did exactly that, one commit after the same mistake was removed from
+`agents.json` itself.
+
+The enforced answer is per-agent `automatic_invocation` in
+[`ops/state/truth/agents.json`](../../ops/state/truth/agents.json). To see it:
+
+```bash
+python3 scripts/check-agent-registry.py --verbose
+```
 
 ## Agent Categories
 
@@ -14,7 +45,7 @@ This repo defines custom Copilot agents under `.github/agents/`.
 
 | Agent | Purpose |
 |-------|---------|
-| `@icn-orchestrator` | Router + decomposer for multi-subsystem work (auto-selects) |
+| `@icn-orchestrator` | Router + decomposer for multi-subsystem work |
 | `@icn-planner` | Strategic planning, task breakdown, dependency analysis |
 | `@icn-architect` | System design, crate boundaries, API design review |
 | `@icn-code-reviewer` | PR review with ICN invariants lens, high signal-to-noise |
@@ -70,7 +101,7 @@ User Request
      │
      ▼
 ┌─────────────────┐
-│ icn-orchestrator│  ← auto-selected (infer: true)
+│ icn-orchestrator│  ← entry point for multi-subsystem work
 │                 │
 │ 1. Classify     │
 │ 2. Decompose    │
