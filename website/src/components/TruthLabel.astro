@@ -1,0 +1,156 @@
+---
+// TruthLabel.astro — the truth-state chip that travels with every explanatory
+// figure, rendered plain-language-first.
+//
+// ─── What this fixes ─────────────────────────────────────────────────────────
+//
+// Two problems, one component.
+//
+// 1. The chip read "Truth label · repo-grounded public explainer" on five
+//    public pages. Both halves are internal vocabulary. "Truth label" is the
+//    name of the QA mechanism, and "repo-grounded public explainer" is a
+//    classification from ICN_VISUAL_EXPLAINER_BIBLE §3 written for reviewers
+//    deciding whether an asset may ship. A newcomer meeting a diagram has to
+//    decode a provenance taxonomy before reading the diagram.
+//
+//    PUBLIC_SITE_IA §5 already settles how this should read on an introductory
+//    surface: plain-language concept first, ICN term second, deeper meaning on
+//    demand. The truth chip was the one place on the site that did it backwards.
+//    The semantics are unchanged and nothing is softened — "not a real screen"
+//    is if anything blunter than "illustrative direction".
+//
+// 2. The label strings were duplicated as literals in six components
+//    (ClosureLoop, ProvenanceTrail, ScopeModel, HowIcnWorksExplainer,
+//    MemberSurface, AdoptionPath) and once more in data/walkthrough.ts. Seven
+//    copies of a controlled vocabulary is a drift surface; this is the one
+//    place it is now spelled.
+//
+// ─── What must not change ────────────────────────────────────────────────────
+//
+// The canonical label still travels with the asset, in three places: the
+// `data-truth-label` attribute on the figure, the chip's accessible name, and
+// the visible secondary term. MUST_NOT_SHIP §2 requires the label to be present
+// and not croppable; ICN_VISUAL_EXPLAINER_BIBLE §3 owns the vocabulary. This
+// component changes the reading order, not the contract.
+
+export type TruthLabelId = 'repo-grounded public explainer' | 'illustrative direction';
+
+export interface Props {
+  /** The canonical label from ICN_VISUAL_EXPLAINER_BIBLE §3. */
+  label: TruthLabelId;
+  /** Render the visible chip. When false, the label is still exposed to AT. */
+  visible?: boolean;
+  /** Optional extra sentence — e.g. what specifically is fictional here. */
+  detail?: string;
+}
+
+const { label, visible = true, detail } = Astro.props;
+
+// Plain-language rendering of each canonical label. These are derived from the
+// bible's own definitions, compressed to something readable at chip size:
+//
+//   repo-grounded public explainer — "grounded directly in repo material
+//     (canonical docs, source code, runtime surfaces). May abstract for
+//     clarity, but never contradict the source."
+//   illustrative direction — "concept art for a surface, flow, or member
+//     experience that is not yet shipped end to end. Capabilities beneath may
+//     be real, but the unified surface is not."
+const PLAIN: Record<TruthLabelId, { lead: string; gloss: string }> = {
+  'repo-grounded public explainer': {
+    lead: 'Checked against the code',
+    gloss:
+      'Simplified for clarity, but it does not contradict what the repository actually does.',
+  },
+  'illustrative direction': {
+    lead: 'Not a real screen',
+    gloss:
+      'It shows the intended shape. Parts underneath are built; this assembled surface is not.',
+  },
+};
+
+const plain = PLAIN[label];
+---
+
+{visible ? (
+  <p class:list={['truth-label', `truth-${label.split(' ')[0]}`]} role="note" aria-label={`Truth label: ${label}`}>
+    <span class="truth-label-lead">{plain.lead}</span>
+    <span class="truth-label-gloss">{detail ?? plain.gloss}</span>
+    <span class="truth-label-canon" aria-hidden="true">{label}</span>
+  </p>
+) : (
+  <span class="truth-label-sr">Truth label: {label}. {plain.lead} — {detail ?? plain.gloss}</span>
+)}
+
+<style>
+  .truth-label {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5em;
+    padding: 0.5em 0.85em;
+    align-self: flex-start;
+    max-width: var(--measure-prose);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--accent-teal);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  /* "Not a real screen" is the more cautionary of the two states, so it takes
+     the caution accent. Color reinforces only — the lead text names the state
+     and survives grayscale (MUST_NOT_SHIP §4). */
+  .truth-label.truth-illustrative {
+    border-left-color: var(--accent-amber);
+  }
+
+  .truth-label-lead {
+    font-weight: 600;
+    color: var(--text-heading);
+    white-space: nowrap;
+  }
+
+  .truth-label-gloss {
+    min-width: 0;
+  }
+
+  /* The canonical classification, kept visible for reviewers and anyone
+     checking the asset against the register, but demoted out of the reading
+     path. aria-hidden because the chip's accessible name already carries it
+     verbatim, and announcing it twice is worse than not showing it. */
+  .truth-label-canon {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .truth-label-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: 560px) {
+    .truth-label {
+      flex-direction: column;
+      gap: 0.25em;
+    }
+
+    .truth-label-lead,
+    .truth-label-canon {
+      white-space: normal;
+    }
+  }
+</style>
