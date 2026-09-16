@@ -128,6 +128,179 @@ const CHECKSUM_FILENAME: &str = "state.snapshot.sha256";
 #[allow(dead_code)]
 const DEFAULT_SNAPSHOT_RETENTION: usize = 3;
 
+/// An operator-supplied snapshot identifier that has been proven to name a file
+/// *inside* a snapshot store directory and nowhere else.
+///
+/// # Why this type exists
+///
+/// `icnctl snapshot delete` took its argument as a `String` and joined it onto
+/// `<data_dir>/store` before calling `remove_file` (#2779). `Path::join`
+/// consumes `..` components, and an absolute argument replaces the base
+/// outright, so the argument selected any file the operator could unlink — the
+/// node keystore `identity.age`, the `.icn-data-dir.lock` exclusion anchor, or
+/// a file outside the ICN data root entirely.
+///
+/// Containment is a property of the *identifier*, so it is established once,
+/// here, rather than re-checked by every caller that happens to remember. A
+/// `&str` can no longer reach the path-joining functions in this module; a
+/// `SnapshotName` can, and it carries the proof.
+///
+/// # What it guarantees
+///
+/// For any `SnapshotName` and any directory `dir`, both [`Self::path_in`] and
+/// [`Self::checksum_path_in`] return a direct child of `dir`. The checksum
+/// sidecar is derived from the same validated token rather than re-formatted
+/// from the caller's original string, so it cannot escape independently of the
+/// snapshot it belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SnapshotName(String);
+
+/// Why a string was refused as a snapshot name.
+///
+/// The two variants correspond to the two validation layers and are kept
+/// distinct on purpose: `NotASingleComponent` is the security boundary, and
+/// `OutsideNamespace` is the namespace rule. A future change that widened the
+/// namespace would not be able to weaken containment by accident.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InvalidSnapshotName {
+    /// The string does not name exactly one plain file: it is empty, absolute,
+    /// contains a path separator or NUL, or is a `.`/`..` component.
+    NotASingleComponent {
+        /// The rejected input, for the operator-facing message.
+        raw: String,
+    },
+    /// The string is a single plain filename but is not a snapshot: snapshots
+    /// are `state.snapshot` or `state.snapshot.{unix_timestamp}`.
+    OutsideNamespace {
+        /// The rejected input, for the operator-facing message.
+        raw: String,
+    },
+}
+
+impl std::fmt::Display for InvalidSnapshotName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotASingleComponent { raw } => write!(
+                f,
+                "'{raw}' is not a snapshot name: a snapshot name is a single \
+                 filename inside the snapshot store, with no path separators, \
+                 no '.' or '..' components, and no leading '/'"
+            ),
+            Self::OutsideNamespace { raw } => write!(
+                f,
+                "'{raw}' is not a snapshot: snapshots are named \
+                 '{SNAPSHOT_FILENAME}' or '{SNAPSHOT_FILENAME}.<unix-timestamp>' \
+                 (run 'icnctl snapshot list' to see them)"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for InvalidSnapshotName {}
+
+impl SnapshotName {
+    /// The primary snapshot, `state.snapshot`.
+    pub fn primary() -> Self {
+        Self(SNAPSHOT_FILENAME.to_string())
+    }
+
+    /// Validate an untrusted string as a snapshot name.
+    ///
+    /// Validation runs in two ordered layers. The first establishes
+    /// containment and the second establishes membership of the snapshot
+    /// namespace. The namespace rule alone would in fact imply containment
+    /// today — a `u64` suffix cannot hold a separator — but that is a
+    /// coincidence of the current naming scheme, not a guarantee. Keeping the
+    /// structural check first and separate means containment survives any later
+    /// change to what a snapshot is called.
+    pub fn parse(raw: &str) -> std::result::Result<Self, InvalidSnapshotName> {
+        if !is_single_plain_component(raw) {
+            return Err(InvalidSnapshotName::NotASingleComponent {
+                raw: raw.to_string(),
+            });
+        }
+
+        if !is_in_snapshot_namespace(raw) {
+            return Err(InvalidSnapshotName::OutsideNamespace {
+                raw: raw.to_string(),
+            });
+        }
+
+        Ok(Self(raw.to_string()))
+    }
+
+    /// The validated name, as it appears on disk.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Whether this is the primary snapshot rather than a timestamped one.
+    pub fn is_primary(&self) -> bool {
+        self.0 == SNAPSHOT_FILENAME
+    }
+
+    /// The snapshot's path inside `store_dir`.
+    ///
+    /// Always a direct child of `store_dir`.
+    pub fn path_in(&self, store_dir: impl AsRef<Path>) -> PathBuf {
+        store_dir.as_ref().join(&self.0)
+    }
+
+    /// The path of this snapshot's SHA256 sidecar inside `store_dir`.
+    ///
+    /// Derived from the validated name, not from any caller-held string, so the
+    /// sidecar is always a sibling of [`Self::path_in`] and cannot be steered
+    /// somewhere else.
+    pub fn checksum_path_in(&self, store_dir: impl AsRef<Path>) -> PathBuf {
+        store_dir.as_ref().join(format!("{}.sha256", self.0))
+    }
+}
+
+impl std::fmt::Display for SnapshotName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// Whether `raw` names exactly one plain file, on every supported platform.
+///
+/// `Path::components` alone is not enough: `\` is an ordinary filename
+/// character on Unix and a separator on Windows, so a Unix build would accept
+/// `..\..\etc\passwd` as a single component. Both separators are rejected
+/// unconditionally so that a snapshot name means the same thing everywhere.
+fn is_single_plain_component(raw: &str) -> bool {
+    if raw.is_empty() || raw == "." || raw == ".." {
+        return false;
+    }
+
+    if raw.contains('/') || raw.contains('\\') || raw.contains('\0') {
+        return false;
+    }
+
+    // Rejects absolute paths, Windows drive/UNC prefixes, and anything that
+    // normalises to more or fewer than one ordinary component.
+    let mut components = Path::new(raw).components();
+    let Some(std::path::Component::Normal(only)) = components.next() else {
+        return false;
+    };
+
+    components.next().is_none() && only == std::ffi::OsStr::new(raw)
+}
+
+/// Whether `raw` is a name this crate actually gives a snapshot.
+///
+/// Deliberately the same predicate [`list_snapshots`] enumerates with, so the
+/// set of names an operator can delete is exactly the set the CLI shows them,
+/// plus the primary snapshot.
+fn is_in_snapshot_namespace(raw: &str) -> bool {
+    if raw == SNAPSHOT_FILENAME {
+        return true;
+    }
+
+    raw.strip_prefix("state.snapshot.")
+        .is_some_and(|suffix| suffix.parse::<u64>().is_ok())
+}
+
 /// Complete state snapshot for graceful restart
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateSnapshot {
@@ -579,17 +752,19 @@ pub fn verify_snapshot(data_dir: impl AsRef<Path>) -> Result<()> {
 
 /// Verify a specific timestamped snapshot's checksum
 ///
-/// Takes the snapshot filename (e.g., "state.snapshot.1703169600") and verifies
-/// that its contents match the stored checksum.
+/// Takes a validated [`SnapshotName`] (e.g., `state.snapshot.1703169600`) and
+/// verifies that its contents match the stored checksum. The name is a
+/// `SnapshotName` rather than a `&str` so that an untrusted string cannot reach
+/// a path join here (#2779).
 ///
 /// Returns Ok(()) if checksum is valid, Err if corrupted or checksum missing
 pub fn verify_timestamped_snapshot(
     data_dir: impl AsRef<Path>,
-    snapshot_filename: &str,
+    snapshot_filename: &SnapshotName,
 ) -> Result<()> {
     let data_dir = data_dir.as_ref();
-    let snapshot_path = data_dir.join(snapshot_filename);
-    let checksum_path = data_dir.join(format!("{snapshot_filename}.sha256"));
+    let snapshot_path = snapshot_filename.path_in(data_dir);
+    let checksum_path = snapshot_filename.checksum_path_in(data_dir);
 
     if !snapshot_path.exists() {
         return Err(anyhow!("Snapshot '{snapshot_filename}' does not exist"));
@@ -620,15 +795,17 @@ pub fn verify_timestamped_snapshot(
 
 /// Load a specific timestamped snapshot by filename
 ///
-/// Takes the snapshot filename (e.g., "state.snapshot.1703169600") and loads it.
-/// This also verifies the checksum before returning the snapshot.
+/// Takes a validated [`SnapshotName`] (e.g., `state.snapshot.1703169600`) and
+/// loads it, verifying the checksum before returning the snapshot. The name is a
+/// `SnapshotName` rather than a `&str` so that an untrusted string cannot reach
+/// a path join here (#2779).
 pub fn load_timestamped_snapshot(
     data_dir: impl AsRef<Path>,
-    snapshot_filename: &str,
+    snapshot_filename: &SnapshotName,
 ) -> Result<StateSnapshot> {
     let data_dir = data_dir.as_ref();
-    let snapshot_path = data_dir.join(snapshot_filename);
-    let checksum_path = data_dir.join(format!("{snapshot_filename}.sha256"));
+    let snapshot_path = snapshot_filename.path_in(data_dir);
+    let checksum_path = snapshot_filename.checksum_path_in(data_dir);
 
     if !snapshot_path.exists() {
         return Err(anyhow!("Snapshot '{snapshot_filename}' does not exist"));
@@ -1210,6 +1387,140 @@ mod tests {
         std::fs::remove_dir_all(&temp).unwrap();
     }
 
+    /// Every spelling that could make an identifier name something other than a
+    /// single file in the snapshot store (#2779).
+    ///
+    /// Grouped as one case on purpose: the guarantee is that *none* of them
+    /// parse, and a table makes it obvious when a new spelling is added.
+    #[test]
+    fn hostile_snapshot_names_are_refused() {
+        let hostile = [
+            // traversal
+            "../identity.age",
+            "../.icn-data-dir.lock",
+            "../../some/other/file",
+            "..",
+            ".",
+            "./state.snapshot",
+            "a/../..",
+            // absolute
+            "/etc/passwd",
+            "/",
+            // separators, both platforms' spellings
+            "sub/state.snapshot.1",
+            "..\\identity.age",
+            "sub\\state.snapshot.1",
+            // not a snapshot at all
+            "",
+            "identity.age",
+            ".icn-data-dir.lock",
+            "state.snapshot.sha256",
+            "state.snapshot.1700000000.sha256",
+            "state.snapshotX",
+            "state.snapshot.",
+            "state.snapshot.-1",
+            "state.snapshot.abc",
+            "\0",
+        ];
+
+        for raw in hostile {
+            assert!(
+                SnapshotName::parse(raw).is_err(),
+                "'{raw}' parsed as a snapshot name but must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_snapshot_names_are_accepted() {
+        for raw in [
+            "state.snapshot",
+            "state.snapshot.0",
+            "state.snapshot.1703169600",
+            "state.snapshot.18446744073709551615",
+        ] {
+            let name = SnapshotName::parse(raw)
+                .unwrap_or_else(|e| panic!("'{raw}' must be a valid snapshot name: {e}"));
+            assert_eq!(name.as_str(), raw);
+        }
+
+        assert!(SnapshotName::parse("state.snapshot").unwrap().is_primary());
+        assert!(!SnapshotName::parse("state.snapshot.1")
+            .unwrap()
+            .is_primary());
+        assert!(SnapshotName::primary().is_primary());
+    }
+
+    /// The containment guarantee, stated as a property over both derived paths.
+    ///
+    /// This is what makes the checksum sidecar safe: it is not re-derived from a
+    /// caller-held string, so it cannot be steered away from its snapshot.
+    #[test]
+    fn every_accepted_name_resolves_to_a_direct_child_including_its_sidecar() {
+        let store = Path::new("/srv/icn/data/store");
+
+        for raw in [
+            "state.snapshot",
+            "state.snapshot.0",
+            "state.snapshot.1703169600",
+        ] {
+            let name = SnapshotName::parse(raw).unwrap();
+
+            for path in [name.path_in(store), name.checksum_path_in(store)] {
+                assert_eq!(
+                    path.parent(),
+                    Some(store),
+                    "{} escaped the store directory",
+                    path.display()
+                );
+                assert!(
+                    path.starts_with(store),
+                    "{} is not under the store directory",
+                    path.display()
+                );
+                assert_eq!(
+                    path.components().count(),
+                    store.components().count() + 1,
+                    "{} added more than one component",
+                    path.display()
+                );
+            }
+
+            assert_eq!(
+                name.checksum_path_in(store).parent(),
+                name.path_in(store).parent(),
+                "the sidecar is not a sibling of its snapshot"
+            );
+        }
+    }
+
+    /// `delete` must be able to remove anything `list` shows, or the CLI offers
+    /// the operator names it then refuses to act on.
+    #[test]
+    fn every_listed_snapshot_is_a_parseable_name() {
+        let temp = std::env::temp_dir().join("icn-snapshot-list-parity");
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshot = StateSnapshot::new();
+        save_timestamped_snapshot(&snapshot, &temp).unwrap();
+        // Decoys that `list_snapshots` already filters out.
+        std::fs::write(temp.join("identity.age"), b"x").unwrap();
+        std::fs::write(temp.join("state.snapshot.notanumber"), b"x").unwrap();
+
+        let listed = list_snapshots(&temp).unwrap();
+        assert!(!listed.is_empty(), "fixture produced no snapshots to list");
+
+        for (filename, _, _) in &listed {
+            assert!(
+                SnapshotName::parse(filename).is_ok(),
+                "'{filename}' is listed but cannot be parsed, so it could never be deleted"
+            );
+        }
+
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
     #[test]
     fn test_verify_timestamped_snapshot() {
         let temp = std::env::temp_dir().join("icn-snapshot-verify-ts");
@@ -1217,7 +1528,7 @@ mod tests {
 
         let snapshot = StateSnapshot::new();
         let timestamp = snapshot.created_at;
-        let filename = format!("state.snapshot.{timestamp}");
+        let filename = SnapshotName::parse(&format!("state.snapshot.{timestamp}")).unwrap();
 
         save_timestamped_snapshot(&snapshot, &temp).unwrap();
 
@@ -1229,7 +1540,7 @@ mod tests {
         assert_eq!(loaded.created_at, timestamp);
 
         // Corrupt the snapshot and verify should fail
-        let snapshot_path = temp.join(&filename);
+        let snapshot_path = filename.path_in(&temp);
         std::fs::write(&snapshot_path, b"corrupted").unwrap();
         let result = verify_timestamped_snapshot(&temp, &filename);
         assert!(result.is_err());
@@ -1246,7 +1557,10 @@ mod tests {
         let temp = std::env::temp_dir().join("icn-snapshot-verify-missing");
         std::fs::create_dir_all(&temp).unwrap();
 
-        let result = verify_timestamped_snapshot(&temp, "state.snapshot.999999");
+        let result = verify_timestamped_snapshot(
+            &temp,
+            &SnapshotName::parse("state.snapshot.999999").unwrap(),
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("does not exist"));
 

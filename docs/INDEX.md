@@ -135,6 +135,7 @@ Comprehensive architectural reviews and design decisions:
 - [GOVERNANCE_STATE_MACHINE.md](architecture/GOVERNANCE_STATE_MACHINE.md) - Governance flow design
 - [IDENTITY_SEMANTICS.md](architecture/IDENTITY_SEMANTICS.md) - **Canonical** for the `identity_semantics` domain (#2597): the seven N2 semantic contracts (six identity-bearing classes plus ContextNonce protocol data), identifier domains, the allowed/forbidden substitution matrix, context-scope rules, legacy-DID bridge invariants, and the type-level invariants implementation must enforce. Semantic contract only - no implementation, migration or production-integration claim
 - [HUMAN_IDENTITY_ARCHITECTURE.md](architecture/HUMAN_IDENTITY_ARCHITECTURE.md) - Broader human-identity architecture: requirements, first-principles derivation, threat model, N1 authority-log design. Living, deliberately not canonical - IDENTITY_SEMANTICS.md owns the semantic contract
+- [GEN_SUBJECT_CONTEXT_GENESIS.md](architecture/GEN_SUBJECT_CONTEXT_GENESIS.md) - **Normative** byte-level contract for GEN-A (#2695), slice 1 of the #2694 semantic convergence ladder: the domain-separated derivation binding a governance-domain context plus a fresh CSPRNG salt to the N1 `ContextNonce`, the witness-independent `subject_context_ref` / `initial_device_binding_ref`, the Alpha bootstrap device profile and its device/establishment-authority separation invariant, the fail-closed verifier, and fixed cross-implementation vectors. Outer binding over N1 - no N1 wire change; library/spec/tests only, with no recognition, membership, durability or deployment claim
 - [IDENTITY_MEMBERSHIP_ARCHITECTURE.md](architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md) - **Superseded** historical predecessor (2025-12-25), retained for rationale. Its identity portions are superseded by the two documents above; its membership-lifecycle material is downstream and unbuilt (#2605)
 - [NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md](architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md) - Downstream demand signal from NYCN's fake airlock rehearsals: what ICN must provide (Tool Commons / GovernedServiceBinding / ToolManifest / receipts) before a governed bridge can move real rows into custody (requirements note, not doctrine)
 - Plus audit reports and gap analyses
@@ -502,6 +503,10 @@ Public introduction materials (June 2026, claims bounded by the evidence map):
 - [ICN_HARD_QUESTIONS.md](strategy/ICN_HARD_QUESTIONS.md) - Hard questions answered directly (bad-answer/honest-answer format): production use, fixture vs live vs design-only, capture, surveillance, private data, regulation, bus factor
 - [ICN_INTRODUCTION_EVIDENCE_MAP.md](strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md) - Maps every introduction claim to verifiable merged artifacts and states what each does NOT prove
 
+Programme control:
+
+- [ICN-Technical-Alpha-Control-Plan.md](strategy/ICN-Technical-Alpha-Control-Plan.md) - **Navigation surface for the Organizational Technical Alpha**: the bounded A1 claim and its non-claims, the proof chain with every edge resolved to a primitive / bounded slice / containment / non-claim, the dependency DAG, the containment ledger with a profile restriction per contained defect, the critical path, and the open maintainer decisions. A projection over owner truth, not a truth owner — live status routes to `live_issue_state`.
+
 Strategic direction and gap analysis (dated snapshots, March–July 2026):
 
 - [ICN_SECOND_PASS_STRATEGY_BRIEF_2026-07-17.md](strategy/ICN_SECOND_PASS_STRATEGY_BRIEF_2026-07-17.md) - **Non-canonical** dated analysis snapshot: software-vs-institutional axis reframe, built-but-sidelined pattern, minimum-cut sets, horizon map, re-ranked wedges, recommended ADRs; institutional axis advances only on a human-signed act
@@ -546,7 +551,7 @@ Live status reports and deployment verification:
 Formal architectural decisions:
 
 - [ADR-0010-app-topology.md](adr/ADR-0010-app-topology.md) - App topology decision
-- [ADR-0086-deployment-profiles.md](adr/ADR-0086-deployment-profiles.md) - Deployment profiles and the public/private infrastructure boundary: Debian appliance as the canonical sovereign-node artifact, Docker Compose as the disposable development network, Kubernetes/K3s as optional hosted operator infrastructure, native Linux as an advanced installation form. **`status: proposed`, `implementation_status: partially implemented`** — merging the record does not adopt the decision, and only the appliance profile has a retained build-and-boot witness
+- [ADR-0086-deployment-profiles.md](adr/ADR-0086-deployment-profiles.md) - Deployment profiles and the public/private infrastructure boundary: Debian appliance as the canonical sovereign-node artifact, Docker Compose as the disposable development network, Kubernetes/K3s as optional hosted operator infrastructure, native Linux as an advanced installation form. **`status: accepted` (2026-09-15), `implementation_status: partially implemented`** — the Alpha profile is frozen at `860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1`. Merging the record did not adopt the decision; acceptance was a separate act, and it settles the classification and the frozen revision without certifying production readiness. Only the appliance profile has a retained build-and-boot witness, and independent restoration is still blocked
 - Additional ADRs as numbered documents
 
 ### Templates (`templates/`)

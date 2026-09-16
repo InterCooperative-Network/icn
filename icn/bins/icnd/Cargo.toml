@@ -56,6 +56,11 @@ sled.workspace = true
 icn-governance.workspace = true
 
 [dev-dependencies]
+# Test-only. The exclusion witnesses need to construct an on-disk identity
+# that differs from the one new files receive — `chown` the group to a
+# supplementary group — which is the only way to exercise the account guard
+# without privilege.
+libc = "0.2"
 tempfile = "3.24"
 # Test-only: encodes gossip payloads in community_wiring's integration test.
 # Runtime decode lives in icn-community (which owns its own icn-encoding dep).

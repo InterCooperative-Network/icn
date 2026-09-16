@@ -202,6 +202,57 @@ pub fn ledger_store_path(data_dir: &Path) -> PathBuf {
     store_path(data_dir).join("ledger")
 }
 
+/// The canonical native daemon configuration file inside a data directory.
+///
+/// One name, owned here, because this path had four spellings and no owner
+/// (icn#2755): nothing at all (`icnd` with no `--config` silently builds
+/// `Config::default()`), `<data_dir>/icn.toml` published by `icnctl institution
+/// runtime-root create`, `<data_dir>/config.toml` written by `icnd --init` and
+/// read by `icnctl steward`, and `/etc/icn/icn.toml` in archived and Kubernetes
+/// material.
+///
+/// `icn.toml` wins on ownership evidence, not convention:
+///
+/// * the runtime-root ceremony already publishes exactly here, and `icnd` takes
+///   its configuration lock on *the directory holding the configuration file*
+///   precisely so that ceremony and daemon coordinate on these bytes;
+/// * that lock is created inside the same directory, so a root-owned
+///   `/etc/icn/` would be refused outright under `User=icn` — the conventional
+///   split cannot be adopted without also making `/etc/icn` daemon-writable,
+///   which defeats its purpose;
+/// * secrets keep their own custody at `/etc/icn/icnd.env`, consumed by
+///   `EnvironmentFile=`, and mutable state stays under the data directory.
+///
+/// # `<data_dir>/config.toml` — the compatibility contract, stated explicitly
+///
+/// **Deprecated as a native daemon configuration location, and deliberately not
+/// migrated.** This is an Alpha non-claim, not an oversight:
+///
+/// * an existing native installation whose configuration exists only as
+///   `config.toml` is **not an upgrade target of the Technical Alpha profile**;
+/// * the supported Alpha path is a fresh or provisioned `<data_dir>/icn.toml`;
+/// * **no dual-path auto-discovery is introduced**, now or later — a loader
+///   that searches two names is a loader whose answer depends on which files
+///   happen to exist, which is the ambiguity this owner exists to remove.
+///
+/// Nothing is silently broken by that choice. `--config` still honours whatever
+/// path it is given, so an operator with a hand-written unit passing
+/// `--config <data_dir>/config.toml` keeps working unchanged; what moved is the
+/// file `icnd --init` writes and the file the SHIPPED unit reads.
+///
+/// Migration machinery was considered and rejected on evidence: there is no
+/// existing supported upgrade promise for native installs (`deploy/install.sh`
+/// has no upgrade path at all), and reading both names would have to define
+/// what a disagreement between them means — inventing a semantics for a
+/// situation this project has never shipped.
+///
+/// The deprecation costs nothing in reach, because `config.toml` was never
+/// loaded at daemon startup in the first place — only `--config` is. A treasury
+/// provisioned into it could not have reached the running node.
+pub fn config_file_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("icn.toml")
+}
+
 impl Config {
     /// Load configuration from a TOML file
     pub fn from_file(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
@@ -454,6 +505,27 @@ impl Config {
         match self.identity.validate() {
             Ok(id_warnings) => warnings.extend(id_warnings),
             Err(id_errors) => errors.extend(id_errors),
+        }
+
+        // A configured treasury that cannot parse.
+        //
+        // `--validate-config` is documented as predicting whether the daemon
+        // accepts a file. It did not predict this one: nothing here looked at
+        // `[cooperative] treasury_did`, so validation reported success and
+        // normal startup then failed much later, after stores and services had
+        // begun initializing. `resolve_treasury_did` refuses an unparseable
+        // value rather than silently substituting the node's own DID (#2744),
+        // so the failure is certain — which is exactly what validation is for.
+        //
+        // Through `CooperativeConfig::parse_configured_treasury_did`, which is
+        // the same rule startup applies — not a second copy of the parse. Two
+        // definitions of "usable configured treasury DID" would make this
+        // prediction true only until one of them changed.
+        //
+        // Structural only: it parses the string. No store, no key material, no
+        // authorization, no claim that the treasury exists.
+        if let Err(e) = self.cooperative.parse_configured_treasury_did() {
+            errors.push(format!("{e:#}"));
         }
 
         if errors.is_empty() {

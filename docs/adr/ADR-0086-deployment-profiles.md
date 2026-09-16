@@ -1,8 +1,9 @@
 ---
 id: "0086"
 title: "ICN deployment profiles and public/private infrastructure boundary"
-status: "proposed"
+status: "accepted"
 date: "2026-07-26"
+accepted_date: "2026-09-15"
 deciders: ["Matt Faherty"]
 tags: ["deployment", "appliance", "systemd", "compose", "kubernetes", "k3s", "operations"]
 supersedes: []
@@ -26,15 +27,55 @@ references:
 
 ## Status
 
-`proposed` — this record states the deployment decision for review. It does not
-adopt itself, authorize a production deployment, or certify any profile as
-production-ready.
+**`accepted` (2026-09-15).** The four-profile decision and the public/private
+boundary are in force; new deployment work must conform. Accepted by the decider
+named above, as a deliberate act — merging this record did not perform it, and
+ADR-0018 is explicit that the decision lifecycle moves only when the project
+decides.
 
-`implementation_status: partially implemented` — repository paths exist for all
-four profiles, but only the assembled Debian appliance has a current, retained
-build-and-boot witness. Backup/restoration, artifact signing, reproducibility,
-two-node institutional operation, and generic Kubernetes reconciliation remain
+**Frozen Alpha profile revision: `860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1`.**
+That is the exact `main` revision at which the Profile A artifacts were reviewed
+and witnessed. The profile means those bytes, not "whatever `deploy/` currently
+contains".
+
+What acceptance settles, and what it does not:
+
+* it settles the **classification** — appliance as canonical sovereign-node
+  artifact, Compose devnet as disposable, Kubernetes/K3s as optional operator
+  infrastructure, native Linux as an advanced install form — and the
+  public/private repository boundary;
+* it settles that the native service consumes the configuration the institution
+  was provisioned with, at the frozen revision, across every shipped profile
+  override;
+* it does **not** certify production readiness, authorize a production
+  deployment, or adopt any profile for pilot or partner use;
+* it does **not** convert an incomplete item into a complete one. Every non-claim
+  below still holds, and item 7 of the Profile A contract remains open.
+
+`implementation_status: partially implemented` is unchanged and is a separate
+axis from the decision status (ADR-0018 § "Decision status is separate from
+implementation status"). Repository paths exist for all four profiles, but only
+the assembled Debian appliance has a current, retained build-and-boot witness.
+Independent restoration, artifact signing, reproducibility, two-node
+institutional operation, and generic Kubernetes reconciliation remain
 incomplete.
+
+### What the freeze added since this record was written
+
+At the frozen revision, and witnessed against the shipped artifacts rather than
+hand-composed invocations:
+
+* the native unit and **every** shipped `icnd` drop-in pass the provisioned
+  configuration, so the effective ledger treasury is the institutional principal
+  and not a node-DID fallback (icn#2755);
+* `<data_dir>/icn.toml` is the single canonical native configuration path, owned
+  by `icn_core::config::config_file_path`;
+* both units that create `icnd`'s files — `icnd.service` and
+  `icn-appliance-firstboot.service` — pin `UMask=0077`;
+* `<data_dir>/config.toml` is deprecated and **not** migrated. There is no
+  legacy upgrade path: when the canonical configuration is absent and a legacy
+  `config.toml` sits beside it, `icnd` refuses to start and names both remedies.
+  It does not read the legacy file, and no dual-path discovery exists.
 
 ## Context
 
@@ -99,9 +140,27 @@ The canonical appliance contract requires:
 
 Items 1–5 have partial runtime evidence. Item 6 exists as generic `icnctl`
 backup tooling, but it writes a data-directory tar archive and is not yet an
-encrypted appliance recovery contract. Item 7 is open: the current data backup
-does not include `/etc/icn/icnd.env`, so restoring `/var/lib/icn` alone is not
-an independently operable appliance recovery. Items 8–9 are only partially
+encrypted appliance recovery contract. Item 7 is open for two independent
+reasons, and closing either alone does not close the item. First, the current
+data backup does not include `/etc/icn/icnd.env`, so restoring `/var/lib/icn`
+alone is not an independently operable appliance recovery. Second, a restored
+ledger cannot be shown to be *complete*: a `db` truncated to a partial length
+reopens cleanly as a valid short prefix, and nothing commits to the extent it
+should have had. Nothing available to a verifier distinguishes that from a
+ledger that always held that many, so restoration cannot be shown to restore a
+*complete* ledger (icn#2746). icn#2787 has landed and stops the verifier
+overclaiming: `verify-backup --verify-ledger` now reports completeness as
+`unresolved` and fails closed instead of certifying it. That removed a false
+positive; it is not detection, and it did not make restoration provable.
+icn#2786 owns the requirement for an independent extent/frontier commitment
+that would make completeness checkable at all. It remains open, and the
+mechanism is deliberately **not yet selected** — a durable count, a monotonic
+frontier and a digest accumulator differ in what they can prove, and a count
+alone can refute completeness but never establish it. **Item 7 closes only when
+BOTH causes are closed** — the secret-bearing environment file must travel with
+the backup, *and* icn#2786 must land. Closing either alone leaves an appliance
+that cannot be independently restored, which is what item 7 asserts. Items
+8–9 are only partially
 met: manifests exist and Kubernetes is not required, but appliance artifacts
 are not yet signed or reproducibly built.
 
@@ -110,7 +169,7 @@ sovereign-node durability contract.
 
 ### Profile B: disposable local development network
 
-`deploy/devnet/docker-compose.yml` is the proposed canonical Compose entry point
+`deploy/devnet/docker-compose.yml` is the canonical Compose entry point
 for fast multi-node development, protocol and gossip tests, integration work,
 and disposable demos.
 
@@ -174,7 +233,7 @@ workflow, but supplies and protects all deployment-specific values itself.
 | Identity survives restart/reboot | Stable retained-overlay identity/config/genesis hashes | Proven for the witnessed bytes |
 | Durable receipt survives restart/reboot | Exact completion receipt re-fetched after both transitions | Proven for the witnessed fixture receipt |
 | Full demo workspace is durable | Read-only status became uninitialized after process restart | Not proven; currently false |
-| Independent appliance restoration | Plain data-directory tar omits the secret-bearing environment file | Open blocker |
+| Independent appliance restoration | Two independent causes: the plain data-directory tar omits the secret-bearing environment file, and ledger completeness cannot be established at all — a truncated journal reopens as a valid short prefix and nothing commits to its expected extent (icn#2746; the verifier stopped overclaiming in icn#2787, which has landed, but the mechanism that would make completeness checkable is icn#2786 and remains open) | Open blocker |
 | Signed immutable appliance release | Manifest states `signed: false`, `immutable: false` | Not implemented |
 | Generic OCI image builds | Local cold build plus merged hosted workflow from PR #2455 | Build evidence only |
 | Kubernetes production readiness | Conflicting/stale generic and homelab material | Not claimed |
@@ -192,8 +251,9 @@ workflow, but supplies and protects all deployment-specific values itself.
 - The repository must reconcile duplicate Compose and Kubernetes paths over time.
 - Appliance recovery and signed distribution become explicit product blockers
   rather than undocumented operator assumptions.
-- A later acceptance decision may adopt or amend this ADR only after review; the
-  current `proposed` status is deliberate.
+- This decision was adopted on 2026-09-15 after review, at the frozen revision
+  named in § Status. Amending it now requires an amendment note under ADR-0018's
+  lifecycle rather than an edit.
 
 ## Alternatives considered
 
@@ -208,7 +268,9 @@ workflow, but supplies and protects all deployment-specific values itself.
 ## Non-goals
 
 - No live cluster change and no private infrastructure migration.
-- No adoption of this proposed decision without governance review.
+- No production-readiness or pilot adoption follows from accepting this
+  decision. Acceptance settles the classification and the frozen profile
+  revision; it authorizes no deployment.
 - No production-readiness, pilot, institutional-adoption, or federation claim.
 - No `COMMUNITY_TOPIC`, composition-root, ledger, or B1/B2 architecture change.
 - No assertion that a fixture rehearsal proves institution-owned durable

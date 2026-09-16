@@ -37,6 +37,8 @@ pub mod personhood_store;
 pub mod recovery;
 pub mod revocation;
 pub mod revocation_store;
+/// GEN-A — context-scoped Subject genesis over the N1 authority log (library-only, unwired).
+pub mod subject_context;
 pub mod sync;
 pub mod vui;
 

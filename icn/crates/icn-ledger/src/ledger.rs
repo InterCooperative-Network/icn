@@ -273,7 +273,14 @@ pub struct ArchiveRecord {
 
 /// Minimum trust score required for entry acceptance (Known+ trust level)
 /// Default: 0.1 (requires at least Known trust class)
-const DEFAULT_MIN_TRUST_FOR_ENTRY: f64 = 0.1;
+/// Minimum author trust an entry's author must carry for the ledger to accept it.
+///
+/// Public because it is a cross-crate contract, not an internal tuning knob:
+/// anything that wants to know in advance whether an author *would* be accepted
+/// — a provisioning ceremony verifying the trust facts it just wrote, for
+/// instance — has to enforce the same number the gate enforces, and a copied
+/// literal is exactly how the two drift apart.
+pub const DEFAULT_MIN_TRUST_FOR_ENTRY: f64 = 0.1;
 
 /// Key for storing journal version in storage
 const JOURNAL_VERSION_KEY: &str = "ledger:journal_version";

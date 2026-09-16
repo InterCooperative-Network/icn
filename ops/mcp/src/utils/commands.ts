@@ -25,12 +25,26 @@ export type RunCommandResult = {
   timedOut: boolean;
 };
 
+function applyTrim(s: string, options: RunCommandOptions): string {
+  return options.trimStdout === false ? s : s.trim();
+}
+
 function truncate(s: string, maxBytes: number): string {
   if (s.length <= maxBytes) return s;
   return `${s.slice(0, maxBytes)}\n… [truncated ${s.length - maxBytes} chars]`;
 }
 
 export type RunCommandOptions = {
+  /**
+   * Trim surrounding whitespace from stdout. Default true, which suits the overwhelming
+   * majority of callers here: they read identifiers — a commit id, a branch name, a count —
+   * where surrounding whitespace is noise.
+   *
+   * Set false when stdout is CONTENT rather than an identifier. For file content the leading
+   * and trailing bytes are part of the value, and trimming silently returns something other
+   * than what was committed.
+   */
+  trimStdout?: boolean;
   cwd?: string;
   timeoutMs?: number;
   maxStdoutBytes?: number;
@@ -64,7 +78,7 @@ export async function runCommand(
       ok: true,
       exitCode: 0,
       signal: null,
-      stdout: truncate(String(stdout ?? "").trim(), maxOut),
+      stdout: truncate(applyTrim(String(stdout ?? ""), options), maxOut),
       stderr: truncate(String(stderr ?? "").trim(), maxErr),
       timedOut: false,
     };
@@ -83,7 +97,7 @@ export async function runCommand(
         : typeof e.code === "number"
           ? e.code
           : null;
-    const stdout = truncate(String(e.stdout ?? "").trim(), maxOut);
+    const stdout = truncate(applyTrim(String(e.stdout ?? ""), options), maxOut);
     const stderrRaw = truncate(String(e.stderr ?? "").trim(), maxErr);
     const stderr =
       stderrRaw || (e.message ?? "").slice(0, maxErr) || "execFile failed";

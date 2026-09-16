@@ -31,6 +31,36 @@ use std::process::{Command, Output};
 use icn_store::{SledStore, Store};
 use tempfile::TempDir;
 
+/// A `--verify-ledger` run that established everything it could, and stopped
+/// short only at the completeness claim no backup can currently support.
+///
+/// Before icn#2746 these call sites asserted `out.status.success()`. That is no
+/// longer the right gate: `--verify-ledger` now exits non-zero whenever ledger
+/// completeness is unresolved, and it is unresolved for *every* backup until an
+/// independent commitment to the expected journal extent exists. A bare success
+/// assertion would therefore be testing that gap rather than the property each
+/// of these tests is actually about.
+///
+/// So assert the shape precisely: the run reached the ledger stage, reported
+/// completeness as unresolved rather than verified, and did not exit 0. Each
+/// caller then goes on to assert its own detail lines exactly as before.
+fn assert_verified_except_completeness(out: &Output, text: &str) {
+    let flat = flattened(text);
+    assert!(
+        flat.contains("Verifying ledger integrity"),
+        "the run must have reached the ledger stage, not bailed earlier:\n{text}"
+    );
+    assert!(
+        flat.contains("ledger completeness: unresolved"),
+        "the run must have stopped at completeness specifically (icn#2746), not \
+         failed for some other reason:\n{text}"
+    );
+    assert!(
+        !out.status.success(),
+        "icn#2746: an unresolved completeness claim must not exit 0:\n{text}"
+    );
+}
+
 fn icnctl_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_icnctl"))
 }
@@ -313,10 +343,7 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
     let out = verify(&archive, true);
     let text = combined(&out);
 
-    assert!(
-        out.status.success(),
-        "a balanced ledger must verify:\n{text}"
-    );
+    assert_verified_except_completeness(&out, &text);
     assert!(
         text.contains("double-entry invariant holds per entry"),
         "success must state that the invariant was actually checked, not merely \
@@ -516,10 +543,7 @@ fn an_empty_ledger_does_not_claim_the_invariant_was_verified() {
     let out = verify(&archive, true);
     let text = combined(&out);
 
-    assert!(
-        out.status.success(),
-        "a ledger with nothing to balance is not itself a failure:\n{text}"
-    );
+    assert_verified_except_completeness(&out, &text);
     assert!(
         text.contains("Ledger empty (no entries)"),
         "the detail line must say what was actually read:\n{text}"
@@ -1214,11 +1238,9 @@ fn verification_touches_nothing_outside_its_known_side_effect_surface() {
 
     let out = verify(&archive, true);
     let text = combined(&out);
-    assert!(
-        out.status.success(),
-        "fixture: a balanced ledger must verify, or the claims below are made \
-         about a run that failed early:\n{text}"
-    );
+    // Fixture precondition: the run must have gone all the way through the
+    // ledger stage, so the side-effect claims below describe a full run.
+    assert_verified_except_completeness(&out, &text);
 
     assert_eq!(
         tree_identity(&data_dir),
@@ -1601,14 +1623,22 @@ fn sleds_recovery_signal_is_destroyed_by_the_first_open() {
 ///
 /// The whole point of icn#2732 is to separate two facts, not to collapse them in
 /// the other direction. A database sled really did recover, which really has no
-/// journal rows, must still report `✓ Ledger empty` and still pass — otherwise
+/// journal rows, must still be READ and reported as `✓ Ledger empty` — otherwise
 /// the fix has simply moved the false conclusion.
 ///
+/// What changed with icn#2746: this case no longer *passes* the command, because
+/// its COMPLETENESS is unresolved for exactly the same reason a populated
+/// ledger's is — nothing commits to how many entries there should have been, and
+/// "zero entries" is as unprovable a total as any other. The recovery check
+/// still does not reject it, which is what this test is about; the claim above
+/// it narrowed. icn#2746's acceptance criterion "a genuinely empty readable
+/// ledger still verifies" is therefore superseded rather than met, and that is
+/// recorded on the issue rather than quietly reinterpreted here.
+///
 /// Complements `an_empty_ledger_does_not_claim_the_invariant_was_verified`, which
-/// pins the same case's summary wording; this one pins that the new recovery
-/// check does not reject it.
+/// pins the same case's summary wording.
 #[test]
-fn a_genuinely_empty_readable_ledger_still_verifies() {
+fn a_genuinely_empty_readable_ledger_is_read_and_reported_empty() {
     let dir = TempDir::new().unwrap();
     let data_dir = dir.path().join("data");
     let archive = dir.path().join("backup.tar");
@@ -1623,11 +1653,12 @@ fn a_genuinely_empty_readable_ledger_still_verifies() {
 
     let out = verify(&archive, true);
     let text = combined(&out);
-    assert!(
-        out.status.success(),
-        "an honestly empty ledger must still verify — the recovery check must not \
-         reject a database sled actually recovered:\n{text}"
-    );
+    // An honestly empty ledger must still be READ and reported as empty — the
+    // recovery check must not reject a database sled actually recovered. What
+    // changed with icn#2746 is only the completeness claim, which is unresolved
+    // for an empty journal exactly as it is for a populated one: nothing commits
+    // to how many entries there should have been.
+    assert_verified_except_completeness(&out, &text);
     assert!(
         flattened(&text).contains("Ledger empty (no entries)"),
         "and it must still be reported as empty:\n{text}"
@@ -1892,5 +1923,295 @@ fn crafted_symlink_archive_must_not_touch_the_victim(shape: SymlinkShape) {
         flat.contains("nothing was opened"),
         "and must say that no database was opened, which is the property that \
          distinguishes this refusal from the gate catching it afterwards:\n{text}"
+    );
+}
+
+// ── icn#2746: completeness is a separate claim from validity ────────────────
+//
+// The defect is an overclaim, not a missed detection. A ledger `db` truncated to
+// a partial length reopens cleanly — sled recovers the surviving prefix, reports
+// no error, and returns fewer rows — and NOTHING in the artifact distinguishes
+// that from a ledger that always held that many. `verify-backup --verify-ledger`
+// nevertheless printed a count and `BACKUP VERIFICATION PASSED`, which operators
+// read as "this backup is whole".
+//
+// Counting rows at backup time does not close it: if the damage precedes the
+// backup, the count records the already-reduced extent and compares equal to
+// itself. It would only catch damage occurring AFTER capture — and
+// `a_finished_archive_damaged_in_transit_fails_the_checksum` below pins that
+// that case is already caught, by the whole-directory checksum. So the honest
+// correction is for the verifier to stop asserting completeness it cannot
+// establish. Detection needs an independent extent/frontier owner, filed
+// separately.
+
+/// Seed `count` VALID journal rows, each large enough that the database spans
+/// well past one sled segment.
+///
+/// Size matters: a small database truncates to nothing or to everything, and
+/// neither exercises the partial-recovery path. Each row carries `pairs`
+/// balanced debit/credit deltas so the row stays valid under `icn-ledger`'s own
+/// entry validation — a row that failed validation would make the command refuse
+/// for a reason unrelated to extent, which would not discriminate.
+fn seed_large_ledger(data_dir: &Path, count: usize, pairs: usize) {
+    let path = ledger_dir(data_dir);
+    std::fs::create_dir_all(&path).expect("fixture: could not create ledger dir");
+    let store = SledStore::open(&path).expect("fixture: could not open ledger store");
+    for i in 0..count {
+        let author = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let mut accounts = Vec::with_capacity(pairs * 2);
+        for p in 0..pairs {
+            let currency = format!("CUR{p:03}");
+            accounts.push(icn_ledger::AccountDelta {
+                account_id: author.clone(),
+                currency: currency.clone(),
+                debit: Some(100),
+                credit: None,
+            });
+            accounts.push(icn_ledger::AccountDelta {
+                account_id: author.clone(),
+                currency,
+                debit: None,
+                credit: Some(100),
+            });
+        }
+        let entry = icn_ledger::JournalEntry {
+            id: None,
+            timestamp: 1_700_000_000 + i as u64,
+            author,
+            contract_ref: None,
+            accounts,
+            parents: Vec::new(),
+            signature: None,
+            nonce: None,
+            provenance: icn_ledger::types::ProvenanceRef::SystemGenerated {
+                reason: "icn#2746 fixture".to_string(),
+            },
+        };
+        store
+            .put(
+                format!("ledger:journal:{i:064}").as_bytes(),
+                &serde_json::to_vec(&entry).unwrap(),
+            )
+            .expect("fixture: could not write journal row");
+    }
+    store.db().flush().expect("fixture: could not flush ledger");
+    drop(store);
+}
+
+/// Count journal rows WITHOUT touching the artifact under test.
+///
+/// sled has no read-only open: opening a damaged database performs recovery and
+/// rewrites it, which both normalises the damage and consumes `was_recovered()`.
+/// Measuring the live fixture directly would change the very thing the backup is
+/// about to archive. So copy the ledger to a throwaway directory OUTSIDE the
+/// archived tree and measure the copy; it absorbs the recovery instead.
+fn rows_in_disposable_copy(data_dir: &Path, label: &str) -> usize {
+    let scratch = data_dir
+        .parent()
+        .expect("fixture: data_dir must have a parent")
+        .join(format!(".probe-{label}"));
+    if scratch.exists() {
+        std::fs::remove_dir_all(&scratch).expect("fixture: could not clear probe dir");
+    }
+    std::fs::create_dir_all(&scratch).expect("fixture: could not create probe dir");
+    for entry in std::fs::read_dir(ledger_dir(data_dir)).expect("fixture: could not read ledger") {
+        let entry = entry.expect("fixture: bad dir entry");
+        if entry.file_type().expect("fixture: file type").is_file() {
+            std::fs::copy(entry.path(), scratch.join(entry.file_name()))
+                .expect("fixture: could not copy ledger file");
+        }
+    }
+    let store = SledStore::open(&scratch).expect("fixture: could not open probe ledger");
+    let n = store.scan(b"ledger:journal:").expect("fixture: scan").len();
+    drop(store);
+    std::fs::remove_dir_all(&scratch).expect("fixture: could not remove probe dir");
+    n
+}
+
+/// Truncate the sled `db` file to a fraction of its length.
+///
+/// TRUNCATE, never zero-fill in place. icn#2746 records that zero-filling takes
+/// a different sled path and does NOT reproduce this, so a fixture that
+/// zero-filled would silently prove nothing.
+fn truncate_ledger_db(data_dir: &Path, fraction: f64) -> (u64, u64) {
+    let db = ledger_dir(data_dir).join("db");
+    let before = std::fs::metadata(&db)
+        .expect("fixture: ledger db must exist to truncate")
+        .len();
+    let after = (before as f64 * fraction) as u64;
+    let handle = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&db)
+        .expect("fixture: could not open ledger db for truncation");
+    handle
+        .set_len(after)
+        .expect("fixture: could not truncate ledger db");
+    handle
+        .sync_all()
+        .expect("fixture: could not sync truncation");
+    (before, after)
+}
+
+/// THE primary regression for icn#2746.
+///
+/// A perfectly healthy ledger, undamaged, with every entry valid. The command
+/// must still refuse to report the journal as COMPLETE, because no independent
+/// commitment to its expected extent exists to check it against.
+///
+/// Fails against current `main`, which prints `BACKUP VERIFICATION PASSED` and
+/// exits 0 — asserting, to an operator, a completeness it never established.
+#[test]
+fn a_valid_ledger_without_an_extent_commitment_is_not_certified_complete() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = &dir.path().join("data");
+    // Sibling, never inside: `backup` tars `data_dir` wholesale, so an archive
+    // written into it archives its own growing output.
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(data_dir);
+    seed_large_ledger(data_dir, 8, 2);
+    make_backup(data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+    let flat = flattened(&text);
+
+    // The entries that ARE here were checked, and that claim stands.
+    assert!(
+        flat.contains("8 entries valid under icn-ledger's entry validation"),
+        "validity of the observed entries must still be established:\n{text}"
+    );
+    // The structured result must separate the questions.
+    assert!(
+        flat.contains("entries observed: 8"),
+        "the result must report what was observed:\n{text}"
+    );
+    assert!(
+        flat.contains("expected extent available: no"),
+        "the result must say whether a commitment to compare against exists:\n{text}"
+    );
+    assert!(
+        flat.contains("ledger completeness: unresolved"),
+        "completeness must be reported as unresolved, not verified:\n{text}"
+    );
+    // And the overall claim must not read as completeness.
+    assert!(
+        !flat.contains("BACKUP VERIFICATION PASSED"),
+        "an unresolved completeness claim must not render as PASSED:\n{text}"
+    );
+    assert!(
+        !out.status.success(),
+        "a verification that was asked for and could not be performed must not \
+         exit 0 — that renders uncertainty as success:\n{text}"
+    );
+}
+
+/// The boundary witness, kept as adversarial evidence rather than as a detection
+/// claim.
+///
+/// It proves the loss is REAL and that the artifact does not reveal it: rows
+/// genuinely disappear, yet every surviving row is valid and the ledger reopens
+/// clean. That is the evidence justifying an independent extent/frontier owner
+/// — and the reason this command may only report `unresolved` here, not `failed`.
+/// Asserting detection instead would demand the verifier infer history it cannot
+/// observe.
+#[test]
+fn a_truncated_ledger_still_looks_internally_valid_and_is_not_certified_complete() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = &dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(data_dir);
+    seed_large_ledger(data_dir, 100, 30);
+    let seeded = rows_in_disposable_copy(data_dir, "seeded");
+    assert_eq!(
+        seeded, 100,
+        "fixture: all rows must be readable before damage"
+    );
+
+    let (before, after) = truncate_ledger_db(data_dir, 0.80);
+    let survived = rows_in_disposable_copy(data_dir, "survived");
+    assert!(
+        survived < seeded,
+        "fixture: truncation must actually remove committed rows, or this proves \
+         nothing (seeded={seeded}, survived={survived}, db {before} -> {after})"
+    );
+
+    make_backup(data_dir, &archive);
+    assert!(archive_contains_ledger(&archive));
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+    let flat = flattened(&text);
+
+    // The damage is invisible: the surviving prefix is a valid ledger.
+    assert!(
+        flat.contains("entries valid under icn-ledger's entry validation"),
+        "the surviving prefix must still validate — that is what makes this \
+         undetectable (seeded={seeded}, survived={survived}):\n{text}"
+    );
+    // So the only honest answer is `unresolved` — never `verified`.
+    assert!(
+        flat.contains("ledger completeness: unresolved"),
+        "completeness must be unresolved, not verified (seeded={seeded}, \
+         survived={survived}):\n{text}"
+    );
+    assert!(
+        !flat.contains("BACKUP VERIFICATION PASSED"),
+        "a ledger that lost {} of {seeded} entries must not be reported as \
+         verified:\n{text}",
+        seeded - survived
+    );
+    assert!(!out.status.success(), "must not exit 0:\n{text}");
+}
+
+/// Why a backup-time row count would close nothing.
+///
+/// Damage occurring AFTER capture — the interrupted-copy / failed-transfer shape
+/// — is the only case a backup-time extent record could catch, and it is already
+/// caught: `verify-backup` recomputes the whole-directory checksum in step [3/4]
+/// and that checksum covers `store/ledger/db`. This test pins that, so the
+/// architectural follow-up is scoped to the case that is genuinely open.
+#[test]
+fn a_finished_archive_damaged_in_transit_fails_the_checksum() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = &dir.path().join("data");
+    let archive = dir.path().join("good.tar");
+
+    init_identity(data_dir);
+    seed_large_ledger(data_dir, 100, 30);
+    make_backup(data_dir, &archive);
+
+    // Unpack the FINISHED archive, truncate its ledger db, re-archive it.
+    let staging = dir.path().join("staging");
+    std::fs::create_dir_all(&staging).unwrap();
+    {
+        let f = std::fs::File::open(&archive).unwrap();
+        tar::Archive::new(f).unpack(&staging).unwrap();
+    }
+    let db = staging.join("store").join("ledger").join("db");
+    let before = std::fs::metadata(&db).unwrap().len();
+    let h = std::fs::OpenOptions::new().write(true).open(&db).unwrap();
+    h.set_len((before as f64 * 0.80) as u64).unwrap();
+    h.sync_all().unwrap();
+
+    let damaged = dir.path().join("damaged.tar");
+    {
+        let f = std::fs::File::create(&damaged).unwrap();
+        let mut b = tar::Builder::new(f);
+        b.append_dir_all(".", &staging).unwrap();
+        b.finish().unwrap();
+    }
+
+    let out = verify(&damaged, true);
+    let text = combined(&out);
+    assert!(
+        !out.status.success(),
+        "post-capture damage must be refused:\n{text}"
+    );
+    assert!(
+        flattened(&text).to_lowercase().contains("checksum"),
+        "and must be refused BY THE CHECKSUM — that is what makes a backup-time \
+         extent record redundant for this case:\n{text}"
     );
 }

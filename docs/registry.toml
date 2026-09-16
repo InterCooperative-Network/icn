@@ -730,7 +730,7 @@ category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-07-28"
+last_updated = "2026-09-15"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -762,7 +762,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-07-28"
+last_updated = "2026-09-15"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -1280,6 +1280,27 @@ freshness = "stale"
 domain_tags = ["architecture", "identity"]
 recommended_action = "keep"
 last_reviewed = "2026-08-18"
+
+[docs."docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md"]
+category = "architecture"
+status = "living"
+title = "GEN-A - context-scoped Subject genesis (SubjectContextGenesisV1)"
+description = "NORMATIVE BYTE-LEVEL CONTRACT for GEN-A (icn#2695), slice 1 of the #2694 semantic convergence ladder: the deterministic derivation that turns a named governance-domain context plus a fresh public CSPRNG salt into the 32 opaque bytes N1 already accepts as its ContextNonce, plus the two witness-independent reference hashes (subject_context_ref, initial_device_binding_ref) that later semantic facts may name. Specifies the three GEN domain separators, the exact length-prefixed preimages, the Alpha initial-device profile (exactly {Sign, Present}, position 1, no validity span), the fail-closed verifier including the load-bearing derive step that separates admissible from authorized, and fixed cross-implementation test vectors reproduced by an independent non-Rust reference. Carries the explicit unlinkability argument that IDENTITY_SEMANTICS.md invariant I4b requires of any alternative ContextNonce generation method. Outer binding protocol over N1 - no N1 wire format, canonical body, signature preimage or digest rule is changed. Library, spec and tests only: it makes NO claim of institutional recognition, membership, standing, governance participation, economic authority, delegation, session authorization, guardian recovery, replication, durability, deployment or production readiness, and introduces no registrar or global person registry. Bundle transport, durable storage and every downstream slice remain unimplemented."
+last_updated = "2026-09-15"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-09-15"
+depends_on = [
+  "icn/crates/icn-identity/src/subject_context.rs",
+  "icn/crates/icn-identity/src/authority_log/**",
+  "icn/crates/icn-identity/tests/gen_subject_context.rs",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+]
 
 [docs."docs/architecture/GOVERNANCE_STATE_MACHINE.md"]
 category = "architecture"
@@ -2166,6 +2187,16 @@ description = "Strategic roadmap phases 0-3 with dependencies, milestones, and l
 last_updated = "2026-03-12"
 owner = "matt"
 audiences = ["architects", "stakeholders", "grant-reviewers"]
+
+[docs."docs/strategy/ICN-Technical-Alpha-Control-Plan.md"]
+category = "strategy"
+status = "living"
+title = "ICN Organizational Technical Alpha — Control Plan"
+description = "Navigable reconstruction of the Technical Alpha program: bounded claim, proof chain with every arrow resolved, dependency DAG, containment ledger, owner seams. A projection, not a truth owner — live status is owned by live_issue_state."
+last_updated = "2026-09-13"
+owner = "matt"
+audiences = ["team", "stakeholders"]
+last_reviewed = "2026-09-13"
 
 [docs."docs/strategy/ICN-Roadmap-Live.md"]
 category = "strategy"
@@ -4716,14 +4747,16 @@ audiences = ["architects", "developers"]
 
 [docs."docs/adr/ADR-0086-deployment-profiles.md"]
 # DOC status is "living" because ADRs remain institutional memory at their
-# canonical path. The DECISION lifecycle inside the ADR is still "proposed",
-# so the truth class remains descriptive until that decision is adopted.
+# canonical path. The DECISION inside the ADR was ADOPTED on 2026-09-15, so the
+# truth class advances to normative per the rule this comment previously stated.
+# Decision status and implementation_status stay separate axes (ADR-0018 § 3):
+# the decision is in force while the implementation remains partial.
 category = "architecture"
 status = "living"
-truth_class = "descriptive"
+truth_class = "normative"
 title = "ADR-0086: ICN Deployment Profiles and Public/Private Infrastructure Boundary"
-description = "Proposed four-profile deployment decision: Debian appliance as the canonical sovereign-node artifact; disposable Compose devnet for development; Kubernetes/K3s as optional hosted/operator infrastructure; advanced native Linux. Separates generic public product artifacts from private deployment automation and preserves explicit recovery, signing, two-node, production, and federation nonclaims."
-last_updated = "2026-07-26"
+description = "ACCEPTED 2026-09-15; Alpha profile frozen at main 860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1. Four-profile deployment decision: Debian appliance as the canonical sovereign-node artifact; disposable Compose devnet for development; Kubernetes/K3s as optional hosted/operator infrastructure; advanced native Linux. Separates generic public product artifacts from private deployment automation and preserves explicit recovery, signing, two-node, production, and federation nonclaims. Independent appliance restoration is recorded as blocked by TWO independent causes: the backup omits the secret-bearing environment file, and a restored ledger cannot be shown to be complete (#2746; the independent evidence this needs is owned by #2786, where the mechanism is not yet selected). Acceptance settles the classification and the frozen revision; it certifies no production readiness and closes no open item."
+last_updated = "2026-09-15"
 owner = "matt"
 audiences = ["architects", "developers", "operators"]
 

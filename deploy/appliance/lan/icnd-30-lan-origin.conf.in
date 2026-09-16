@@ -38,6 +38,10 @@
 #    used for CORS above, so this adds no new configuration surface.
 [Service]
 ExecStart=
-ExecStart=/usr/local/bin/icnd --data-dir /var/lib/icn --gateway-enable --gateway-bind 127.0.0.1:8080
+# --config is carried over from the base unit. This override REPLACES
+# ExecStart and sorts AFTER 20-demo-profile.conf, so omitting it would drop
+# the LAN profile back to Config::default() and the node-DID treasury
+# fallback — icn#2755, reintroduced by the last drop-in to win.
+ExecStart=/usr/local/bin/icnd --config /var/lib/icn/icn.toml --data-dir /var/lib/icn --gateway-enable --gateway-bind 127.0.0.1:8080
 Environment=ICN_CORS_ORIGINS=http://localhost:8090,http://127.0.0.1:8090,http://localhost:18090,http://127.0.0.1:18090,@LAN_ORIGIN@
 Environment=GATEWAY_BASE_URL=@LAN_ORIGIN@

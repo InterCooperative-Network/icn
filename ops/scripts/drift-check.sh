@@ -137,6 +137,57 @@ else
   fail "scripts/check-skill-registry.py missing — in-repo skill ownership is unenforced"
 fi
 
+# ─── Check 2c: The systemic-leverage policy must have exactly one owner ──────
+#
+# ops/state/truth/engineering-leverage.json owns the causal escalation an agent
+# performs after establishing a defect, and the catalogue of classes ICN has
+# already seen. Its checker proves the owner parses, is registered in the truth
+# spine, is projected to the surfaces the skill registry declares, has not grown
+# a rival copy of the delivery lifecycle, and is actually referenced by the
+# surfaces agents read — a policy nobody is routed to is prose.
+
+LEVERAGE_CHECK="${REPO_ROOT}/scripts/check-engineering-leverage.py"
+if [[ -f "${LEVERAGE_CHECK}" ]]; then
+  if lev_out="$(python3 "${LEVERAGE_CHECK}" 2>&1)"; then
+    ok "engineering leverage policy: ${lev_out}"
+  else
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && echo "  ${line}" >&2
+    done <<< "${lev_out}"
+    fail "engineering-leverage policy is not mechanically true (see output above)"
+  fi
+else
+  fail "scripts/check-engineering-leverage.py missing — the systemic-leverage policy is unenforced"
+fi
+
+# ─── Check 2d: Generated navigation must not lag its registered owners ───────
+#
+# Registering a truth domain in ops/state/truth/sources.json changes an input
+# the agent context spine consumes. If the spine is not regenerated, path briefs
+# and agent navigation silently omit the new owner.
+#
+# This is enforced HERE, in drift-check.sh, because drift-check runs inside the
+# REQUIRED Agent Tooling Drift Check. The same freshness check already exists in
+# generated-truth.yml, but three things kept it from binding: it reports drift
+# as a ::warning:: that cannot fail the job, its paths filter does not include
+# ops/state/truth/**, and generated-truth is not a required check. Rather than
+# add a second generation mechanism, this calls the SAME checker from a path
+# that actually gates merge.
+
+SPINE_CHECK="${REPO_ROOT}/scripts/check-agent-context-spine.py"
+if [[ -f "${SPINE_CHECK}" ]]; then
+  if spine_out="$(python3 "${SPINE_CHECK}" 2>&1)"; then
+    ok "agent context spine: valid and current"
+  else
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && echo "  ${line}" >&2
+    done <<< "${spine_out}"
+    fail "agent context spine is stale or invalid — regenerate with: python3 scripts/generate-agent-context-spine.py --write"
+  fi
+else
+  fail "scripts/check-agent-context-spine.py missing — generated navigation is unenforced"
+fi
+
 # ─── Check 3: Stale path patterns must not appear in agent tooling files ─────
 
 # These patterns have historically caused drift. Any hit is a FAIL.

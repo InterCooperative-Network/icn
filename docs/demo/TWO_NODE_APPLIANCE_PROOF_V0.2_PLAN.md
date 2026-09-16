@@ -6,6 +6,11 @@ Last Reviewed: 2026-07-27
 
 # Two-node appliance proof v0.2 plan
 
+> Programme context: this plan is the acceptance design for one link in the
+> Technical Alpha proof chain. For the bounded A1 claim, the dependency graph,
+> the containment ledger and which gates are currently blocked, see
+> [ICN Organizational Technical Alpha — Control Plan](../strategy/ICN-Technical-Alpha-Control-Plan.md).
+
 ## Purpose
 
 This is the executable acceptance design for the next ICN appliance proof. It

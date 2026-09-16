@@ -95,6 +95,13 @@ Be suspicious of work that is mostly:
 - cleanup that crosses a reviewed semantic boundary because "we are already here";
 - a second implementation of machinery that already has an owner.
 
+Fix the defect first, then ask what mechanism allowed that class of defect to exist. Those are two
+different questions and the second is usually the higher-leverage one: prefer asking what would
+have made the bug difficult to write over asking only what test would catch it next time. The loop,
+its dispositions and the catalogue of classes ICN has already seen are owned by
+`ops/state/truth/engineering-leverage.json`. Answering `NONE` is correct whenever a defect is
+genuinely local — this heuristic is not a mandate to produce architecture work.
+
 ## Authority and role boundary
 
 Agents are instruments for inspection, synthesis, implementation, review, and reconciliation. They do not acquire project authority by being able to edit files.
