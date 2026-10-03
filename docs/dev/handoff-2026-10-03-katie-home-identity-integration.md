@@ -68,11 +68,39 @@ These values are provenance for this handoff, not instructions for the next sess
 
 ## Work not completed
 
-- Push and PR were not opened in the first session segment; see the PR for this branch once opened.
+- Push and draft PR: done at closeout (see the PR for this branch); nothing merged.
 - The strict deterministic **container** for (N1 facts, act) — the one missing boundary (doc §9.2 item 2). Not started.
 - `icnctl` verb consuming that container. Not started; waits on the container and on #2777's exclusion domain.
-- Routing comments on #2694 (rung 5 landed ahead of rungs 3–4) and #2599 (first tranche). Not posted; maintainer's call.
-- ADR-0083 drift: its front matter says `not-started` while `docs/spec/institutional-domain.md` and code say landed. Observed, not fixed (out of scope).
+- Routing comments on #2694 (rung 5 landed ahead of rungs 3–4) and #2599 (first tranche): posted at closeout, pointing at the PR for this branch.
+- ADR-0083 drift — **recorded and routed as icn#2806**, not fixed here (documentation-truth defect outside this PR's scope):
+  - **Normative/history claim:** `docs/adr/ADR-0083-institutional-domain-and-domain-policy-runtime-root.md` front matter `status: "proposed"`, `implementation_status: "not-started"` (line 11), restated at line 33 and in the "Status: design decision, not yet implemented" note (line 240).
+  - **Implementation fact:** `docs/spec/institutional-domain.md` lines 251, 257 and 291 record #2142 **closed-completed 2026-06-23** with rungs #2162, #2166, #2170, #2172, #2174, #2176, #2178 and #2180 landed. Code: `icn/crates/icn-governance/src/institutional_domain.rs:187` (`InstitutionalDomain`), `:208` (`declare`), `icn/apps/governance/src/http/handlers.rs:3690` (gated declare route).
+  - **Disposition:** the ADR is the stale layer; spec and code agree. The ADR's *decision* stands; its *implementation status* field is false. Correction belongs to an ADR-lifecycle update (ADR-0018), owned by icn#2806, not to this branch.
+
+## Current consumability (do not read "implemented" as "integrated")
+
+| Piece | Class | Evidence |
+|---|---|---|
+| N1 authority log (`authority_log/`) | library-usable | merged `7c28876d`; zero references outside `icn-identity` |
+| GEN-A context-scoped genesis (`subject_context.rs`) | library-usable | merged `d47ebcf9`; only kind is `GovernanceDomainV1` |
+| N4-A `derive_prefix` + `device_authority` (this branch) | library-usable, test-proven | 25 tests; independent Python reference agrees 4/4 |
+| N1-D fact store (#2800) | proposed, PR open | `icnd::build_services` deliberately not wired; waits on #2777 |
+| external (facts + act) container | **missing** | N4-A doc §9.2 item 2 — the next boundary |
+| stateless `icnctl` consumer | **missing** | waits on the container |
+| personal/household context kind | **missing** | #2602 owns; nothing in code |
+| N4 enrollment ceremony, rotation, replacement, lost/stolen | **missing** | #2599 owns |
+| legacy `multi_device.rs`, `/v1/devices`, SDIS recovery, RN SDK signing | experimental / unreachable / superseded | HIA F8, F13, F19; #2588, #2590, #2448, #2591 |
+| gateway JWT sessions + `jti` revocation | production-runtime-usable (sessions only) | AUTHORITY_SPINE; not identity, not device authority |
+
+## Cross-project boundary
+
+| Layer | Owns | Must not |
+|---|---|---|
+| **ICN** | identity, authority, delegation, revocation, recovery, proof, canonical encodings and verification | encode Katie-, Pi-, VM- or RDP-specific workflow |
+| **Home / Mutualware-facing runtime** | Context experience, endpoint presence, handoff between endpoints, provider resolution, presentation/execution intent | invent subjects, principals, grants, revocation, recovery or a second encoding |
+| **network-ops** | machines, images, deployment, inventory, networking, firewalls, health, rollback | treat an SSH key, OS account, RDP login, VM or Pi as a Subject; hold a `ContinuityRoot`; build a bearer-token "enrollment" and call it N4 |
+
+The invariants the proof pins, in the vocabulary of `IDENTITY_SEMANTICS.md`: no global public Person identifier; one Subject per context; cross-context continuity is client-held; a device is an ordinary Principal; device-ness is the grant, not the identifier; a device never receives the human's key; attenuation is mandatory; a provider cannot author as the human; changing hosting changes nothing about identity.
 
 ## Decisions and rationale
 
@@ -112,7 +140,14 @@ This is a **recommendation, not current truth**.
 1. Reverify checkout and `origin/main`; `cargo test -p icn-identity --test device_authority`.
 2. Requery the PR for this branch, its reviews and required checks.
 3. Re-resolve `IDENTITY_SEMANTICS.md`, the N4-A doc, #2694 and #2599.
-4. If the premise holds: specify the (facts, act) container as the next bounded slice, consuming the #2800 fact-record layout once it lands; then the `icnctl` verb.
+4. If the premise holds, the next executable entry point is:
+
+   ```bash
+   cd ~/icn-dev/worktrees/icn/katie-home-identity-integration/icn
+   cargo test -p icn-identity --test device_authority
+   ```
+
+   then open the next bounded slice: a strict deterministic container for `(N1 facts, DeviceActV1 + signature)` — framing per N4-A doc §9.2 item 2, record layout aligned with #2800's `event_id || signature → canonical body` once it lands — with its own independent reference vectors, followed by the stateless `icnctl` verb that consumes it without `icnd`.
 
 ## Reverification targets
 
