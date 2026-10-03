@@ -226,7 +226,8 @@ pub use construct::{
     authorize_event, revoke_event, sign_body, ConstructError, ContinuityRoot, EstablishmentKind,
 };
 pub use derive::{
-    derive, resolve, supersede, AuthorityState, AuthorityView, DeviceGrant, Resolution,
+    derive, derive_prefix, resolve, supersede, AuthorityState, AuthorityView, DeviceGrant,
+    Resolution,
 };
 pub use encoding::CodecError;
 pub use store::{AuthorityStore, SignedAuthorityEvent, Witness, WitnessSignature};

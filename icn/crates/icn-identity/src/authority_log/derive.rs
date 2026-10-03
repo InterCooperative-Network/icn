@@ -434,6 +434,36 @@ pub fn derive(subject: SubjectId, store: &AuthorityStore) -> AuthorityView {
     derive_bodies(subject, &bodies)
 }
 
+/// Derive the authority view for `subject` from the **retained prefix** of its durable body
+/// set: every body at a position `≤ through`, folded by exactly the rules [`derive`] applies.
+///
+/// This is the relying-party evaluation primitive (N4-A, #2694 §7). A relying party that pins an
+/// evaluation position `E` needs the authority state *as of* `E`, which the frontier view cannot
+/// report once a later `revoke` has removed a grant. Bounding the fold is sound because the
+/// candidate set at any position is drawn only from bodies at that exact position, so no body
+/// above `through` can change what the fold concludes at or below it. Equivalently:
+///
+/// ```text
+/// derive_prefix(σ, S, E) == derive(σ, S)        whenever E ≥ frontier(derive(σ, S)) − 1
+/// derive_prefix(σ, S, MAX_POSITION) == derive(σ, S)
+/// ```
+///
+/// No new selector is introduced: [`resolve`] remains the single decision point, and a fork at or
+/// below `through` still halts. A reported `frontier ≤ through` means the retained prefix does not
+/// reach `through` — a gap — and a caller evaluating at `through` must fail closed on it rather
+/// than read the state as current.
+///
+/// The bound is a **position**, never a timestamp, and it is supplied by the relying party, never
+/// read from a signed act.
+pub fn derive_prefix(subject: SubjectId, store: &AuthorityStore, through: u64) -> AuthorityView {
+    let bodies: BTreeSet<AuthorityBody> = store
+        .bodies_for(subject)
+        .into_iter()
+        .filter(|body| body.position() <= through)
+        .collect();
+    derive_bodies(subject, &bodies)
+}
+
 /// Body-only fold behind the admitted-store boundary.
 fn derive_bodies(subject: SubjectId, bodies: &BTreeSet<AuthorityBody>) -> AuthorityView {
     derive_indexed(subject, &CandidateIndex::build(subject, bodies))

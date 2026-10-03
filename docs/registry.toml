@@ -1302,6 +1302,28 @@ depends_on = [
   "docs/architecture/IDENTITY_SEMANTICS.md",
 ]
 
+[docs."docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md"]
+category = "architecture"
+status = "living"
+title = "N4-A - relying-party evaluation of delegated device authority (derive_prefix, DeviceActV1)"
+description = "NORMATIVE CONTRACT for N4-A (first tranche of icn#2599; rung 5 of the #2694 convergence ladder): how a relying party decides whether one device-signed act is covered by a human Subject's delegation at one relying-party-chosen log position. Specifies derive_prefix - the existing N1 fold applied to the retained prefix through position E, which is what makes 'authorized at E' answerable after a later revoke - the canonical DeviceActV1 bytes under the icn.n4.device-act domain, the fail-closed verifier whose signature check and authority check are two separate steps, the refusal classes, the rule that the evaluation position is supplied by the relying party and merely echoed by the signer, and the mapping onto the act classes of HUMAN_IDENTITY_ARCHITECTURE.md section 9.3. States the external-consumer boundary: a stateless verifier over retained canonical N1 facts plus the act, and what a downstream deployment may rely on versus must not reimplement. Library, spec and tests only: no gateway route, no transport container, no persistence, no replication, no recovery, no session coupling, no attenuation beyond what N1 records, no household or personal context kind, no production wiring, and no claim about Katie's or any real person's identity. Fixture identities only."
+last_updated = "2026-10-03"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-03"
+depends_on = [
+  "icn/crates/icn-identity/src/device_authority.rs",
+  "icn/crates/icn-identity/src/authority_log/derive.rs",
+  "icn/crates/icn-identity/tests/device_authority.rs",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
+]
+
 [docs."docs/architecture/GOVERNANCE_STATE_MACHINE.md"]
 category = "architecture"
 status = "living"

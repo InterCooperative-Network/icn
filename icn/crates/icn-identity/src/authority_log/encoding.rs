@@ -229,6 +229,15 @@ impl<'a> Reader<'a> {
         Ok(n)
     }
 
+    /// Read a length-prefixed byte string of any content: `u32be(len) || bytes`.
+    ///
+    /// Bounded by the input itself: a declared length that overruns the remaining bytes fails
+    /// before any allocation, exactly as [`Reader::take`] fails for a fixed-width field.
+    pub(crate) fn lp(&mut self, field: &'static str) -> Result<&'a [u8], CodecError> {
+        let len = self.u32(field)? as usize;
+        self.take(len, field)
+    }
+
     /// Assert the input is fully consumed.
     pub(crate) fn finish(self) -> Result<(), CodecError> {
         let remaining = self.buf.len().saturating_sub(self.pos);
