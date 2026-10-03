@@ -68,10 +68,10 @@ These values are provenance for this handoff, not instructions for the next sess
 
 ## Work not completed
 
-- Push and draft PR: done at closeout (see the PR for this branch); nothing merged.
+- Push and draft PR: done at closeout — **PR #2807** (draft, lane STANDARD, state IMPLEMENTING); nothing merged.
 - The strict deterministic **container** for (N1 facts, act) — the one missing boundary (doc §9.2 item 2). Not started.
 - `icnctl` verb consuming that container. Not started; waits on the container and on #2777's exclusion domain.
-- Routing comments on #2694 (rung 5 landed ahead of rungs 3–4) and #2599 (first tranche): posted at closeout, pointing at the PR for this branch.
+- Routing comments posted at closeout, each pointing at PR #2807: #2694 (rung 5 landed ahead of rungs 3–4; the (facts, act) container is the shared missing boundary), #2599 (the concrete A/B/revoke case; invariants 4/6/8/9 pinned; enrollment ceremony, rotation, replacement, partition effectiveness remain), #2602 (personal/household context kind is a concrete requirement; `GovernanceDomainV1` must not be reused for it). #2800 deliberately not commented: the container note on #2694 already names its record layout.
 - ADR-0083 drift — **recorded and routed as icn#2806**, not fixed here (documentation-truth defect outside this PR's scope):
   - **Normative/history claim:** `docs/adr/ADR-0083-institutional-domain-and-domain-policy-runtime-root.md` front matter `status: "proposed"`, `implementation_status: "not-started"` (line 11), restated at line 33 and in the "Status: design decision, not yet implemented" note (line 240).
   - **Implementation fact:** `docs/spec/institutional-domain.md` lines 251, 257 and 291 record #2142 **closed-completed 2026-06-23** with rungs #2162, #2166, #2170, #2172, #2174, #2176, #2178 and #2180 landed. Code: `icn/crates/icn-governance/src/institutional_domain.rs:187` (`InstitutionalDomain`), `:208` (`declare`), `icn/apps/governance/src/http/handlers.rs:3690` (gated declare route).
@@ -138,7 +138,7 @@ The invariants the proof pins, in the vocabulary of `IDENTITY_SEMANTICS.md`: no 
 This is a **recommendation, not current truth**.
 
 1. Reverify checkout and `origin/main`; `cargo test -p icn-identity --test device_authority`.
-2. Requery the PR for this branch, its reviews and required checks.
+2. Requery PR #2807, its reviews and required checks.
 3. Re-resolve `IDENTITY_SEMANTICS.md`, the N4-A doc, #2694 and #2599.
 4. If the premise holds, the next executable entry point is:
 
