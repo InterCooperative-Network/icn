@@ -12,6 +12,13 @@ Last verified: 2026-10-04
 > admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
 > Title of record: Survey: what a person's durable continuity is in N1 (ContinuityRoot, pre-rotation, Rotate/Recover), loss scenarios, and the exact N7 gaps.
 
+> **Convergence note (2026-10-04).** Mentions below of `DeviceAuthorityBundleV1`,
+> `icn.n4.device-authority-bundle`, `MAX_BUNDLE_FACTS`, `verify_bundle` / `store_from_bundle`,
+> `device_authority_bundle.rs` and its tests describe N4-B as it stood when this record was
+> written. N4-B has since been converged on `EvidenceBundle` (`icn.n4.evidence-bundle`,
+> `evidence_bundle.rs`; `N4B_PORTABLE_EVIDENCE_BUNDLE.md` §11). Read those references as
+> historical; the text is preserved as written.
+
 # Survey — recovery and continuity for a Home runtime under ICN N1 (read-only, 2026-10-03)
 
 Source: `the icn-dev VM:/home/ubuntu/icn-dev/worktrees/icn/katie-home-identity-integration`,

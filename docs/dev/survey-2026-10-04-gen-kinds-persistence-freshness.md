@@ -12,6 +12,13 @@ Last verified: 2026-10-04
 > admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
 > Title of record: Survey: GEN context kinds for personal/household contexts (#2602), N1-D/N3 persistence and delivery (#2800, #2598), and the class-2 admission position (G1-A).
 
+> **Convergence note (2026-10-04).** Mentions below of `DeviceAuthorityBundleV1`,
+> `icn.n4.device-authority-bundle`, `MAX_BUNDLE_FACTS`, `verify_bundle` / `store_from_bundle`,
+> `device_authority_bundle.rs` and its tests describe N4-B as it stood when this record was
+> written. N4-B has since been converged on `EvidenceBundle` (`icn.n4.evidence-bundle`,
+> `evidence_bundle.rs`; `N4B_PORTABLE_EVIDENCE_BUNDLE.md` §11). Read those references as
+> historical; the text is preserved as written.
+
 # Survey: GEN context kinds, persistence/delivery, evaluation position
 
 Read-only survey of the ICN monorepo on icn-dev, 2026-10-03/04.

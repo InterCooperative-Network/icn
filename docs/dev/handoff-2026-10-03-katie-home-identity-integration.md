@@ -203,6 +203,11 @@ This is a **recommendation, not current truth**.
 | `tests/reference/device_authority_bundle_reference.py` | 2/2 literals agree |
 | `tests/reference/device_act_reference.py` | still agrees (signature verifies) |
 
+> **Converged 2026-10-04.** The N4-B rows above record what ran at the time. N4-B's container was
+> since converged on `EvidenceBundle` (`icn.n4.evidence-bundle`, `evidence_bundle.rs`);
+> `DeviceAuthorityBundleV1`, its domain, `MAX_BUNDLE_FACTS`, `device_authority_bundle.rs`, its
+> test file and its Python reference no longer exist. See `N4B_PORTABLE_EVIDENCE_BUNDLE.md` §11.
+
 ### Classification decision
 
 `PRODUCTION` is withheld from `icnctl device-authority`. The profile's earlier legend ("reachable

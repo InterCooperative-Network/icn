@@ -61,11 +61,11 @@ but unreachable, stubbed or unsafe · **DOC-ONLY** · **MISSING**.
 | (e) recovery | N1 pre-rotation `Rotate`/`Recover` establishment | LIB-TESTED (establishment transitions); MISSING (guardian/threshold protocol, backup) | IS §2.5; N7 #2603 | `construct::establish`; `Recover` clears device grants (`derive.rs:288`) |
 | (e′) legacy recovery | `recovery.rs`, RPC `recovery.*`, SDIS recovery routes | EXPERIMENTAL — **unsafe**: node key signs the trustee attestation; SDIS complete is a stub | HIA F13; #2591, #2448 | `icn-rpc/src/handler/recovery.rs:138`; `api/sdis/recovery.rs:306` |
 | (f) durable local facts | `AuthorityFactStore` + sled adapter (N1-D) | PROPOSED (PR #2800 open) | #2799/#2694 | record = `event_id ‖ signature → canonical body`; `icnd` wiring deferred to #2777 |
-| (g) external facts+act container | `DeviceAuthorityBundleV1`, `verify_bundle` (N4-B) | LIB-TESTED (14 tests + Python framing vector) | `N4B_DEVICE_AUTHORITY_BUNDLE.md` | `device_authority_bundle.rs`; fact record = N1-D layout |
+| (g) external facts+act container | `EvidenceBundle` (`icn.n4.evidence-bundle`), `verify_evidence_bundle` (N4-B, converged 2026-10-04) | LIB-TESTED (24 tests observed on icn-dev + an independent Python reference) | `N4B_PORTABLE_EVIDENCE_BUNDLE.md` | `evidence_bundle.rs`; fact record = N1-D layout |
 | (h) stateless CLI consumer | `icnctl device-authority verify\|inspect` | CLI-REACHABLE (5 end-to-end tests observed on icn-dev) — a relying party, never an authority; not PRODUCTION: no runtime, route or deployment exercises it | N4-B §4 | `bins/icnctl/src/device_authority.rs` |
 | (h′) enrollment request and attenuated approval | `EnrollmentRequestV1`, `approve_enrollment` (N4-C) | LIB-TESTED (10 tests observed on icn-dev; ceremony end to end in a fixture) | `N4C_DEVICE_ENROLLMENT_REQUEST.md` | `device_enrollment.rs`; transport, UI, delivery not built |
 | (m) device ↔ transport-channel binding | `ChannelBindingV1` as the payload of a `Present` `DeviceActV1` (N4-D) | LIB-TESTED (7 tests observed on icn-dev); no runtime calls it | `N4D_DEVICE_CHANNEL_BINDING.md` | `device_channel_binding.rs`; node `BindingInfo` not reused |
-| (n) current admission position (class 2) | `admission_position`, `verify_device_act_at_admission` (N4-E) | LIB-TESTED (8 tests observed on icn-dev) | `N4E_CURRENT_ADMISSION.md` | `device_admission.rs`; position from the relying party's own facts, never the act |
+| (n) current admission position (class 2) | `admission_position`, `verify_device_act_at_admission` (N4-E) | LIB-TESTED (8 tests observed on icn-dev) | `device_admission.rs` module docs (contract document not yet written) | `device_admission.rs`; position from the relying party's own facts, never the act |
 | (h″) the two-device acceptance invariant through every boundary | `tests/device_lifecycle_acceptance.rs` | LIB-TESTED (2 tests observed on icn-dev) | this document §2 | request → approval → facts → bundle bytes → verdict; A revoked, B accepted, S unchanged; order-independent; stale facts fail closed |
 | (i) context kinds | GEN-A `GovernanceDomainV1` only | LIB-TESTED (one kind); MISSING (personal/household) | GEN doc §5; #2602 | `subject_context.rs:180` |
 | (j) legacy device path | `multi_device.rs`, `/v1/devices/*` | EXPERIMENTAL — unreachable: no DID document is ever created | HIA F8; #2588/#2590; superseded by N4 | `identity_mgr.rs:156` |
@@ -102,7 +102,7 @@ than accepting `A`. 2 tests observed on icn-dev.
 |---|---|
 | library API `icn_identity::device_authority` | LIB-TESTED |
 | documented canonical act bytes + cross-implementation vectors | done — N4-A doc §6, §8 |
-| deterministic container for **(N1 facts, act)** that a non-Rust client can carry | **built — N4-B** (`DeviceAuthorityBundleV1`; 14 tests; independent framing vector) |
+| deterministic container for **(N1 facts, act)** that a non-Rust client can carry | **built — N4-B** (`EvidenceBundle`, `icn.n4.evidence-bundle`; 24 tests; independent Python reference) |
 | stateless `icnctl` verb consuming that container, no `icnd` | **built — `icnctl device-authority verify\|inspect`** (exit 0/1/2 = authorized/refused/malformed; 5 end-to-end tests) |
 | gateway route | deliberately not planned as an authority; at most a hosted relying party (N4-A §9.2) |
 

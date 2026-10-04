@@ -6,7 +6,7 @@ Last Reviewed: 2026-10-04
 
 # N4-D — binding a transport connection to a device Principal, by composition
 
-**Companion to:** `N4A_DEVICE_AUTHORITY_EVALUATION.md` (the verifier), `N4B_DEVICE_AUTHORITY_BUNDLE.md`
+**Companion to:** `N4A_DEVICE_AUTHORITY_EVALUATION.md` (the verifier), `N4B_PORTABLE_EVIDENCE_BUNDLE.md`
 (carrying facts), `N4C_DEVICE_ENROLLMENT_REQUEST.md` (how the device got its grant),
 `IDENTITY_SEMANTICS.md` §9 (node transport identity), `HOME_RUNTIME_IDENTITY_PROFILE.md` §6.5 ·
 **Issue:** #2599 (N4) · **Code:** `icn/crates/icn-identity/src/device_channel_binding.rs`,

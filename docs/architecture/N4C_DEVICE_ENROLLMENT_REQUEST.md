@@ -6,7 +6,7 @@ Last Reviewed: 2026-10-04
 
 # N4-C — the enrollment request, the approval step, and the ceremony a client can implement
 
-**Companion to:** `N4A_DEVICE_AUTHORITY_EVALUATION.md` (evaluation), `N4B_DEVICE_AUTHORITY_BUNDLE.md`
+**Companion to:** `N4A_DEVICE_AUTHORITY_EVALUATION.md` (evaluation), `N4B_PORTABLE_EVIDENCE_BUNDLE.md`
 (carrying facts), `IDENTITY_SEMANTICS.md` §2.7 (the Device Principal contract),
 `HUMAN_IDENTITY_ARCHITECTURE.md` §11–§12 (per-context device keys; custody of the root),
 `HOME_RUNTIME_IDENTITY_PROFILE.md` (who consumes this) · **Issue:** #2599 (N4) ·

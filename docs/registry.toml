@@ -4876,11 +4876,11 @@ domain_tags = ["website", "truth", "claims"]
 recommended_action = "keep"
 last_reviewed = "2026-08-17"
 
-[docs."docs/architecture/N4B_DEVICE_AUTHORITY_BUNDLE.md"]
+[docs."docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md"]
 category = "architecture"
 status = "living"
-title = "N4-B - the (N1 facts, device act) bundle and the stateless icnctl relying party"
-description = "NORMATIVE CONTRACT for N4-B (second tranche of icn#2599; the shared missing boundary named in icn#2694): a strict, deterministic container carrying a Subject's retained canonical N1 facts and one signed DeviceActV1 to any relying party, laid out so that the fact record equals the N1-D persistence record (event_id || witness -> canonical body). Verification re-admits every fact through the N1 gate fail-closed (one inadmissible fact refuses the whole bundle), then runs the N4-A verifier unchanged; withholding a fact can only shrink what the bundle proves; the relying party supplies the Subject and position, never the bytes. Specifies the stateless icnctl device-authority verify/inspect verb (exit 0 authorized, 1 refused with the N4-A class, 2 malformed) as the first non-Rust entry point to ICN device authority. Library, CLI, tests and an independent Python framing vector only: no transport, persistence, replication, enrollment transport, recovery, gateway route or production wiring beyond the verb. Fixture identities only."
+title = "N4-B - the portable evidence bundle (EvidenceBundle, icn.n4.evidence-bundle) and the stateless icnctl relying party"
+description = "NORMATIVE CONTRACT for N4-B, the one canonical container for carrying the N1 evidence needed to evaluate one SignedDeviceAct at position E (N4A_DEVICE_AUTHORITY_EVALUATION.md section 9.2 items 2 and 3). A strict, deterministic, externally transportable byte container under the icn.n4.evidence-bundle domain carrying every retained N1 body for one Subject at or below the act's evaluation position E, every witness over each, and one canonical DeviceActV1 plus signature. States the scope rule and why it is exactly the derive_prefix input set; the fact layout as the N1-D record (event_id || signature -> canonical body) grouped by body with the digest stated explicitly; ordering by digest that carries no authority meaning; no bound beyond N1's and N4-A's own; the fail-closed decode table; re-admission of every pair through AuthorityStore::ingest; the three separate claims (decode, admit, verify) and what each proves; the thin verify_evidence_bundle composition that decides nothing of its own; summarize for inspection; the stateless icnctl device-authority verify|inspect verb (exit 0/1/2, refusal classes, what it must never do); an independently reproduced cross-implementation vector; and the 2026-10-04 convergence record that retired DeviceAuthorityBundleV1, its domain and MAX_BUNDLE_FACTS with no compatibility decoder. The container transports evidence and does not interpret authority. Library (24 tests observed on icn-dev), CLI-reachable (5 end-to-end tests), spec and reference only: no network protocol, no N3 replication, no persistence guarantee, no session format, no enrollment or recovery, no icnd, gateway or SDK surface, no institutional recognition, no claim about Katie's Pi or any real device. Fixture identities only."
 last_updated = "2026-10-04"
 owner = "matt"
 audiences = ["developers", "architects"]
@@ -4891,11 +4891,14 @@ domain_tags = ["architecture", "identity", "security"]
 recommended_action = "keep"
 last_reviewed = "2026-10-04"
 depends_on = [
-  "icn/crates/icn-identity/src/device_authority_bundle.rs",
+  "icn/crates/icn-identity/src/evidence_bundle.rs",
+  "icn/crates/icn-identity/tests/evidence_bundle.rs",
+  "icn/crates/icn-identity/tests/reference/evidence_bundle_reference.py",
   "icn/bins/icnctl/src/device_authority.rs",
-  "icn/crates/icn-identity/tests/device_authority_bundle.rs",
+  "icn/bins/icnctl/tests/device_authority_bundle_test.rs",
   "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
   "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md",
 ]
 
 [docs."docs/architecture/N4C_DEVICE_ENROLLMENT_REQUEST.md"]
@@ -4916,7 +4919,7 @@ depends_on = [
   "icn/crates/icn-identity/src/device_enrollment.rs",
   "icn/crates/icn-identity/tests/device_enrollment.rs",
   "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
-  "docs/architecture/N4B_DEVICE_AUTHORITY_BUNDLE.md",
+  "docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md",
   "docs/architecture/IDENTITY_SEMANTICS.md",
   "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md",
 ]

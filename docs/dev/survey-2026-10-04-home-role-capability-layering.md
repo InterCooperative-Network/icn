@@ -12,6 +12,13 @@ Last verified: 2026-10-04
 > admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
 > Title of record: Survey: where a Home runtime's device roles live relative to N1 device capabilities (icn-authz, kernel Capability, AuthorityGrant/TypedScope, N4 payloads).
 
+> **Convergence note (2026-10-04).** Mentions below of `DeviceAuthorityBundleV1`,
+> `icn.n4.device-authority-bundle`, `MAX_BUNDLE_FACTS`, `verify_bundle` / `store_from_bundle`,
+> `device_authority_bundle.rs` and its tests describe N4-B as it stood when this record was
+> written. N4-B has since been converged on `EvidenceBundle` (`icn.n4.evidence-bundle`,
+> `evidence_bundle.rs`; `N4B_PORTABLE_EVIDENCE_BUNDLE.md` §11). Read those references as
+> historical; the text is preserved as written.
+
 # Survey: a generic, extensible role model for a person's Home runtime
 
 **Read-only survey.** Source: icn-dev VM, worktree
