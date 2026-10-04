@@ -164,6 +164,7 @@ This is a **recommendation, not current truth**.
 - `icn/crates/icn-identity/src/lib.rs` — module registration
 - `icn/crates/icn-identity/tests/device_authority.rs`, `tests/reference/device_act_reference.py` — tests and audit reference
 - `docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md`, `docs/registry.toml`, `docs/INDEX.md`, `docs/DOCUMENT_REGISTRY.md` — contract and registration
+- `docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md` (2026-10-04) — decision record: primitive map with classes and owners, external-boundary status, GEN stance for personal/household contexts, four contradictions settled against cited text, and the spec a deployment track may build to with every MISSING step and forbidden substitute named
 - this handoff
 
 ## Closing classification
