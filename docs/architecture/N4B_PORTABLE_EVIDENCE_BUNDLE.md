@@ -81,7 +81,7 @@ prove different things and none implies the next.
 |---|---|---|---|
 | **decode** (§5) | the bytes are one canonical bundle | the framing is well-formed; each carried body is a strict canonical N1 body; each stated `event_id` is that body's digest; each body belongs to the bundle's Subject at position `≤ E`; each body has `≥ 1` witness; the act is a strict canonical device act naming the bundle's Subject and `E` | that any witness signature verifies; that any fact was ever authorized; that the prefix is complete or unforked |
 | **admit** (§6) | every `(body, witness)` passes N1 admission | *some key signed each body* — the inline signer — exactly as a live replica would conclude | that the signer had authority; that the set is complete; anything about the act |
-| **verify** (§7) | the existing N4-A verifier returns evidence | under **the facts the bundler supplied**, folded through `E`, the chain was live and gap-free through `E`, the device held a covering grant, was not the establishment authority, and signed this exact act | that the bundler supplied *all* facts that exist for `S` through `E` (see §3.3); that the device is authorized *now* (that is N4-E, `device_admission.rs`); anything N4-A §2 lists as outside its claim |
+| **verify** (§7) | the existing N4-A verifier returns evidence | under **the facts the bundler supplied**, folded through `E`, the chain was live and gap-free through `E`, the device held a covering grant, was not the establishment authority, and signed this exact act | that the bundler supplied *all* facts that exist for `S` through `E` (see §3.3); that the device is authorized *now* (that is N4-E, `N4E_CURRENT_ADMISSION.md`); anything N4-A §2 lists as outside its claim |
 
 A bundle that decodes and admits but whose act is **refused** is a correct bundle. Refusal is a
 verdict, and transporting the evidence for a refusal is the container doing its job.
@@ -322,7 +322,7 @@ is then checked by N4-A itself: a disagreement is `ActSubjectMismatch` or
 to rely on the bundler's selection (§3.3), its own `(S, E)` **is** the bundle's. A consumer that
 holds its own facts should ingest the bundle's facts into its own store (the join is set union;
 order is irrelevant) and evaluate at its own `E` — and if the question is "is this act valid
-*now*?", that `E` is the one N4-E computes from its own retained clean tip (`device_admission.rs`),
+*now*?", that `E` is the one N4-E computes from its own retained clean tip (`N4E_CURRENT_ADMISSION.md`),
 never one the device chose.
 
 ### 7.1 The thin composition — `verify_evidence_bundle`
