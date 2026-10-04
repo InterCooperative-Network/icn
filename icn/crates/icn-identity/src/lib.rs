@@ -25,6 +25,7 @@ pub mod commons;
 pub mod commons_store;
 pub mod device_authority;
 pub mod device_authority_bundle;
+pub mod device_channel_binding;
 pub mod device_enrollment;
 pub mod did_signer;
 pub mod keybundle;
