@@ -23,6 +23,7 @@ pub mod batch_verify;
 pub mod bundle;
 pub mod commons;
 pub mod commons_store;
+pub mod device_admission;
 pub mod device_authority;
 pub mod device_authority_bundle;
 pub mod device_channel_binding;
