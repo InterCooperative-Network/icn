@@ -4920,3 +4920,25 @@ depends_on = [
   "docs/architecture/IDENTITY_SEMANTICS.md",
   "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md",
 ]
+
+[docs."docs/architecture/N4D_DEVICE_CHANNEL_BINDING.md"]
+category = "architecture"
+status = "living"
+title = "N4-D - binding a transport connection to a device Principal, by composition"
+description = "NORMATIVE CONTRACT for N4-D (icn#2599): how a Home connection says 'this connection is acting as device Principal K for Subject S' without trusting an address, a hostname, an OS or remote-desktop login, TLS certificate ownership or an enrollment request. No kernel primitive: a Present DeviceActV1 whose payload is the domain-separated ChannelBindingV1 (channel digest, nonce), verified by N4-A over the relying party's retained facts at its position and then one equality against the channel it sees. Why node DID-TLS BindingInfo is not reused for devices; what the channel digest means and what N4-D deliberately does not define about the transport; the verification order; refusal of an authorized device on the wrong channel, of unauthorized and revoked devices, of a Sign act carrying binding bytes and of a Present act with a non-binding payload; replay by challenge or channel-unique digest. Library and tests only (7 tests): no transport profile, runtime, route or CLI calls it. Fixture identities only."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "icn/crates/icn-identity/src/device_channel_binding.rs",
+  "icn/crates/icn-identity/tests/device_channel_binding.rs",
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md",
+]

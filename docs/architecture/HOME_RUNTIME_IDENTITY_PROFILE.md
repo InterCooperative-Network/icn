@@ -64,6 +64,8 @@ but unreachable, stubbed or unsafe · **DOC-ONLY** · **MISSING**.
 | (g) external facts+act container | `DeviceAuthorityBundleV1`, `verify_bundle` (N4-B) | LIB-TESTED (14 tests + Python framing vector) | `N4B_DEVICE_AUTHORITY_BUNDLE.md` | `device_authority_bundle.rs`; fact record = N1-D layout |
 | (h) stateless CLI consumer | `icnctl device-authority verify\|inspect` | CLI-REACHABLE (5 end-to-end tests observed on icn-dev) — a relying party, never an authority; not PRODUCTION: no runtime, route or deployment exercises it | N4-B §4 | `bins/icnctl/src/device_authority.rs` |
 | (h′) enrollment request and attenuated approval | `EnrollmentRequestV1`, `approve_enrollment` (N4-C) | LIB-TESTED (10 tests observed on icn-dev; ceremony end to end in a fixture) | `N4C_DEVICE_ENROLLMENT_REQUEST.md` | `device_enrollment.rs`; transport, UI, delivery not built |
+| (m) device ↔ transport-channel binding | `ChannelBindingV1` as the payload of a `Present` `DeviceActV1` (N4-D) | LIB-TESTED (7 tests observed on icn-dev); no runtime calls it | `N4D_DEVICE_CHANNEL_BINDING.md` | `device_channel_binding.rs`; node `BindingInfo` not reused |
+| (n) current admission position (class 2) | `admission_position`, `verify_device_act_at_admission` (N4-E) | LIB-TESTED (8 tests observed on icn-dev) | `N4E_CURRENT_ADMISSION.md` | `device_admission.rs`; position from the relying party's own facts, never the act |
 | (h″) the two-device acceptance invariant through every boundary | `tests/device_lifecycle_acceptance.rs` | LIB-TESTED (2 tests observed on icn-dev) | this document §2 | request → approval → facts → bundle bytes → verdict; A revoked, B accepted, S unchanged; order-independent; stale facts fail closed |
 | (i) context kinds | GEN-A `GovernanceDomainV1` only | LIB-TESTED (one kind); MISSING (personal/household) | GEN doc §5; #2602 | `subject_context.rs:180` |
 | (j) legacy device path | `multi_device.rs`, `/v1/devices/*` | EXPERIMENTAL — unreachable: no DID document is ever created | HIA F8; #2588/#2590; superseded by N4 | `identity_mgr.rs:156` |
@@ -228,9 +230,10 @@ humans or devices. Therefore:
 
 - the thin-client transport (remote desktop to a hosted workstation) keeps its **conventional**
   PKI, owned and operated by the deployment track; it is a transport fact, not an identity fact;
-- a future Home transport that wants "this connection is device Principal `K`" needs a device
-  binding object designed under N4, with the same three-fact shape (key signs the cert digest;
-  current cert matches) — **MISSING**, routed with #2599;
+- a Home transport that wants "this connection is device Principal `K`" uses the N4-D binding:
+  a `Present` act whose payload is `(channel digest, nonce)`, verified by N4-A over retained facts
+  and then one equality against the channel the relying party sees — **LIB-TESTED**
+  (`N4D_DEVICE_CHANNEL_BINDING.md`); what `channel` digests is the transport profile's to state;
 - nothing about a TLS root ever identifies the human.
 
 ### 6.6 The MAY / MUST NOT list
