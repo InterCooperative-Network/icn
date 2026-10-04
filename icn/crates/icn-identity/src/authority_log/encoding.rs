@@ -129,6 +129,10 @@ impl Writer {
         self.buf.extend_from_slice(value);
     }
 
+    pub(crate) fn b64(&mut self, value: &[u8; 64]) {
+        self.buf.extend_from_slice(value);
+    }
+
     /// Write a length-prefixed byte string: `u32be(len) || bytes`.
     pub(crate) fn lp(&mut self, value: &[u8]) {
         // Domain separators and every other length-prefixed field in this module are short,
@@ -194,6 +198,13 @@ impl<'a> Reader<'a> {
     pub(crate) fn b32(&mut self, field: &'static str) -> Result<[u8; 32], CodecError> {
         let bytes = self.take(32, field)?;
         let mut out = [0u8; 32];
+        out.copy_from_slice(bytes);
+        Ok(out)
+    }
+
+    pub(crate) fn b64(&mut self, field: &'static str) -> Result<[u8; 64], CodecError> {
+        let bytes = self.take(64, field)?;
+        let mut out = [0u8; 64];
         out.copy_from_slice(bytes);
         Ok(out)
     }

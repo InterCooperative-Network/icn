@@ -66,6 +66,8 @@ icn-entity.workspace = true
 utoipa = { version = "5.4.0", features = ["yaml"] }
 
 [dev-dependencies]
+# Test-only: the N4-B relying-party test builds fixture Subjects and device keys.
+ed25519-dalek.workspace = true
 # Test-only: the cooperative-row inspection witness constructs a real
 # `sled::Error` so it can drive `CoopError::Storage` through the classification
 # under test. Already in the lock file via icn-store; never linked into the
