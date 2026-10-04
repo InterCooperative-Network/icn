@@ -353,15 +353,15 @@ The first consumable surface, in order of smallness, is therefore:
 
 1. **this library API** (`icn_identity::device_authority`) — exists;
 2. a strict, deterministic **container** for *(facts, act)* so a non-Rust client can carry them —
-   **not yet specified**; `DeviceActV1` already has canonical bytes, the N1-D record layout
-   (`event_id || signature → canonical body`) is the natural fact framing, and GEN-A's rule holds:
+   **built: N4-B**, `N4B_DEVICE_AUTHORITY_BUNDLE.md` (`device_authority_bundle.rs`); its fact
+   record is the N1-D layout (`event_id || signature → canonical body`), and GEN-A's rule holds:
    serde/JSON bytes are never the cryptographic identity of anything;
-3. an `icnctl` verb that consumes that container and prints the evidence or the refusal — **not
-   built**; it is the right first non-Rust entry point for network-ops because it is local,
-   stateless and needs no running daemon;
+3. an `icnctl` verb that consumes that container and prints the evidence or the refusal —
+   **built: `icnctl device-authority verify|inspect`** (N4-B §4); local, stateless, no daemon;
 4. only after that, a gateway route — and only as a hosted relying party, never as an authority.
 
-**The one missing boundary to build next is item 2.** Items 3 and 4 follow from it mechanically.
+Items 2 and 3 landed as N4-B. Item 4 remains deliberately unbuilt. The ceremony that puts facts
+in a device's hands in the first place is N4-C (`N4C_DEVICE_ENROLLMENT_REQUEST.md`).
 
 ### 9.3 Downstream contract (what a deployment MAY rely on, MUST NOT reimplement)
 

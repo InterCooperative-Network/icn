@@ -4875,3 +4875,48 @@ freshness = "current"
 domain_tags = ["website", "truth", "claims"]
 recommended_action = "keep"
 last_reviewed = "2026-08-17"
+
+[docs."docs/architecture/N4B_DEVICE_AUTHORITY_BUNDLE.md"]
+category = "architecture"
+status = "living"
+title = "N4-B - the (N1 facts, device act) bundle and the stateless icnctl relying party"
+description = "NORMATIVE CONTRACT for N4-B (second tranche of icn#2599; the shared missing boundary named in icn#2694): a strict, deterministic container carrying a Subject's retained canonical N1 facts and one signed DeviceActV1 to any relying party, laid out so that the fact record equals the N1-D persistence record (event_id || witness -> canonical body). Verification re-admits every fact through the N1 gate fail-closed (one inadmissible fact refuses the whole bundle), then runs the N4-A verifier unchanged; withholding a fact can only shrink what the bundle proves; the relying party supplies the Subject and position, never the bytes. Specifies the stateless icnctl device-authority verify/inspect verb (exit 0 authorized, 1 refused with the N4-A class, 2 malformed) as the first non-Rust entry point to ICN device authority. Library, CLI, tests and an independent Python framing vector only: no transport, persistence, replication, enrollment transport, recovery, gateway route or production wiring beyond the verb. Fixture identities only."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "icn/crates/icn-identity/src/device_authority_bundle.rs",
+  "icn/bins/icnctl/src/device_authority.rs",
+  "icn/crates/icn-identity/tests/device_authority_bundle.rs",
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+]
+
+[docs."docs/architecture/N4C_DEVICE_ENROLLMENT_REQUEST.md"]
+category = "architecture"
+status = "living"
+title = "N4-C - the enrollment request, the attenuating approval, and the ceremony a client can implement"
+description = "NORMATIVE CONTRACT for N4-C (third tranche of icn#2599): the self-signed EnrollmentRequestV1 a new device presents before it holds any authority - the Subject it asks to join, its per-context Principal, the capabilities it asks for (never Recover), a human label and a nonce - which proves possession of the device key and nothing more; the approve_enrollment step on the person's authority edge that turns it into the N1 Authorize fact, refusing a request for another Subject, a grant wider than asked, an empty grant, Recover, or the establishment key as device; rejection as silence and expiry as the edge's policy; the eleven-step ceremony with each step's class; the contradictions it settles (per-context device keys; attenuation structural; recovery never delegated); and the per-phase contract a Home runtime may build to (first boot, enrollment, runtime, revocation, recovery, contexts, trust/transport). Library, spec and tests only: no transport, approval UI, pending-request persistence, fact delivery, rotation, replacement, recovery, context kind, or icnctl verb. Fixture identities only."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "icn/crates/icn-identity/src/device_enrollment.rs",
+  "icn/crates/icn-identity/tests/device_enrollment.rs",
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/N4B_DEVICE_AUTHORITY_BUNDLE.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md",
+]
