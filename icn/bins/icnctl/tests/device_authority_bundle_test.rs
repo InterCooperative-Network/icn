@@ -1,4 +1,5 @@
-//! `icnctl device-authority`: the stateless relying party over an N4-B bundle, end to end.
+//! `icnctl device-authority`: the stateless relying party over the canonical N4-B portable
+//! evidence bundle (`icn.n4.evidence-bundle`), end to end.
 //!
 //! The binary is driven as a downstream consumer would drive it: a bundle file on disk, the
 //! Subject and position supplied by the caller, one JSON document on stdout, the verdict in the
@@ -13,11 +14,11 @@ use std::process::Command;
 
 use ed25519_dalek::SigningKey;
 use icn_identity::authority_log::{
-    authorize_event, revoke_event, CapabilitySet, ContextNonce, ContinuityRoot, DeviceCapability,
-    EstablishmentKind, PrincipalKey, SignedAuthorityEvent, SubjectId,
+    authorize_event, revoke_event, AuthorityStore, CapabilitySet, ContextNonce, ContinuityRoot,
+    DeviceCapability, EstablishmentKind, PrincipalKey, SignedAuthorityEvent, SubjectId,
 };
 use icn_identity::device_authority::{sign_device_act, DeviceActV1, SignedDeviceAct};
-use icn_identity::device_authority_bundle::DeviceAuthorityBundleV1;
+use icn_identity::evidence_bundle::EvidenceBundle;
 use serde_json::Value;
 
 fn icnctl() -> PathBuf {
@@ -94,7 +95,13 @@ fn signed(f: &Fixture, device: PrincipalKey, key: &SigningKey, position: u64) ->
 }
 
 fn write_bundle(dir: &Path, facts: &[SignedAuthorityEvent], act: SignedDeviceAct) -> PathBuf {
-    let bundle = DeviceAuthorityBundleV1::new(facts.iter().cloned(), act).unwrap();
+    // The bundler is a holder of facts: assemble from a store, through the N1 gate, for the
+    // (S, E) the act names.
+    let mut store = AuthorityStore::new();
+    for fact in facts {
+        store.ingest(fact).unwrap();
+    }
+    let bundle = EvidenceBundle::assemble(&store, &act).unwrap();
     let path = dir.join("bundle.bin");
     std::fs::write(&path, bundle.canonical_bytes()).unwrap();
     path
@@ -233,6 +240,13 @@ fn inspect_describes_the_facts_and_the_act_without_deciding() {
         "inspect never refuses a well-formed bundle, even one that would fail verification"
     );
     assert_eq!(doc["fact_count"], 4);
+    assert_eq!(doc["subject"], hex::encode(f.subject.as_bytes()));
+    assert_eq!(doc["evaluation_position"], 3);
+    assert!(doc["facts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|x| x["witness_count"] == 1));
     let kinds: Vec<u64> = doc["facts"]
         .as_array()
         .unwrap()
