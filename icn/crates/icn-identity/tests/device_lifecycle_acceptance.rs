@@ -23,7 +23,7 @@
 
 mod authority_log_support;
 
-use authority_log_support::{permutations, stranger, subject, Subject};
+use authority_log_support::{permutations, store_of, stranger, subject, Subject};
 use ed25519_dalek::SigningKey;
 use icn_identity::authority_log::{
     derive, derive_prefix, revoke_event, AuthorityState, AuthorityView, CapabilitySet,
@@ -33,11 +33,11 @@ use icn_identity::device_authority::{
     sign_device_act, DeviceActV1, DeviceActVerifyError, DeviceAuthorityEvidence,
     DeviceAuthorityRefusal, SignedDeviceAct,
 };
-use icn_identity::device_authority_bundle::{
-    verify_bundle_bytes, BundleVerifyError, DeviceAuthorityBundleV1,
-};
 use icn_identity::device_enrollment::{
     approve_enrollment, sign_enrollment_request, verify_enrollment_request, EnrollmentRequestV1,
+};
+use icn_identity::evidence_bundle::{
+    verify_evidence_bundle_bytes, EvidenceBundle, EvidenceVerifyError,
 };
 
 /// A device, from its own secret: generate, request, be approved. Returns the key, the Principal
@@ -79,18 +79,17 @@ fn relying_party(
     act: SignedDeviceAct,
     subject: SubjectId,
     position: u64,
-) -> Result<DeviceAuthorityEvidence, BundleVerifyError> {
-    let bytes = DeviceAuthorityBundleV1::new(facts.iter().cloned(), act)
-        .unwrap()
-        .canonical_bytes();
-    verify_bundle_bytes(&bytes, subject, position)
+) -> Result<DeviceAuthorityEvidence, EvidenceVerifyError> {
+    let bundle =
+        EvidenceBundle::assemble(&store_of(facts), &act).map_err(EvidenceVerifyError::Bundle)?;
+    verify_evidence_bundle_bytes(&bundle.canonical_bytes(), subject, position)
 }
 
 fn refused_as(
-    result: Result<DeviceAuthorityEvidence, BundleVerifyError>,
+    result: Result<DeviceAuthorityEvidence, EvidenceVerifyError>,
 ) -> DeviceAuthorityRefusal {
     match result {
-        Err(BundleVerifyError::Act(DeviceActVerifyError::Refused(refusal))) => refusal,
+        Err(EvidenceVerifyError::Act(DeviceActVerifyError::Refused(refusal))) => refusal,
         other => panic!("expected an N4-A refusal, got {other:?}"),
     }
 }

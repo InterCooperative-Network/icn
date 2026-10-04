@@ -25,12 +25,12 @@ use icn_identity::authority_log::{
 use icn_identity::device_authority::{
     sign_device_act, DeviceActV1, DeviceActVerifyError, DeviceAuthorityRefusal, DEVICE_ACT_DOMAIN,
 };
-use icn_identity::device_authority_bundle::DEVICE_AUTHORITY_BUNDLE_DOMAIN;
 use icn_identity::device_channel_binding::{
     bind_channel, verify_channel_binding, ChannelBindingError, ChannelBindingV1,
     CHANNEL_BINDING_DOMAIN, CHANNEL_BINDING_VERSION,
 };
 use icn_identity::device_enrollment::ENROLLMENT_REQUEST_DOMAIN;
+use icn_identity::evidence_bundle::BUNDLE_DOMAIN;
 use icn_identity::subject_context::GEN_CONTEXT_DOMAIN;
 
 const CHANNEL: [u8; 32] = [0xc1; 32]; // e.g. SHA-256 of the server certificate the client saw
@@ -176,7 +176,7 @@ fn channel_binding_domain_is_distinct_from_every_other_domain() {
         COMMITMENT_DOMAIN,
         KDF_DOMAIN,
         DEVICE_ACT_DOMAIN,
-        DEVICE_AUTHORITY_BUNDLE_DOMAIN,
+        BUNDLE_DOMAIN,
         ENROLLMENT_REQUEST_DOMAIN,
         GEN_CONTEXT_DOMAIN,
     ] {

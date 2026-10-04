@@ -13,7 +13,7 @@
 
 mod authority_log_support;
 
-use authority_log_support::{revoke_at, stranger, subject};
+use authority_log_support::{revoke_at, store_of, stranger, subject};
 use icn_identity::authority_log::{
     derive, AuthorityStore, AuthorityView, CapabilitySet, CodecError, DeviceCapability,
     COMMITMENT_DOMAIN, DOMAIN, KDF_DOMAIN, SIGNATURE_DOMAIN,
@@ -21,14 +21,14 @@ use icn_identity::authority_log::{
 use icn_identity::device_authority::{
     sign_device_act, DeviceActV1, DeviceActVerifyError, DeviceAuthorityRefusal, DEVICE_ACT_DOMAIN,
 };
-use icn_identity::device_authority_bundle::{
-    verify_bundle, BundleVerifyError, DeviceAuthorityBundleV1, DEVICE_AUTHORITY_BUNDLE_DOMAIN,
-};
 use icn_identity::device_enrollment::{
     approve_enrollment, sign_enrollment_request, verify_enrollment_request,
     EnrollmentApprovalError, EnrollmentRequestError, EnrollmentRequestSignature,
     EnrollmentRequestV1, EnrollmentVerifyError, SignedEnrollmentRequest, ENROLLMENT_REQUEST_DOMAIN,
     ENROLLMENT_REQUEST_VERSION, MAX_ENROLLMENT_LABEL,
+};
+use icn_identity::evidence_bundle::{
+    verify_evidence_bundle, EvidenceBundle, EvidenceVerifyError, BUNDLE_DOMAIN,
 };
 use icn_identity::subject_context::GEN_CONTEXT_DOMAIN;
 
@@ -81,12 +81,12 @@ fn the_ceremony_end_to_end_request_approve_act_revoke() {
         b"show".to_vec(),
     )
     .unwrap();
-    let bundle = DeviceAuthorityBundleV1::new(
-        [s.inception.clone(), fact.clone()],
-        sign_device_act(&present, &pi_key).unwrap(),
+    let bundle = EvidenceBundle::assemble(
+        &store_of(&[s.inception.clone(), fact.clone()]),
+        &sign_device_act(&present, &pi_key).unwrap(),
     )
     .unwrap();
-    let evidence = verify_bundle(&bundle, s.subject, 1).expect("Present was granted");
+    let evidence = verify_evidence_bundle(&bundle, s.subject, 1).expect("Present was granted");
     assert_eq!(evidence.grant.granted_at, 1);
     assert_eq!(
         evidence.grant.capabilities,
@@ -95,14 +95,14 @@ fn the_ceremony_end_to_end_request_approve_act_revoke() {
 
     // … outside the grant, refused: the device asked for Sign, the edge did not give it.
     let sign = DeviceActV1::new(s.subject, pi, DeviceCapability::Sign, 1, b"act".to_vec()).unwrap();
-    let bundle = DeviceAuthorityBundleV1::new(
-        [s.inception.clone(), fact.clone()],
-        sign_device_act(&sign, &pi_key).unwrap(),
+    let bundle = EvidenceBundle::assemble(
+        &store_of(&[s.inception.clone(), fact.clone()]),
+        &sign_device_act(&sign, &pi_key).unwrap(),
     )
     .unwrap();
     assert!(matches!(
-        verify_bundle(&bundle, s.subject, 1),
-        Err(BundleVerifyError::Act(DeviceActVerifyError::Refused(
+        verify_evidence_bundle(&bundle, s.subject, 1),
+        Err(EvidenceVerifyError::Act(DeviceActVerifyError::Refused(
             DeviceAuthorityRefusal::CapabilityNotGranted(DeviceCapability::Sign)
         )))
     ));
@@ -118,14 +118,14 @@ fn the_ceremony_end_to_end_request_approve_act_revoke() {
         b"show".to_vec(),
     )
     .unwrap();
-    let bundle = DeviceAuthorityBundleV1::new(
-        [s.inception.clone(), fact.clone(), revoke],
-        sign_device_act(&later, &pi_key).unwrap(),
+    let bundle = EvidenceBundle::assemble(
+        &store_of(&[s.inception.clone(), fact.clone(), revoke]),
+        &sign_device_act(&later, &pi_key).unwrap(),
     )
     .unwrap();
     assert!(matches!(
-        verify_bundle(&bundle, s.subject, 2),
-        Err(BundleVerifyError::Act(DeviceActVerifyError::Refused(
+        verify_evidence_bundle(&bundle, s.subject, 2),
+        Err(EvidenceVerifyError::Act(DeviceActVerifyError::Refused(
             DeviceAuthorityRefusal::DeviceNotAuthorized
         )))
     ));
@@ -153,16 +153,16 @@ fn a_verified_request_that_was_never_approved_buys_nothing() {
         b"show".to_vec(),
     )
     .unwrap();
-    let bundle = DeviceAuthorityBundleV1::new(
-        [s.inception.clone()],
-        sign_device_act(&act, &pi_key).unwrap(),
+    let bundle = EvidenceBundle::assemble(
+        &store_of(std::slice::from_ref(&s.inception)),
+        &sign_device_act(&act, &pi_key).unwrap(),
     )
     .unwrap();
     assert!(matches!(
-        verify_bundle(&bundle, s.subject, 1),
-        Err(BundleVerifyError::Act(DeviceActVerifyError::Refused(
+        verify_evidence_bundle(&bundle, s.subject, 1),
+        Err(EvidenceVerifyError::Act(DeviceActVerifyError::Refused(
             DeviceAuthorityRefusal::PrefixIncomplete { .. }
-        ))) | Err(BundleVerifyError::Act(DeviceActVerifyError::Refused(
+        ))) | Err(EvidenceVerifyError::Act(DeviceActVerifyError::Refused(
             DeviceAuthorityRefusal::DeviceNotAuthorized
         )))
     ));
@@ -375,7 +375,7 @@ fn request_domain_is_distinct_from_every_other_domain() {
         COMMITMENT_DOMAIN,
         KDF_DOMAIN,
         DEVICE_ACT_DOMAIN,
-        DEVICE_AUTHORITY_BUNDLE_DOMAIN,
+        BUNDLE_DOMAIN,
         GEN_CONTEXT_DOMAIN,
     ] {
         assert_ne!(ENROLLMENT_REQUEST_DOMAIN, other);
