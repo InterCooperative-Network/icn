@@ -173,3 +173,56 @@ This is a **recommendation, not current truth**.
 - Semantic contract changed: no (N1 wire format, bodies, digests and selection untouched; N4-A is additive)
 - Merge performed: no
 - Deploy/release/migration performed: no
+
+---
+
+## Session 2 — 2026-10-04 — N4-B, N4-C and the acceptance backbone (observed on icn-dev)
+
+> **Memory status:** session evidence only. Every count below is a test run that completed on
+> icn-dev in this session; reverify before relying on it.
+
+### Observed checkout
+
+- branch `task/katie-home-identity-integration`; base `origin/main` `7ef8a670a`
+- commits this session, in order: `b5df9d93b` (N4-B), `3c10a63fc` (N4-C), `b098396b5`
+  (acceptance backbone); documentation commit follows
+- not pushed in this session; PR #2807 still points at `eee1dca63`
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| `cargo test -p icn-identity --test device_authority` (N4-A, unchanged) | 25 passed |
+| `cargo test -p icn-identity --test device_authority_bundle` (N4-B) | 14 passed |
+| `cargo test -p icnctl --test device_authority_bundle_test` (N4-B CLI, end to end) | 5 passed (11 min 31 s build) |
+| `cargo test -p icn-identity --test device_enrollment` (N4-C) | 10 passed |
+| `cargo test -p icn-identity --test device_lifecycle_acceptance` (backbone) | 2 passed |
+| `cargo clippy -p icn-identity --all-targets -- -D warnings` | clean |
+| `cargo clippy -p icnctl --all-targets -- -D warnings` | clean (6 min 03 s) |
+| `cargo fmt --all --check` | clean |
+| `tests/reference/device_authority_bundle_reference.py` | 2/2 literals agree |
+| `tests/reference/device_act_reference.py` | still agrees (signature verifies) |
+
+> **Converged 2026-10-04.** The N4-B rows above record what ran at the time. N4-B's container was
+> since converged on `EvidenceBundle` (`icn.n4.evidence-bundle`, `evidence_bundle.rs`);
+> `DeviceAuthorityBundleV1`, its domain, `MAX_BUNDLE_FACTS`, `device_authority_bundle.rs`, its
+> test file and its Python reference no longer exist. See `N4B_PORTABLE_EVIDENCE_BUNDLE.md` §11.
+
+### Classification decision
+
+`PRODUCTION` is withheld from `icnctl device-authority`. The profile's earlier legend ("reachable
+from a shipped binary/route") would have admitted it; that conflates *executable* with
+*operationally wired*, and ADR-0032/0033 maturity claims need evidence of the latter. The verb is
+classified **CLI-REACHABLE**: executable by an operator from the workspace binary, with
+end-to-end tests, wired into no runtime, route, deployment or profile. The legend in
+`HOME_RUNTIME_IDENTITY_PROFILE.md` §1 now defines the class.
+
+### Not done, named
+
+- transport and delivery of requests and facts (N4 ceremony carriage; N3 #2598; N1-D #2800 merge)
+- recovery (N7 #2603); a context kind for personal/household contexts (GEN #2602)
+- a capability vocabulary beyond N1's four; a device-binding object for transports
+- the full workspace gates (`cargo test --workspace`, `cargo clippy --workspace`) — only the
+  crates touched were gated in this session
+- PR #2807's earlier CI failure ("Build and verify" → "Rendered layout and accessibility audit",
+  a website step) was not root-caused; the crates' own gates are clean

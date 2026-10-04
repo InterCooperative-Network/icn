@@ -401,14 +401,14 @@ impl CapabilitySet {
         self.0.contains(&cap)
     }
 
-    fn encode(&self, w: &mut Writer) {
+    pub(crate) fn encode(&self, w: &mut Writer) {
         w.u32(self.0.len() as u32);
         for cap in &self.0 {
             w.u8(cap.tag());
         }
     }
 
-    fn decode(r: &mut Reader<'_>, field: &'static str) -> Result<Self, CodecError> {
+    pub(crate) fn decode(r: &mut Reader<'_>, field: &'static str) -> Result<Self, CodecError> {
         let count = r.count(1, field)?;
         let mut set = BTreeSet::new();
         let mut previous: Option<u8> = None;

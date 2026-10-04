@@ -1,6 +1,7 @@
 //! icnctl - CLI for managing ICNd
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+mod device_authority;
 mod institution_bootstrap;
 mod institution_runtime_root;
 
@@ -94,6 +95,10 @@ enum Commands {
     /// Institution package bootstrap operations
     #[command(subcommand)]
     Institution(institution_bootstrap::InstitutionCommands),
+
+    /// Device authority (N4-B): a stateless relying party over a (facts, act) bundle
+    #[command(subcommand)]
+    DeviceAuthority(device_authority::DeviceAuthorityCommands),
 
     /// Backup data directory
     Backup {
@@ -3261,6 +3266,8 @@ async fn main() -> Result<()> {
     let data_dir = get_data_dir(args.data_dir)?;
 
     match args.command {
+        Commands::DeviceAuthority(cmd) => device_authority::handle_device_authority_command(cmd)?,
+
         Commands::Status => {
             handle_status_command(&data_dir, &args.endpoint).await?;
         }

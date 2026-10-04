@@ -45,7 +45,7 @@ consumption profile of ICN identity** — this document — and nothing more.
 
 ## 1. Primitive map (acceptance item 1)
 
-Classes: **PRODUCTION** reachable from a shipped binary/route · **LIB-TESTED** implemented and
+Classes: **PRODUCTION** exercised by a running node, route or deployment (operationally wired; ADR-0032/0033 maturity claims need that evidence) · **CLI-REACHABLE** executable by an operator from a workspace binary, with end-to-end tests, but wired into no runtime, route, deployment or profile · **LIB-TESTED** implemented and
 tested, no runtime caller · **FIXTURE-ONLY** exists only inside tests · **EXPERIMENTAL** present
 but unreachable, stubbed or unsafe · **DOC-ONLY** · **MISSING**.
 
@@ -61,15 +61,20 @@ but unreachable, stubbed or unsafe · **DOC-ONLY** · **MISSING**.
 | (e) recovery | N1 pre-rotation `Rotate`/`Recover` establishment | LIB-TESTED (establishment transitions); MISSING (guardian/threshold protocol, backup) | IS §2.5; N7 #2603 | `construct::establish`; `Recover` clears device grants (`derive.rs:288`) |
 | (e′) legacy recovery | `recovery.rs`, RPC `recovery.*`, SDIS recovery routes | EXPERIMENTAL — **unsafe**: node key signs the trustee attestation; SDIS complete is a stub | HIA F13; #2591, #2448 | `icn-rpc/src/handler/recovery.rs:138`; `api/sdis/recovery.rs:306` |
 | (f) durable local facts | `AuthorityFactStore` + sled adapter (N1-D) | PROPOSED (PR #2800 open) | #2799/#2694 | record = `event_id ‖ signature → canonical body`; `icnd` wiring deferred to #2777 |
-| (g) external facts+act container | — | **MISSING** | N4-A doc §9.2 item 2 | nothing carries N1 facts across a process boundary |
-| (h) stateless CLI consumer | — | **MISSING** | N4-A doc §9.2 item 3 | `icnctl` has `id`/`device`/`recovery` verbs over legacy objects only |
+| (g) external facts+act container | `EvidenceBundle` (`icn.n4.evidence-bundle`), `verify_evidence_bundle` (N4-B, converged 2026-10-04) | LIB-TESTED (24 tests observed on icn-dev + an independent Python reference) | `N4B_PORTABLE_EVIDENCE_BUNDLE.md` | `evidence_bundle.rs`; fact record = N1-D layout |
+| (h) stateless CLI consumer | `icnctl device-authority verify\|inspect` | CLI-REACHABLE (5 end-to-end tests observed on icn-dev) — a relying party, never an authority; not PRODUCTION: no runtime, route or deployment exercises it | N4-B §4 | `bins/icnctl/src/device_authority.rs` |
+| (h′) enrollment request and attenuated approval | `EnrollmentRequestV1`, `approve_enrollment` (N4-C) | LIB-TESTED (10 tests observed on icn-dev; ceremony end to end in a fixture) | `N4C_DEVICE_ENROLLMENT_REQUEST.md` | `device_enrollment.rs`; transport, UI, delivery not built |
+| (m) device ↔ transport-channel binding | `ChannelBindingV1` as the payload of a `Present` `DeviceActV1` (N4-D) | LIB-TESTED (7 tests observed on icn-dev); no runtime calls it | `N4D_DEVICE_CHANNEL_BINDING.md` | `device_channel_binding.rs`; node `BindingInfo` not reused |
+| (n) current admission position (class 2) | `admission_position`, `verify_device_act_at_admission` (N4-E) | LIB-TESTED (8 tests observed on icn-dev) | `N4E_CURRENT_ADMISSION.md` | `device_admission.rs`; position from the relying party's own facts, never the act |
+| (h″) the two-device acceptance invariant through every boundary | `tests/device_lifecycle_acceptance.rs` | LIB-TESTED (2 tests observed on icn-dev) | this document §2 | request → approval → facts → bundle bytes → verdict; A revoked, B accepted, S unchanged; order-independent; stale facts fail closed |
 | (i) context kinds | GEN-A `GovernanceDomainV1` only | LIB-TESTED (one kind); MISSING (personal/household) | GEN doc §5; #2602 | `subject_context.rs:180` |
 | (j) legacy device path | `multi_device.rs`, `/v1/devices/*` | EXPERIMENTAL — unreachable: no DID document is ever created | HIA F8; #2588/#2590; superseded by N4 | `identity_mgr.rs:156` |
 | (k) sessions | gateway HS256 JWT + `jti` revocation | PRODUCTION — **not identity** | `AUTHORITY_SPINE.md` | a session proves a request may enter a handler; never authorship |
 | (l) node transport identity | DID-TLS `BindingInfo` in Hello | PRODUCTION — **node Principal only** | IS §9; `network-session-identity-binding.md` | `bundle.rs:181`; `handlers/hello.rs` |
 
-**What a Home runtime consumes today, truthfully:** rows (a), (b), (c), (c′), (d) as a Rust
-library. Nothing else. Rows (g)–(i) are the seam it is waiting on.
+**What a Home runtime consumes today, truthfully:** rows (a), (b), (c), (c′), (d), (g) and (h′)
+as a Rust library, and row (h) as a stateless `icnctl` verb. Row (i) (context kinds) and the
+transport/delivery around (h′) are the seam it is still waiting on.
 
 ---
 
@@ -81,6 +86,14 @@ evidence `{granted_at: 2, generation: 0}`; `S`'s identifier, authority set, gene
 commitment identical before and after; `A ∉ devices`, `B ∈ devices`, `B ∉ authority`; device bytes ≠
 Subject bytes. `A`'s act at `E = 2` still verifies. 25 tests; independent reference 4/4.
 
+**Extended through every boundary (2026-10-04):** `tests/device_lifecycle_acceptance.rs` enrols `A`
+and `B` through N4-C requests and attenuated approvals, carries the facts and each act as N4-B
+bytes to an independent relying party, revokes `A`, and pins: `A` refused and `B` accepted at the
+current position; `S`'s identifier, authority set, generation (still 0: nothing rotates) and
+pre-rotation commitment unchanged; the same verdicts for every arrival order of the facts; and a
+relying party whose facts stop before the revocation failing closed (`PrefixIncomplete`) rather
+than accepting `A`. 2 tests observed on icn-dev.
+
 ---
 
 ## 3. The external verification boundary (acceptance item 3)
@@ -89,14 +102,15 @@ Subject bytes. `A`'s act at `E = 2` still verifies. 25 tests; independent refere
 |---|---|
 | library API `icn_identity::device_authority` | LIB-TESTED |
 | documented canonical act bytes + cross-implementation vectors | done — N4-A doc §6, §8 |
-| deterministic container for **(N1 facts, act)** that a non-Rust client can carry | **MISSING — the exact missing piece** |
-| stateless `icnctl` verb consuming that container, no `icnd` | MISSING (follows the container) |
+| deterministic container for **(N1 facts, act)** that a non-Rust client can carry | **built — N4-B** (`EvidenceBundle`, `icn.n4.evidence-bundle`; 24 tests; independent Python reference) |
+| stateless `icnctl` verb consuming that container, no `icnd` | **built — `icnctl device-authority verify\|inspect`** (exit 0/1/2 = authorized/refused/malformed; 5 end-to-end tests) |
 | gateway route | deliberately not planned as an authority; at most a hosted relying party (N4-A §9.2) |
 
 The container's record layout should align with #2800's `event_id ‖ signature → canonical body`
-so that "what the daemon persists" and "what a client carries" are one framing. Until it lands,
-*external systems consume ICN truth* stops at the Rust API, and the Home runtime has no
-identity-bearing thing to build.
+so that "what the daemon persists" and "what a client carries" are one framing. With N4-B landed,
+*external systems consume ICN truth* reaches a stateless CLI relying party; what the Home runtime
+still lacks is the ceremony transport (N4-C defines the request and approval, not their carriage)
+and a context kind for personal/household contexts (#2602).
 
 ---
 
@@ -168,7 +182,7 @@ pretends to be the ICN one.
 |---|---|---|---|
 | generate a **device secret** locally, hardware-backed where available | nothing ICN-visible | — | never leaves the device; never a human key |
 | derive one **device Principal per context** from that secret and the context descriptor | `PrincipalKey` (32-byte Ed25519) | LIB-TESTED (`PrincipalKey::try_from_bytes`); DOC-ONLY (derivation) | no `SubjectId` in the derivation |
-| **present** to the authority edge: the per-context device public key, spelled `did:icn:<multibase>` or raw 32 bytes, plus a human-readable device label | an enrollment *request* — not an ICN object yet | **MISSING** (N4 request shape) | the request carries **no** certificate, no Subject, no claim of authority |
+| **present** to the authority edge a self-signed `EnrollmentRequestV1`: the Subject it asks to join, its per-context Principal, the capabilities it asks for (never `Recover`), a label, a nonce | `SignedEnrollmentRequest` | **LIB-TESTED** (N4-C) | possession of the key, never authority; carriage of the bytes is MISSING |
 
 The device presents a *key*, nothing more. Possession of the device proves nothing about the human.
 
@@ -178,7 +192,8 @@ The device presents a *key*, nothing more. Possession of the device proves nothi
 |---|---|---|---|
 | the authority edge (the person's phone, holding the context's establishment key) decides | — | — | a human decision on the person's own client |
 | it authors an N1 **`Authorize`** event: `subject`, `position`, `prev_digest`, `device`, `capabilities ⊆ {Sign, Present, Encrypt}`, `validity: Option<ValiditySpan>` | `SignedAuthorityEvent` | LIB-TESTED (`construct::authorize_event`) | `Recover` is never granted to a device; the establishment key is never the device |
-| the event reaches the device and every relying party | facts in their stores | **MISSING** — the N4 ceremony/transport | until it exists the only path is in-process construction with the root present, i.e. fixture-only |
+| the edge turns the request into the fact: `approve_enrollment` (attenuated; refuses another Subject, a wider grant, an empty grant, `Recover`, the establishment key) | `SignedAuthorityEvent` | **LIB-TESTED** (N4-C) | the human decides; the function only refuses what the contract forbids |
+| the event reaches the device and every relying party | facts in their stores | **MISSING** — delivery/transport | in-process construction is no longer the only path to the *fact*; carrying it still is fixture-only |
 
 **Forbidden substitute:** a bearer token, invite code, OS account, SSH key, RDP login or TLS client
 certificate standing in for the `Authorize` event. These may *gate a transport*; none of them is
@@ -215,9 +230,10 @@ humans or devices. Therefore:
 
 - the thin-client transport (remote desktop to a hosted workstation) keeps its **conventional**
   PKI, owned and operated by the deployment track; it is a transport fact, not an identity fact;
-- a future Home transport that wants "this connection is device Principal `K`" needs a device
-  binding object designed under N4, with the same three-fact shape (key signs the cert digest;
-  current cert matches) — **MISSING**, routed with #2599;
+- a Home transport that wants "this connection is device Principal `K`" uses the N4-D binding:
+  a `Present` act whose payload is `(channel digest, nonce)`, verified by N4-A over retained facts
+  and then one equality against the channel the relying party sees — **LIB-TESTED**
+  (`N4D_DEVICE_CHANNEL_BINDING.md`); what `channel` digests is the transport profile's to state;
 - nothing about a TLS root ever identifies the human.
 
 ### 6.6 The MAY / MUST NOT list
@@ -241,9 +257,9 @@ identities into anything real.
 |---|---|
 | 1. decision record with classes and owners | **this document §1** |
 | 2. fixture-backed test | **done** — PR #2807 |
-| 3. external verification boundary | **library + canonical bytes + vectors done; the (facts, act) container is the named missing piece** |
+| 3. external verification boundary | **done to a CLI relying party**: N4-B container (LIB-TESTED, vectors) + `icnctl device-authority` (CLI-REACHABLE). Open: a hosted relying party, deliberately not built |
 | 4. GEN stance | **§4** — new GEN context kinds, routed to #2602; Individual-owned `InstitutionalDomain` rejected for this use |
-| 5. implementable spec | **§6** — with every MISSING step marked and its forbidden substitute named |
+| 5. implementable spec | **§6**, now with the request and approval objects real (N4-C §6 restates the contract per phase: first boot, enrollment, runtime, revocation, recovery, contexts, trust) |
 
 ## 8. Routing
 
