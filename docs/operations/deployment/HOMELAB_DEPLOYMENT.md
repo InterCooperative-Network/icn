@@ -193,7 +193,4 @@ Manual deployment with fixes for:
 | Resource | Location |
 |----------|----------|
 | **Dev Environment** | [DEV_ENVIRONMENT.md](../../guides/developer/DEV_ENVIRONMENT.md) - icn-dev VM details |
-| **Homelab Inventory** | `/home/matt/homelab-inventory` |
-| **ICN Launchpad** | `/home/matt/homelab-inventory/projects/icn/ICN_LAUNCHPAD.md` |
-| **K3s Cluster Docs** | `/home/matt/homelab-inventory/projects/icn/docs/K3S_CLUSTER.md` |
-| **Deployment Plans** | `/home/matt/homelab-inventory/projects/icn/docs/DEPLOYMENT_PLANS.md` |
+| **Provider cluster docs / plans** | Private provider/operations layer (access-gated; see `ops/state/config/repo-map.json#org_repos.network-ops`). Not addressable from public ICN; resolve through the icn-infra scrub gate when authorized. |

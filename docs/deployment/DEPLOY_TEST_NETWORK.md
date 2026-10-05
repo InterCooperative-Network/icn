@@ -79,10 +79,7 @@ sudo kubectl -n icn get servicemonitor
 
 | Resource | Location |
 |----------|----------|
-| Homelab Inventory | `/home/matt/homelab-inventory` |
-| ICN Launchpad | `/home/matt/homelab-inventory/projects/icn/ICN_LAUNCHPAD.md` |
-| K3s Cluster Docs | `/home/matt/homelab-inventory/projects/icn/docs/K3S_CLUSTER.md` |
-| Deployment Plans | `/home/matt/homelab-inventory/projects/icn/docs/DEPLOYMENT_PLANS.md` |
+| Provider cluster docs / plans | Private provider/operations layer (access-gated; see `ops/state/config/repo-map.json#org_repos.network-ops`). The repository this snapshot originally cited is superseded lineage. |
 
 ---
 

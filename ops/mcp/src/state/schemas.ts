@@ -2,7 +2,11 @@ import { z } from "zod";
 
 export const SessionSchema = z.object({
   id: z.string().uuid(),
-  repo: z.enum(["icn", "icn-website", "icn-ops", "homelab-inventory"]),
+  // Free-form: the runtime stores whatever repo name a launcher registers
+  // (session-runtime.ts types it as `string`), and historical rows may carry
+  // retired identifiers. A closed enum here would reject real history while
+  // teaching readers a stale repo set (icn#2809).
+  repo: z.string(),
   worktree: z.string().nullable(),
   task_description: z.string().nullable(),
   started_at: z.string(),

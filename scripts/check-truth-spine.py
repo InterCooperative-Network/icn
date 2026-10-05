@@ -13,8 +13,10 @@ Unconditional (HARD, independent of --strict) failures: an unreadable/unparseabl
 sources.json; the public-map boundary guard — the public icn machine-readable
 maps (repo-map.json, ecosystem.json) must carry NO concrete host addresses or
 operational values (docs/ATLAS.md §5; icn-infra ADR-0005), which live only in the
-private network-ops repo (this map lists infrastructure ROLES only); the volatile-
-currency invariant — a `volatile` domain must not serve a terminal (closed/expired)
+private network-ops repo (this map lists infrastructure ROLES only); the provider-
+pointer guard — repo-map.json#repos may address only the public icn repo itself,
+never a sibling checkout or out-of-org remote for a provider repository (icn#2809);
+the volatile-currency invariant — a `volatile` domain must not serve a terminal (closed/expired)
 record as its current answer without explicitly declaring dormancy; and the
 SessionStart source guard — an unconditional startup hook must not name a
 repo-relative file that does not exist (both icn#2634).
@@ -574,8 +576,10 @@ def main() -> int:
     org_section = repo_map.get("org_repos") or {}
     org_repos = (org_section.get("repos") or {}) if isinstance(org_section, dict) else {}
     if eco_repos:
-        # icn is "this repo" in ecosystem.json; homelab-inventory lives in #repos.
-        expected = set(eco_repos) - {"icn", "homelab-inventory"}
+        # icn is "this repo" in ecosystem.json. Every OTHER ecosystem repo —
+        # including the private provider role (network-ops) — must be
+        # registered in #org_repos; nothing else lives in #repos (icn#2809).
+        expected = set(eco_repos) - {"icn"}
         if not org_repos:
             # The registry this validator exists to protect has disappeared —
             # that must be a warning, never a silent skip.
@@ -597,6 +601,38 @@ def main() -> int:
                 if ev and rv and ev != rv:
                     warn(f"visibility disagrees for {r}: ecosystem.json={ev} registry={rv}")
 
+    # 3b. Provider-pointer guard (icn#2809) — HARD fail regardless of --strict.
+    # repo-map.json#repos is the set of repositories public icn tooling may
+    # open directly; a private provider/personal repository must never appear
+    # there (it is a role resolved through #org_repos, pointer-free). The
+    # superseded homelab-inventory entry lived here for months with a concrete
+    # private remote and a sibling path, routing agents to stale provider
+    # truth. A concrete private repository location is a boundary leak of the
+    # same class as a host address (docs/ATLAS.md §5), so a reappearance is a
+    # hard error, not a log line: the drift workflow runs this script WITHOUT
+    # --strict, and a warning would let the exact regression pass CI.
+    if repo_map:
+        top_repos = repo_map.get("repos")
+        if not isinstance(top_repos, dict) or not top_repos:
+            # The section this guard protects has disappeared — fail closed,
+            # never skip silently (same posture as the #org_repos check above).
+            err("repo-map.json#repos is missing/empty/non-object — cannot verify that public icn addresses only itself")
+        else:
+            for name, entry in sorted(top_repos.items()):
+                remote = entry.get("remote") if isinstance(entry, dict) else None
+                local = entry.get("local") if isinstance(entry, dict) else None
+                foreign_remote = isinstance(remote, str) and "InterCooperative-Network/" not in remote
+                sibling_local = isinstance(local, str) and local not in (".", "")
+                if name != "icn" or foreign_remote or sibling_local:
+                    err(
+                        f"repo-map.json#repos names {name!r} as a directly-addressable repo — "
+                        f"public icn may address only itself; a provider/personal repository "
+                        f"is a ROLE under #org_repos (pointer-free), never a sibling checkout "
+                        f"or a remote outside the org (icn#2809). (value withheld)"
+                    )
+            if list(top_repos) == ["icn"]:
+                ok("repo-map.json#repos addresses only the public icn repo")
+
     # 4. Public-map boundary guard — HARD fail regardless of --strict.
     scan_public_map_boundary(root)
 
@@ -611,7 +647,8 @@ def main() -> int:
         print(
             f"check-truth-spine: {len(errors)} hard error(s) — FAIL "
             f"(public maps/docs must not carry concrete host addresses or "
-            f"operational values; a volatile domain must not serve a terminal "
+            f"operational values; #repos must not address a provider repository; "
+            f"a volatile domain must not serve a terminal "
             f"record as current; SessionStart must not name a missing file)"
         )
         return 1

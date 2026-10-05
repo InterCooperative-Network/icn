@@ -35,7 +35,7 @@ export function registerSessionTools(
     "Register an agent session. Normally called automatically by the SessionStart hook " +
       "(ops/scripts/icn-agent-session); call it manually only from a launcher that has no hooks.",
     {
-      repo: z.string().describe("Repo name: icn, homelab-inventory"),
+      repo: z.string().describe("Repo name (normally icn; see repo-map.json#repos)"),
       worktree: z
         .string()
         .optional()

@@ -1,5 +1,7 @@
 # ICN-Ops Orchestration Plane — Design Document
 
+> **Superseded routing note (icn#2809, 2026-10-05):** references below to `homelab-inventory` as the infrastructure/provider repository describe the February 2026 lineage. The current provider/operations layer is a private, pointer-free role — see `ops/state/config/repo-map.json#org_repos.network-ops`. This plan is retained as dated design evidence, not current routing.
+
 **Date**: 2026-02-19
 **Status**: Approved
 **ADR**: [0001-orchestration-plane-architecture](../../state/decisions/0001-orchestration-plane-architecture.md)
