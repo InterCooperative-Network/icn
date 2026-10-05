@@ -1,7 +1,5 @@
 # ICN-Ops Phases 2–6 Implementation Plan
 
-> **Superseded routing note (icn#2809, 2026-10-05):** references below to `homelab-inventory` as the infrastructure/provider repository describe the February 2026 lineage. The current provider/operations layer is a private, pointer-free role — see `ops/state/config/repo-map.json#org_repos.network-ops`. This plan is retained as dated design evidence, not current routing.
-
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Complete the icn-ops orchestration plane by wiring the Phase 1 MCP server into Claude Code, adding tests, building root-level skills, giving icn-website first-class Claude support, and adding CI.

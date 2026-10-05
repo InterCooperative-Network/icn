@@ -193,4 +193,4 @@ Manual deployment with fixes for:
 | Resource | Location |
 |----------|----------|
 | **Dev Environment** | [DEV_ENVIRONMENT.md](../../guides/developer/DEV_ENVIRONMENT.md) - icn-dev VM details |
-| **Provider cluster docs / plans** | Private provider/operations layer (access-gated; see `ops/state/config/repo-map.json#org_repos.network-ops`). Not addressable from public ICN; resolve through the icn-infra scrub gate when authorized. |
+| **Provider cluster docs / plans** | Private provider/operations layer (access-gated; see `ops/state/config/repo-map.json#org_repos.repos.network-ops`). Not addressable from public ICN; resolve through the icn-infra scrub gate when authorized. |

@@ -1,6 +1,6 @@
 # Documentation Style Guide
 
-This guide ensures consistent documentation across ICN and related projects (the private provider/operations repository and deployment repos).
+This guide ensures consistent documentation across ICN and related projects (homelab-inventory, deployment repos).
 
 ## YAML Frontmatter
 
@@ -174,13 +174,13 @@ Description...
 
 ## Cross-Repository Consistency
 
-### Private provider/operations repository (Infrastructure)
+### homelab-inventory (Infrastructure)
 
-The private provider layer (a pointer-free role; see `ops/state/config/repo-map.json#org_repos.network-ops`) uses additional fields for infrastructure context:
+Uses additional fields for infrastructure context:
 
 ```yaml
-systems: [role:k3s-control-plane, role:k3s-worker]  # Host ROLES, never concrete hostnames in public ICN
-people: [matt, claude]                               # Contributors
+systems: [hyperion, atlas, node-1]  # Physical/virtual hosts
+people: [matt, claude]              # Contributors
 ```
 
 Types include: `deployment`, `incident`, `maintenance`, `session`
@@ -207,8 +207,12 @@ grep -r "topics:.*compute" docs/
 grep -l "status: complete" docs/dev-journal/*.md
 ```
 
-### Private provider/operations repository
-Query tooling lives with that repository; it is not documented here (public ICN holds no pointer to it).
+### homelab-inventory
+```bash
+make query ARGS="--topic kubernetes"
+make query ARGS="--status active"
+make show-active
+```
 
 ## Migration Notes
 
