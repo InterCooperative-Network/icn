@@ -14,9 +14,10 @@ sources.json; the public-map boundary guard — the public icn machine-readable
 maps (repo-map.json, ecosystem.json) must carry NO concrete host addresses or
 operational values (docs/ATLAS.md §5; icn-infra ADR-0005), which live only in the
 private network-ops repo (this map lists infrastructure ROLES only); the provider-
-pointer guard — repo-map.json#repos may address only the public icn repo itself,
-never a sibling checkout or out-of-org remote for a provider repository (icn#2809);
-the volatile-currency invariant — a `volatile` domain must not serve a terminal (closed/expired)
+pointer guard — repo-map.json#repos must contain exactly `icn` with local "." and
+a canonical github.com remote for InterCooperative-Network/icn, parsed whole, so a
+sibling checkout, another repo/org/host, or an absent/malformed map fails closed
+(icn#2809; docs/ATLAS.md §4); the volatile-currency invariant — a `volatile` domain must not serve a terminal (closed/expired)
 record as its current answer without explicitly declaring dormancy; and the
 SessionStart source guard — an unconditional startup hook must not name a
 repo-relative file that does not exist (both icn#2634).
@@ -122,6 +123,66 @@ _IPV6_ALLOWED_RE = re.compile(r"^(?:::1$|2001:0?db8:)", re.IGNORECASE)
 _PRIVATE_HOST_RE = re.compile(
     r"[A-Za-z0-9_-]+\.(?:lan|local|internal|home|homelab|lab)\b", re.IGNORECASE
 )
+
+# Provider-pointer guard (icn#2809; docs/ATLAS.md §4 "Repository and privacy
+# boundaries"). repo-map.json#repos is the set of repositories public icn tooling
+# may open directly. Public icn addresses exactly ONE repository: itself. The
+# provider/personal operations layer is a pointer-free ROLE under #org_repos and
+# must never reappear here as a sibling checkout or a concrete remote (the
+# superseded homelab-inventory entry did exactly that for months). The remote is
+# PARSED against the accepted canonical forms and compared whole — host, org and
+# repo name — never substring-matched: `.../InterCooperative-Network/icn-infra`,
+# a same-org sibling, or another host carrying an ICN-looking path must all fail.
+PUBLIC_REPO_SLUG = "InterCooperative-Network/icn"
+_CANONICAL_PUBLIC_REMOTE_RE = re.compile(
+    r"^(?:git@github\.com:|ssh://git@github\.com/|https://github\.com/)"
+    + re.escape(PUBLIC_REPO_SLUG)
+    + r"(?:\.git)?$"
+)
+
+
+def is_canonical_public_remote(remote: object) -> bool:
+    """True only for an exact canonical spelling of the public ICN repository."""
+    return isinstance(remote, str) and _CANONICAL_PUBLIC_REMOTE_RE.fullmatch(remote) is not None
+
+
+def repo_pointer_violations(repo_map: object) -> list[str]:
+    """Return every way repo-map.json#repos fails the provider-pointer invariant.
+
+    Empty list == the map addresses exactly the public icn repo, with
+    `local: "."` and a canonical remote. Never echoes an offending value."""
+    out: list[str] = []
+    if not isinstance(repo_map, dict):
+        return ["repo-map.json is not a JSON object — cannot verify that public icn addresses only itself"]
+    repos = repo_map.get("repos")
+    if not isinstance(repos, dict) or not repos:
+        return ["repo-map.json#repos is missing/empty/non-object — cannot verify that public icn addresses only itself"]
+    for name in sorted(repos):
+        if name != "icn":
+            out.append(
+                "repo-map.json#repos names an entry other than 'icn' — public icn may "
+                "address only itself; a provider/personal repository is a ROLE under "
+                "#org_repos (pointer-free), never a directly-addressable repo "
+                "(icn#2809). (name withheld)"
+            )
+    icn = repos.get("icn")
+    if not isinstance(icn, dict):
+        out.append("repo-map.json#repos.icn is missing or not an object (icn#2809)")
+        return out
+    if icn.get("local") != ".":
+        out.append(
+            "repo-map.json#repos.icn.local must be exactly '.' — a missing, empty, or "
+            "sibling path would let public tooling open another checkout (icn#2809). "
+            "(value withheld)"
+        )
+    if not is_canonical_public_remote(icn.get("remote")):
+        out.append(
+            f"repo-map.json#repos.icn.remote must be a canonical github.com remote for "
+            f"{PUBLIC_REPO_SLUG} exactly (ssh scp-style, ssh://, or https, optional .git) — "
+            f"missing, empty, another repository, another org, or another host all fail "
+            f"(icn#2809). (value withheld)"
+        )
+    return out
 
 warnings: list[str] = []
 errors: list[str] = []
@@ -571,6 +632,11 @@ def main() -> int:
     except (OSError, json.JSONDecodeError) as e:
         warn(f"cannot cross-check ecosystem vs registry: {e}")
         eco, repo_map = {}, {}
+    if not isinstance(eco, dict) or not isinstance(repo_map, dict):
+        # A non-object map cannot be cross-checked; the provider-pointer guard
+        # below turns the malformed repo-map into a hard error (icn#2809).
+        warn("ecosystem.json / repo-map.json is not a JSON object — cross-check skipped")
+        eco, repo_map = {}, {}
 
     eco_repos = eco.get("repos", {})
     org_section = repo_map.get("org_repos") or {}
@@ -601,37 +667,26 @@ def main() -> int:
                 if ev and rv and ev != rv:
                     warn(f"visibility disagrees for {r}: ecosystem.json={ev} registry={rv}")
 
-    # 3b. Provider-pointer guard (icn#2809) — HARD fail regardless of --strict.
-    # repo-map.json#repos is the set of repositories public icn tooling may
-    # open directly; a private provider/personal repository must never appear
-    # there (it is a role resolved through #org_repos, pointer-free). The
-    # superseded homelab-inventory entry lived here for months with a concrete
-    # private remote and a sibling path, routing agents to stale provider
-    # truth. A concrete private repository location is a boundary leak of the
-    # same class as a host address (docs/ATLAS.md §5), so a reappearance is a
-    # hard error, not a log line: the drift workflow runs this script WITHOUT
-    # --strict, and a warning would let the exact regression pass CI.
-    if repo_map:
-        top_repos = repo_map.get("repos")
-        if not isinstance(top_repos, dict) or not top_repos:
-            # The section this guard protects has disappeared — fail closed,
-            # never skip silently (same posture as the #org_repos check above).
-            err("repo-map.json#repos is missing/empty/non-object — cannot verify that public icn addresses only itself")
-        else:
-            for name, entry in sorted(top_repos.items()):
-                remote = entry.get("remote") if isinstance(entry, dict) else None
-                local = entry.get("local") if isinstance(entry, dict) else None
-                foreign_remote = isinstance(remote, str) and "InterCooperative-Network/" not in remote
-                sibling_local = isinstance(local, str) and local not in (".", "")
-                if name != "icn" or foreign_remote or sibling_local:
-                    err(
-                        f"repo-map.json#repos names {name!r} as a directly-addressable repo — "
-                        f"public icn may address only itself; a provider/personal repository "
-                        f"is a ROLE under #org_repos (pointer-free), never a sibling checkout "
-                        f"or a remote outside the org (icn#2809). (value withheld)"
-                    )
-            if list(top_repos) == ["icn"]:
-                ok("repo-map.json#repos addresses only the public icn repo")
+    # 3b. Provider-pointer guard (icn#2809; docs/ATLAS.md §4) — HARD fail
+    # regardless of --strict, evaluated UNCONDITIONALLY: the drift workflow runs
+    # this script without --strict, so anything short of err() would let the
+    # exact regression (a concrete private repo pointer in #repos) pass CI. An
+    # absent, unreadable, or malformed map is itself a failure, never a skip —
+    # a guard that cannot see its subject must say so rather than stay quiet.
+    try:
+        pointer_map: object = json.loads(map_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        pointer_map = None
+        err("ops/state/config/repo-map.json is absent — cannot verify that public icn addresses only itself (icn#2809)")
+    except (OSError, UnicodeError, json.JSONDecodeError) as e:
+        pointer_map = None
+        err(f"ops/state/config/repo-map.json is unreadable/unparseable ({type(e).__name__}) — failing closed (icn#2809)")
+    if pointer_map is not None:
+        violations = repo_pointer_violations(pointer_map)
+        for msg in violations:
+            err(msg)
+        if not violations:
+            ok(f"repo-map.json#repos addresses only the public icn repo ({PUBLIC_REPO_SLUG}, local '.')")
 
     # 4. Public-map boundary guard — HARD fail regardless of --strict.
     scan_public_map_boundary(root)
