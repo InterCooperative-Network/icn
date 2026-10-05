@@ -153,10 +153,10 @@ def repo_pointer_violations(repo_map: object) -> list[str]:
     `local: "."` and a canonical remote. Never echoes an offending value."""
     out: list[str] = []
     if not isinstance(repo_map, dict):
-        return ["repo-map.json is not a JSON object — cannot verify that public icn addresses only itself"]
+        return ["repo-map.json is not a JSON object — cannot verify that public icn addresses only itself (icn#2809)"]
     repos = repo_map.get("repos")
     if not isinstance(repos, dict) or not repos:
-        return ["repo-map.json#repos is missing/empty/non-object — cannot verify that public icn addresses only itself"]
+        return ["repo-map.json#repos is missing/empty/non-object — cannot verify that public icn addresses only itself (icn#2809)"]
     for name in sorted(repos):
         if name != "icn":
             out.append(
