@@ -2,7 +2,7 @@
   "schema": "icn-ecosystem-atlas/v1",
   "description": "Machine-readable cross-repo ecosystem index. Companion to docs/ATLAS.md. INDEX ONLY: this file points to canonical owners; it does not own facts. For any per-domain fact, defer to ops/state/truth/sources.json (the truth spine). Manually maintained; keep thin.",
   "canonical": false,
-  "last_reviewed": "2026-06-16",
+  "last_reviewed": "2026-10-05",
   "human_view": "docs/ATLAS.md",
   "truth_spine": "ops/state/truth/sources.json",
   "project_index": "docs/reference/project-index/README.md",
@@ -46,7 +46,7 @@
     },
     "network-ops": {
       "visibility": "private",
-      "role": "Concrete provider reality: personal/homelab topology, raw configs, secrets. Most-private layer.",
+      "role": "Concrete provider reality: personal/homelab topology, raw configs, secrets. Most-private layer. The single current provider/personal source; earlier provider repositories are superseded lineage, not current truth (icn#2809).",
       "canonical_for": ["provider topology", "secrets", "raw provider configs"],
       "must_not_contain": ["product or org truth (extraction requires the icn-infra scrub gate)"],
       "pointer": "private (access-gated)"
@@ -71,19 +71,12 @@
       "canonical_for": ["org profile", "shared community health files"],
       "must_not_contain": ["product/architecture truth"],
       "pointer": "InterCooperative-Network/.github"
-    },
-    "homelab-inventory": {
-      "visibility": "private",
-      "role": "Infra the homelab runs on; observed read-only from ops/. Provider/infra state.",
-      "canonical_for": ["homelab infra inventory"],
-      "must_not_contain": ["ICN code/product truth"],
-      "pointer": "fahertym/homelab-inventory (access-gated)"
     }
   },
   "visibility_summary": {
     "public": ["icn", "org-github"],
     "private": ["nycn", "icn-infra", "icn-learn", "icn-community-bridge"],
-    "provider_personal_most_private": ["network-ops", "homelab-inventory"]
+    "provider_personal_most_private": ["network-ops"]
   },
   "sources_of_truth": {
     "current_state": "docs/STATE.md",

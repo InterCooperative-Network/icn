@@ -51,4 +51,4 @@ See [`docs/plans/2026-02-19-icn-ops-design.md`](docs/plans/2026-02-19-icn-ops-de
 - **[icn](https://github.com/InterCooperative-Network/icn)** — Main ICN daemon (Rust, 39 crates)
 - **[icn-website](https://github.com/InterCooperative-Network/icn-website)** — Public website (Astro 5)
 - **icn-wt/** — Git worktrees for parallel feature development (lives at `../icn-wt/` on dev VM)
-- **[homelab-inventory](https://github.com/fahertym/homelab-inventory)** — Infrastructure (read-only observation)
+- **Provider/infrastructure layer** — a private, access-gated role (`ops/state/config/repo-map.json#org_repos.repos.network-ops`), reached only through the icn-infra scrub gate. Public icn tooling holds no pointer to it and never observes it directly.
