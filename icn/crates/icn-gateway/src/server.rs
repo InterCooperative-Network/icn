@@ -342,10 +342,11 @@ pub fn sdis_scope(flags: SdisMountFlags) -> actix_web::Scope {
 /// prove control of that DID. Every authority gate downstream (office,
 /// steward, `sub == path`, ownership) trusts `claims.sub`, so a caller-chosen
 /// subject defeats all of them: any bearer holding an invite code could mint
-/// a session as anyone. The two known callers, the onboarding wizards in
-/// `web/pilot-ui` and the gateway's static app, never sent the bearer this
-/// scope requires, so no working flow depended on it. Mounting it again needs
-/// a redemption that proves possession of the named DID, not a flag.
+/// a session as anyone. The three known call sites -- two in
+/// `web/pilot-ui/app.js` and one in the gateway's static `app.js` -- never
+/// sent the bearer this scope requires, so no working flow depended on it.
+/// Mounting it again needs a redemption that proves possession of the named
+/// DID, not a flag.
 pub fn invites_scope() -> actix_web::Scope {
     // As in `sdis_scope`, the middleware sits on an inner scope so the returned
     // type stays a plain `Scope`; request order is unchanged (auth, then rate
