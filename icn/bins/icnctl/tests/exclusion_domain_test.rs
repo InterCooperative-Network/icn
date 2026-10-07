@@ -487,3 +487,143 @@ fn an_absent_data_root_still_reports_empty_and_creates_nothing() {
         "a read-only report must not have created the data directory"
     );
 }
+/// `restore --force` with a `--data-dir` that ends in a separator -- what shell
+/// completion produces -- must still move the existing contents *beside* the
+/// root, never into it.
+///
+/// The backup name used to be formatted from the root's display string, so
+/// `<root>/` yielded `<root>/.backup-<t>`: a directory inside the root being
+/// emptied. Moving the root's entries into it then reached the backup itself,
+/// which cannot be renamed into itself, and the restore stopped with the live
+/// root's contents split between the two. (Before contents were moved
+/// individually, the whole-root `rename` failed outright on the same path, so
+/// nothing moved; this is the case that change has to keep safe.)
+#[test]
+fn restore_force_with_a_trailing_separator_moves_contents_beside_the_root() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let dest = scratch.path().join("data");
+    seeded_root(&dest);
+    std::fs::write(dest.join("store").join("marker"), b"pre-restore\n").unwrap();
+
+    let mut spelled = dest.clone().into_os_string();
+    spelled.push("/");
+    let spelled = PathBuf::from(spelled);
+
+    let out = icnctl(&spelled)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "restore through `{}` must succeed: {}",
+        spelled.display(),
+        combined(&out)
+    );
+
+    let names = |dir: &Path| -> Vec<String> {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect()
+    };
+    let inside: Vec<String> = names(&dest)
+        .into_iter()
+        .filter(|n| n.contains(".backup-"))
+        .collect();
+    assert!(
+        inside.is_empty(),
+        "a backup directory was created inside the data root it was emptying: {inside:?}"
+    );
+
+    let siblings: Vec<String> = names(scratch.path())
+        .into_iter()
+        .filter(|n| n.starts_with("data.backup-"))
+        .collect();
+    assert_eq!(
+        siblings.len(),
+        1,
+        "exactly one backup must sit beside the root: {siblings:?}"
+    );
+    assert_eq!(
+        std::fs::read(
+            scratch
+                .path()
+                .join(&siblings[0])
+                .join("store")
+                .join("marker")
+        )
+        .unwrap(),
+        b"pre-restore\n",
+        "the replaced contents must be in the sibling backup, whole"
+    );
+    assert_eq!(
+        std::fs::read(dest.join("store").join("marker")).unwrap(),
+        b"original\n",
+        "the root must hold the restored archive"
+    );
+}
+
+/// The same, spelled `--data-dir ./` from inside the root: no final component to
+/// append to, so the backup name must come from the directory it resolves to.
+#[test]
+fn restore_force_with_a_dot_data_dir_moves_contents_beside_the_root() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let dest = scratch.path().join("data");
+    seeded_root(&dest);
+    std::fs::write(dest.join("store").join("marker"), b"pre-restore\n").unwrap();
+
+    let out = icnctl(Path::new("./"))
+        .current_dir(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "restore through `./` must succeed: {}",
+        combined(&out)
+    );
+
+    assert!(
+        !std::fs::read_dir(&dest).unwrap().any(|e| e
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .contains("backup-")),
+        "a backup directory was created inside the data root it was emptying"
+    );
+    let siblings: Vec<PathBuf> = std::fs::read_dir(scratch.path())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with("data.backup-"))
+        })
+        .collect();
+    assert_eq!(
+        siblings.len(),
+        1,
+        "exactly one backup beside the root: {siblings:?}"
+    );
+    assert_eq!(
+        std::fs::read(siblings[0].join("store").join("marker")).unwrap(),
+        b"pre-restore\n"
+    );
+    assert_eq!(
+        std::fs::read(dest.join("store").join("marker")).unwrap(),
+        b"original\n"
+    );
+}

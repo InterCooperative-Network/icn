@@ -7203,6 +7203,41 @@ fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
 /// Honest limit: entry-by-entry renames are not atomic the way the single
 /// directory rename was. A failure part-way is reported with both directories
 /// named, so an operator can see where the contents are.
+/// Where `restore --force` moves the existing contents: a *sibling* of the data
+/// root, named after the archive's own timestamp.
+///
+/// Built from the root's parent and final component, never from its display
+/// string. Formatting `"{root}.backup-{t}"` turned `--data-dir /var/lib/icn/`
+/// (a trailing separator, as shell completion writes it) into
+/// `/var/lib/icn/.backup-{t}` -- a directory *inside* the root being emptied --
+/// and `--data-dir .` into `..backup-{t}` in the same place. Moving the root's
+/// entries into it then reached the backup itself, which cannot be renamed into
+/// itself, and the restore stopped with the live root split. `Path::parent` and
+/// `Path::file_name` already ignore a trailing separator; spellings with no
+/// final component at all (`.`, `./`, `..`) are resolved to the directory they
+/// name first. A root with no parent (`/`) is refused rather than guessed at.
+fn sibling_backup_dir(data_dir: &Path, created_at: u64) -> Result<PathBuf> {
+    let root = if data_dir.file_name().is_some() {
+        data_dir.to_path_buf()
+    } else {
+        data_dir.canonicalize().with_context(|| {
+            format!(
+                "Failed to resolve the data directory {}",
+                data_dir.display()
+            )
+        })?
+    };
+    let (Some(parent), Some(name)) = (root.parent(), root.file_name()) else {
+        bail!(
+            "Refusing to move {} aside: it has no parent directory to place the backup beside",
+            data_dir.display()
+        );
+    };
+    let mut backup_name = name.to_os_string();
+    backup_name.push(format!(".backup-{created_at}"));
+    Ok(parent.join(backup_name))
+}
+
 fn move_data_root_contents_aside(data_dir: &Path, backup_dir: &Path) -> Result<usize> {
     // `create_dir`, not `create_dir_all`: the destination must be *new*.
     //
@@ -7324,11 +7359,7 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     // If force, move the existing data aside — contents only, never the root.
     if replacing_existing {
         println!("Backing up existing data directory...");
-        let backup_dir = PathBuf::from(format!(
-            "{}.backup-{}",
-            data_dir.display(),
-            metadata.created_at
-        ));
+        let backup_dir = sibling_backup_dir(data_dir, metadata.created_at)?;
         move_data_root_contents_aside(data_dir, &backup_dir)?;
         println!("  Existing data moved to: {}", backup_dir.display());
     }
@@ -14425,7 +14456,8 @@ mod exclusion_domain_tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::{
-        calculate_dir_checksum, handle_backup_command, handle_restore_command, StorageDomain,
+        calculate_dir_checksum, handle_backup_command, handle_restore_command, sibling_backup_dir,
+        StorageDomain,
     };
     use std::path::{Path, PathBuf};
 
@@ -14788,5 +14820,25 @@ mod exclusion_domain_tests {
         domain
             .open_store(&dir.path().join("store").join("trust"))
             .expect("a creating open inside the held root must be admitted");
+    }
+
+    /// The backup is always a sibling of the root, however the root is spelled.
+    #[test]
+    fn the_restore_backup_is_named_beside_the_root_not_inside_it() {
+        for spelled in ["/var/lib/icn", "/var/lib/icn/", "/var/lib/icn//"] {
+            assert_eq!(
+                sibling_backup_dir(Path::new(spelled), 7).unwrap(),
+                PathBuf::from("/var/lib/icn.backup-7"),
+                "spelled {spelled:?}"
+            );
+        }
+        assert_eq!(
+            sibling_backup_dir(Path::new("data/"), 7).unwrap(),
+            PathBuf::from("data.backup-7")
+        );
+        assert!(
+            sibling_backup_dir(Path::new("/"), 7).is_err(),
+            "a root with no parent has nowhere to put a sibling"
+        );
     }
 }
