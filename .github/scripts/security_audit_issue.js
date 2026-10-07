@@ -14,7 +14,20 @@ const TITLE = 'Weekly Security Audit Failed';
 const DEDUP_LABEL = 'security-audit';
 const CREATE_LABELS = ['priority:critical', 'type:impl', DEDUP_LABEL];
 
-const isTracker = (issue) => issue.title === TITLE && issue.state === 'open' && !issue.pull_request;
+// The tracker is an issue this workflow itself opened. On a public repository anyone
+// can open an issue with this title (and the title is all the legacy fallback has),
+// so trusting the title alone would let an outside account receive the audit's
+// failure reports -- and then close or edit them away. Issues created with the
+// workflow's GITHUB_TOKEN are authored by the reserved app login below.
+const WORKFLOW_AUTHOR = 'github-actions[bot]';
+
+const isTracker = (issue) =>
+  issue.title === TITLE &&
+  issue.state === 'open' &&
+  !issue.pull_request &&
+  issue.user != null &&
+  issue.user.login === WORKFLOW_AUTHOR &&
+  issue.user.type === 'Bot';
 
 // Deterministic choice among several candidates: the most recently opened.
 const newest = (issues) => issues.reduce((a, b) => (b.number > a.number ? b : a));
@@ -94,4 +107,4 @@ async function reportAuditFailure({ github, context }) {
 }
 
 module.exports = reportAuditFailure;
-Object.assign(module.exports, { reportAuditFailure, TITLE, DEDUP_LABEL, CREATE_LABELS });
+Object.assign(module.exports, { reportAuditFailure, TITLE, DEDUP_LABEL, CREATE_LABELS, WORKFLOW_AUTHOR });

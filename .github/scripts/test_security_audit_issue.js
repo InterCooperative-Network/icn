@@ -13,13 +13,15 @@ const mod = require('./security_audit_issue.js');
 
 const run = typeof mod === 'function' ? mod : mod.reportAuditFailure;
 const TITLE = 'Weekly Security Audit Failed';
+// What the REST API reports for issues created with a workflow's GITHUB_TOKEN.
+const BOT = { login: 'github-actions[bot]', type: 'Bot' };
 
 // A fake of the slice of the GitHub REST API the reporter uses. It is stricter
 // than GitHub on purpose: applying a label that does not exist throws, so the
 // reporter cannot depend on label auto-creation behaviour.
 function fakeGitHub({ issues = [], labels = ['priority:critical', 'type:impl'] } = {}) {
   const state = {
-    issues: issues.map((i) => ({ state: 'open', labels: [], ...i })),
+    issues: issues.map((i) => ({ state: 'open', labels: [], user: BOT, ...i })),
     labels: new Set(labels),
     comments: [],
     nextNumber: Math.max(1000, ...issues.map((i) => i.number)) + 1,
@@ -34,6 +36,7 @@ function fakeGitHub({ issues = [], labels = ['priority:critical', 'type:impl'] }
     title: i.title,
     state: i.state,
     labels: i.labels.map((name) => ({ name })),
+    user: i.user,
     ...(i.pull_request ? { pull_request: {} } : {}),
   });
   const listForRepo = async ({ state: wanted = 'open', labels: filter } = {}) => {
@@ -52,7 +55,7 @@ function fakeGitHub({ issues = [], labels = ['priority:critical', 'type:impl'] }
         listForRepo,
         create: async ({ title, body, labels: ls = [] }) => {
           requireLabels(ls);
-          const issue = { number: state.nextNumber++, title, body, state: 'open', labels: [...ls] };
+          const issue = { number: state.nextNumber++, title, body, state: 'open', labels: [...ls], user: BOT };
           state.issues.push(issue);
           return { data: view(issue) };
         },
@@ -147,4 +150,26 @@ test('the label the lookup filters on is one of the labels a created issue carri
   assert.equal(typeof mod.DEDUP_LABEL, 'string');
   assert.ok(Array.isArray(mod.CREATE_LABELS));
   assert.ok(mod.CREATE_LABELS.includes(mod.DEDUP_LABEL));
+});
+
+test('a look-alike issue opened by another account is never adopted or commented on', async () => {
+  // Anyone can open an issue with the tracker title; a privileged user could even
+  // label one. Neither makes it the workflow's tracker.
+  const outsider = { login: 'someone-else', type: 'User' };
+  const { github, state } = fakeGitHub({
+    issues: [
+      { number: 20, title: TITLE, user: outsider, labels: [] },
+      { number: 21, title: TITLE, user: outsider, labels: ['security-audit'] },
+    ],
+    labels: ['priority:critical', 'type:impl', 'security-audit'],
+  });
+  await run({ github, context: context(6) });
+  assert.equal(state.comments.length, 0, 'no failure report may land in an issue the workflow did not open');
+  for (const n of [20, 21]) {
+    const i = state.issues.find((x) => x.number === n);
+    assert.equal(i.labels.includes('security-audit'), n === 21, 'look-alikes are not relabelled');
+  }
+  const created = state.issues.filter((i) => i.user === BOT && i.title === TITLE);
+  assert.equal(created.length, 1, 'the workflow opens its own tracker instead');
+  assert.equal(mod.WORKFLOW_AUTHOR, BOT.login);
 });
