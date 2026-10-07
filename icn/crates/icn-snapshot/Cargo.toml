@@ -12,7 +12,7 @@ icn-time = { path = "../icn-time" }
 sha2 = "0.10"
 hex = "0.4"
 icn-encoding = { path = "../icn-encoding" }
-getrandom = "0.2"
+getrandom = "0.4"
 icn-identity = { path = "../icn-identity" }
 tokio = { version = "1", features = ["sync"] }
 tracing = "0.1"
