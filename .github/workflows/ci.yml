@@ -354,6 +354,9 @@ jobs:
       - name: Self-test the readiness linter
         run: python3 .github/scripts/test_readiness_overclaim_linter.py
 
+      - name: Self-test the weekly security-audit issue reporter
+        run: node --test .github/scripts/test_security_audit_issue.js
+
       - name: Run readiness overclaim linter
         run: |
           set -euo pipefail
