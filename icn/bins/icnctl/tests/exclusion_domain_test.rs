@@ -854,3 +854,525 @@ fn a_refused_init_coop_writes_nothing_inside_the_held_root() {
     }
     assert_refused_by_the_domain(&out, "init-coop");
 }
+
+// ---------------------------------------------------------------------------
+// restore --force: the directory the existing contents move into
+// ---------------------------------------------------------------------------
+
+/// A root's entries, without the two coordination files any participant in the
+/// domain creates and retains.
+fn root_contents(dir: &Path) -> Vec<String> {
+    let mut v: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n != ".icn-data-dir.lock" && n != ".icn-config.lock")
+        .collect();
+    v.sort();
+    v
+}
+
+/// `icnctl` started under an explicit umask, scrubbed the same way as `icnctl`.
+#[cfg(unix)]
+fn icnctl_with_umask(umask: &str, data_dir: &Path) -> Command {
+    let mut cmd = Command::new("/bin/sh");
+    for (key, _) in std::env::vars() {
+        if key.starts_with("ICN_DEV_") {
+            cmd.env_remove(&key);
+        }
+    }
+    cmd.env("RUST_LOG", "off")
+        .env("ICN_GATEWAY", "http://127.0.0.1:1")
+        .env_remove("ICN_TOKEN")
+        .arg("-c")
+        .arg(format!("umask {umask} && exec \"$0\" \"$@\""))
+        .arg(icnctl_bin())
+        .arg("--data-dir")
+        .arg(data_dir);
+    cmd
+}
+
+#[cfg(unix)]
+fn mode_of(path: &Path) -> u32 {
+    use std::os::unix::fs::PermissionsExt as _;
+    std::fs::symlink_metadata(path)
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o7777
+}
+
+#[cfg(unix)]
+fn set_mode(path: &Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt as _;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+}
+
+/// The packaged layout: the account owns its data directory and not the parent
+/// (`/var/lib/icn` vs `/var/lib`), so it cannot create the directory beside the
+/// root. Restore must refuse *before* moving anything and describe the
+/// directory that makes the restore possible -- not stop part-way. This parent
+/// belongs to the test's own account, not root, so no root command may be
+/// printed: anyone who can write a parent could plant a link at that name
+/// before root ran it.
+#[cfg(unix)]
+#[test]
+fn restore_force_beside_an_unwritable_parent_refuses_before_moving_anything() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let var_lib = scratch.path().join("var-lib");
+    let dest = var_lib.join("icn");
+    seeded_root(&dest);
+    std::fs::write(dest.join("store").join("marker"), b"pre-restore\n").unwrap();
+    let before = root_contents(&dest);
+
+    set_mode(&var_lib, 0o555);
+    let bound = permissions_bind_this_process(&var_lib);
+    let out = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    set_mode(&var_lib, 0o755);
+    if !bound {
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+
+    let text = combined(&out);
+    assert!(!out.status.success(), "must refuse: {text}");
+    assert!(
+        text.contains("Nothing has been moved"),
+        "must say the root is untouched: {text}"
+    );
+    assert!(
+        text.contains("owned by uid"),
+        "must describe the directory that makes the restore possible: {text}"
+    );
+    assert!(
+        !text.contains("sudo"),
+        "no root command beside a parent root does not exclusively control: {text}"
+    );
+    assert_eq!(root_contents(&dest), before, "nothing may move: {text}");
+    assert_eq!(
+        std::fs::read(dest.join("store").join("marker")).unwrap(),
+        b"pre-restore\n"
+    );
+    assert_eq!(
+        root_contents(&var_lib),
+        vec!["icn".to_string()],
+        "nothing may be created beside the root: {text}"
+    );
+}
+
+/// The privileged step that refusal names, taken: an empty directory created
+/// for the data directory's account -- deliberately wider than asked, as an
+/// operator might -- is accepted, made owner-only before anything moves into it,
+/// and receives the whole pre-restore root while the parent stays unwritable.
+#[cfg(unix)]
+#[test]
+fn restore_force_uses_an_empty_directory_created_for_it_and_makes_it_owner_only() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let var_lib = scratch.path().join("var-lib");
+    let dest = var_lib.join("icn");
+    seeded_root(&dest);
+    std::fs::write(dest.join("store").join("marker"), b"pre-restore\n").unwrap();
+
+    set_mode(&var_lib, 0o555);
+    let bound = permissions_bind_this_process(&var_lib);
+    let first = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    if !bound {
+        set_mode(&var_lib, 0o755);
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+    let text = combined(&first);
+    assert!(!first.status.success(), "first run must refuse: {text}");
+    let named = var_lib
+        .canonicalize()
+        .unwrap()
+        .join(backup_name_restoring(&archive, scratch.path()));
+    assert!(
+        text.contains(&named.display().to_string()),
+        "the refusal must name the directory to create, beside the real root: {text}"
+    );
+
+    // The privileged step, as root would take it.
+    set_mode(&var_lib, 0o755);
+    std::fs::create_dir(&named).unwrap();
+    set_mode(&named, 0o755);
+    set_mode(&var_lib, 0o555);
+
+    let second = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    set_mode(&var_lib, 0o755);
+    assert!(
+        second.status.success(),
+        "restore must use the directory created for it: {}",
+        combined(&second)
+    );
+    assert_eq!(mode_of(&named), 0o700, "made owner-only before use");
+    assert_eq!(
+        std::fs::read(named.join("store").join("marker")).unwrap(),
+        b"pre-restore\n",
+        "the whole pre-restore root is in it"
+    );
+    assert_eq!(
+        std::fs::read(dest.join("store").join("marker")).unwrap(),
+        b"original\n",
+        "the root holds the restored archive"
+    );
+}
+
+/// The moved-aside copy is never more exposed than the root it came from: a
+/// `0700` root under a `022` umask used to yield a `0755` backup holding its
+/// formerly shielded files. Owner-only for every root mode and umask, and the
+/// live root keeps its own mode.
+#[cfg(unix)]
+#[test]
+fn restore_force_moves_the_root_into_an_owner_only_backup_whatever_the_umask() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    for (n, (root_mode, umask)) in [
+        (0o700, "022"),
+        (0o700, "000"),
+        (0o750, "077"),
+        (0o755, "022"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let parent = scratch.path().join(format!("case-{n}"));
+        let dest = parent.join("icn");
+        seeded_root(&dest);
+        set_mode(&dest.join("icn.toml"), 0o644);
+        set_mode(&dest, root_mode);
+
+        let out = icnctl_with_umask(umask, &dest)
+            .arg("restore")
+            .arg(&archive)
+            .arg("--force")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "root {root_mode:o}, umask {umask}: {}",
+            combined(&out)
+        );
+        let backups: Vec<PathBuf> = std::fs::read_dir(&parent)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| {
+                p.file_name()
+                    .is_some_and(|n| n.to_string_lossy().starts_with("icn.backup-"))
+            })
+            .collect();
+        assert_eq!(backups.len(), 1, "root {root_mode:o}, umask {umask}");
+        assert_eq!(
+            mode_of(&backups[0]),
+            0o700,
+            "root {root_mode:o}, umask {umask}: the backup must be owner-only"
+        );
+        assert!(backups[0].join("icn.toml").exists());
+        assert_eq!(
+            mode_of(&dest),
+            root_mode,
+            "root {root_mode:o}, umask {umask}: the live root keeps its mode"
+        );
+    }
+}
+
+/// A move that fails on its very first entry has changed nothing, must say so,
+/// and must not leave behind an empty directory that would block the retry.
+/// (A directory that does not grant its owner write cannot be moved to another
+/// parent: `rename(2)` must rewrite its `..`.)
+#[cfg(unix)]
+#[test]
+fn a_restore_that_cannot_move_its_first_entry_changes_nothing_and_leaves_nothing() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let dest = scratch.path().join("data");
+    std::fs::create_dir_all(dest.join("store")).unwrap();
+    std::fs::write(dest.join("store").join("marker"), b"pre-restore\n").unwrap();
+    set_mode(&dest.join("store"), 0o555);
+    let bound = permissions_bind_this_process(&dest.join("store"));
+
+    let out = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    set_mode(&dest.join("store"), 0o755);
+    if !bound {
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+
+    let text = combined(&out);
+    assert!(!out.status.success(), "must fail: {text}");
+    assert!(
+        text.contains("Nothing has been moved"),
+        "must not claim a split that did not happen: {text}"
+    );
+    assert_eq!(root_contents(&dest), vec!["store".to_string()]);
+    assert_eq!(
+        std::fs::read(dest.join("store").join("marker")).unwrap(),
+        b"pre-restore\n"
+    );
+    let leftovers: Vec<String> = root_contents(scratch.path())
+        .into_iter()
+        .filter(|n| n.contains(".backup-"))
+        .collect();
+    assert!(
+        leftovers.is_empty(),
+        "an empty backup directory was left to block the retry: {leftovers:?}"
+    );
+}
+
+/// A root that exists but holds nothing has nothing to move aside: restore must
+/// neither create a directory for it nor demand one -- even in the packaged
+/// layout, where it could not.
+#[cfg(unix)]
+#[test]
+fn restore_force_over_an_empty_root_needs_no_directory_beside_it() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let var_lib = scratch.path().join("var-lib");
+    let dest = var_lib.join("icn");
+    std::fs::create_dir_all(&dest).unwrap();
+
+    set_mode(&var_lib, 0o555);
+    let bound = permissions_bind_this_process(&var_lib);
+    let out = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    set_mode(&var_lib, 0o755);
+    if !bound {
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+
+    assert!(
+        out.status.success(),
+        "an empty root needs nothing moved aside: {}",
+        combined(&out)
+    );
+    assert_eq!(root_contents(&var_lib), vec!["icn".to_string()]);
+    assert_eq!(
+        std::fs::read(dest.join("store").join("marker")).unwrap(),
+        b"original\n"
+    );
+}
+
+/// A symlink planted at the backup's name is refused before anything follows
+/// it: nothing moves, and the directory it points at is neither written into
+/// nor re-moded (`chmod` follows symlinks, so the type check must come first).
+#[cfg(unix)]
+#[test]
+fn restore_force_refuses_a_symlink_at_the_backup_name_without_following_it() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let name = backup_name_restoring(&archive, scratch.path());
+
+    let parent = scratch.path().join("case");
+    let dest = parent.join("icn");
+    seeded_root(&dest);
+    std::fs::write(dest.join("store").join("marker"), b"pre-restore\n").unwrap();
+    let elsewhere = scratch.path().join("elsewhere");
+    std::fs::create_dir(&elsewhere).unwrap();
+    set_mode(&elsewhere, 0o755);
+    std::os::unix::fs::symlink(&elsewhere, parent.join(&name)).unwrap();
+    let before = root_contents(&dest);
+
+    let out = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(!out.status.success(), "must refuse: {text}");
+    assert!(text.contains("is not a directory"), "{text}");
+    assert!(text.contains("Nothing has been moved"), "{text}");
+    assert_eq!(root_contents(&dest), before, "nothing may move: {text}");
+    assert_eq!(
+        mode_of(&elsewhere),
+        0o755,
+        "the link's target must not be re-moded"
+    );
+    assert!(
+        root_contents(&elsewhere).is_empty(),
+        "nothing may be moved through the link"
+    );
+}
+
+/// The name a restore of `archive` gives the directory beside a root called
+/// `icn`, learned by doing one in a throwaway root under `scratch`.
+fn backup_name_restoring(archive: &Path, scratch: &Path) -> String {
+    let probe = scratch.join("probe").join("icn");
+    seeded_root(&probe);
+    let out = icnctl(&probe)
+        .arg("restore")
+        .arg(archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "probe restore: {}", combined(&out));
+    root_contents(probe.parent().unwrap())
+        .into_iter()
+        .find(|n| n.starts_with("icn.backup-"))
+        .expect("the probe restore names its backup")
+}
+
+/// A directory already at the backup's name that is not empty is never written
+/// into. Moving the root's entries one by one would replace its files of the
+/// same name -- here, an earlier backup's `icn.toml` -- before anything else
+/// failed.
+#[cfg(unix)]
+#[test]
+fn restore_force_refuses_a_non_empty_backup_without_touching_it() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+    let name = backup_name_restoring(&archive, scratch.path());
+
+    let parent = scratch.path().join("case");
+    let dest = parent.join("icn");
+    seeded_root(&dest);
+    let earlier = parent.join(&name);
+    std::fs::create_dir(&earlier).unwrap();
+    std::fs::write(earlier.join("icn.toml"), b"earlier backup\n").unwrap();
+    set_mode(&earlier, 0o700);
+    let before = root_contents(&dest);
+
+    let out = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(!out.status.success(), "must refuse: {text}");
+    assert!(text.contains("is not empty"), "{text}");
+    assert!(text.contains("Nothing has been moved"), "{text}");
+    assert_eq!(root_contents(&dest), before, "nothing may move: {text}");
+    assert_eq!(
+        std::fs::read(dest.join("icn.toml")).unwrap(),
+        b"# fixture\n"
+    );
+    assert_eq!(root_contents(&earlier), vec!["icn.toml".to_string()]);
+    assert_eq!(
+        std::fs::read(earlier.join("icn.toml")).unwrap(),
+        b"earlier backup\n",
+        "the earlier backup must be untouched"
+    );
+}
+
+/// A move that fails part-way must not leave the live root split between two
+/// directories, where a daemon would start with half its state missing: every
+/// entry already moved is put back, and the directory restore made is removed.
+/// The *last* directory in listing order cannot be moved (`rename(2)` must
+/// rewrite its `..`), so every entry before it has already moved when it fails.
+#[cfg(unix)]
+#[test]
+fn a_restore_that_fails_part_way_moves_back_everything_it_moved() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let parent = scratch.path().join("case");
+    let dest = parent.join("icn");
+    for d in ["store", "keys", "ledger", "gateway", "coop"] {
+        std::fs::create_dir_all(dest.join(d)).unwrap();
+        std::fs::write(dest.join(d).join("marker"), format!("pre-restore {d}\n")).unwrap();
+    }
+    std::fs::write(dest.join("icn.toml"), b"# live\n").unwrap();
+    let last = std::fs::read_dir(&dest)
+        .unwrap()
+        .map(|e| e.unwrap())
+        .filter(|e| e.file_type().unwrap().is_dir())
+        .last()
+        .unwrap()
+        .path();
+    set_mode(&last, 0o555);
+    let bound = permissions_bind_this_process(&last);
+    let before = root_contents(&dest);
+
+    let out = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    set_mode(&last, 0o755);
+    if !bound {
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+
+    let text = combined(&out);
+    assert!(!out.status.success(), "must fail: {text}");
+    assert!(
+        text.contains("were moved back"),
+        "the failure must come after earlier entries moved, and they must be put back: {text}"
+    );
+    assert!(text.contains("Nothing has been moved"), "{text}");
+    assert_eq!(
+        root_contents(&dest),
+        before,
+        "the root must be whole again: {text}"
+    );
+    for d in ["store", "keys", "ledger", "gateway", "coop"] {
+        assert_eq!(
+            std::fs::read_to_string(dest.join(d).join("marker")).unwrap(),
+            format!("pre-restore {d}\n")
+        );
+    }
+    assert_eq!(
+        root_contents(&parent),
+        vec!["icn".to_string()],
+        "the directory restore made must be gone: {text}"
+    );
+}

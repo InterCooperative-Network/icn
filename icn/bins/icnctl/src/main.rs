@@ -7203,23 +7203,6 @@ fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Move everything under a data root aside, leaving the root itself in place.
-///
-/// The *contents* move, never the directory. That distinction is the whole
-/// repair for icn#2758: `rename(2)` of the root carried the locked
-/// `.icn-data-dir.lock` inode into the backup while a fresh, unlocked file
-/// appeared at the stable pathname, so restore and a daemon could hold two
-/// valid exclusive locks over "the data directory" and never contend. Keeping
-/// the root — and with it the coordination files this process is holding —
-/// means the exclusion is continuous across the replacement, with no instant in
-/// which the stable path is unlocked.
-///
-/// The coordination files are skipped rather than moved: they are the anchor of
-/// the domain, not state, and moving one is precisely the split above.
-///
-/// Honest limit: entry-by-entry renames are not atomic the way the single
-/// directory rename was. A failure part-way is reported with both directories
-/// named, so an operator can see where the contents are.
 /// Where `restore --force` moves the existing contents: a *sibling* of the data
 /// root, named after the archive's own timestamp.
 ///
@@ -7287,34 +7270,426 @@ fn sibling_backup_dir(data_dir: &Path, created_at: u64) -> Result<PathBuf> {
     Ok(backup)
 }
 
-fn move_data_root_contents_aside(data_dir: &Path, backup_dir: &Path) -> Result<usize> {
-    // `create_dir`, not `create_dir_all`: the destination must be *new*.
-    //
-    // The name is derived from the archive's own timestamp, so restoring one
-    // archive twice picks the same one both times. The single `rename` this
-    // replaced failed outright in that case (`ENOTEMPTY`); moving entries
-    // individually would instead overwrite the earlier backup file by file
-    // until it hit a directory collision. Refusing by name is clearer than
-    // either.
-    match std::fs::create_dir(backup_dir) {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => bail!(
-            "Refusing to move the existing data aside: {} is already there. It holds the data \
-             moved aside by an earlier restore of this same backup — the directory is named \
-             after the archive's own timestamp — and writing into it would overwrite that copy \
-             entry by entry. Move or remove it first.",
+/// The mode of the directory `restore --force` moves the existing contents into.
+///
+/// Owner-only, and never derived from the umask: the directory receives every
+/// file of the data root -- keys, configuration, stores -- and a root kept at
+/// `0700` may be the only thing standing between those files and other local
+/// accounts. Owner-only is never wider than any root restore can operate on (it
+/// needs to write there itself), and at this mode an ACL inherited from the
+/// parent is masked to nothing, whatever group the new directory receives.
+const MOVE_ASIDE_DIR_MODE: u32 = 0o700;
+
+/// Why the root's contents cannot be moved beside it without copying across a
+/// filesystem boundary, if they cannot.
+///
+/// `rename(2)` cannot cross filesystems (`EXDEV`) and cannot move a mount point
+/// (`EBUSY`). Both would surface part-way through the move, after earlier
+/// entries had already gone, so they are asked before anything moves: the
+/// directory beside the root is on the parent's filesystem, so a root that is
+/// itself a mount point has nowhere to go; and an entry on another filesystem
+/// is a mount point inside the root. (A bind mount of the *same* filesystem is
+/// not visible this way; its `EBUSY` is reported where it happens.)
+#[cfg(unix)]
+fn cross_filesystem_obstacle(
+    root: &Path,
+    root_dev: u64,
+    parent_dev: u64,
+    entries: &[(PathBuf, u64)],
+) -> Option<String> {
+    if parent_dev != root_dev {
+        return Some(format!(
+            "{} is the root of its own filesystem (a mount point or a btrfs subvolume), so a \
+             directory beside it is on another filesystem and its contents cannot be moved there \
+             without copying",
+            root.display()
+        ));
+    }
+    entries
+        .iter()
+        .find(|(_, dev)| *dev != root_dev)
+        .map(|(entry, _)| {
+            format!(
+                "{} is on another filesystem than {} (a mount point or btrfs subvolume inside it), \
+                 and it cannot be moved by rename",
+                entry.display(),
+                root.display()
+            )
+        })
+}
+
+/// Make `backup_dir` ready to receive the data root's contents, or refuse with
+/// nothing moved.
+///
+/// The refusals that can be known before anything moves are asked here
+/// first: the filesystem boundaries, whether this account can create the
+/// directory at all, and what is already there. The move can still fail
+/// part-way on an entry this account cannot move (a directory it cannot write,
+/// an immutable file, a bind mount); [`move_data_root_contents_aside`] then
+/// puts back what it had moved. Returns `None` when the root holds nothing
+/// to move -- no directory is needed then, so none is created or demanded --
+/// and otherwise whether this call created it, so a move that fails before its
+/// first entry can remove exactly what it made.
+///
+/// **An account that cannot write the root's parent.** A packaged install gives
+/// the service account its data directory and nothing above it
+/// (`/var/lib/icn` is the account's, `/var/lib` is root's), and restore must
+/// run as that account. So when the directory cannot be created, restore
+/// refuses and names the one privileged step that makes it possible: create
+/// it, empty, owned by the data directory's account (see
+/// [`privileged_move_aside_step`] for when that is printed as a command). An existing directory is
+/// accepted only if it is a real directory (not a symlink), owned by that
+/// account, on the root's filesystem and empty -- and it is made owner-only
+/// *before* it is checked for emptiness, so nothing can be placed in it between
+/// the check and the first move.
+fn prepare_move_aside_dir(data_dir: &Path, backup_dir: &Path) -> Result<Option<bool>> {
+    let root_meta = std::fs::metadata(data_dir).with_context(|| {
+        format!(
+            "Failed to inspect the data directory {}",
+            data_dir.display()
+        )
+    })?;
+    let Some(parent) = backup_dir.parent() else {
+        bail!(
+            "Refusing to move the existing data aside: {} has no parent directory",
             backup_dir.display()
-        ),
+        );
+    };
+
+    // What would move -- every entry but the coordination files -- and the
+    // filesystem each is on.
+    let mut entries: Vec<(PathBuf, u64)> = Vec::new();
+    for entry in std::fs::read_dir(data_dir)
+        .with_context(|| format!("Failed to read {}", data_dir.display()))?
+    {
+        let entry =
+            entry.with_context(|| format!("Failed to read an entry of {}", data_dir.display()))?;
+        if is_root_coordination_file(Path::new(&entry.file_name())) {
+            continue;
+        }
+        let meta = std::fs::symlink_metadata(entry.path())
+            .with_context(|| format!("Failed to inspect {}", entry.path().display()))?;
+        #[cfg(unix)]
+        let dev = {
+            use std::os::unix::fs::MetadataExt as _;
+            meta.dev()
+        };
+        #[cfg(not(unix))]
+        let dev = {
+            let _ = meta;
+            0
+        };
+        entries.push((entry.path(), dev));
+    }
+    if entries.is_empty() {
+        return Ok(None);
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        let parent_meta = std::fs::metadata(parent)
+            .with_context(|| format!("Failed to inspect {}", parent.display()))?;
+        if let Some(obstacle) =
+            cross_filesystem_obstacle(data_dir, root_meta.dev(), parent_meta.dev(), &entries)
+        {
+            bail!("Refusing to move the existing data aside: {obstacle}. Nothing has been moved.");
+        }
+    }
+
+    let created = match create_move_aside_dir(backup_dir) {
+        Ok(()) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => false,
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+                // Every directory from the parent up to `/`, as (owner, mode).
+                // One that is unreadable is reported as unsafe, never skipped.
+                let chain: Vec<(u32, u32)> = parent
+                    .ancestors()
+                    .map(|dir| {
+                        std::fs::metadata(dir)
+                            .map(|m| (m.uid(), m.permissions().mode()))
+                            .unwrap_or((u32::MAX, 0o777))
+                    })
+                    .collect();
+                let how = match privileged_move_aside_step(
+                    backup_dir,
+                    &chain,
+                    root_meta.uid(),
+                    root_meta.gid(),
+                ) {
+                    Some(step) => format!(
+                        "A packaged install gives the data directory to the service account and \
+                         keeps its parent for root. Create the directory empty and owned by the \
+                         data directory's account, then run this restore again; it accepts an \
+                         empty directory there and makes it owner-only before moving anything \
+                         into it:\n    {step}"
+                    ),
+                    None => format!(
+                        "Create it empty, owned by uid {} and on the same filesystem as the data \
+                         directory, then run this restore again; it accepts an empty directory \
+                         there and makes it owner-only before moving anything into it.",
+                        root_meta.uid()
+                    ),
+                };
+                bail!(
+                    "Refusing to move the existing data aside: this account cannot create {} beside \
+                     the data directory ({} is not writable by it). Nothing has been moved.\n{how}",
+                    backup_dir.display(),
+                    parent.display()
+                );
+            }
+            #[cfg(not(unix))]
+            return Err(e).with_context(|| {
+                format!(
+                    "Failed to create the directory {} to move existing data into. Nothing has \
+                     been moved.",
+                    backup_dir.display()
+                )
+            });
+        }
         Err(e) => {
             return Err(e).with_context(|| {
                 format!(
-                    "Failed to create the directory {} to move existing data into",
+                    "Failed to create the directory {} to move existing data into. Nothing has \
+                     been moved.",
                     backup_dir.display()
                 )
             })
         }
+    };
+
+    let accepted = accept_move_aside_dir(backup_dir, &root_meta);
+    if accepted.is_err() && created {
+        // Only ever empty here (nothing has been moved), so this cannot lose data.
+        let _ = std::fs::remove_dir(backup_dir);
     }
-    let mut moved = 0usize;
+    accepted.map(|()| Some(created))
+}
+
+/// The root command that creates the move-aside directory for the data root's
+/// account, when printing one is safe -- otherwise `None`, and the refusal
+/// describes the directory instead.
+///
+/// Printed only when every directory from the parent up to `/` (`chain`, as
+/// owner and mode, nearest first) belongs to root and nobody else can write
+/// it. Then nothing but root can have put anything at that name, or replace
+/// any directory on the way to it, so the command cannot be re-aimed between
+/// this refusal and the operator running it -- checking the parent alone would
+/// leave a writable ancestor that could be swapped for a link between the
+/// `mkdir` and the `chown`. The command is also built not to follow links:
+/// `mkdir` refuses an existing name, symlink or not (`install -d` would follow
+/// one and re-own its target), and `chown -h` changes the directory itself.
+/// (Owner and mode are what the filesystem reports; a FUSE mount that reports
+/// root ownership it does not enforce is outside what this can see.) The path is
+/// single-quoted for the shell, and the ids are forced numeric (`+uid`), so a
+/// user *named* like a number cannot be picked instead.
+#[cfg(unix)]
+fn privileged_move_aside_step(
+    path: &Path,
+    chain: &[(u32, u32)],
+    uid: u32,
+    gid: u32,
+) -> Option<String> {
+    if chain.is_empty()
+        || chain
+            .iter()
+            .any(|&(owner, mode)| owner != 0 || mode & 0o022 != 0)
+    {
+        return None;
+    }
+    let quoted = format!("'{}'", path.to_str()?.replace('\'', r"'\''"));
+    Some(format!(
+        "sudo mkdir -m 0700 -- {quoted} && sudo chown -h +{uid}:+{gid} -- {quoted}"
+    ))
+}
+
+/// Create the directory the root's contents move into, owner-only from the
+/// instant it exists.
+///
+/// The mode is given to `mkdir` itself, so the umask can only narrow it: there
+/// is no moment at which the directory is visible wider than owner-only. A
+/// `chmod` afterwards could not promise that -- by then the directory is already
+/// visible with whatever the umask allowed.
+fn create_move_aside_dir(path: &Path) -> std::io::Result<()> {
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt as _;
+        builder.mode(MOVE_ASIDE_DIR_MODE);
+    }
+    builder.create(path)
+}
+
+/// The checks `prepare_move_aside_dir` applies to the directory it will move
+/// the root's contents into, whether it made it or found it.
+fn accept_move_aside_dir(backup_dir: &Path, root_meta: &std::fs::Metadata) -> Result<()> {
+    let meta = std::fs::symlink_metadata(backup_dir)
+        .with_context(|| format!("Failed to inspect {}", backup_dir.display()))?;
+    if !meta.file_type().is_dir() {
+        bail!(
+            "Refusing to move the existing data aside: {} exists and is not a directory (a \
+             symlink is not followed). Nothing has been moved.",
+            backup_dir.display()
+        );
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+        if meta.uid() != root_meta.uid() {
+            bail!(
+                "Refusing to move the existing data aside: {} belongs to uid {}, not to uid {} \
+                 which owns the data directory. Nothing has been moved.",
+                backup_dir.display(),
+                meta.uid(),
+                root_meta.uid()
+            );
+        }
+        if meta.dev() != root_meta.dev() {
+            bail!(
+                "Refusing to move the existing data aside: {} is on another filesystem than the \
+                 data directory, so its contents cannot be moved there without copying. Nothing \
+                 has been moved.",
+                backup_dir.display()
+            );
+        }
+        // Owner-only before anything is looked for or moved inside it.
+        std::fs::set_permissions(
+            backup_dir,
+            std::fs::Permissions::from_mode(MOVE_ASIDE_DIR_MODE),
+        )
+        .with_context(|| {
+            format!(
+                "Failed to make {} owner-only before moving the existing data into it",
+                backup_dir.display()
+            )
+        })?;
+        let mode = std::fs::symlink_metadata(backup_dir)
+            .with_context(|| format!("Failed to inspect {}", backup_dir.display()))?
+            .permissions()
+            .mode()
+            & 0o7777;
+        if mode != MOVE_ASIDE_DIR_MODE {
+            bail!(
+                "Refusing to move the existing data aside: {} is mode {mode:o} after being set to \
+                 {MOVE_ASIDE_DIR_MODE:o}. Nothing has been moved.",
+                backup_dir.display()
+            );
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = root_meta;
+    if std::fs::read_dir(backup_dir)
+        .with_context(|| format!("Failed to read {}", backup_dir.display()))?
+        .next()
+        .is_some()
+    {
+        bail!(
+            "Refusing to move the existing data aside: {} is already there and is not empty. It \
+             holds data an earlier restore of this same backup moved aside — the directory is \
+             named after the archive's own timestamp — either a restore that finished or one \
+             that was interrupted, in which case it holds part of this data directory (see \
+             \"If a restore is interrupted\" in the backup and recovery guide). Writing into it \
+             would overwrite that copy entry by entry. It may be the only copy of what the data \
+             directory held: do not delete it until you have checked what it holds. Nothing has \
+             been moved.",
+            backup_dir.display()
+        );
+    }
+    Ok(())
+}
+
+/// Move everything under a data root aside, leaving the root itself in place.
+///
+/// The *contents* move, never the directory. That distinction is the whole
+/// repair for icn#2758: `rename(2)` of the root carried the locked
+/// `.icn-data-dir.lock` inode into the backup while a fresh, unlocked file
+/// appeared at the stable pathname, so restore and a daemon could hold two
+/// valid exclusive locks over "the data directory" and never contend. Keeping
+/// the root — and with it the coordination files this process is holding —
+/// means the exclusion is continuous across the replacement, with no instant in
+/// which the stable path is unlocked.
+///
+/// The coordination files are skipped rather than moved: they are the anchor of
+/// the domain, not state, and moving one is precisely the split above.
+///
+/// `backup_dir` comes from [`prepare_move_aside_dir`]; `created` is whether
+/// that call made it.
+///
+/// **All or nothing, as far as `rename(2)` allows.** Entry-by-entry renames are
+/// not atomic the way the single directory rename was, and the move can fail
+/// part-way on an entry this account cannot move -- a directory it cannot write
+/// (`rename` must rewrite its `..`), an immutable file, a bind mount -- or on
+/// the listing itself. Then every entry already moved is put back, newest
+/// first, and a directory this restore created is removed again: the outcome
+/// is "nothing has been moved", never a live root split between two
+/// directories that a daemon would start on with half its state missing.
+///
+/// Putting back is safe because each step is the exact inverse of a rename
+/// that has just succeeded between the same two directories, made by this
+/// process while it holds both of the root's locks, so no ICN process can have
+/// touched the root in between. It never deletes, and it does not put an entry
+/// back over one now at its original name: that entry stays in the backup.
+/// (The check and the rename are two steps, so a non-ICN process running as
+/// this account or root, creating that name in between, is not excluded.) Only
+/// if a step back fails is the split reported, naming each entry still in the
+/// backup and why.
+///
+/// What this cannot cover is the process dying part-way (power loss,
+/// `SIGKILL`). Then the split stays as it was; the operator guide's recovery
+/// for an interrupted restore applies.
+fn move_data_root_contents_aside(
+    data_dir: &Path,
+    backup_dir: &Path,
+    created: bool,
+) -> Result<usize> {
+    let mut moved: Vec<std::ffi::OsString> = Vec::new();
+    let Err(failure) = move_entries_aside(data_dir, backup_dir, &mut moved) else {
+        return Ok(moved.len());
+    };
+    let stranded = move_entries_back(data_dir, backup_dir, &moved);
+    if stranded.is_empty() {
+        if created {
+            // Everything that was moved into it has left again: it is empty.
+            let _ = std::fs::remove_dir(backup_dir);
+        }
+        let undone = if moved.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " The {} entries already moved were moved back.",
+                moved.len()
+            )
+        };
+        return Err(failure.context(format!(
+            "Nothing has been moved; {} is unchanged.{undone}",
+            data_dir.display()
+        )));
+    }
+    let names = stranded
+        .iter()
+        .map(|(name, why)| format!("{name:?} ({why})"))
+        .collect::<Vec<_>>()
+        .join("; ");
+    Err(failure.context(format!(
+        "The data directory is split: {} of the entries already moved could not be moved back \
+         and are still in {}: {names}. Everything else is in {}. Do not start anything on this \
+         data directory until those entries are back.",
+        stranded.len(),
+        backup_dir.display(),
+        data_dir.display()
+    )))
+}
+
+/// The forward half of [`move_data_root_contents_aside`]: move every entry but
+/// the coordination files, recording each one that moved.
+fn move_entries_aside(
+    data_dir: &Path,
+    backup_dir: &Path,
+    moved: &mut Vec<std::ffi::OsString>,
+) -> Result<()> {
     for entry in std::fs::read_dir(data_dir)
         .with_context(|| format!("Failed to read {}", data_dir.display()))?
     {
@@ -7326,17 +7701,57 @@ fn move_data_root_contents_aside(data_dir: &Path, backup_dir: &Path) -> Result<u
         }
         std::fs::rename(entry.path(), backup_dir.join(&name)).with_context(|| {
             format!(
-                "Failed to move {} aside into {}. {moved} of this data directory's entries had \
-                 already been moved, so its contents are now split between {} and {}.",
+                "Failed to move {} aside into {}",
                 entry.path().display(),
-                backup_dir.display(),
-                data_dir.display(),
                 backup_dir.display()
             )
         })?;
-        moved += 1;
+        moved.push(name);
     }
-    Ok(moved)
+    // Renaming entries out of a directory while listing it is reliable on
+    // local filesystems, but not every filesystem promises it, and something
+    // outside ICN could add an entry meanwhile. Anything still here would be
+    // merged into by the extraction, so it is a failure -- and rolled back.
+    for entry in std::fs::read_dir(data_dir)
+        .with_context(|| format!("Failed to re-read {}", data_dir.display()))?
+    {
+        let entry =
+            entry.with_context(|| format!("Failed to read an entry of {}", data_dir.display()))?;
+        if !is_root_coordination_file(Path::new(&entry.file_name())) {
+            bail!(
+                "{} was still in the data directory after its contents were moved aside",
+                entry.path().display()
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Put `names` back from `backup_dir` into `data_dir`, newest first, never over
+/// anything now at the original name. Returns those that could not be, each
+/// with the reason.
+fn move_entries_back(
+    data_dir: &Path,
+    backup_dir: &Path,
+    names: &[std::ffi::OsString],
+) -> Vec<(std::ffi::OsString, String)> {
+    let mut stranded = Vec::new();
+    for name in names.iter().rev() {
+        let home = data_dir.join(name);
+        let vacant = matches!(
+            std::fs::symlink_metadata(&home),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound
+        );
+        if !vacant {
+            stranded.push((
+                name.clone(),
+                "its original name is taken again; compare the two".to_string(),
+            ));
+        } else if let Err(e) = std::fs::rename(backup_dir.join(name), &home) {
+            stranded.push((name.clone(), format!("moving it back failed: {e}")));
+        }
+    }
+    stranded
 }
 
 fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<()> {
@@ -7427,8 +7842,20 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     if replacing_existing {
         println!("Backing up existing data directory...");
         let backup_dir = sibling_backup_dir(data_dir, metadata.created_at)?;
-        move_data_root_contents_aside(data_dir, &backup_dir)?;
-        println!("  Existing data moved to: {}", backup_dir.display());
+        match prepare_move_aside_dir(data_dir, &backup_dir)? {
+            Some(created) => {
+                move_data_root_contents_aside(data_dir, &backup_dir, created)?;
+                println!(
+                    "  Existing data moved to: {} (owner-only; remove it once the restored node \
+                     is verified)",
+                    backup_dir.display()
+                );
+            }
+            None => println!(
+                "  Nothing to move aside: {} holds no data",
+                data_dir.display()
+            ),
+        }
     }
 
     // Create data directory if it doesn't exist
@@ -14522,10 +14949,13 @@ mod managed_config_edit_tests {
 mod exclusion_domain_tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+    use super::move_entries_back;
     use super::{
         calculate_dir_checksum, handle_backup_command, handle_restore_command, sibling_backup_dir,
         StorageDomain,
     };
+    #[cfg(unix)]
+    use super::{create_move_aside_dir, cross_filesystem_obstacle, privileged_move_aside_step};
     use std::path::{Path, PathBuf};
 
     #[cfg(unix)]
@@ -14887,6 +15317,143 @@ mod exclusion_domain_tests {
         domain
             .open_store(&dir.path().join("store").join("trust"))
             .expect("a creating open inside the held root must be admitted");
+    }
+
+    /// Moving a root's contents beside it must never need to cross a
+    /// filesystem: refused when the root is itself a mount point (the
+    /// directory beside it is on the parent's filesystem) or holds one.
+    #[cfg(unix)]
+    #[test]
+    fn moving_a_root_aside_refuses_to_cross_a_filesystem() {
+        let root = Path::new("/var/lib/icn");
+        let same = vec![(root.join("store"), 7), (root.join("icn.toml"), 7)];
+        assert!(cross_filesystem_obstacle(root, 7, 7, &same).is_none());
+        assert!(cross_filesystem_obstacle(root, 7, 7, &[]).is_none());
+
+        // Its entries are all on its own filesystem; the parent is not.
+        let on_the_root = vec![(root.join("store"), 9), (root.join("icn.toml"), 9)];
+        let why = cross_filesystem_obstacle(root, 9, 7, &on_the_root)
+            .expect("a root that is a mount point must be refused");
+        assert!(why.contains("root of its own filesystem"), "{why}");
+
+        let mixed = vec![(root.join("icn.toml"), 7), (root.join("store"), 8)];
+        let why = cross_filesystem_obstacle(root, 7, 7, &mixed)
+            .expect("a mount point inside the root must be refused");
+        assert!(why.contains("/var/lib/icn/store"), "{why}");
+    }
+
+    /// The root command restore prints is offered only where nothing but root
+    /// can have placed anything at that name, cannot follow a link, and cannot
+    /// be split or redirected by the path's spelling.
+    #[cfg(unix)]
+    #[test]
+    fn the_privileged_step_is_printed_only_when_it_cannot_be_turned_against_another_path() {
+        let path = Path::new("/var/lib/icn.backup-7");
+        // /var/lib, /var, / -- the native layout.
+        let native = [(0, 0o40755), (0, 0o40755), (0, 0o40755)];
+        let step = privileged_move_aside_step(path, &native, 998, 997)
+            .expect("a root-only chain gets the command");
+        assert_eq!(
+            step,
+            "sudo mkdir -m 0700 -- '/var/lib/icn.backup-7' && \
+             sudo chown -h +998:+997 -- '/var/lib/icn.backup-7'"
+        );
+        assert!(
+            !step.contains("install"),
+            "install -d follows an existing symlink"
+        );
+
+        // Anyone but root able to write the parent could plant a link there first.
+        let writable_parent = [(0, 0o40775), (0, 0o40755), (0, 0o40755)];
+        assert!(privileged_move_aside_step(path, &writable_parent, 998, 997).is_none());
+        let sticky_parent = [(0, 0o41777), (0, 0o40755), (0, 0o40755)];
+        assert!(privileged_move_aside_step(path, &sticky_parent, 998, 997).is_none());
+        let user_parent = [(1000, 0o40755), (0, 0o40755), (0, 0o40755)];
+        assert!(privileged_move_aside_step(path, &user_parent, 998, 997).is_none());
+        // ...or swap an ancestor for a link between the mkdir and the chown.
+        let user_ancestor = [(0, 0o40755), (1000, 0o40755), (0, 0o40755)];
+        assert!(privileged_move_aside_step(path, &user_ancestor, 998, 997).is_none());
+        let writable_ancestor = [(0, 0o40755), (0, 0o40755), (0, 0o40777)];
+        assert!(privileged_move_aside_step(path, &writable_ancestor, 998, 997).is_none());
+        assert!(privileged_move_aside_step(path, &[], 998, 997).is_none());
+
+        // The spelling cannot split or escape the quoting.
+        let odd = Path::new("/srv/it's here/icn.backup-7");
+        let step = privileged_move_aside_step(odd, &native, 998, 997).unwrap();
+        assert!(
+            step.contains(r"-- '/srv/it'\''s here/icn.backup-7'"),
+            "{step}"
+        );
+        {
+            use std::os::unix::ffi::OsStrExt as _;
+            let lossy = Path::new(std::ffi::OsStr::from_bytes(b"/var/lib/icn\xff.backup-7"));
+            assert!(
+                privileged_move_aside_step(lossy, &native, 998, 997).is_none(),
+                "a path that would print lossily gets no command"
+            );
+        }
+    }
+
+    /// Putting entries back after a failed move never replaces anything that
+    /// is at the original name again: that entry stays in the backup and is
+    /// reported, and the rest still go back.
+    #[test]
+    fn moving_entries_back_never_replaces_what_is_at_the_original_name() {
+        let scratch = tempfile::TempDir::new().unwrap();
+        let root = scratch.path().join("icn");
+        let backup = scratch.path().join("icn.backup-7");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(backup.join("store")).unwrap();
+        std::fs::write(backup.join("store").join("marker"), b"moved\n").unwrap();
+        std::fs::write(backup.join("icn.toml"), b"moved\n").unwrap();
+        std::fs::write(root.join("icn.toml"), b"appeared since\n").unwrap();
+
+        let stranded = move_entries_back(&root, &backup, &["store".into(), "icn.toml".into()]);
+
+        assert_eq!(stranded.len(), 1, "{stranded:?}");
+        assert_eq!(stranded[0].0, std::ffi::OsString::from("icn.toml"));
+        assert!(stranded[0].1.contains("taken again"), "{stranded:?}");
+        assert_eq!(
+            std::fs::read(root.join("icn.toml")).unwrap(),
+            b"appeared since\n",
+            "what is at the original name must not be replaced"
+        );
+        assert_eq!(std::fs::read(backup.join("icn.toml")).unwrap(), b"moved\n");
+        assert_eq!(
+            std::fs::read(root.join("store").join("marker")).unwrap(),
+            b"moved\n"
+        );
+    }
+
+    /// The move-aside directory is owner-only from the instant `mkdir` makes it,
+    /// not narrowed afterwards. That is observable only where the umask leaves
+    /// group or other bits on a new directory, which a control directory made
+    /// under the same umask establishes; otherwise the test says it was skipped.
+    #[cfg(unix)]
+    #[test]
+    fn the_move_aside_directory_is_created_owner_only_by_mkdir_itself() {
+        use std::os::unix::fs::{DirBuilderExt as _, PermissionsExt as _};
+        let scratch = tempfile::TempDir::new().unwrap();
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o7777;
+        let control = scratch.path().join("control");
+        std::fs::DirBuilder::new()
+            .mode(0o777)
+            .create(&control)
+            .unwrap();
+        if mode(&control) & 0o077 == 0 {
+            eprintln!(
+                "skipped: this process's umask already removes group and other bits, so a \
+                 creation mode wider than owner-only would not be visible"
+            );
+            return;
+        }
+        let made = scratch.path().join("made");
+        create_move_aside_dir(&made).unwrap();
+        assert_eq!(
+            mode(&made),
+            0o700,
+            "created owner-only by mkdir itself, with no window narrowed by a later chmod"
+        );
     }
 
     /// The backup is always a sibling of the root, however the root is spelled.
