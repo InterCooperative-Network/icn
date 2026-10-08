@@ -578,9 +578,12 @@ standing or account context.</li>
 <p><strong>A signature by the old principal proves FACT A only. It never proves FACT B.</strong>
 The authority separation is normative now; the evidence object that carries FACT
 B is not specified here (§7, §13).</p>
-<p><em>Live enforcement gap, recorded not solved:</em> #2589 — invite redemption mints a
-token for a caller-supplied DID with no proof of key control. The rule above
-presupposes that gap closes. N2 does not implement it.</p>
+<p><em>Enforcement gap, contained not solved:</em> #2589 — invite redemption minted a
+token for a caller-supplied DID with no proof of key control. The production
+gateway no longer mounts that redemption route (<code>POST /v1/invites/join</code>,
+#2821), so the issuance path is closed; the handler remains in source, unmounted,
+for a redemption that proves possession of the named DID. That redemption does
+not exist yet. The rule above presupposes it; N2 does not implement it.</p>
 <hr>
 <h2 id="7-the-legacy-did-bridge">7. The legacy DID bridge</h2>
 <h3 id="71-the-contradiction-that-drives-the-design">7.1 The contradiction that drives the design</h3>
@@ -992,9 +995,10 @@ account-identifier field is retyped.</p>
 </tr>
 </tbody></table>
 <p><strong>Coordination, not ownership.</strong> #2480 (sender identity — N2 keeps it shippable
-now via §9), #2469 (authorship ≠ authority at the substrate), #2589 (the live
-enforcement gap §6 presupposes will close), #2441 (authenticated standing, which
-#2605 cannot be built before), #2448, #2591, #2613.</p>
+now via §9), #2469 (authorship ≠ authority at the substrate), #2589 (the
+enforcement gap §6 presupposes will close — contained by unmounting, not
+solved), #2441 (authenticated standing, which #2605 cannot be built before),
+#2448, #2591, #2613.</p>
 <p><strong>Explicitly not smuggled into N2.</strong> Byzantine reliable broadcast · device
 authorization mechanics · member-origin envelopes · protected continuity
 backup/recovery · replication topology · transport protocol changes · governance
