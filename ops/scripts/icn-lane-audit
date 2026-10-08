@@ -1,0 +1,354 @@
+#!/usr/bin/env bash
+#
+# icn-lane-audit — report agent-worktree lifecycle debt on the icn-dev development VM.
+#
+# THE PROBLEM
+#   `icn-disk-guard` correctly refuses to reclaim a Cargo target while any process holds the
+#   worktree. That refusal is right, and it is also unbounded: a merged lane whose shells never
+#   exit pins its build output forever. One merged lane (PR #2644) currently pins 114 GB this
+#   way behind three shells aged 1-2.8 days.
+#
+# WHY "IS A PROCESS RUNNING" IS THE WRONG QUESTION
+#   Investigating those three shells is what shaped this tool. Every one of them is a wait-loop
+#   that can never finish:
+#
+#     until ! pgrep -f "scratchpad/mutate.py"; do sleep 20; done
+#
+#   `pgrep -f` matches command lines, and the waiting shell's own command line *contains that
+#   pattern* — so the shell matches itself, the predicate is permanently false, and the loop
+#   spins forever. A third waits on `grep -q "^EXIT=" <file>` for a file whose session was
+#   cleaned up and which no longer exists.
+#
+#   All three therefore look maximally *alive* by every naive metric: a fresh child process
+#   every 5-20 seconds, a live parent, a recent process start. And all three are maximally
+#   *dead*: no future event can let them exit.
+#
+#   So this tool does not measure activity. It measures **progress**, and treats
+#   activity-without-progress as the specific pathology it is.
+#
+# WHAT IT DOES NOT DO
+#   Read-only. It never signals a process, never deletes anything, never mutates git. It
+#   classifies and explains. Retirement is a separate, operator-approved step (--plan-retire
+#   prints exactly what would be signalled and stops).
+#
+# USAGE
+#   icn-lane-audit                 human-readable report
+#   icn-lane-audit --json          machine-readable
+#   icn-lane-audit --plan-retire   print the retirement plan for STALE-CANDIDATE lanes; acts on nothing
+#   icn-lane-audit --self-test     policy unit tests
+#   icn-lane-audit --quiet         only speak when there is debt
+#
+# EXIT CODES
+#   0 no lifecycle debt   1 debt present   2 debt pinning a large target   3 usage error
+#
+set -uo pipefail
+
+# ═══════════════════════ POLICY CONFIGURATION — SINGLE SOURCE OF TRUTH ═════════════════════
+readonly ICN_ROOT="${ICN_DEV_ROOT:-$HOME/icn-dev}"
+readonly WORKTREE_ROOT="$ICN_ROOT/worktrees"
+
+# Grace intervals. Deliberately far longer than any plausible audit cadence: a lane must be
+# quiet for the better part of a working day before it is even a candidate.
+readonly QUIESCENT_AFTER_MIN="${ICN_LANE_QUIESCENT_AFTER_MIN:-90}"    # no progress -> QUIESCENT
+readonly STALE_AFTER_HOURS="${ICN_LANE_STALE_AFTER_HOURS:-8}"         # merged + no progress -> candidate
+readonly MIN_PROC_AGE_HOURS="${ICN_LANE_MIN_PROC_AGE_HOURS:-4}"       # never consider a young process
+readonly PIN_SIZE_WARN_GB="${ICN_LANE_PIN_SIZE_WARN_GB:-50}"          # debt worth escalating over
+
+# Command-line patterns recognised as agent *session shells* — the only things retirement
+# would ever target. Anything else in a worktree makes the lane UNKNOWN and untouchable.
+readonly AGENT_SHELL_RE="${ICN_LANE_AGENT_SHELL_RE:-claude/shell-snapshots|ccd-cli}"
+# Child processes that mean real work is happening; their presence alone keeps a lane ACTIVE.
+readonly WORK_CHILD_RE="${ICN_LANE_WORK_CHILD_RE:-cargo|rustc|sccache|node|python3|pytest|npm|git}"
+# ═══════════════════════════════════════════════════════════════════════════════════════════
+
+MODE=report; QUIET=0
+for a in "$@"; do
+  case "$a" in
+    --json)         MODE=json ;;
+    --plan-retire)  MODE=plan ;;
+    --self-test)    MODE=selftest ;;
+    --quiet)        QUIET=1 ;;
+    -h|--help)      sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $a (try --help)" >&2; exit 3 ;;
+  esac
+done
+
+OUT=""; say() { OUT+="$*"$'\n'; }
+flush() { if [ "$QUIET" = 0 ] || [ "${rc:-0}" -ne 0 ]; then printf '%s' "$OUT"; fi; }
+trap flush EXIT
+
+# ═════════════════════════ PURE POLICY — exercised directly by --self-test ═════════════════
+#
+# lane_state <git_class> <pins> <unknown_pins> <work_children> <progress_age_min> <proc_age_h> <dirty>
+#
+#   git_class      MERGED | OPEN | UNMERGED | UNKNOWN
+#   pins           processes holding the worktree
+#   unknown_pins   pins NOT matching AGENT_SHELL_RE (a stranger in the lane)
+#   work_children  build/test children under those pins
+#   progress_age_min  minutes since the last evidence of *progress* (not activity)
+#   proc_age_h     age of the oldest pinning process, hours
+#   dirty          uncommitted tracked/untracked source
+#
+lane_state() {
+  local gc="$1" pins="$2" unk="$3" work="$4" prog="$5" age="$6" dirty="$7"
+
+  # No pins: nothing for this tool to retire. The disk guard already handles these.
+  [ "$pins" -eq 0 ] && { echo "UNPINNED"; return; }
+
+  # A process we do not recognise is an absolute stop. We will not reason about, let alone
+  # signal, something whose purpose we cannot name.
+  [ "$unk" -gt 0 ] && { echo "PINNED-UNKNOWN"; return; }
+
+  # Real work in flight.
+  [ "$work" -gt 0 ] && { echo "ACTIVE"; return; }
+
+  # Uncommitted source is unique state. Never a candidate, whatever else is true.
+  [ "$dirty" -gt 0 ] && { echo "PINNED-DIRTY"; return; }
+
+  case "$gc" in
+    OPEN)     echo "OPEN-PR";   return ;;   # the lane still has a job
+    UNMERGED) echo "UNMERGED";  return ;;
+    UNKNOWN)  echo "PINNED-UNKNOWN"; return ;;   # fail safe: unknown git state is not retireable
+    MERGED)   ;;
+    *)        echo "PINNED-UNKNOWN"; return ;;
+  esac
+
+  # Merged, recognised agent shells only, no work children, no dirty state.
+  [ "$age" -lt "$MIN_PROC_AGE_HOURS" ] && { echo "QUIESCENT"; return; }
+  if [ "$prog" -lt "$QUIESCENT_AFTER_MIN" ]; then echo "ACTIVE"; return; fi
+  if [ "$prog" -lt $(( STALE_AFTER_HOURS * 60 )) ]; then echo "QUIESCENT"; return; fi
+  echo "STALE-CANDIDATE"
+}
+
+# Only STALE-CANDIDATE is ever proposed for retirement, and only via an operator-approved step.
+retireable() { [ "$1" = "STALE-CANDIDATE" ] && echo yes || echo no; }
+
+# A wait-loop whose predicate can never become true. Detected structurally, not by age.
+#   self-matching pgrep : the shell's own cmdline contains the pattern it greps for
+#   vanished-file wait  : it polls a path that does not exist
+nonterminating_reason() {
+  local cmd="$1" pat f
+  if [[ "$cmd" =~ pgrep[[:space:]]+-[a-z]*f[[:space:]]+\"?([^\"\;\ ]+)\"? ]]; then
+    pat="${BASH_REMATCH[1]}"
+    # A bracketed character class is the standard idiom for *deliberately* not self-matching:
+    # `pgrep -f "[m]utate.py"` appears in the caller's own cmdline as the literal
+    # "[m]utate.py", which the regex does not match. Flagging that would be a false positive on
+    # correctly written code, and a false positive here means proposing a healthy process for
+    # termination.
+    if [[ "$pat" != *"["* ]] && [[ "$cmd" == *"$pat"* ]]; then
+      echo "self-matching pgrep on '$pat'"; return
+    fi
+  fi
+  if [[ "$cmd" =~ (grep|tail|cat)[^\;]*[[:space:]](/[^[:space:];\"\']+\.(log|out|txt)) ]]; then
+    f="${BASH_REMATCH[2]}"
+    [ -e "$f" ] || { echo "waits on a path that does not exist: $f"; return; }
+  fi
+  echo ""
+}
+
+# ═══════════════════════════════════ PROBES (I/O) ══════════════════════════════════════════
+# The 2>/dev/null must wrap the whole group, not trail the command: bash installs
+# redirections left to right, so a failing `< /proc/PID/cmdline` (the process exited between
+# enumeration and this read) reports before a trailing 2>/dev/null is in effect.
+cmd_of()  { { tr '\0' ' ' < "/proc/$1/cmdline"; } 2>/dev/null; }
+# Elapsed seconds since the process started. NOT the mtime of /proc/PID, which tracks
+# attribute changes rather than start time and under-reported a 2.8-day shell as one hour.
+age_h_of() { local e; e=$(ps -o etimes= -p "$1" 2>/dev/null | tr -d ' '); echo $(( ${e:-0} / 3600 )); }
+
+# This tool must not count itself. It runs from a shell whose cwd may well be inside a
+# worktree, and an auditor that reports its own probe processes as pins is committing exactly
+# the self-matching error it exists to diagnose elsewhere.
+self_pids() {
+  local p=$$
+  while [ "$p" -gt 1 ]; do echo "$p"; p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || break; [ -z "$p" ] && break; done
+}
+SELF_PIDS=" $(self_pids | tr '\n' ' ') "
+
+pins_of() { # pids whose cwd is inside this worktree, matched on the FULL path
+  # Matching on the basename was wrong and dangerously so: one registered worktree is literally
+  # named `icn`, and `*/icn/*` matches the path of every other worktree in the tree — so every
+  # lane's processes were attributed to it. Retirement decisions must never be made from a
+  # substring collision, so this compares the resolved absolute path.
+  local wtpath="$1" c pid pc
+  wtpath="${wtpath%/}"
+  for p in /proc/[0-9]*; do
+    c=$(readlink "$p/cwd" 2>/dev/null) || continue
+    case "$c" in "$wtpath"|"$wtpath"/*) ;; *) continue ;; esac
+    pid="${p##*/}"
+    case "$SELF_PIDS" in *" $pid "*) continue ;; esac      # never count our own process tree
+    # Transient children of a pinning shell (the `sleep` in a wait-loop) come and go every few
+    # seconds. Counting them inflates the pin count and puts already-dead PIDs in a plan.
+    # A process can exit between enumeration and this read; treat a vanished one as absent
+    # rather than letting the redirect failure surface as noise.
+    [ -r "/proc/$pid/cmdline" ] || continue
+    pc=$( { tr '\0' ' ' < "/proc/$pid/cmdline"; } 2>/dev/null ) || continue
+    case "$pc" in sleep*|"") continue ;; esac
+    echo "$pid"
+  done
+}
+
+# Minutes since the last evidence of PROGRESS. Deliberately not "activity": a spinning
+# wait-loop re-executes constantly and progresses never. Progress means the lane's own state
+# moved — source or build output written, or git state changed.
+progress_age_min() {
+  local wt="$1" newest=0 t
+  for probe in "$wt/.git" "$wt/icn/target" "$wt/icn/crates" "$wt"; do
+    [ -e "$probe" ] || continue
+    t=$(find "$probe" -maxdepth 2 -newermt "-30 days" -printf '%T@\n' 2>/dev/null | sort -rn | head -1)
+    t=${t%%.*}; [ -n "$t" ] && [ "$t" -gt "$newest" ] && newest=$t
+  done
+  [ "$newest" -eq 0 ] && { echo 999999; return; }
+  echo $(( ( $(date +%s) - newest ) / 60 ))
+}
+
+git_class_of() {
+  local wt="$1" br pr
+  br=$(git -C "$wt" branch --show-current 2>/dev/null)
+  [ -z "$br" ] && { echo UNKNOWN; return; }
+  command -v gh >/dev/null 2>&1 || { echo UNKNOWN; return; }
+  pr=$(cd "$wt" && gh pr list --state all --head "$br" --json state --jq '.[0].state' 2>/dev/null)
+  case "$pr" in MERGED) echo MERGED ;; OPEN) echo OPEN ;; CLOSED) echo UNMERGED ;; *) echo UNKNOWN ;; esac
+}
+
+# ═════════════════════════════════════ SELF-TEST ═══════════════════════════════════════════
+run_self_test() {
+  local fails=0 n=0
+  chk() { n=$((n+1)); if [ "$2" = "$1" ]; then printf '  PASS  %s\n' "$3"
+          else printf '  FAIL  %s -> got "%s", wanted "%s"\n' "$3" "$2" "$1"; fails=$((fails+1)); fi; }
+  local FRESH=5 OLD=$(( STALE_AFTER_HOURS * 60 + 60 )) MID=$(( QUIESCENT_AFTER_MIN + 10 ))
+  local OLDPROC=$(( MIN_PROC_AGE_HOURS + 20 ))
+  echo "icn-lane-audit self-test"
+
+  echo "-- config coherence --"
+  chk ok "$([ "$QUIESCENT_AFTER_MIN" -lt $(( STALE_AFTER_HOURS * 60 )) ] && echo ok)" "quiescent grace < stale grace"
+  chk ok "$([ "$MIN_PROC_AGE_HOURS" -ge 1 ] && echo ok)"                              "min process age >= 1h"
+
+  echo "-- the cases the task names --"
+  chk ACTIVE          "$(lane_state MERGED 1 0 0 "$FRESH"  "$OLDPROC" 0)" "1. merged + old shell + RECENT progress -> KEEP"
+  chk STALE-CANDIDATE "$(lane_state MERGED 1 0 0 "$OLD"    "$OLDPROC" 0)" "2. merged + old shell + no progress -> candidate"
+  chk OPEN-PR         "$(lane_state OPEN   1 0 0 "$OLD"    999        0)" "3. open PR + ancient shell -> KEEP"
+  chk UNMERGED        "$(lane_state UNMERGED 1 0 0 "$OLD"  999        0)" "4. unmerged branch -> KEEP"
+  chk PINNED-DIRTY    "$(lane_state MERGED 1 0 0 "$OLD"    "$OLDPROC" 1)" "5. dirty tree -> KEEP"
+  chk PINNED-UNKNOWN  "$(lane_state MERGED 2 1 0 "$OLD"    "$OLDPROC" 0)" "6. unknown process present -> FAIL-SAFE"
+  chk ACTIVE          "$(lane_state MERGED 1 0 1 "$OLD"    "$OLDPROC" 0)" "7. active build child -> KEEP"
+  chk ACTIVE          "$(lane_state MERGED 1 0 0 "$FRESH"  "$OLDPROC" 0)" "8. recent progress -> KEEP"
+  chk yes             "$(retireable "$(lane_state MERGED 1 0 0 "$OLD" "$OLDPROC" 0)")" "9. stale agent shell is retireable only with every predicate"
+
+  echo "-- ordering: safety predicates dominate staleness --"
+  chk PINNED-UNKNOWN  "$(lane_state UNKNOWN  1 0 0 "$OLD" "$OLDPROC" 0)" "unknown git state never retireable"
+  chk PINNED-UNKNOWN  "$(lane_state MERGED   3 1 1 "$OLD" "$OLDPROC" 1)" "a stranger outranks every other signal"
+  chk PINNED-DIRTY    "$(lane_state MERGED   1 0 0 "$OLD" "$OLDPROC" 1)" "dirty outranks staleness"
+  chk QUIESCENT       "$(lane_state MERGED   1 0 0 "$OLD" 1          0)" "a young process is never a candidate"
+  chk QUIESCENT       "$(lane_state MERGED   1 0 0 "$MID" "$OLDPROC" 0)" "inside the grace window -> QUIESCENT, not candidate"
+  chk UNPINNED        "$(lane_state MERGED   0 0 0 "$OLD" "$OLDPROC" 0)" "no pins -> the disk guard's business, not ours"
+  for st in ACTIVE OPEN-PR UNMERGED PINNED-DIRTY PINNED-UNKNOWN QUIESCENT UNPINNED; do
+    chk no "$(retireable "$st")" "  $st is never retireable"
+  done
+
+  echo "-- activity-without-progress: the real #2644 pathology --"
+  local c1='until ! pgrep -f "scratchpad/mutate.py" > /dev/null; do sleep 20; done'
+  chk ok "$([ -n "$(nonterminating_reason "$c1")" ] && echo ok)" "self-matching pgrep is detected as non-terminating"
+  local c2='until grep -q "^EXIT=" /tmp/definitely/not/here-xyz.log; do sleep 20; done'
+  chk ok "$([ -n "$(nonterminating_reason "$c2")" ] && echo ok)" "waiting on a vanished path is detected"
+  # The bracket idiom is how a correctly written wait-loop avoids matching itself. It must NOT
+  # be flagged: a false positive here is a healthy process proposed for termination.
+  local c3='until ! pgrep -f "[m]utate.py" >/dev/null; do sleep 5; done'
+  chk ok "$([ -z "$(nonterminating_reason "$c3")" ] && echo ok)" "the [b]racket anti-self-match idiom is NOT flagged"
+  chk ok "$([ -z "$(nonterminating_reason 'cargo test -p icn-net')" ] && echo ok)" "ordinary commands are not flagged"
+
+  echo
+  [ "$fails" -eq 0 ] && { echo "self-test: $n/$n passed"; return 0; }
+  echo "self-test: $fails of $n FAILED"; return 1
+}
+
+[ "$MODE" = selftest ] && { run_self_test; exit $?; }
+
+# ══════════════════════════════════════ REPORT ═════════════════════════════════════════════
+rc=0; debt=0; debt_gb=0
+declare -a JSON=() PLAN=()
+
+say "icn-lane-audit  $(date -Is)"
+say "grace: quiescent after ${QUIESCENT_AFTER_MIN}m without progress; stale after ${STALE_AFTER_HOURS}h; oldest pin must exceed ${MIN_PROC_AGE_HOURS}h"
+say ""
+
+for wt in "$WORKTREE_ROOT"/*/*; do
+  [ -d "$wt" ] || continue
+  [ -e "$wt/.git" ] || continue
+  name=$(basename "$wt")
+
+  mapfile -t pinpids < <(pins_of "$wt")
+  npins=${#pinpids[@]}
+  [ "$npins" -eq 0 ] && continue          # unpinned lanes are the disk guard's business
+
+  unknown=0; work=0; oldest_h=0
+  for pid in "${pinpids[@]}"; do
+    c=$(cmd_of "$pid")
+    [[ "$c" =~ $AGENT_SHELL_RE ]] || { case "$c" in *sleep*) ;; *) unknown=$((unknown+1)) ;; esac; }
+    a=$(age_h_of "$pid"); [ "$a" -gt "$oldest_h" ] && oldest_h=$a
+    for kid in $(pgrep -P "$pid" 2>/dev/null); do
+      kc=$(cmd_of "$kid"); [[ "$kc" =~ $WORK_CHILD_RE ]] && work=$((work+1))
+    done
+  done
+
+  gc=$(git_class_of "$wt")
+  dirty=$(git -C "$wt" status --porcelain 2>/dev/null | grep -cv '^?? icn/target')
+  prog=$(progress_age_min "$wt")
+  tgt="$wt/icn/target"; gb=0
+  [ -d "$tgt" ] && gb=$(( $(du -sm "$tgt" 2>/dev/null | cut -f1) / 1024 ))
+  state=$(lane_state "$gc" "$npins" "$unknown" "$work" "$prog" "$oldest_h" "$dirty")
+  ret=$(retireable "$state")
+  br=$(git -C "$wt" branch --show-current 2>/dev/null); br=${br:-DETACHED}
+
+  say "$(printf '  %-40s %-17s %5sGB  pins=%-2s oldest=%-4sh progress=%sm' "$name" "$state" "$gb" "$npins" "$oldest_h" "$prog")"
+  say "$(printf '      branch=%s  git=%s  dirty=%s  retireable=%s' "$br" "$gc" "$dirty" "$ret")"
+
+  stuck_any=""
+  for pid in "${pinpids[@]}"; do
+    c=$(cmd_of "$pid"); [[ "$c" =~ ^sleep ]] && continue
+    reason=$(nonterminating_reason "$c")
+    [ -n "$reason" ] && stuck_any="yes"
+    say "$(printf '      pid %-8s age %-5sh %s%s' "$pid" "$(age_h_of "$pid")" "$(echo "$c" | cut -c1-56)" "${reason:+  << NON-TERMINATING: $reason}")"
+  done
+  [ -n "$stuck_any" ] && say "      ^ this lane contains a wait-loop that cannot complete; activity here is not progress"
+
+  JSON+=("{\"worktree\":\"$name\",\"branch\":\"$br\",\"git\":\"$gc\",\"state\":\"$state\",\"retireable\":\"$ret\",\"target_gb\":$gb,\"pins\":$npins,\"unknown_pins\":$unknown,\"work_children\":$work,\"oldest_pin_hours\":$oldest_h,\"progress_age_min\":$prog,\"dirty\":$dirty,\"nonterminating\":\"${stuck_any:-no}\"}")
+
+  if [ "$ret" = yes ]; then
+    debt=$((debt+1)); debt_gb=$((debt_gb+gb)); rc=1
+    [ "$gb" -ge "$PIN_SIZE_WARN_GB" ] && rc=2
+    PLAN+=("$name|$gb|${pinpids[*]}")
+  fi
+  say ""
+done
+
+say "lifecycle debt: $debt retireable lane(s), ${debt_gb} GB of build output currently pinned by them"
+[ "$debt" -eq 0 ] && say "no lane satisfies every retirement predicate."
+
+if [ "$MODE" = json ]; then
+  OUT=""; QUIET=0
+  printf '{"generated":"%s","debt_lanes":%s,"debt_gb":%s,"lanes":[%s]}\n' \
+    "$(date -Is)" "$debt" "$debt_gb" "$(IFS=,; echo "${JSON[*]}")"
+  trap - EXIT; exit "$rc"
+fi
+
+if [ "$MODE" = plan ]; then
+  say ""
+  say "RETIREMENT PLAN — nothing below has been or will be signalled by this tool."
+  if [ "${#PLAN[@]}" -eq 0 ]; then
+    say "  no lane is retireable."
+  else
+    for e in "${PLAN[@]}"; do
+      IFS='|' read -r n gb pids <<< "$e"
+      say "  $n  (${gb} GB pinned)"
+      for pid in $pids; do
+        say "      would send SIGTERM to pid $pid  ($(cmd_of "$pid" | cut -c1-52))"
+      done
+      say "      then wait, verify exit, and leave the worktree and its target untouched."
+      say "      the disk guard would afterwards classify the target on its own rules."
+    done
+    say ""
+    say "  This tool does not implement termination. See the branch README for why, and for the"
+    say "  operator-approved procedure."
+  fi
+fi
+exit "$rc"
