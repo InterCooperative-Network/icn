@@ -15353,10 +15353,12 @@ mod exclusion_domain_tests {
         let native = [(0, 0o40755), (0, 0o40755), (0, 0o40755)];
         let step = privileged_move_aside_step(path, &native, 998, 997)
             .expect("a root-only chain gets the command");
-        assert_eq!(
-            step,
-            "sudo mkdir -m 0700 -- '/var/lib/icn.backup-7' && \
-             sudo chown -h +998:+997 -- '/var/lib/icn.backup-7'"
+        // Compared, not formatted into the failure message: the command carries
+        // account ids, and an assertion message is output like any other.
+        assert!(
+            step == "sudo mkdir -m 0700 -- '/var/lib/icn.backup-7' && \
+                     sudo chown -h +998:+997 -- '/var/lib/icn.backup-7'",
+            "the printed command must be exactly the link-safe mkdir-then-chown form"
         );
         assert!(
             !step.contains("install"),
@@ -15382,7 +15384,7 @@ mod exclusion_domain_tests {
         let step = privileged_move_aside_step(odd, &native, 998, 997).unwrap();
         assert!(
             step.contains(r"-- '/srv/it'\''s here/icn.backup-7'"),
-            "{step}"
+            "the path must reach the shell as one single-quoted word"
         );
         {
             use std::os::unix::ffi::OsStrExt as _;
