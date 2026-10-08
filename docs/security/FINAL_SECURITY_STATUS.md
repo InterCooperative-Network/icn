@@ -273,7 +273,8 @@ This implementation supports:
 
 ## Sign-off
 
-**Status**: ✅ **PRODUCTION READY**
+**Status (2025-12)**: the security issues listed below were fixed. This is not a
+readiness sign-off.
 
 All security issues have been comprehensively addressed:
 - 3 critical vulnerabilities FIXED

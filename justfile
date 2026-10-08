@@ -155,8 +155,11 @@ website-audit:
 website-audit-full:
     cd website && npm run audit:full
 
-# Readiness/claim linting over public-facing content
-website-claims:
+# Readiness/claim linting over public-facing content: website/ pages plus the
+# docs/ files that actually publish (per the generated manifest). Depends on
+# website-generate because the manifest is a build artifact and the linter fails
+# closed without it — CI already generates first, this makes standalone runs safe.
+website-claims: website-generate
     python3 .github/scripts/readiness_overclaim_linter.py --repo-root . --config .github/claim-lint-website.json
 
 # Everything CI runs for a website change, in CI's order and at CI's depth.

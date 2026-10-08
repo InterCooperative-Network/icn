@@ -2,7 +2,9 @@
 
 ## Executive Summary
 
-**Status:** ✅ PRODUCTION-READY WITH POST-QUANTUM SECURITY
+**Status (audit of 2025-12-17):** post-quantum cryptography integrated across the
+subsystems audited below. This audit assessed architectural completeness; it did
+not certify production readiness, and does not now.
 
 This document provides a comprehensive audit of the ICN (Intercooperative Network) architecture, verifying completeness of all major subsystems and identifying any remaining gaps.
 
@@ -866,7 +868,9 @@ Phase 3 (12 months): PQ-only
 
 ## Conclusion
 
-The ICN architecture is **PRODUCTION-READY for pilot deployments** with the following caveats:
+As audited on 2025-12-17, the architecture was assessed as structurally complete
+for pilot *rehearsal*. That assessment was not a certification for production use
+or for a formal pilot. Caveats recorded at the time:
 
 **Strengths:**
 - ✅ Comprehensive security model (post-quantum ready)

@@ -474,7 +474,7 @@ User needs: Recover identity
 
 **Last Updated**: December 13, 2025
 **Version**: 1.1.0
-**Status**: Production Ready ✅
+**Status**: research-grade; not certified for production use
 
 **What's New in 1.1.0**:
 - Steward Dashboard for enrollment review
