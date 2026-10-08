@@ -832,7 +832,7 @@ Operational guides for running ICN deployments
 
 Operator procedures for node backup and recovery
 
-**For:** `operators` | **Updated:** 2026-03-10
+**For:** `operators` | **Updated:** 2026-10-08
 
 ### 📝 **Living** [Backup and Restore: Operator Recovery](/docs/guides/operations/backup-restore.md)
 

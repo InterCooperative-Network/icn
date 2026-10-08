@@ -103,9 +103,70 @@ icnctl restore /path/to/backup.tar --force
 ```
 
 This will:
-1. Move existing data directory to `<data-dir>.backup-<timestamp>`
-2. Extract the backup to the original location
-3. Preserve the old data in case you need it
+1. Take the data directory's locks. Restore is refused while `icnd` or another `icnctl` command holds the directory, so stop the daemon first. On a systemd install, use `sudo systemctl disable --now icnd` rather than just `stop`, so a reboot part-way can't start the daemon on a half-restored directory. Re-enable it once the restored node is verified.
+2. Move the existing *contents* (not the directory itself) into `<data-dir>.backup-<archive-timestamp>`, beside the real data directory (symlinks resolved). That directory is owner-only (`0700`) whatever your umask, so files that a `0700` data directory protected stay protected.
+3. Extract the backup into the data directory and verify its checksum.
+4. Leave the old data in the `.backup-` directory in case you need it. Remove it once the restored node is verified.
+
+The data directory's two lock files (`.icn-data-dir.lock` and `.icn-config.lock`) stay where they are. They are coordination files, not state. A data directory that holds nothing else has nothing to move aside, so no `.backup-` directory is created.
+
+Restore checks everything it can before moving anything. It refuses, saying `Nothing has been moved`, when:
+
+- a `.backup-` directory of that name already exists and isn't empty (an earlier restore of the same archive). It may be the only copy of what the data directory held before, so move it somewhere safe rather than deleting it;
+- the data directory is a mount point or btrfs subvolume, or contains one. The `.backup-` directory would be on a different filesystem, and contents can't be renamed across filesystems;
+- the account running restore can't create the `.backup-` directory (see the native install below).
+
+**If the move fails part-way, restore puts everything back.** An entry can turn out to be unmovable only once restore tries to move it, for example a directory the account can't write or an immutable file. Restore then moves every entry it had already moved back into the data directory, removes the `.backup-` directory it created, and reports `Nothing has been moved; <data-dir> is unchanged`. Restore doesn't put an entry back over something now at its original name. If an entry can't be put back, restore says the data directory is split, and names each entry still in the `.backup-` directory and why.
+
+#### Native install (`/var/lib/icn`): supported, with one administrator step
+
+`deploy/install.sh` gives the `icn` service account `/var/lib/icn` but not its parent `/var/lib`. Restore must run as the account that owns the data directory: it refuses to run as root over a directory the service account owns, because files it created would belong to root. So the first attempt refuses, having moved nothing, and prints the one administrator step that makes the restore possible: creating the empty `.backup-` directory for the `icn` account.
+
+Restore prints that step as a command only when every directory from the parent up to `/` belongs to root and nobody else can write it, as `/var/lib`, `/var` and `/` do. In any other layout someone else could plant a link at that name, or swap a directory on the way to it, before you ran it. So restore describes the directory instead.
+
+```bash
+sudo systemctl disable --now icnd
+sudo -u icn icnctl --data-dir /var/lib/icn restore /path/to/backup.tar --force
+#   Refusing to move the existing data aside: this account cannot create
+#   /var/lib/icn.backup-<timestamp> beside the data directory ... Nothing has been moved.
+#       sudo mkdir -m 0700 -- '/var/lib/icn.backup-<timestamp>' && sudo chown -h +<uid>:+<gid> -- '/var/lib/icn.backup-<timestamp>'
+
+# Run the exact line it printed, then the same restore again:
+sudo mkdir -m 0700 -- '/var/lib/icn.backup-<timestamp>' && sudo chown -h +<uid>:+<gid> -- '/var/lib/icn.backup-<timestamp>'
+sudo -u icn icnctl --data-dir /var/lib/icn restore /path/to/backup.tar --force
+```
+
+The command uses `mkdir` and `chown -h` rather than `install -d` because `install -d` follows a symlink that already exists at that name and re-owns its target. Restore accepts the directory only if it is a real directory (not a symlink), owned by the data directory's account, on the same filesystem, and empty. It makes the directory owner-only before moving anything into it. The `icn` account must be able to read the archive.
+
+#### Mount-point data directory (container volume, PVC): not supported in place
+
+When the data directory is itself a mount point, as with the Kubernetes and Helm deployments, Compose volumes and a PVC, there is nowhere on the same filesystem beside it to move the contents to. Restore refuses with `Nothing has been moved`. To restore one:
+
+1. Stop the node, so nothing holds the data directory.
+2. Move or copy the contents off the volume yourself, to storage you control, including dotfiles. That copy is your only backup of the previous state, so verify it before going on.
+3. Leave nothing in the directory except the two lock files. On an ext4-formatted volume that includes removing `lost+found`, which `fsck` recreates when it needs it.
+4. Run `icnctl restore /path/to/backup.tar --force`. A data directory with nothing in it needs no `.backup-` directory.
+
+#### If a restore is interrupted
+
+A restore stopped part-way (Ctrl-C, `kill`, power loss) can't clean up after itself. **Don't start the daemon on the data directory until it is recovered.** First make sure no `icnctl` or `icnd` is running against it. Then check whether restore printed `Existing data moved to:`.
+
+**It did not print that line: interrupted while moving.** The data directory is split. Some entries are still in it and the rest are in `<data-dir>.backup-<timestamp>`. As the data directory's account, move the `.backup-` directory's entries back, never overwriting:
+
+```bash
+find '<data-dir>.backup-<timestamp>' -mindepth 1 -maxdepth 1 -exec mv -n -t '<data-dir>' -- {} +
+ls -A '<data-dir>.backup-<timestamp>'   # must print nothing
+```
+
+If anything is left, a name exists in both places. Stop and compare the two before going on. Once the `.backup-` directory is empty, leave it: running the restore again accepts an empty one. (On a native install the `icn` account can't remove it anyway; root can.)
+
+**It printed that line: interrupted or failed while extracting or verifying.** The move finished, so the `.backup-` directory holds the complete previous state. The data directory holds only what came from the archive, part of it or an unverified whole. To get back to the previous state, first delete the data directory's contents except the two lock files. They all came from the archive, so nothing is lost:
+
+```bash
+find '<data-dir>' -mindepth 1 -maxdepth 1 ! -name .icn-data-dir.lock ! -name .icn-config.lock -exec rm -rf -- {} +
+```
+
+Then move the `.backup-` directory's entries back as above. Running the restore again then works as the first time did.
 
 ### Restore to Custom Location
 
