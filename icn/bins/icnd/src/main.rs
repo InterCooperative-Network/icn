@@ -392,6 +392,9 @@ fn handle_init(args: &Args) -> Result<()> {
 
     std::fs::create_dir_all(&data_dir)
         .with_context(|| format!("Failed to create data directory: {}", data_dir.display()))?;
+    // A half-restored root is not a fresh one: initializing it would mint an
+    // identity and configuration into a directory a restore has not finished.
+    icn_core::refuse_if_restore_incomplete(&data_dir, "icnd --init")?;
 
     let keystore_path = data_dir.join("identity.age");
     // The canonical native configuration path, owned by `icn-core` rather than

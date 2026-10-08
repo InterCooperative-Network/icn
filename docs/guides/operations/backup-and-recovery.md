@@ -103,7 +103,7 @@ icnctl restore /path/to/backup.tar --force
 ```
 
 This will:
-1. Take the data directory's locks. Restore is refused while `icnd` or another `icnctl` command holds the directory, so stop the daemon first. On a systemd install, use `sudo systemctl disable --now icnd` rather than just `stop`, so a reboot part-way can't start the daemon on a half-restored directory. Re-enable it once the restored node is verified.
+1. Take the data directory's locks. Restore is refused while `icnd` or another `icnctl` command holds the directory, so stop the daemon first. On a systemd install, use `sudo systemctl disable --now icnd` rather than just `stop`, so the daemon doesn't keep trying to start (it refuses while a restore is incomplete, see below). Re-enable it once the restored node is verified.
 2. Move the existing *contents* (not the directory itself) into `<data-dir>.backup-<archive-timestamp>`, beside the real data directory (symlinks resolved). That directory is owner-only (`0700`) whatever your umask, so files that a `0700` data directory protected stay protected.
 3. Extract the backup into the data directory and verify its checksum.
 4. Leave the old data in the `.backup-` directory in case you need it. Remove it once the restored node is verified.
@@ -147,26 +147,36 @@ When the data directory is itself a mount point, as with the Kubernetes and Helm
 3. Leave nothing in the directory except the two lock files. On an ext4-formatted volume that includes removing `lost+found`, which `fsck` recreates when it needs it.
 4. Run `icnctl restore /path/to/backup.tar --force`. A data directory with nothing in it needs no `.backup-` directory.
 
-#### If a restore is interrupted
+#### If a restore does not finish
 
-A restore stopped part-way (Ctrl-C, `kill`, power loss) can't clean up after itself. **Don't start the daemon on the data directory until it is recovered.** First make sure no `icnctl` or `icnd` is running against it. Then check whether restore printed `Existing data moved to:`.
+Before it changes anything, restore writes a marker into the data directory, `.icn-restore-incomplete`, and flushes it to disk. The marker records what the directory held and where restore was moving it. Restore removes it only once the directory is verified: the restore finished with its data on disk, or a failed move put back exactly what it took.
 
-**It did not print that line: interrupted while moving.** The data directory is split. Some entries are still in it and the rest are in `<data-dir>.backup-<timestamp>`. As the data directory's account, move the `.backup-` directory's entries back, never overwriting:
+A restore that is stopped part-way (Ctrl-C, `kill`, power loss) or fails after moving the old contents aside leaves the marker in place. **While it is there, nothing opens the data directory's stores.** `icnd`, every `icnctl` command that uses them, `icnctl backup`, and another restore all refuse and name the marker. That holds across a reboot too, so a daemon that starts on its own refuses instead of coming up with its stores empty.
+
+To recover, run, as the data directory's account and with nothing else running against it:
+
+```bash
+icnctl --data-dir '<data-dir>' restore --recover-incomplete
+```
+
+Recovery puts the previous contents back from `<data-dir>.backup-<timestamp>`, but only the same objects restore recorded, never copies and never over anything. It then checks that the data directory holds exactly what it held before the restore began, and only then removes the marker. It deletes nothing, and it stops and says why in two cases:
+
+- **Entries that were not there before.** These came from the archive, or from somewhere else. Remove exactly the entries it lists, for example `rm -rf -- '<data-dir>/<name>'` for each one. The archive still has them.
+- **Entries that carry an earlier name but are not the same objects.** One may be the only copy of that entry, changed in place. Compare it with what you expect, and do not delete it.
+
+It runs only as the account that owns the data directory. It refuses if every account can write the directory, or can replace entries in its parent, because then its record could have been written by someone else. In those cases, recover by hand.
+
+Then run the recovery again. It is safe to run any number of times, including after it was itself interrupted, because it works from where things are now. Once it succeeds, the empty `.backup-` directory can stay; a later restore accepts it.
+
+If recovery can't read the marker, or you recover the directory some other way, move the `.backup-` directory's entries back without overwriting:
 
 ```bash
 find '<data-dir>.backup-<timestamp>' -mindepth 1 -maxdepth 1 -exec mv -n -t '<data-dir>' -- {} +
-ls -A '<data-dir>.backup-<timestamp>'   # must print nothing
 ```
 
-If anything is left, a name exists in both places. Stop and compare the two before going on. Once the `.backup-` directory is empty, leave it: running the restore again accepts an empty one. (On a native install the `icn` account can't remove it anyway; root can.)
+When you are certain the data directory is whole, remove `.icn-restore-incomplete` yourself. Nothing removes it automatically.
 
-**It printed that line: interrupted or failed while extracting or verifying.** The move finished, so the `.backup-` directory holds the complete previous state. The data directory holds only what came from the archive, part of it or an unverified whole. To get back to the previous state, first delete the data directory's contents except the two lock files. They all came from the archive, so nothing is lost:
-
-```bash
-find '<data-dir>' -mindepth 1 -maxdepth 1 ! -name .icn-data-dir.lock ! -name .icn-config.lock -exec rm -rf -- {} +
-```
-
-Then move the `.backup-` directory's entries back as above. Running the restore again then works as the first time did.
+While the marker is there, `icnd --init`, `icnctl id init` and anything that writes the configuration refuse as well, so nothing mints a fresh identity or configuration into a half-restored directory.
 
 ### Restore to Custom Location
 
