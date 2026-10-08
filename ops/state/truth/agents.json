@@ -104,8 +104,8 @@
   ],
   "orchestrator": {
     "name": "orchestrator",
-    "path": "../../../.claude/agents/orchestrator.md",
-    "note": "Lives at project-level .claude/agents/. Cross-repo coordinator.",
+    "location": "external",
+    "note": "Not in this repository: a user/project-level Claude agent outside the checkout, so there is no in-repo path to validate. Recorded for routing only. The previous value was a relative path escaping the repo root, which can never resolve from a worktree.",
     "routing_triggers": ["cross-repo task", "birds-eye view", "unfamiliar area", "multiple repos"]
   }
 }
