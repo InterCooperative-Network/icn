@@ -259,8 +259,15 @@ function isFork(
     padding: 0.2em 0.6em;
     border: 1px solid var(--ladder-accent);
     border-radius: 999px;
-    flex-shrink: 0;
-    white-space: nowrap;
+    /* Neither `flex-shrink: 0` nor `white-space: nowrap` here. Together they
+       made this chip an incompressible 120px box inside the fork step, which
+       overflowed the viewport by 6px at 768px and put a horizontal scrollbar on
+       the whole document. Pre-existing; caught only by the 5-width
+       `audit:full` profile, since the 3-width PR profile skips 768px.
+       "you are here" wrapping in a genuinely cramped row is a far smaller cost
+       than a page that scrolls sideways. */
+    min-width: 0;
+    max-width: 100%;
   }
 
   /* Fork step: parallel pair under a shared "05" number. */

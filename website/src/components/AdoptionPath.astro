@@ -1,0 +1,357 @@
+---
+// AdoptionPath.astro — how an institution could move from its current stack to
+// ICN without a big-bang migration.
+//
+// ─── Why this component exists ───────────────────────────────────────────────
+//
+// The public site explained at length why the existing fragmented stack is
+// structurally inadequate, and never answered the only question a cooperative
+// that already depends on all of it actually has: "how would we get from here
+// to there?" Leaving that unanswered makes the diagnosis read as a demand to
+// throw everything away at once, which no functioning institution can do and
+// no honest project should ask for.
+//
+// ─── Why it carries a readiness axis ─────────────────────────────────────────
+//
+// An adoption path is the single easiest place on a public site to imply a
+// product that does not exist. The sequence below spans current capability,
+// active development, and architectural direction, so every stage states which
+// of the three it is — in text, never by color alone (MUST_NOT_SHIP §4).
+//
+// The honest shape this produces is not flattering, and that is the point: the
+// two ENDS of the path are the most real, and the BRIDGING APPARATUS IN THE
+// MIDDLE is the least built part of it. A visitor should finish this figure
+// knowing that, not believing there is an import wizard.
+//
+// ─── Visual grammar ──────────────────────────────────────────────────────────
+//
+// Deliberately the same grammar as ProvenanceTrail and ClosureLoop: numbered
+// stations, a canonical icon from the ICN symbol family, a label, a gloss, and
+// directional connectors. A reader who has already met one of those figures has
+// already learned how to read this one. Bespoke-diagram-per-idea is how a site
+// stops teaching its own vocabulary.
+//
+// The readiness axis is deliberately NOT the ADR-0032 maturity band taxonomy.
+// Those bands describe subsystems verified against source in docs/status.toml;
+// these stages are not subsystems and have no row in that file. Borrowing the
+// band vocabulary would imply a verification that has not happened.
+
+import Icon from './Icon.astro';
+import TruthLabel from './TruthLabel.astro';
+import type { IconName } from '../data/icons';
+
+export interface Props {
+  title?: string;
+  showTruthLabelChip?: boolean;
+}
+
+const {
+  title = 'Adopting ICN without a big-bang migration',
+  showTruthLabelChip = false,
+} = Astro.props;
+
+const truthLabel = 'repo-grounded public explainer';
+
+type Readiness = 'today' | 'building' | 'direction';
+
+const READINESS: Record<Readiness, { label: string; detail: string }> = {
+  today: {
+    label: 'Possible today',
+    detail: 'Needs no ICN software you do not already have.',
+  },
+  building: {
+    label: 'Parts exist, path does not',
+    detail: 'The underlying capability is implemented; the guided route through it is not.',
+  },
+  direction: {
+    label: 'Architectural direction',
+    detail: 'Designed, not built. No implementation to point at yet.',
+  },
+};
+
+interface Stage {
+  n: string;
+  label: string;
+  gloss: string;
+  icon: IconName;
+  readiness: Readiness;
+}
+
+const stages: Stage[] = [
+  {
+    n: '01',
+    label: 'Look at what you already run',
+    gloss:
+      'Write down where membership, rules, decisions, money, and work actually live right now — and who can change each one.',
+    icon: 'identity',
+    readiness: 'today',
+  },
+  {
+    n: '02',
+    label: 'Describe the institution to itself',
+    gloss:
+      'Express the cooperative as scopes, membership, and the rules it already follows. Nothing is migrated; the institution is only described.',
+    icon: 'standing',
+    readiness: 'building',
+  },
+  {
+    n: '03',
+    label: 'Check the description against reality',
+    gloss:
+      'Compare that description to what the existing systems say. The disagreements are the useful output — they are usually real institutional ambiguity, not data errors.',
+    icon: 'policy',
+    readiness: 'direction',
+  },
+  {
+    n: '04',
+    label: 'Run one function in parallel',
+    gloss:
+      'ICN records a single function alongside the incumbent system. The incumbent stays authoritative. Nothing breaks if ICN is wrong.',
+    icon: 'governance',
+    readiness: 'direction',
+  },
+  {
+    n: '05',
+    label: 'Let ICN be authoritative for that one function',
+    gloss:
+      'One bounded function moves over — decided by the members, reversible, and narrow enough that the cooperative can still operate if it is reversed.',
+    icon: 'authority',
+    readiness: 'building',
+  },
+  {
+    n: '06',
+    label: 'Retire the incumbent when it is safe',
+    gloss:
+      'The old system goes read-only, then archive, then out — on the institution’s schedule. Then, if it went well, the next function.',
+    icon: 'provenance',
+    readiness: 'direction',
+  },
+];
+---
+
+<figure
+  class="adopt"
+  aria-label="A six-stage progressive adoption path from an institution's existing systems to ICN, with the readiness of each stage stated"
+  data-truth-label={truthLabel}
+>
+  <figcaption class="adopt-title">{title}</figcaption>
+
+  <TruthLabel label={truthLabel} visible={showTruthLabelChip} />
+
+  <p class="adopt-intro">
+    No cooperative can stop running while it changes what it runs on. The
+    sequence below is designed so that every stage is survivable on its own,
+    and so that the institution can stop at any stage and still be working.
+  </p>
+
+  <ol class="adopt-steps" role="list">
+    {stages.map((s, i) => (
+      <>
+        <li class="adopt-step" id={`adopt-${s.n}`}>
+          <div class="adopt-step-inner">
+            <div class="adopt-head">
+              <span class="adopt-number" aria-hidden="true">{s.n}</span>
+              <span class="adopt-icon" aria-hidden="true">
+                <Icon name={s.icon} size={22} />
+              </span>
+            </div>
+            <div class="adopt-body">
+              <span class="adopt-label">{s.label}</span>
+              <span class="adopt-gloss">{s.gloss}</span>
+              <span class:list={['adopt-ready', `ready-${s.readiness}`]}>
+                <span class="adopt-ready-label">{READINESS[s.readiness].label}</span>
+                <span class="adopt-ready-detail">{READINESS[s.readiness].detail}</span>
+              </span>
+            </div>
+          </div>
+        </li>
+        {i < stages.length - 1 && (
+          <li class="adopt-connector" aria-hidden="true" role="presentation">
+            <span class="adopt-arrow-down">↓</span>
+          </li>
+        )}
+      </>
+    ))}
+  </ol>
+
+  <p class="adopt-foot">
+    <span class="adopt-foot-eyebrow">Where this is honest</span>
+    The two ends of this path are the most real part of it. Describing an
+    institution and running one bounded governed loop both rest on implemented
+    subsystems. The middle — reconciling against incumbent systems, and running
+    a function in parallel with one — is the least built part of ICN, and there
+    is no import tool, no connector library, and no migration product to point
+    at. An institution attempting this today would be doing the middle stages by
+    hand, with the project.
+  </p>
+</figure>
+
+<style>
+  .adopt {
+    --adopt-accent: var(--accent-teal);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .adopt-title {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .adopt-intro,
+  .adopt-foot {
+    margin: 0;
+    color: var(--text-body);
+    line-height: 1.7;
+    max-width: var(--measure-prose);
+  }
+
+  .adopt-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .adopt-step {
+    margin: 0;
+  }
+
+  .adopt-step-inner {
+    display: flex;
+    gap: var(--space-md);
+    align-items: flex-start;
+    padding: var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--adopt-accent);
+    border-radius: var(--radius-sm);
+    min-width: 0;
+  }
+
+  .adopt-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    flex-shrink: 0;
+  }
+
+  .adopt-number {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+
+  .adopt-icon {
+    display: inline-flex;
+    color: var(--adopt-accent);
+  }
+
+  .adopt-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+    min-width: 0;
+  }
+
+  .adopt-label {
+    font-weight: 600;
+    color: var(--text-heading);
+    line-height: 1.4;
+  }
+
+  .adopt-gloss {
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* Readiness. Color reinforces; the label carries the meaning, and the
+     detail sentence carries it again in full prose. Legible in grayscale. */
+  .adopt-ready {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5em;
+    margin-top: 0.35em;
+  }
+
+  .adopt-ready-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.2em 0.65em;
+    border-radius: 999px;
+    border: 1px solid var(--border-default);
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    /* No `white-space: nowrap`. "Parts exist, path does not" is 25 characters
+       of letter-spaced uppercase mono; held on one line it was wider than a
+       320px viewport, which pushed the whole document into horizontal scroll
+       and stretched the site nav to 338px. Caught by `just website-audit-full`
+       at the 320px width, which the 3-width PR profile does not exercise. */
+    max-width: 100%;
+  }
+
+  .ready-today .adopt-ready-label {
+    color: var(--accent-green);
+    border-color: rgba(74, 222, 128, 0.35);
+  }
+
+  .ready-building .adopt-ready-label {
+    color: var(--accent-amber);
+    border-color: rgba(251, 191, 36, 0.35);
+  }
+
+  .ready-direction .adopt-ready-label {
+    color: var(--text-muted);
+    border-style: dashed;
+  }
+
+  .adopt-ready-detail {
+    font-size: 0.9375rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    min-width: 0;
+  }
+
+  .adopt-connector {
+    display: flex;
+    justify-content: center;
+    color: var(--text-muted);
+    line-height: 1;
+    padding: 0.35em 0;
+  }
+
+  .adopt-arrow-down {
+    font-size: 1.1rem;
+  }
+
+  .adopt-foot {
+    border-top: 1px dashed var(--border-default);
+    padding-top: var(--space-md);
+    color: var(--text-secondary);
+  }
+
+  .adopt-foot-eyebrow {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    margin-bottom: 0.4em;
+  }
+</style>
