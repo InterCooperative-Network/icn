@@ -210,6 +210,7 @@ mod admission;
 mod body;
 mod construct;
 mod derive;
+mod fact_store;
 // Crate-visible so the GEN layer (`crate::subject_context`) can build its hash preimages with
 // *this* length-prefix writer rather than reimplementing `LP(x)`. A second implementation of the
 // framing is exactly how canonical encodings drift apart. Still crate-private on the outside.
@@ -229,6 +230,10 @@ pub use derive::{
     derive, resolve, supersede, AuthorityState, AuthorityView, DeviceGrant, Resolution,
 };
 pub use encoding::CodecError;
+pub use fact_store::{
+    rehydrate, AuthorityFactStore, FactStoreError, InMemoryAuthorityFactStore, PersistedFact,
+    FACT_KEY_LEN,
+};
 pub use store::{AuthorityStore, SignedAuthorityEvent, Witness, WitnessSignature};
 
 /// Domain separator that opens every canonical body encoding.
