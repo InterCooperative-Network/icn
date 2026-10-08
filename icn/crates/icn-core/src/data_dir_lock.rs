@@ -290,8 +290,9 @@ impl DataDirLock {
     /// * they would not and there is none to join — **refuse**. Proceeding
     ///   unlocked is the failure this domain exists to prevent, not a fallback.
     ///
-    /// This is the same shape `runtime-root show` has had since #2749, lifted
-    /// here rather than copied: the sweep that added it to inspection is the
+    /// The create-join-refuse decision is lifted from `runtime-root show` (#2749)
+    /// rather than copied -- though `show` itself still probes before joining, a
+    /// pre-existing ordering outside this change: the sweep that added it to inspection is the
     /// one that missed the maintenance commands (icn#2759), and a rule written
     /// once at the primitive is a rule a later caller cannot spell differently.
     ///
@@ -299,7 +300,19 @@ impl DataDirLock {
     /// which *refuses* a wrong-account run outright. That is the right answer
     /// for a ceremony about to mint durable state; this is the right answer for
     /// a command that only has to be inside the domain while it looks.
+    ///
+    /// **Join before probing.** When the coordination file already exists, joining
+    /// it creates nothing, so there is no account question to ask -- and the probe
+    /// that asks it writes a transient file inside this directory. A contender that
+    /// probed first would write inside a root another process holds before even
+    /// asking for the lock (icn#2777 review). Both acquisitions end in the same
+    /// exclusive `flock` when the file exists, so this changes nothing but the
+    /// write. Only when there is no file to join does create-or-refuse arise, and
+    /// no process can hold a root whose coordination file does not exist yet.
     pub fn acquire_joining_or_creating(data_dir: &Path, holder: &str) -> Result<Self> {
+        if std::fs::symlink_metadata(Self::lock_path(data_dir)).is_ok() {
+            return Self::acquire_without_creating(data_dir, holder);
+        }
         if new_files_here_belong_to_the_directory_account(data_dir)? {
             Self::acquire(data_dir, holder)
         } else {

@@ -627,3 +627,230 @@ fn restore_force_with_a_dot_data_dir_moves_contents_beside_the_root() {
         b"original\n"
     );
 }
+
+/// A `--data-dir` that is a symlink to a directory *containing* it names a
+/// location inside the very root it resolves to. Moving that root's contents
+/// aside would move the name itself (and, computed lexically, put the backup
+/// inside the root). Restore must refuse before moving anything.
+#[cfg(unix)]
+#[test]
+fn restore_refuses_a_data_dir_that_lives_inside_the_root_it_resolves_to() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let root = scratch.path().join("icn");
+    seeded_root(&root);
+    std::fs::write(root.join("store").join("marker"), b"pre-restore\n").unwrap();
+    let named = root.join("data");
+    std::os::unix::fs::symlink(&root, &named).unwrap();
+    // The root's contents. The two coordination files are excluded by name:
+    // restore takes its locks before reading or moving anything, and any
+    // participant in the domain creates and retains them.
+    let contents = |dir: &Path| -> Vec<String> {
+        let mut v: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|n| n != ".icn-data-dir.lock" && n != ".icn-config.lock")
+            .collect();
+        v.sort();
+        v
+    };
+    let before = contents(&root);
+
+    let out = icnctl(&named)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+
+    assert!(
+        !out.status.success(),
+        "restore through a data dir inside its own root must be refused: {}",
+        combined(&out)
+    );
+    assert!(
+        combined(&out).contains("which contains it"),
+        "refused for this reason, not another: {}",
+        combined(&out)
+    );
+    let after = contents(&root);
+    assert_eq!(
+        after,
+        before,
+        "nothing may be moved, created or removed in the root: {}",
+        combined(&out)
+    );
+    assert_eq!(
+        std::fs::read(root.join("store").join("marker")).unwrap(),
+        b"pre-restore\n"
+    );
+    let backups: Vec<String> = [scratch.path(), root.as_path()]
+        .iter()
+        .flat_map(|d| contents(d))
+        .filter(|n| n.contains(".backup-"))
+        .collect();
+    assert!(
+        backups.is_empty(),
+        "no backup may be created anywhere: {backups:?}"
+    );
+}
+
+/// An ordinary symlinked data dir: the backup is a sibling of the *real* root
+/// it resolves to, not of the link, and the link still names the restored root.
+#[cfg(unix)]
+#[test]
+fn restore_force_through_a_symlinked_data_dir_backs_up_beside_the_real_root() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let real = scratch.path().join("disk").join("icn");
+    seeded_root(&real);
+    std::fs::write(real.join("store").join("marker"), b"pre-restore\n").unwrap();
+    let link = scratch.path().join("data");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+
+    let out = icnctl(&link)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "restore must succeed: {}",
+        combined(&out)
+    );
+
+    let beside_real: Vec<PathBuf> = std::fs::read_dir(real.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with("icn.backup-"))
+        })
+        .collect();
+    assert_eq!(
+        beside_real.len(),
+        1,
+        "one backup beside the real root: {beside_real:?}"
+    );
+    assert_eq!(
+        std::fs::read(beside_real[0].join("store").join("marker")).unwrap(),
+        b"pre-restore\n"
+    );
+    assert!(std::fs::symlink_metadata(&link)
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert_eq!(
+        std::fs::read(link.join("store").join("marker")).unwrap(),
+        b"original\n"
+    );
+}
+
+/// Whether this process is exempt from directory permissions (root), in which
+/// case a read-only directory proves nothing and the write-ordering tests below
+/// must not claim to have checked it.
+#[cfg(unix)]
+fn permissions_bind_this_process(dir: &Path) -> bool {
+    let probe = dir.join(".perm-check");
+    let bound = std::fs::write(&probe, b"").is_err();
+    let _ = std::fs::remove_file(&probe);
+    bound
+}
+
+/// A contender the exclusion domain refuses must be refused *by the domain*,
+/// before it writes anything inside the root another process holds. The root is
+/// made read-only while held: a contender that checks the lock first gets the
+/// domain's refusal; one that writes first fails on that write instead.
+#[cfg(unix)]
+#[test]
+fn a_refused_store_opener_writes_nothing_inside_the_held_root() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let scratch = TempDir::new().unwrap();
+    let data_dir = scratch.path().join("data");
+    seeded_root(&data_dir);
+    let holder = icn_core::DataDirLock::acquire(&data_dir, "runtime-root provisioning").unwrap();
+
+    std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let bound = permissions_bind_this_process(&data_dir);
+    let out = icnctl(&data_dir)
+        .args(["coop", "entity-report", "--json"])
+        .output()
+        .unwrap();
+    std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    drop(holder);
+
+    if !bound {
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+    assert_refused_by_the_domain(&out, "`icnctl coop entity-report`");
+}
+
+/// The same for restore: refused by the domain before it writes in the held root.
+#[cfg(unix)]
+#[test]
+fn a_refused_restore_writes_nothing_inside_the_held_root() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let dest = scratch.path().join("data");
+    seeded_root(&dest);
+    let holder = icn_core::DataDirLock::acquire(&dest, "a daemon").unwrap();
+
+    std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let bound = permissions_bind_this_process(&dest);
+    let out = icnctl(&dest)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755)).unwrap();
+    drop(holder);
+
+    if !bound {
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+    assert_refused_by_the_domain(&out, "restore --force");
+}
+
+/// And for `init-coop`, which takes a creating acquisition: refused by the
+/// domain before it writes anything inside the root another process holds.
+#[cfg(unix)]
+#[test]
+fn a_refused_init_coop_writes_nothing_inside_the_held_root() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let scratch = TempDir::new().unwrap();
+    let data_dir = scratch.path().join("data");
+    std::fs::create_dir_all(&data_dir).unwrap();
+    let holder = icn_core::DataDirLock::acquire(&data_dir, "runtime-root provisioning").unwrap();
+
+    std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let bound = permissions_bind_this_process(&data_dir);
+    let out = icnctl(&data_dir)
+        .args(["init-coop", "--name", "Blocked", "--yes", "--no-start"])
+        .output()
+        .unwrap();
+    std::fs::set_permissions(&data_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    drop(holder);
+
+    if !bound {
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+    assert_refused_by_the_domain(&out, "init-coop");
+}

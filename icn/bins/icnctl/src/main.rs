@@ -2408,10 +2408,27 @@ impl StorageDomain {
         // part of what taking a creating acquisition *means*, and leaving it
         // outside let it run before the classification above and produce the
         // very error that classification exists to prevent.
-        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
-            data_dir,
-        )?;
-        let storage = icn_core::DataDirLock::acquire(data_dir, holder)?;
+        //
+        // Join before probing: the guard writes a transient probe file in this
+        // directory, so it must not run inside a root another process may hold.
+        // When the lock file exists, join it first (creating nothing) and ask
+        // while holding it; only when it does not -- so nothing can hold this
+        // root -- is the guard asked first. The same rule as
+        // `DataDirLock::acquire_joining_or_creating` and restore.
+        let storage = if std::fs::symlink_metadata(icn_core::DataDirLock::lock_path(data_dir))
+            .is_ok()
+        {
+            let storage = icn_core::DataDirLock::acquire_without_creating(data_dir, holder)?;
+            institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+                data_dir,
+            )?;
+            storage
+        } else {
+            institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+                data_dir,
+            )?;
+            icn_core::DataDirLock::acquire(data_dir, holder)?
+        };
         Self::held(storage, data_dir)
     }
 
@@ -7206,27 +7223,50 @@ fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
 /// Where `restore --force` moves the existing contents: a *sibling* of the data
 /// root, named after the archive's own timestamp.
 ///
-/// Built from the root's parent and final component, never from its display
-/// string. Formatting `"{root}.backup-{t}"` turned `--data-dir /var/lib/icn/`
-/// (a trailing separator, as shell completion writes it) into
-/// `/var/lib/icn/.backup-{t}` -- a directory *inside* the root being emptied --
-/// and `--data-dir .` into `..backup-{t}` in the same place. Moving the root's
-/// entries into it then reached the backup itself, which cannot be renamed into
-/// itself, and the restore stopped with the live root split. `Path::parent` and
-/// `Path::file_name` already ignore a trailing separator; spellings with no
-/// final component at all (`.`, `./`, `..`) are resolved to the directory they
-/// name first. A root with no parent (`/`) is refused rather than guessed at.
+/// "Sibling" means beside the directory the data dir actually *is*, so the root
+/// is resolved first. Two shapes put a lexically computed backup inside the root
+/// being emptied, where moving the root's entries reaches the backup itself --
+/// which cannot be renamed into itself -- and stops with the live root split:
+///
+/// * a display-string name: `--data-dir /var/lib/icn/` (a trailing separator, as
+///   shell completion writes it) formatted to `/var/lib/icn/.backup-{t}`, and
+///   `--data-dir .` to `..backup-{t}`;
+/// * a symlink whose target contains it (`/srv/icn/data -> /srv/icn`): the
+///   lexical sibling `/srv/icn/data.backup-{t}` is inside the real root.
+///
+/// The second shape is refused outright, not merely re-pathed: the name the
+/// operator gave lives inside the root it resolves to, so moving that root's
+/// contents aside would move the name itself and leave the restore writing
+/// somewhere the exclusion anchor does not cover. A root with no parent (`/`)
+/// is refused rather than guessed at.
 fn sibling_backup_dir(data_dir: &Path, created_at: u64) -> Result<PathBuf> {
-    let root = if data_dir.file_name().is_some() {
-        data_dir.to_path_buf()
-    } else {
-        data_dir.canonicalize().with_context(|| {
-            format!(
-                "Failed to resolve the data directory {}",
-                data_dir.display()
-            )
-        })?
-    };
+    let root = data_dir.canonicalize().with_context(|| {
+        format!(
+            "Failed to resolve the data directory {}",
+            data_dir.display()
+        )
+    })?;
+    // Where the name itself lives: its resolved parent plus its final
+    // component (a symlink is not followed for this, only its parent is).
+    if let Some(name) = data_dir.file_name() {
+        let parent = match data_dir.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => Path::new("."),
+        };
+        let named_at = parent
+            .canonicalize()
+            .with_context(|| format!("Failed to resolve {}", parent.display()))?
+            .join(name);
+        if named_at != root && named_at.starts_with(&root) {
+            bail!(
+                "Refusing to move {} aside: it resolves to {}, which contains it. Moving that \
+                 directory's contents would move the name itself. Name the data directory by a \
+                 path outside it.",
+                data_dir.display(),
+                root.display()
+            );
+        }
+    }
     let (Some(parent), Some(name)) = (root.parent(), root.file_name()) else {
         bail!(
             "Refusing to move {} aside: it has no parent directory to place the backup beside",
@@ -7235,7 +7275,16 @@ fn sibling_backup_dir(data_dir: &Path, created_at: u64) -> Result<PathBuf> {
     };
     let mut backup_name = name.to_os_string();
     backup_name.push(format!(".backup-{created_at}"));
-    Ok(parent.join(backup_name))
+    let backup = parent.join(backup_name);
+    // Holds by construction for a resolved root; checked so it cannot regress.
+    if backup.starts_with(&root) {
+        bail!(
+            "Refusing to move {} aside: the backup {} would be inside it",
+            data_dir.display(),
+            backup.display()
+        );
+    }
+    Ok(backup)
 }
 
 fn move_data_root_contents_aside(data_dir: &Path, backup_dir: &Path) -> Result<usize> {
@@ -7325,14 +7374,32 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     // work landed in the replacement, splitting one logical root in two with
     // both sides "correctly" locked.
     //
-    // Creating acquisitions, so the account question comes first: these files
-    // are retained after release and mode 0600, and a `sudo` restore over a
-    // service-owned root would otherwise leave ones the daemon cannot reopen.
-    institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
-        data_dir,
-    )?;
-    let restore_config = icn_core::DataDirLock::acquire_config(data_dir, "this restore")?;
-    let restore_storage = icn_core::DataDirLock::acquire(data_dir, "this restore")?;
+    // The account question has to be answered before this restore creates any
+    // file here: coordination files are retained after release and mode 0600,
+    // and a `sudo` restore over a service-owned root would otherwise leave ones
+    // the daemon cannot reopen. But asking it writes a transient probe file in
+    // this directory, so it must not be asked of a root another process may be
+    // holding. When the storage lock file exists the root may be held: join it
+    // first (creating nothing), and ask while holding it. Only when it does not
+    // exist -- so nothing can hold this root -- is the question asked first.
+    // The locks never wait, so taking them in this order cannot deadlock.
+    let storage_lock_exists =
+        std::fs::symlink_metadata(icn_core::DataDirLock::lock_path(data_dir)).is_ok();
+    let (restore_config, restore_storage) = if storage_lock_exists {
+        let storage = icn_core::DataDirLock::acquire_without_creating(data_dir, "this restore")?;
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
+        let config = icn_core::DataDirLock::acquire_config(data_dir, "this restore")?;
+        (config, storage)
+    } else {
+        institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
+            data_dir,
+        )?;
+        let config = icn_core::DataDirLock::acquire_config(data_dir, "this restore")?;
+        let storage = icn_core::DataDirLock::acquire(data_dir, "this restore")?;
+        (config, storage)
+    };
 
     println!("Restoring backup from {}...", input.display());
 
@@ -14823,18 +14890,35 @@ mod exclusion_domain_tests {
     }
 
     /// The backup is always a sibling of the root, however the root is spelled.
+    #[cfg(unix)]
     #[test]
     fn the_restore_backup_is_named_beside_the_root_not_inside_it() {
-        for spelled in ["/var/lib/icn", "/var/lib/icn/", "/var/lib/icn//"] {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let base = tmp.path().canonicalize().unwrap();
+        let root = base.join("var").join("lib").join("icn");
+        std::fs::create_dir_all(&root).unwrap();
+        let expected = base.join("var").join("lib").join("icn.backup-7");
+        for spelled in [
+            root.display().to_string(),
+            format!("{}/", root.display()),
+            format!("{}//", root.display()),
+        ] {
             assert_eq!(
-                sibling_backup_dir(Path::new(spelled), 7).unwrap(),
-                PathBuf::from("/var/lib/icn.backup-7"),
+                sibling_backup_dir(Path::new(&spelled), 7).unwrap(),
+                expected,
                 "spelled {spelled:?}"
             );
         }
-        assert_eq!(
-            sibling_backup_dir(Path::new("data/"), 7).unwrap(),
-            PathBuf::from("data.backup-7")
+        // A symlink to the root: the backup goes beside the real root.
+        let link = base.join("link");
+        std::os::unix::fs::symlink(&root, &link).unwrap();
+        assert_eq!(sibling_backup_dir(&link, 7).unwrap(), expected);
+        // A symlink living inside the root it points at is refused.
+        let inside = root.join("self");
+        std::os::unix::fs::symlink(&root, &inside).unwrap();
+        assert!(
+            sibling_backup_dir(&inside, 7).is_err(),
+            "a name inside the root it resolves to must be refused"
         );
         assert!(
             sibling_backup_dir(Path::new("/"), 7).is_err(),
