@@ -45,8 +45,9 @@ pub use data_dir_lock::{classify_ownership_transfer, AccessIdentity, OwnershipTr
 #[cfg(unix)]
 pub use data_dir_lock::{data_root_account, identity_new_files_receive};
 pub use restore_marker::{
-    read_restore_record, refuse_if_restore_incomplete, restore_marker_path, sync_directory,
-    InventoryEntry, RestoreInProgress, RestorePhase, RestoreRecord, RESTORE_INCOMPLETE_FILE_NAME,
+    marker_seen, read_restore_record, refuse_if_restore_incomplete, restore_marker_path,
+    sync_directory, InventoryEntry, MarkerSeen, RestoreInProgress, RestorePhase, RestoreRecord,
+    RESTORE_INCOMPLETE_FILE_NAME,
 };
 
 pub use config::{Config, GenesisBundle, InitialContract, InitialCoop, GENESIS_SCHEMA_VERSION};

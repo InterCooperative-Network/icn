@@ -644,6 +644,7 @@ fn the_daemon_refuses_a_data_directory_whose_restore_did_not_finish() {
         icn_core::RestoreRecord {
             phase: icn_core::RestorePhase::Extracting,
             archive: PathBuf::from("/srv/backups/node.tar"),
+            archive_checksum: "0".repeat(64),
             move_aside: None,
             inventory: vec![],
         },
@@ -722,6 +723,7 @@ fn init_refuses_a_data_directory_whose_restore_did_not_finish() {
         icn_core::RestoreRecord {
             phase: icn_core::RestorePhase::Extracting,
             archive: PathBuf::from("/srv/backups/node.tar"),
+            archive_checksum: "0".repeat(64),
             move_aside: None,
             inventory: vec![],
         },

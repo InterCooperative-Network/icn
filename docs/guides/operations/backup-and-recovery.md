@@ -116,7 +116,7 @@ Restore checks everything it can before moving anything. It refuses, saying `Not
 - the data directory is a mount point or btrfs subvolume, or contains one. The `.backup-` directory would be on a different filesystem, and contents can't be renamed across filesystems;
 - the account running restore can't create the `.backup-` directory (see the native install below).
 
-**If the move fails part-way, restore puts everything back.** An entry can turn out to be unmovable only once restore tries to move it, for example a directory the account can't write or an immutable file. Restore then moves every entry it had already moved back into the data directory, removes the `.backup-` directory it created, and reports `Nothing has been moved; <data-dir> is unchanged`. Restore doesn't put an entry back over something now at its original name. If an entry can't be put back, restore says the data directory is split, and names each entry still in the `.backup-` directory and why.
+**If the move fails part-way, restore puts everything back.** An entry can turn out to be unmovable only once restore tries to move it, for example a directory the account can't write or an immutable file. Restore then moves every entry it had already moved back into the data directory, removes the `.backup-` directory it created, and reports `Nothing has been moved; <data-dir> is unchanged`. Restore doesn't put an entry back over anything that holds data at its original name (the same rule as recovery below). If an entry can't be put back, restore says the data directory is split, and names each entry still in the `.backup-` directory and why.
 
 #### Native install (`/var/lib/icn`): supported, with one administrator step
 
@@ -151,7 +151,7 @@ When the data directory is itself a mount point, as with the Kubernetes and Helm
 
 Before it changes anything, restore writes a marker into the data directory, `.icn-restore-incomplete`, and flushes it to disk. The marker records what the directory held and where restore was moving it. Restore removes it only once the directory is verified: the restore finished with its data on disk, or a failed move put back exactly what it took.
 
-A restore that is stopped part-way (Ctrl-C, `kill`, power loss) or fails after moving the old contents aside leaves the marker in place. **While it is there, nothing opens the data directory's stores.** `icnd`, every `icnctl` command that uses them, `icnctl backup`, and another restore all refuse and name the marker. That holds across a reboot too, so a daemon that starts on its own refuses instead of coming up with its stores empty.
+A restore that is stopped part-way (Ctrl-C, `kill`, power loss) or fails after moving the old contents aside leaves the marker in place. **While it is there, nothing opens the data directory's stores.** `icnd`, every `icnctl` command that uses them, `icnctl backup`, `icnctl snapshot create`, `delete` and `cleanup`, `icnctl device add`, and another restore all refuse and name the marker. That holds across a reboot too, so a daemon that starts on its own refuses instead of coming up with its stores empty.
 
 To recover, run, as the data directory's account and with nothing else running against it:
 
@@ -159,24 +159,33 @@ To recover, run, as the data directory's account and with nothing else running a
 icnctl --data-dir '<data-dir>' restore --recover-incomplete
 ```
 
-Recovery puts the previous contents back from `<data-dir>.backup-<timestamp>`, but only the same objects restore recorded, never copies and never over anything. It then checks that the data directory holds exactly what it held before the restore began, and only then removes the marker. It deletes nothing, and it stops and says why in two cases:
+Recovery puts the previous contents back from `<data-dir>.backup-<timestamp>`, but only the same objects restore recorded, never copies. It never puts anything over an object that holds data: a file goes back by a hard link that fails if the name is taken. The one thing that could be replaced is an empty directory created at the same name in the instant a directory is moved back. (Where a hard link can't be made, such as a file another account owns, or a filesystem without hard links, a file is checked and then renamed, and a file created at that name in that instant could be replaced.) It then checks that the data directory holds exactly what it held before the restore began, and only then removes the marker. It deletes no data. (The one name it may remove is a second link to an object already back in place, which an interrupted put-back leaves.) It stops and says why in two cases:
 
-- **Entries that were not there before.** These came from the archive, or from somewhere else. Remove exactly the entries it lists, for example `rm -rf -- '<data-dir>/<name>'` for each one. The archive still has them.
-- **Entries that carry an earlier name but are not the same objects.** One may be the only copy of that entry, changed in place. Compare it with what you expect, and do not delete it.
+- **Entries that were not there before.** These came from the archive, or from somewhere else. For each one, recovery checks whether the archive holds it **exactly**: every name in it, and every file's contents, compared by SHA-256 against the archive's own bytes. You may remove the entries it holds exactly, for example `rm -rf --one-file-system -- '<data-dir>/<name>'` for each one, because the archive can extract them again. Any it doesn't hold exactly may be the only copy of what they hold: a file written into one after the restore, a partly written file, or a different archive at that path. The same goes for all of them if the archive can't be read, or declares a different backup from the one the marker recorded. Move those somewhere safe instead of deleting them.
+- **Entries it can't account for.** These carry an earlier name but are not the same objects, or are on another filesystem (a mount point). One may be the only copy of what it holds. Compare it with what you expect, and don't delete it.
 
 It runs only as the account that owns the data directory. It refuses if every account can write the directory, or can replace entries in its parent, because then its record could have been written by someone else. In those cases, recover by hand.
 
 Then run the recovery again. It is safe to run any number of times, including after it was itself interrupted, because it works from where things are now. Once it succeeds, the empty `.backup-` directory can stay; a later restore accepts it.
 
-If recovery can't read the marker, or you recover the directory some other way, move the `.backup-` directory's entries back without overwriting:
+If recovery can't read the marker, or you recover the directory some other way:
 
-```bash
-find '<data-dir>.backup-<timestamp>' -mindepth 1 -maxdepth 1 -exec mv -n -t '<data-dir>' -- {} +
-```
+1. Move what the archive extracted out of the data directory, leaving only the two lock files and the marker. If the archive is gone or has been replaced by a different backup, keep those entries somewhere safe. Otherwise, delete only what you have checked the archive holds unchanged.
+2. Move the `.backup-` directory's entries back without overwriting:
 
-When you are certain the data directory is whole, remove `.icn-restore-incomplete` yourself. Nothing removes it automatically.
+   ```bash
+   find '<data-dir>.backup-<timestamp>' -mindepth 1 -maxdepth 1 -exec mv -n -t '<data-dir>' -- {} +
+   ls -A '<data-dir>.backup-<timestamp>'   # must print nothing
+   ```
+
+   `mv -n` skips a name that is already taken without saying so. If `ls -A` prints anything, that name exists in both places: stop and compare the two.
+3. When you are certain the data directory is whole, remove `.icn-restore-incomplete` yourself. Nothing removes it automatically.
 
 While the marker is there, `icnd --init`, `icnctl id init` and anything that writes the configuration refuse as well, so nothing mints a fresh identity or configuration into a half-restored directory.
+
+**What the marker relies on.** Restore flushes (`fsync`) the marker and its directory before it changes anything, and flushes everything it restored before removing the marker. That ordering holds across power loss only on storage that honours flushes. ext4, XFS and btrfs with default options do. Network and user-space filesystems (NFS, SMB, FUSE), and disks or controllers with a volatile write cache that ignore flushes, may not. Interrupting a running restore or recovery (an injected `SIGKILL`) has been tested against the real binary, outside the automated test suite. Block-level power loss has not.
+
+**If a restore was stopped after it had restored and verified everything, but before its marker was gone,** recovery recognizes it, as long as the archive is still at the path the marker recorded, readable, and declaring the same backup. Recognizing it means every entry, type and permission, and every file's contents, match the archive, and everything the directory held before is in the `.backup-` directory. Recovery then flushes the directory and removes the marker instead of asking you to undo the restore. What the directory held before stays in the `.backup-` directory. If the archive has moved or changed, recovery lists the restored entries instead and the marker stays: put the archive back at its path, or handle them as above.
 
 ### Restore to Custom Location
 

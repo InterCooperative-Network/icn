@@ -239,12 +239,35 @@ impl DataDirLock {
     /// Join the storage domain of a root whose restore did not finish.
     ///
     /// For `icnctl restore --recover-incomplete` and nothing else: the one
-    /// holder that must work on such a root, to verify it and put it back.
-    /// Never creates the lock file -- a root a restore was working on already
-    /// has one -- and excludes every other participant exactly as any storage
-    /// lock does.
-    pub fn acquire_for_restore_recovery(data_dir: &Path, holder: &str) -> Result<Self> {
-        Self::join_existing(data_dir, holder)
+    /// holder that must work on such a root, to verify it and put it back --
+    /// which is why it takes a [`MarkerSeen`](crate::restore_marker::MarkerSeen)
+    /// for this root, and refuses one for any other. Otherwise it is
+    /// [`Self::acquire_joining_or_creating`] without the marker check: it joins
+    /// the lock, or creates it (only where this account may) if someone removed
+    /// it by hand, and excludes every other participant as any storage lock does.
+    pub fn acquire_for_restore_recovery(
+        data_dir: &Path,
+        holder: &str,
+        seen: &crate::restore_marker::MarkerSeen,
+    ) -> Result<Self> {
+        if !seen.is_for(data_dir) {
+            bail!(
+                "Refusing to start {holder}: no restore marker was seen on {}",
+                data_dir.display()
+            );
+        }
+        if std::fs::symlink_metadata(Self::lock_path(data_dir)).is_ok() {
+            return Self::join_existing(data_dir, holder);
+        }
+        if new_files_here_belong_to_the_directory_account(data_dir)? {
+            Self::take(
+                Self::lock_path(data_dir),
+                Sharing::Exclusive,
+                &Self::storage_refusal(data_dir, holder),
+            )
+        } else {
+            Self::join_existing(data_dir, holder)
+        }
     }
 
     fn join_existing(data_dir: &Path, holder: &str) -> Result<Self> {
@@ -451,7 +474,17 @@ impl DataDirLock {
 
     /// The configuration side of [`Self::acquire_for_restore_recovery`]: for
     /// `icnctl restore --recover-incomplete` and nothing else.
-    pub fn acquire_config_for_restore_recovery(config_root: &Path, holder: &str) -> Result<Self> {
+    pub fn acquire_config_for_restore_recovery(
+        config_root: &Path,
+        holder: &str,
+        seen: &crate::restore_marker::MarkerSeen,
+    ) -> Result<Self> {
+        if !seen.is_for(config_root) {
+            bail!(
+                "Refusing to start {holder}: no restore marker was seen on {}",
+                config_root.display()
+            );
+        }
         Self::take_config_exclusive(config_root, holder)
     }
 
@@ -1005,6 +1038,7 @@ mod tests {
             RestoreRecord {
                 phase: RestorePhase::Moving,
                 archive: PathBuf::from("/srv/backup.tar"),
+                archive_checksum: "0".repeat(64),
                 move_aside: None,
                 inventory: vec![],
             },
@@ -1026,12 +1060,26 @@ mod tests {
 
         // The refusals released what they took: recovery can join, and while it
         // holds the root nobody else gets in.
-        let recovery_config =
-            DataDirLock::acquire_config_for_restore_recovery(dir.path(), "recovery").unwrap();
-        let recovery = DataDirLock::acquire_for_restore_recovery(dir.path(), "recovery").unwrap();
+        let seen = crate::restore_marker::marker_seen(dir.path())
+            .unwrap()
+            .expect("the marker is there");
+        // The token is for this root and no other.
+        let elsewhere = tempfile::TempDir::new().unwrap();
         let err = format!(
             "{:#}",
-            DataDirLock::acquire_for_restore_recovery(dir.path(), "another recovery").unwrap_err()
+            DataDirLock::acquire_for_restore_recovery(elsewhere.path(), "recovery", &seen)
+                .unwrap_err()
+        );
+        assert!(err.contains("no restore marker was seen"), "{err}");
+        let recovery_config =
+            DataDirLock::acquire_config_for_restore_recovery(dir.path(), "recovery", &seen)
+                .unwrap();
+        let recovery =
+            DataDirLock::acquire_for_restore_recovery(dir.path(), "recovery", &seen).unwrap();
+        let err = format!(
+            "{:#}",
+            DataDirLock::acquire_for_restore_recovery(dir.path(), "another recovery", &seen)
+                .unwrap_err()
         );
         assert!(err.contains("already holds"), "{err}");
 

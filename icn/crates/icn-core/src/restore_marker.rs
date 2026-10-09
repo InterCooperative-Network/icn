@@ -8,7 +8,8 @@
 //! an archive, and none of that goes away with the process. `icnd` opens the
 //! stores it finds and creates the missing ones empty, so a daemon started on
 //! such a root comes up under the same identity with its state gone. This
-//! marker is what outlives the crash: every storage acquisition refuses while
+//! marker is what outlives the crash (on storage that honours `fsync`, see
+//! below): every storage acquisition refuses while
 //! it exists, and it is removed only by a restore that finished, a rollback
 //! that put everything back, or a recovery that verified the root.
 //!
@@ -22,6 +23,37 @@
 //! **Removal only through [`RestoreInProgress::finish`].** There is no `Drop`
 //! that clears it: a handle dropped on an error path leaves the marker exactly
 //! where it is, which is the point.
+//!
+//! # Durability: what this does, and what it relies on
+//!
+//! What is done: the marker is created, written and `fsync`ed, and its
+//! directory `fsync`ed, before the restore changes anything. Before the marker
+//! is removed, every restored file and directory is `fsync`ed (or, after a
+//! rollback or recovery, the directories entries moved between), and the
+//! removal is followed by an `fsync` of the directory.
+//!
+//! What that relies on: a filesystem and storage stack that honour `fsync` --
+//! file and directory -- by the time it returns. ext4, XFS and btrfs with their
+//! default options do. Network and user-space filesystems (NFS, SMB, FUSE),
+//! and storage with a volatile write cache that ignores flushes, may not, and
+//! there the ordering promised here may not hold after a power loss. Where a
+//! directory cannot be opened for syncing (non-Unix), [`sync_directory`] does
+//! nothing.
+//!
+//! What is tested: process death at each step, by injecting `SIGKILL` into a
+//! real restore and a real recovery (outside the automated suite, which cannot
+//! schedule it). Power loss at the block layer is not tested.
+//!
+//! Known windows, each failing safe: a crash between the marker's `unlink` and
+//! its directory's `fsync` can bring the marker back over a restore that had
+//! finished -- recovery then finds the root matching the archive exactly and
+//! clears it, provided the archive at the recorded path is still readable and
+//! still declares the same backup (its declared checksum is recorded);
+//! otherwise it lists the restored entries for the operator and the marker
+//! stays. A crash
+//! between creating the marker and finishing its write can leave an unreadable
+//! one with nothing changed, which every participant refuses until the
+//! operator, having checked, removes it.
 
 use anyhow::{bail, Context, Result};
 use std::ffi::{OsStr, OsString};
@@ -109,6 +141,12 @@ pub struct RestoreRecord {
     pub phase: RestorePhase,
     /// The archive being restored, for the operator.
     pub archive: PathBuf,
+    /// The checksum the archive's metadata declares for the tree it holds --
+    /// the one restore verifies the root against. A path names whatever is
+    /// there now: an archive declaring a different checksum is not the backup
+    /// this restore extracted. (A declared checksum is not proof of contents;
+    /// recovery compares contents itself before it calls anything removable.)
+    pub archive_checksum: String,
     /// Where the previous contents were moved, if the restore replaced a root
     /// that held any.
     pub move_aside: Option<PathBuf>,
@@ -132,6 +170,14 @@ impl RestoreRecord {
         out.push_str(&format!("phase {}\n", self.phase.as_str()));
         out.push_str(&format!("archive {}\n", encode(self.archive.as_os_str())));
         out.push_str(&format!("# archive: {:?}\n", self.archive));
+        out.push_str(&format!(
+            "archive-checksum {}\n",
+            encode(OsStr::new(&self.archive_checksum))
+        ));
+        out.push_str(&format!(
+            "# archive-checksum: {:?}\n",
+            self.archive_checksum
+        ));
         match &self.move_aside {
             Some(dir) => {
                 out.push_str(&format!("move-aside {}\n", encode(dir.as_os_str())));
@@ -162,8 +208,8 @@ impl RestoreRecord {
         if lines.next() != Some(HEADER) {
             bail!("it does not start with `{HEADER}`");
         }
-        let (mut phase, mut archive, mut move_aside, mut inventory) =
-            (None, None, None, Vec::<InventoryEntry>::new());
+        let (mut phase, mut archive, mut archive_checksum, mut move_aside, mut inventory) =
+            (None, None, None, None, Vec::<InventoryEntry>::new());
         let once = |seen: bool, key: &str| -> Result<()> {
             if seen {
                 bail!("{key} recorded twice");
@@ -188,6 +234,14 @@ impl RestoreRecord {
                 "archive" => {
                     once(archive.is_some(), "archive")?;
                     archive = Some(PathBuf::from(decode(value)?));
+                }
+                "archive-checksum" => {
+                    once(archive_checksum.is_some(), "archive-checksum")?;
+                    archive_checksum = Some(
+                        decode(value)?
+                            .into_string()
+                            .map_err(|_| anyhow::anyhow!("archive checksum is not UTF-8"))?,
+                    );
                 }
                 "move-aside" => {
                     once(move_aside.is_some(), "move-aside")?;
@@ -230,6 +284,7 @@ impl RestoreRecord {
         Ok(Self {
             phase: phase.context("no phase recorded")?,
             archive: archive.context("no archive recorded")?,
+            archive_checksum: archive_checksum.context("no archive checksum recorded")?,
             move_aside: move_aside.context("no move-aside directory recorded")?,
             inventory,
         })
@@ -280,8 +335,9 @@ pub fn restore_marker_path(root: &Path) -> PathBuf {
         .join(RESTORE_INCOMPLETE_FILE_NAME)
 }
 
-/// Flush a directory's entries to disk, so a rename or unlink in it survives a
-/// crash. A no-op where directories cannot be opened for syncing.
+/// `fsync` a directory, so a rename or unlink in it is on disk once this
+/// returns -- on storage that honours it (see the module's durability note). A
+/// no-op where directories cannot be opened for syncing.
 pub fn sync_directory(dir: &Path) -> Result<()> {
     #[cfg(unix)]
     std::fs::File::open(dir)
@@ -339,6 +395,38 @@ pub fn read_restore_record(root: &Path) -> Result<Option<RestoreRecord>> {
     RestoreRecord::parse(&text)
         .map(Some)
         .with_context(|| format!("{} cannot be read as a restore record", path.display()))
+}
+
+/// Proof, for one data root, that a restore marker was there when it was asked.
+///
+/// The only key to the marker-tolerant acquisitions
+/// ([`crate::DataDirLock::acquire_for_restore_recovery`] and its configuration
+/// counterpart): code that has not found a marker on that root cannot use them
+/// to step around the refusal everything else gets.
+#[derive(Debug)]
+pub struct MarkerSeen {
+    root: PathBuf,
+}
+
+impl MarkerSeen {
+    /// Whether this was seen on `root`, however that root is spelled.
+    pub fn is_for(&self, root: &Path) -> bool {
+        std::fs::canonicalize(root).ok().as_deref() == Some(self.root.as_path())
+    }
+}
+
+/// A [`MarkerSeen`] for `root` if anything is at its marker's name, `None` if
+/// nothing is. Being unable to tell is an error, as everywhere here.
+pub fn marker_seen(root: &Path) -> Result<Option<MarkerSeen>> {
+    let path = restore_marker_path(root);
+    match std::fs::symlink_metadata(&path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e).with_context(|| format!("Failed to inspect {}", path.display())),
+        Ok(_) => Ok(Some(MarkerSeen {
+            root: std::fs::canonicalize(root)
+                .with_context(|| format!("Failed to resolve {}", root.display()))?,
+        })),
+    }
 }
 
 /// Refuse to let `holder` proceed while a restore of `root` is incomplete.
@@ -399,8 +487,9 @@ impl RestoreInProgress {
     ///
     /// Refuses if a marker is already there (`O_EXCL`): an earlier restore that
     /// did not finish is recovered, never overwritten. Returns only once the
-    /// record and its directory entry are on disk, so nothing the restore does
-    /// afterwards can survive a crash without the marker surviving too.
+    /// record and its directory entry have been `fsync`ed, so -- on storage that
+    /// honours that -- nothing the restore does afterwards can survive a crash
+    /// without the marker surviving too.
     pub fn begin(root: &Path, record: RestoreRecord) -> Result<Self> {
         let path = restore_marker_path(root);
         let text = record.to_text();
@@ -489,7 +578,13 @@ impl RestoreInProgress {
     pub fn finish(self) -> Result<()> {
         std::fs::remove_file(&self.path)
             .with_context(|| format!("Failed to remove {}", self.path.display()))?;
-        sync_directory(&self.root)
+        sync_directory(&self.root).with_context(|| {
+            format!(
+                "{} was removed, but the removal could not be flushed to disk; after a crash \
+                 it could come back",
+                self.path.display()
+            )
+        })
     }
 }
 
@@ -502,6 +597,8 @@ mod tests {
         RestoreRecord {
             phase: RestorePhase::Moving,
             archive: PathBuf::from("/srv/backups/icn backup.tar"),
+            archive_checksum: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+                .into(),
             move_aside: Some(PathBuf::from("/var/lib/icn.backup-7")),
             inventory: vec![
                 InventoryEntry {
@@ -549,6 +646,7 @@ mod tests {
     fn a_name_with_a_newline_cannot_inject_a_field() {
         let mut r = record();
         r.archive = PathBuf::from("/srv/x\nmove-aside -");
+        r.archive_checksum = "x\narchive-checksum y".into();
         r.inventory[0].name = OsString::from("x\nmove-aside -\nphase extracting\n\u{1b}[2J");
         let text = r.to_text();
         assert!(
@@ -556,6 +654,12 @@ mod tests {
             "no raw control characters: {text:?}"
         );
         assert_eq!(text.lines().filter(|l| l.starts_with("phase ")).count(), 1);
+        assert_eq!(
+            text.lines()
+                .filter(|l| l.starts_with("archive-checksum "))
+                .count(),
+            1
+        );
         assert_eq!(RestoreRecord::parse(&text).unwrap(), r);
     }
 
@@ -566,10 +670,17 @@ mod tests {
         let text = record().to_text();
         assert!(RestoreRecord::parse(&text.replace("phase moving", "phase sideways")).is_err());
         assert!(RestoreRecord::parse(&text.replace("phase moving\n", "")).is_err());
+        let without_checksum: String = text
+            .lines()
+            .filter(|l| !l.starts_with("archive-checksum "))
+            .map(|l| format!("{l}\n"))
+            .collect();
+        assert!(RestoreRecord::parse(&without_checksum).is_err());
         assert!(RestoreRecord::parse(&format!("{text}mystery field\n")).is_err());
         // A field recorded twice -- an injected line, say -- is not "last wins".
         assert!(RestoreRecord::parse(&format!("{text}move-aside -\n")).is_err());
         assert!(RestoreRecord::parse(&format!("{text}phase extracting\n")).is_err());
+        assert!(RestoreRecord::parse(&format!("{text}archive-checksum 30\n")).is_err());
         let first_entry = text.lines().find(|l| l.starts_with("entry ")).unwrap();
         assert!(RestoreRecord::parse(&format!("{text}{first_entry}\n")).is_err());
         assert!(RestoreRecord::parse(&text.replacen("entry 2049 131", "entry x 131", 1)).is_err());
@@ -626,6 +737,27 @@ mod tests {
         )
         .unwrap();
         assert!(refuse_if_restore_incomplete(dangling.path(), "x").is_err());
+    }
+
+    /// Being unable to look is not evidence that nothing is there.
+    #[cfg(unix)]
+    #[test]
+    fn being_unable_to_look_for_the_marker_refuses() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path().join("root");
+        std::fs::create_dir(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let blind = std::fs::symlink_metadata(root.join(RESTORE_INCOMPLETE_FILE_NAME))
+            .is_err_and(|e| e.kind() == std::io::ErrorKind::PermissionDenied);
+        let verdict = refuse_if_restore_incomplete(&root, "the daemon");
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        if !blind {
+            eprintln!("skipped: directory permissions do not bind this process (running as root)");
+            return;
+        }
+        let err = format!("{:#}", verdict.unwrap_err());
+        assert!(err.contains("could not tell"), "{err}");
     }
 
     #[test]
