@@ -189,12 +189,18 @@ impl DataDirLock {
     ///
     /// `holder` names the caller in the refusal, so an operator learns which
     /// side to stop.
+    ///
+    /// Refused, with the lock released again, while a restore of this root is
+    /// incomplete: see [`crate::restore_marker`]. Asked *after* locking, so a
+    /// restore cannot be between creating its marker and holding the root.
     pub fn acquire(data_dir: &Path, holder: &str) -> Result<Self> {
-        Self::take(
+        let lock = Self::take(
             Self::lock_path(data_dir),
             Sharing::Exclusive,
             &Self::storage_refusal(data_dir, holder),
-        )
+        )?;
+        crate::restore_marker::refuse_if_restore_incomplete(data_dir, holder)?;
+        Ok(lock)
     }
 
     fn storage_refusal(data_dir: &Path, holder: &str) -> String {
@@ -221,7 +227,50 @@ impl DataDirLock {
     /// There is no check-then-create window to lose, because this never
     /// creates: if the file vanishes between the caller's decision and this
     /// call, the open simply fails and the caller refuses.
+    ///
+    /// Refused, like [`Self::acquire`], while a restore of this root is
+    /// incomplete.
     pub fn acquire_without_creating(data_dir: &Path, holder: &str) -> Result<Self> {
+        let lock = Self::join_existing(data_dir, holder)?;
+        crate::restore_marker::refuse_if_restore_incomplete(data_dir, holder)?;
+        Ok(lock)
+    }
+
+    /// Join the storage domain of a root whose restore did not finish.
+    ///
+    /// For `icnctl restore --recover-incomplete` and nothing else: the one
+    /// holder that must work on such a root, to verify it and put it back --
+    /// which is why it takes a [`MarkerSeen`](crate::restore_marker::MarkerSeen)
+    /// for this root, and refuses one for any other. Otherwise it is
+    /// [`Self::acquire_joining_or_creating`] without the marker check: it joins
+    /// the lock, or creates it (only where this account may) if someone removed
+    /// it by hand, and excludes every other participant as any storage lock does.
+    pub fn acquire_for_restore_recovery(
+        data_dir: &Path,
+        holder: &str,
+        seen: &crate::restore_marker::MarkerSeen,
+    ) -> Result<Self> {
+        if !seen.is_for(data_dir) {
+            bail!(
+                "Refusing to start {holder}: no restore marker was seen on {}",
+                data_dir.display()
+            );
+        }
+        if std::fs::symlink_metadata(Self::lock_path(data_dir)).is_ok() {
+            return Self::join_existing(data_dir, holder);
+        }
+        if new_files_here_belong_to_the_directory_account(data_dir)? {
+            Self::take(
+                Self::lock_path(data_dir),
+                Sharing::Exclusive,
+                &Self::storage_refusal(data_dir, holder),
+            )
+        } else {
+            Self::join_existing(data_dir, holder)
+        }
+    }
+
+    fn join_existing(data_dir: &Path, holder: &str) -> Result<Self> {
         let path = Self::lock_path(data_dir);
 
         // Same containment as `take`: never open through a link, never treat a
@@ -341,6 +390,12 @@ impl DataDirLock {
         config_root: &Path,
         holder: &str,
     ) -> Result<Self> {
+        let lock = Self::join_config_shared(config_root, holder)?;
+        crate::restore_marker::refuse_if_restore_incomplete(config_root, holder)?;
+        Ok(lock)
+    }
+
+    fn join_config_shared(config_root: &Path, holder: &str) -> Result<Self> {
         let path = Self::config_lock_path(config_root);
 
         // Same containment as `take`: never open through a link, never treat a
@@ -407,7 +462,33 @@ impl DataDirLock {
     /// must exclude every daemon that has already consumed bytes from that
     /// directory — including daemons whose *storage* is somewhere else entirely
     /// and which therefore do not contend for [`Self::acquire`] at all.
+    ///
+    /// Refused, with the lock released again, while a restore of this directory
+    /// is incomplete -- a configuration writer must not publish into a
+    /// half-restored root any more than a store opener may read one.
     pub fn acquire_config(config_root: &Path, holder: &str) -> Result<Self> {
+        let lock = Self::take_config_exclusive(config_root, holder)?;
+        crate::restore_marker::refuse_if_restore_incomplete(config_root, holder)?;
+        Ok(lock)
+    }
+
+    /// The configuration side of [`Self::acquire_for_restore_recovery`]: for
+    /// `icnctl restore --recover-incomplete` and nothing else.
+    pub fn acquire_config_for_restore_recovery(
+        config_root: &Path,
+        holder: &str,
+        seen: &crate::restore_marker::MarkerSeen,
+    ) -> Result<Self> {
+        if !seen.is_for(config_root) {
+            bail!(
+                "Refusing to start {holder}: no restore marker was seen on {}",
+                config_root.display()
+            );
+        }
+        Self::take_config_exclusive(config_root, holder)
+    }
+
+    fn take_config_exclusive(config_root: &Path, holder: &str) -> Result<Self> {
         Self::take(
             Self::config_lock_path(config_root),
             Sharing::Exclusive,
@@ -462,6 +543,14 @@ impl DataDirLock {
         config_root: &Path,
         holder: &str,
     ) -> Result<Option<Self>> {
+        let lock = Self::config_shared_if_manageable(config_root, holder)?;
+        if lock.is_some() {
+            crate::restore_marker::refuse_if_restore_incomplete(config_root, holder)?;
+        }
+        Ok(lock)
+    }
+
+    fn config_shared_if_manageable(config_root: &Path, holder: &str) -> Result<Option<Self>> {
         let path = Self::config_lock_path(config_root);
         let refusal = Self::config_refusal(config_root, holder);
 
@@ -935,6 +1024,71 @@ pub fn refuse_if_new_files_would_not_belong_to_the_data_root_account(_dir: &Path
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// While a restore of a root is incomplete, every storage acquisition
+    /// refuses -- and gives the lock back, so the refusal itself holds nothing.
+    /// Only recovery's own join is admitted, and it still excludes everyone.
+    #[test]
+    fn an_incomplete_restore_refuses_every_storage_acquisition_but_recovery() {
+        use crate::restore_marker::{RestoreInProgress, RestorePhase, RestoreRecord};
+        let dir = tempfile::TempDir::new().unwrap();
+        drop(DataDirLock::acquire(dir.path(), "provisioning").unwrap());
+        let marker = RestoreInProgress::begin(
+            dir.path(),
+            RestoreRecord {
+                phase: RestorePhase::Moving,
+                archive: PathBuf::from("/srv/backup.tar"),
+                archive_checksum: "0".repeat(64),
+                move_aside: None,
+                inventory: vec![],
+            },
+        )
+        .unwrap();
+
+        for refused in [
+            DataDirLock::acquire(dir.path(), "the daemon"),
+            DataDirLock::acquire_without_creating(dir.path(), "an inspection"),
+            DataDirLock::acquire_joining_or_creating(dir.path(), "coop maintenance"),
+            DataDirLock::acquire_config(dir.path(), "a configuration writer"),
+            DataDirLock::acquire_config_shared_without_creating(dir.path(), "a reader"),
+            DataDirLock::acquire_config_shared_if_manageable(dir.path(), "the daemon")
+                .map(|lock| lock.expect("a writable directory is manageable")),
+        ] {
+            let err = format!("{:#}", refused.unwrap_err());
+            assert!(err.contains("did not finish"), "{err}");
+        }
+
+        // The refusals released what they took: recovery can join, and while it
+        // holds the root nobody else gets in.
+        let seen = crate::restore_marker::marker_seen(dir.path())
+            .unwrap()
+            .expect("the marker is there");
+        // The token is for this root and no other.
+        let elsewhere = tempfile::TempDir::new().unwrap();
+        let err = format!(
+            "{:#}",
+            DataDirLock::acquire_for_restore_recovery(elsewhere.path(), "recovery", &seen)
+                .unwrap_err()
+        );
+        assert!(err.contains("no restore marker was seen"), "{err}");
+        let recovery_config =
+            DataDirLock::acquire_config_for_restore_recovery(dir.path(), "recovery", &seen)
+                .unwrap();
+        let recovery =
+            DataDirLock::acquire_for_restore_recovery(dir.path(), "recovery", &seen).unwrap();
+        let err = format!(
+            "{:#}",
+            DataDirLock::acquire_for_restore_recovery(dir.path(), "another recovery", &seen)
+                .unwrap_err()
+        );
+        assert!(err.contains("already holds"), "{err}");
+
+        marker.finish().unwrap();
+        drop(recovery);
+        drop(recovery_config);
+        drop(DataDirLock::acquire(dir.path(), "the daemon").unwrap());
+        drop(DataDirLock::acquire_config(dir.path(), "a configuration writer").unwrap());
+    }
 
     #[test]
     fn a_second_acquisition_is_refused_while_the_first_is_held() {

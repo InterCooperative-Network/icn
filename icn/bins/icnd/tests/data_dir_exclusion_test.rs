@@ -607,3 +607,144 @@ fn validate_config_joins_an_existing_configuration_lock() {
         "and the refusal must name the contention:\n{text}"
     );
 }
+
+/// A daemon must not start on a data directory whose restore did not finish.
+///
+/// It would open whatever stores it found and create the missing ones empty,
+/// coming up under the same identity with its state gone -- the N2-A gate
+/// treats a store-less tree as clear. So it refuses at its first lock, before
+/// the gate writes a receipt and before any store is opened, and leaves the
+/// root's contents as they were (its retained lock files, and the transient
+/// probe that asks which account new files belong to, aside). Removing the marker (what a verified recovery does) is
+/// the whole difference: the same daemon then comes up.
+#[test]
+fn the_daemon_refuses_a_data_directory_whose_restore_did_not_finish() {
+    let data_root = tempfile::TempDir::new().unwrap();
+    let init = std::process::Command::new(icnd_bin())
+        .args(["--init", "--node-name", "restore-witness"])
+        .arg("--data-dir")
+        .arg(data_root.path())
+        .args(["--init-gateway-port", &free_tcp_port().to_string()])
+        .args(["--init-gossip-port", &free_udp_port().to_string()])
+        .env("ICN_KEYSTORE_PASSPHRASE", "test-only-not-a-real-credential")
+        .output()
+        .unwrap();
+    assert!(
+        init.status.success(),
+        "fixture: --init must succeed:\n{}{}",
+        String::from_utf8_lossy(&init.stdout),
+        String::from_utf8_lossy(&init.stderr)
+    );
+    let config = icn_core::config::config_file_path(data_root.path());
+    let generated = std::fs::read_to_string(&config).unwrap();
+    std::fs::write(&config, generated.replace("0.0.0.0:", "127.0.0.1:")).unwrap();
+
+    let marker = icn_core::RestoreInProgress::begin(
+        data_root.path(),
+        icn_core::RestoreRecord {
+            phase: icn_core::RestorePhase::Extracting,
+            archive: PathBuf::from("/srv/backups/node.tar"),
+            archive_checksum: "0".repeat(64),
+            move_aside: None,
+            inventory: vec![],
+        },
+    )
+    .unwrap();
+
+    // Everything in the root, recursively, except the retained lock files.
+    let tree = |root: &Path| -> Vec<(PathBuf, Option<Vec<u8>>)> {
+        let mut v: Vec<_> = walk(root)
+            .into_iter()
+            .filter(|p| !p.ends_with(".icn-data-dir.lock") && !p.ends_with(".icn-config.lock"))
+            .map(|p| {
+                let bytes = std::fs::read(root.join(&p)).ok();
+                (p, bytes)
+            })
+            .collect();
+        v.sort();
+        v
+    };
+    let before = tree(data_root.path());
+
+    let mut daemon = Daemon::spawn(&config, data_root.path());
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while daemon.is_running() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the daemon must refuse, not run:\n{}",
+            daemon.log()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    let log = daemon.log();
+    assert!(
+        log.contains("did not finish"),
+        "refused for this reason:\n{log}"
+    );
+    assert!(
+        log.contains("--recover-incomplete"),
+        "and says how to recover:\n{log}"
+    );
+    assert_eq!(
+        tree(data_root.path()),
+        before,
+        "a refused daemon must leave the root's contents as they were:\n{log}"
+    );
+
+    marker.finish().unwrap();
+    let mut daemon = Daemon::spawn(&config, data_root.path());
+    daemon.wait_until_running();
+}
+
+/// Every path under `root`, relative to it.
+fn walk(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            out.push(path.strip_prefix(root).unwrap().to_path_buf());
+            if std::fs::symlink_metadata(&path).unwrap().is_dir() {
+                stack.push(path);
+            }
+        }
+    }
+    out
+}
+
+/// `icnd --init` must not mint a fresh identity and configuration into a data
+/// directory a restore has not finished: after a crash mid-extraction the old
+/// `identity.age` or `icn.toml` may simply not be back yet.
+#[test]
+fn init_refuses_a_data_directory_whose_restore_did_not_finish() {
+    let data_root = tempfile::TempDir::new().unwrap();
+    let _marker = icn_core::RestoreInProgress::begin(
+        data_root.path(),
+        icn_core::RestoreRecord {
+            phase: icn_core::RestorePhase::Extracting,
+            archive: PathBuf::from("/srv/backups/node.tar"),
+            archive_checksum: "0".repeat(64),
+            move_aside: None,
+            inventory: vec![],
+        },
+    )
+    .unwrap();
+    let init = std::process::Command::new(icnd_bin())
+        .args(["--init", "--node-name", "restore-witness"])
+        .arg("--data-dir")
+        .arg(data_root.path())
+        .args(["--init-gateway-port", &free_tcp_port().to_string()])
+        .args(["--init-gossip-port", &free_udp_port().to_string()])
+        .env("ICN_KEYSTORE_PASSPHRASE", "test-only-not-a-real-credential")
+        .output()
+        .unwrap();
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&init.stdout),
+        String::from_utf8_lossy(&init.stderr)
+    );
+    assert!(!init.status.success(), "--init must refuse:\n{text}");
+    assert!(text.contains("did not finish"), "{text}");
+    assert!(!data_root.path().join("identity.age").exists());
+    assert!(!icn_core::config::config_file_path(data_root.path()).exists());
+}
