@@ -1,131 +1,77 @@
-# ICN Contributor Ladder
+# ICN learning ladder
 
-The ICN onboarding follows a **ladder model**: each tier unlocks new responsibilities and requires demonstrable skills via gate checkpoints.
+The Reader → Fixer → Builder → Maintainer ladder is an **optional way to organize technical learning**, not a system of project ranks, permissions, or prerequisites for contributing.
 
-## Overview
+**If you are new and want to help today, start with [Getting Started](../../GETTING_STARTED.md).** You can make a real contribution before starting any of these exercises.
 
-| Tier | Phase | Skills | Artifacts Required |
-|------|-------|--------|---------------------|
-| **Reader** | Phase 1 | Build, test, trace flows, explain code | 4 artifacts (system map, tooling, errors, tiny PR) |
-| **Fixer** | Phase 2 | Fix bugs, write tests, respect boundaries | 4 artifacts (firewall lab, trace diagram, boundary review, lock rationale) |
-| **Builder** | Phase 3 | Add features, implement actors/oracles, design changes | 3 artifacts (real PR, peer review, teaching artifact) |
-| **Maintainer** | Phase 4 | Review boundary PRs, reshape architecture, mentor | 5 artifacts (deployment, ledger, governance, metrics, persistence) |
+Actual code ownership, reviews, security-sensitive changes, and merge authority follow the project's live repository policies and governance, **not** completion of a course or possession of a badge.
 
----
+## Choose a skill to practice
 
-## Tier 1: Reader
+| Learning stage | Useful capability | Example exercise |
+| --- | --- | --- |
+| **Reader** | Find code, reproduce behavior, explain what you observed | Follow a call path; run a focused test; report a confusing instruction |
+| **Fixer** | Identify a bounded defect and preserve system invariants | Reproduce a bug; add a regression test; explain the boundary it protects |
+| **Builder** | Design and test interactions between components | Implement a scoped change across an API and its consumers |
+| **Maintainer practice** | Review, operate, and explain a subsystem responsibly | Review a PR against its claimed evidence and source-of-truth owners |
 
-**Goal**: Navigate codebase, trace execution, file good bug reports.
+These are capabilities, not titles granted by this curriculum. People can learn them in a different order, contribute in other disciplines, or already have relevant experience.
 
-**Skills**:
-- Run `cargo build`, `cargo test`, `cargo clippy` without friction
-- Read Rust code and identify invariants (ownership, borrowing, error handling)
-- Explain error handling patterns (thiserror vs anyhow vs panic)
-- Trace execution through tracing output
-- Understand kernel/app/domain crate boundaries
+## Reader practice
 
-**Gate Checkpoint**: Gate 1 (4 artifacts)
-1. System map diagram showing kernel/app/domain split
-2. Tooling fluency (build → error → fix cycle)
-3. Error/tracing proof (explain thiserror pattern, add tracing span)
-4. Tiny PR (typo, test, doc, tracing span)
+Start from [Phase 1](../path/phase-1-foundations/01-environment.md).
 
-**After passing**: Can read code, trace flows, explain behavior, file bug reports.
+- Find one subsystem and its real entry point in the current code.
+- Run a relevant command and interpret success or failure.
+- Trace an error path or safety rule.
+- Share a small change, reproduction, or clear documentation observation.
 
----
+The [Phase 1 checkpoint](../path/phase-1-foundations/gate-1.md) offers optional activities. A PR is useful practice but is not required to demonstrate learning.
 
-## Tier 2: Fixer
+## Fixer practice
 
-**Goal**: Fix bugs, write tests, ship bugfix PRs respecting boundaries.
+Use the [Phase 2 Meaning Firewall lesson](../path/phase-2-architecture/05-the-meaning-firewall.md) and [firewall lab](../labs/lab-04-firewall-oracle/).
 
-**Skills**:
-- Understand actor pattern (mailbox, sequential processing, shutdown)
-- **Master the Meaning Firewall**: kernel/app separation via PolicyOracle
-- Implement persistence with invariants (double-entry, quarantine)
-- Add tracing spans and metrics to improve observability
-- Choose between `parking_lot::RwLock` and `tokio::sync::RwLock`
+- Separate the cause of a defect from its symptoms.
+- Determine which crate or domain owns the semantics.
+- Write a regression test for a bounded fix.
+- Explain why the change does not weaken authorization, determinism, or other invariants.
 
-**Gate Checkpoint**: Gate 2 (4 artifacts)
-1. Lab-04 complete (firewall oracle with compile-time boundary proof)
-2. End-to-end trace diagram (Gateway → Kernel → Oracle → constraints → enforcement)
-3. Boundary review exercise (identify and fix firewall violation)
-4. Lock choice rationale (when to use parking_lot vs tokio::sync)
+The lesson's idealized diagrams must be checked against current implementation and the owners named by [AGENTS.md](../../../AGENTS.md).
 
-**After passing**: Can fix bugs, write tests, add tracing, ship bugfix PRs.
+## Builder practice
 
----
+Use [Phase 3](../path/phase-3-systems/07-identity-and-crypto.md).
 
-## Tier 3: Builder
+- Work through a well-scoped feature or integration problem.
+- Define expected behavior, failure cases, and test evidence before changing code.
+- Review another person's design or PR and explain which claims are supported and which are not.
+- Help make the subsystem understandable to someone who did not build it.
 
-**Goal**: Add features, implement new actors/oracles, design subsystem changes.
+A cross-crate implementation is not required simply to make a useful contribution.
 
-**Skills**:
-- Practical cryptography (sign, verify, replay protection)
-- Gossip protocol (eventual consistency, vector clocks, anti-entropy)
-- Governance (proposals, voting, parameter changes)
-- Integrate multiple subsystems in a single feature
-- Mentor junior contributors
+## Maintainer practice
 
-**Gate Checkpoint**: Gate 3 (3 artifacts)
-1. Real PR shipped (touches 2+ crates, includes tracing + tests)
-2. Peer review (review another PR using boundary-safety rubric)
-3. Teaching artifact (diagram, checklist, or mini-lesson for future contributors)
+Use [Phase 4](../path/phase-4-ownership/10-federation-and-ops.md).
 
-**After passing**: Can add features, implement actors/oracles, design subsystem changes.
+- Understand a subsystem's source-of-truth owner and operational limits.
+- Trace an upgrade, restart, or recovery claim back to evidence.
+- Evaluate risks, CI results, review comments, and out-of-scope observations.
+- Help someone else complete a bounded contribution.
 
----
+Completing these exercises does not grant review or merge authority. Deployment, production operations, and architectural changes require appropriate authorization.
 
-## Tier 4: Maintainer
+## Suggested study plans
 
-**Goal**: Review boundary PRs, reshape architecture, mentor contributors.
+The [Foundations](foundations.md) and [Accelerated](accelerated.md) tracks include example multiweek pacing. They are **not** commitments, approvals, or requirements, and may need updating as the code changes.
 
-**Skills**:
-- Federation (inter-cooperative coordination, clearing/netting)
-- Operations (deployment, monitoring, incident response)
-- Advanced Rust (lifetimes when they matter, trait objects vs generics)
-- Hot path profiling and optimization
-- Maintainer review rubric (firewall, errors, observability, tests, docs)
+The [path lessons](../path/) and [labs](../labs/) are teaching resources. Their checkpoints should be treated as practice prompts, not tests of whether someone is permitted to participate.
 
-**Gate Checkpoint**: Capstone (5 artifacts)
-1. Deployment proof (2-node cluster, metrics exposed)
-2. Ledger flow (transaction via Gateway API, replicated)
-3. Governance flow (proposal activated, parameter changed, oracle updated)
-4. Metrics verification (Prometheus shows activity)
-5. Persistence verification (state survives restart)
+## Using the ladder with real project work
 
-**After passing**: Can review boundary PRs, reshape architecture, mentor contributors, own subsystems.
+1. Choose a current issue, verified gap, or concrete use case.
+2. Read the [contribution guide](../../../CONTRIBUTING.md) and [AGENTS.md](../../../AGENTS.md).
+3. Do one bounded piece of work and verify the claims you make about it.
+4. Share the result for review, and decide what to learn next.
 
----
-
-## Progression Timeline
-
-### Foundations Track (8 weeks total)
-- **Phase 1 (Weeks 1-2)**: Reader tier
-- **Phase 2 (Weeks 3-5)**: Fixer tier
-- **Phase 3 (Weeks 6-7)**: Builder tier
-- **Phase 4 (Week 8)**: Maintainer tier
-
-### Accelerated Track (4 weeks total)
-- **Phase 1 (Days 1-3)**: Reader tier (skim if Rust-fluent)
-- **Phase 2 (Week 1)**: Fixer tier
-- **Phase 3 (Weeks 2-3)**: Builder tier
-- **Phase 4 (Week 4)**: Maintainer tier
-
----
-
-## Key Principles
-
-1. **Artifact-driven**: Each gate requires concrete deliverables, not self-assessment.
-2. **Boundary-first**: The Meaning Firewall is the central design principle — mastery comes in Phase 2.
-3. **Incremental**: Each tier builds on the previous. No skipping gates.
-4. **Mentorship**: Builders mentor Fixers, Maintainers mentor Builders.
-5. **Onboarding produces PR-capable humans**, not just readers.
-
----
-
-## Next Steps
-
-- **Start onboarding**: `docs/onboarding/path/phase-1-foundations/01-environment.md`
-- **Choose track**: `docs/onboarding/tracks/foundations.md` or `accelerated.md`
-- **Read manual**: `docs/onboarding/manual.md` for system-first narrative
-- **Ask questions**: #onboarding channel or GitHub Discussions
+A useful review or bug report is a contribution even if it doesn't involve code. [Discussions](https://github.com/InterCooperative-Network/icn/discussions) and [Discord](https://discord.gg/sAEFCnEahn) are valid ways to start.
