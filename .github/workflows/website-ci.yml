@@ -67,7 +67,7 @@ jobs:
           fetch-depth: 400
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           # 22, not 20: audit-layout.mjs drives Chrome over the DevTools
           # Protocol with a global `WebSocket`, which Node 20 does not define.
@@ -189,7 +189,7 @@ jobs:
         with:
           fetch-depth: 400
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           # 22 for the same reason as the build job: the audit needs a global
           # WebSocket to speak CDP, and Node 20 has none.
