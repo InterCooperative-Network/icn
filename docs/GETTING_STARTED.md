@@ -18,7 +18,17 @@ For the project's purpose, read [What is ICN](https://intercooperative.network/w
 
 The [Get Involved page](https://intercooperative.network/get-involved) describes additional routes. You can also ask in the [ICN Discord](https://discord.gg/sAEFCnEahn) without a GitHub account. Tell us what you are interested in and what kind of task you would like; you do not need a proposal ready.
 
-**Where to start if you have no task in mind:** use the onboarding test immediately below. It exists whether or not the [good-first-issue search](https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue) has something appropriate today. Check any issue's current status and scope before starting it.
+### Three concrete first tasks
+
+Pick one of these live, scoped starter issues and **comment before beginning** so another contributor knows what you are taking on:
+
+- **[Test this onboarding guide — #2826](https://github.com/InterCooperative-Network/icn/issues/2826):** no coding required. Follow one path, capture a success or a specific obstruction, and suggest a fix. This task is testing the draft changes in [PR #2825](https://github.com/InterCooperative-Network/icn/pull/2825), which are **not yet merged**.
+- **[Mobile member-shell usability — #2827](https://github.com/InterCooperative-Network/icn/issues/2827):** use the local *fixture-backed* demo on a phone-sized screen, then report two specific interaction findings. No live node, real credentials, or production claim.
+- **[First code task — #2828](https://github.com/InterCooperative-Network/icn/issues/2828):** add two focused Python regression tests for the `icnctl` inventory parser. No full Rust build.
+
+Each issue includes instructions, an expected deliverable, boundaries, and a place to report progress. If it's already claimed or completed, ask on the issue or in Discord for another bounded task rather than duplicating someone else's work. The [good-first-issue search](https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue) may be empty; these linked starter tasks are maintained separately.
+
+**If you want to start immediately without choosing an issue,** use the onboarding walkthrough below and share what you found.
 
 ## 2. First task: test the onboarding
 
