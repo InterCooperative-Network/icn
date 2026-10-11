@@ -93,7 +93,7 @@ For deeper exploration, see the [optional developer curriculum](onboarding/READM
 
 1. Read [CONTRIBUTING.md](../CONTRIBUTING.md) for scope, security, and architectural expectations. For nontrivial code work, also follow [AGENTS.md](../AGENTS.md) and the relevant domain owner.
 2. Confirm the issue still exists, and keep the change to one reviewable problem.
-3. Work on a branch such as `docs/clarify-first-build`, `fix/your-bug`, or `test/your-case`. Fork the repo first if you do not have push access.
+3. Work on a branch such as `docs/clarify-first-build`, `fix/your-bug`, or `chore/your-test`. Fork the repo first if you do not have push access.
 4. Run verification appropriate to **the files you changed**. For documentation, start at the repository root with:
 
    ```bash
