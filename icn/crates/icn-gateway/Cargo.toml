@@ -96,7 +96,7 @@ icn-api = { path = "../icn-api" }
 icn-commons = { path = "../icn-commons" }
 
 # Caching
-lru = "0.16"
+lru = "0.18"
 dashmap = "6.0"
 
 # Metrics
