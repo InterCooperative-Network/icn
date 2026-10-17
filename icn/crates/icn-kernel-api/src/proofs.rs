@@ -168,6 +168,25 @@ mod tests {
         )
     }
 
+    /// Pinned receipt hash for `make_receipt()`. The expected value was derived
+    /// independently of this crate (a hand-written preimage hashed by two
+    /// separate BLAKE3 implementations), and matched the pre-refactor code. It
+    /// guards the encoding: any change to the bytes of `compute_receipt_hash`
+    /// fails here. Layout: DOMAIN_TAG || request_id || blob_hash ||
+    /// lp(requester_did) || lp(provider_did) || lp(scope_id), lp = u64-LE length
+    /// then UTF-8 bytes.
+    #[test]
+    fn artifact_receipt_hash_golden_vector() {
+        assert_eq!(
+            hex32(&make_receipt().receipt_hash),
+            "9b5a58e21a1d50a994f861a41137a119334c9de6cc00d1b1598c6232582ebc1d"
+        );
+    }
+
+    fn hex32(bytes: &[u8; 32]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
     #[test]
     fn receipt_hash_determinism() {
         let r1 = make_receipt();
