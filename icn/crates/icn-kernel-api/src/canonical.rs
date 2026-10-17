@@ -1,8 +1,10 @@
 //! Field-wise canonical hashing: the receipt-hash recipe ICN receipts already use.
 //!
-//! ICN's receipt and proof types (this crate's `proofs.rs`, `icn-governance`'s
-//! `proof.rs`) hash their significant fields by hand, each with the same
-//! recipe:
+//! ICN receipt types hash their significant fields with one recipe, written
+//! out by hand at each site: in this crate `ArtifactReceipt` (now via this
+//! module), and the receipt classes of `icn-governance`'s `proof.rs`. This
+//! crate's other proof types hash `tag || u64-LE length || bincode bytes`, which
+//! is the same recipe with a single [`CanonicalHasher::bytes`] field. The recipe:
 //!
 //! ```text
 //! BLAKE3( domain_tag
@@ -13,7 +15,7 @@
 //!
 //! in a fixed field order chosen by each record type. [`CanonicalHasher`] is
 //! that recipe as one reusable mechanism, byte for byte: it reproduces
-//! `ArtifactReceipt::compute_receipt_hash` and the pinned `icn-governance`
+//! `ArtifactReceipt::compute_receipt_hash` and two pinned `icn-governance`
 //! receipt goldens (see the tests). [`ordered_commitment`] adds a positional
 //! commitment to an ordered list of digests.
 //!
@@ -23,10 +25,19 @@
 //!   || CBOR)`). That normative layout is a different byte format, which no
 //!   receipt hash implements today. This module codifies the implemented
 //!   receipt recipe; reconciling the two is a documentation and governance
-//!   decision this module does not make. A domain string must never be used
-//!   with both formats.
+//!   decision this module does not make. Because `typed_hash` writes
+//!   `domain || 0x00 || ...` and a tag here is followed directly by field
+//!   bytes, a recipe tag that **equals or is a proper prefix of** a
+//!   `typed_hash` domain can produce the same preimage (for example tag
+//!   `icn:x:v1` with a fixed field starting `:ext\0…` against domain
+//!   `icn:x:v1:ext`). No recipe tag may equal or prefix a `typed_hash` domain.
+//!   (The reverse cannot happen: tags hold no 0x00 byte.)
 //! - **Not a schema.** The caller chooses the tag and the field order, and
-//!   how optional values are represented. Nothing here encodes an absent
+//!   how optional values are represented. **One tag binds exactly one field
+//!   sequence:** different sequences under one tag can share bytes (`str("")`
+//!   and `u64(0)` both append eight zero bytes; `bytes(b)` equals `u64(len)`
+//!   then a fixed field). A variable number of fields or list items needs its
+//!   own count, e.g. `u64(n)` before the items, as [`ordered_commitment`] does. Nothing here encodes an absent
 //!   value: a record type that has one must define its own explicit encoding
 //!   (for example a presence byte via [`CanonicalHasher::fixed`]).
 //! - **Not a signature, an attestation or an authorization.** A matching hash
@@ -57,6 +68,11 @@ impl DomainTag {
     /// Intended for `const` items, where an invalid tag is a compile error
     /// (const evaluation fails). Tags are protocol constants, never input;
     /// for a tag that is not known at compile time, use [`DomainTag::try_new`].
+    ///
+    /// # Panics
+    ///
+    /// If `tag` is invalid and this is called outside a `const` context. Use it
+    /// only to define `const` items.
     pub const fn new(tag: &'static [u8]) -> Self {
         match Self::try_new(tag) {
             Some(t) => t,
@@ -85,7 +101,8 @@ impl DomainTag {
     }
 }
 
-/// `true` if no tag is a proper prefix of another and no tag repeats.
+/// `true` if no tag is a proper prefix of another and no tag repeats (and,
+/// vacuously, for an empty slice).
 ///
 /// Use it in a test over every tag a record family hashes under this recipe.
 pub fn tags_are_prefix_free(tags: &[DomainTag]) -> bool {
@@ -129,7 +146,8 @@ impl CanonicalHasher {
     }
 
     /// A fixed-width field: its raw bytes, with no length prefix. The width is
-    /// part of the type, so it is the same for every value of the field.
+    /// part of the type, so it is the same for every value of the field
+    /// (`N = 0` appends nothing).
     pub fn fixed<const N: usize>(&mut self, value: &[u8; N]) -> &mut Self {
         self.inner.update(value);
         self
@@ -152,7 +170,7 @@ impl CanonicalHasher {
     }
 }
 
-/// Why an ordered commitment was refused. Nothing is hashed on refusal.
+/// Why an ordered commitment was refused. No hash is returned on refusal.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum CommitmentError {
     /// An ordered commitment needs at least one member.
@@ -512,12 +530,18 @@ mod tests {
         assert!(tags_are_prefix_free(&tags));
     }
 
-    /// The same-crate proof that the helper is the recipe: for varied inputs,
-    /// `CanonicalHasher` reproduces `ArtifactReceipt::compute_receipt_hash`.
+    /// `ArtifactReceipt::compute_receipt_hash` (which now uses this module)
+    /// equals BLAKE3 of an independently hand-built preimage for varied inputs.
+    /// The expectation never goes through `CanonicalHasher` (review finding L1:
+    /// comparing the hasher against itself could not fail).
     #[test]
-    fn artifact_receipt_hash_reexpressed() {
+    fn artifact_receipt_hash_matches_hand_built_preimages() {
         use crate::proofs::ArtifactReceipt;
-        const TAG: DomainTag = DomainTag::new(ArtifactReceipt::DOMAIN_TAG);
+        fn lp(out: &mut Vec<u8>, s: &str) {
+            out.extend_from_slice(&(s.len() as u64).to_le_bytes());
+            out.extend_from_slice(s.as_bytes());
+        }
+        let long = "x".repeat(1500); // more than one BLAKE3 chunk
         for (req, blob, requester, provider, scope) in [
             (
                 [0xBB; 32],
@@ -528,25 +552,64 @@ mod tests {
             ),
             ([0; 32], [0; 32], "", "", ""),
             ([1; 32], [2; 32], "did:icn:ABC", "did:icn:requester", "XYZ"),
-            ([3; 32], [4; 32], "é", "did:icn:ß", "scope with spaces"),
+            ([3; 32], [4; 32], "é", "did:icn:ß", long.as_str()),
         ] {
-            let via_helper = CanonicalHasher::new(TAG)
-                .fixed(&req)
-                .digest(&blob)
-                .str(requester)
-                .str(provider)
-                .str(scope)
-                .finish();
+            let mut pre = b"icn:artifact-receipt:v1".to_vec();
+            pre.extend_from_slice(&req);
+            pre.extend_from_slice(&blob);
+            lp(&mut pre, requester);
+            lp(&mut pre, provider);
+            lp(&mut pre, scope);
             assert_eq!(
-                via_helper,
                 ArtifactReceipt::compute_receipt_hash(
                     &req,
                     &blob,
                     &requester.to_string(),
                     &provider.to_string(),
                     scope
-                )
+                ),
+                *blake3::hash(&pre).as_bytes()
             );
         }
+    }
+
+    /// The module docs' warning, as an executable fact: a recipe tag that is a
+    /// proper prefix of a `typed_hash` domain (`domain || 0x00 || data`,
+    /// CANONICAL_ENCODING.md 4.1.2) can produce the same preimage (review M1).
+    #[test]
+    fn a_recipe_tag_prefixing_a_typed_hash_domain_collides() {
+        let typed_hash = |domain: &[u8], data: &[u8]| {
+            let mut h = blake3::Hasher::new();
+            h.update(domain);
+            h.update(&[0x00]);
+            h.update(data);
+            *h.finalize().as_bytes()
+        };
+        let collide = CanonicalHasher::new(DomainTag::new(b"icn:x:v1"))
+            .fixed(b":ext\x00cbor")
+            .finish();
+        assert_eq!(collide, typed_hash(b"icn:x:v1:ext", b"cbor"));
+    }
+
+    /// The docs' rule "one tag binds exactly one field sequence", as an
+    /// executable fact: different sequences can share bytes (review L3).
+    #[test]
+    fn different_field_sequences_under_one_tag_can_alias() {
+        let f = || CanonicalHasher::new(TEST_TAG);
+        assert_eq!(f().str("").finish(), f().u64(0).finish());
+        assert_eq!(
+            f().bytes(&[7, 8]).finish(),
+            f().u64(2).fixed(&[7, 8]).finish()
+        );
+        assert_eq!(f().fixed::<0>(&[]).finish(), f().finish());
+    }
+
+    #[test]
+    fn the_printable_ascii_boundaries_are_accepted() {
+        assert!(DomainTag::try_new(b"!").is_some());
+        assert!(DomainTag::try_new(b"~").is_some());
+        assert!(DomainTag::try_new(b" ").is_none());
+        assert!(DomainTag::try_new(b"\x7f").is_none());
+        assert!(tags_are_prefix_free(&[]));
     }
 }
