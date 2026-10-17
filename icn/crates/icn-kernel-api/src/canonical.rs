@@ -1,10 +1,13 @@
 //! Field-wise canonical hashing: the receipt-hash recipe ICN receipts already use.
 //!
-//! ICN receipt types hash their significant fields with one recipe, written
-//! out by hand at each site: in this crate `ArtifactReceipt` (now via this
-//! module), and the receipt classes of `icn-governance`'s `proof.rs`. This
-//! crate's other proof types hash `tag || u64-LE length || bincode bytes`, which
-//! is the same recipe with a single [`CanonicalHasher::bytes`] field. The recipe:
+//! The receipt and proof types in this crate's `proofs.rs` and in
+//! `icn-governance`'s `proof.rs` hash their significant fields with one recipe,
+//! written out by hand at each site: `ArtifactReceipt` (now via this module)
+//! and the governance receipt classes field by field, and this crate's other
+//! proof types as `tag || u64-LE length || bincode bytes`, which is the same
+//! recipe with a single [`CanonicalHasher::bytes`] field. (`receipts.rs`'s
+//! `compute_canonical_hash`, used by `CanonicalReceipt` types, is a different,
+//! untagged scheme: `BLAKE3(bincode(value))`.) The recipe:
 //!
 //! ```text
 //! BLAKE3( domain_tag
@@ -37,9 +40,10 @@
 //!   sequence:** different sequences under one tag can share bytes (`str("")`
 //!   and `u64(0)` both append eight zero bytes; `bytes(b)` equals `u64(len)`
 //!   then a fixed field). A variable number of fields or list items needs its
-//!   own count, e.g. `u64(n)` before the items, as [`ordered_commitment`] does. Nothing here encodes an absent
-//!   value: a record type that has one must define its own explicit encoding
-//!   (for example a presence byte via [`CanonicalHasher::fixed`]).
+//!   own count, e.g. `u64(n)` before the items, as [`ordered_commitment`]
+//!   does. Nothing here encodes an absent value: a record type that has one
+//!   must define its own explicit encoding (for example a presence byte via
+//!   [`CanonicalHasher::fixed`]).
 //! - **Not a signature, an attestation or an authorization.** A matching hash
 //!   proves that two parties committed to the same bytes. It does not say who
 //!   committed, that anything committed is true, or that anyone may act on it.
