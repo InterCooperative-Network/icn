@@ -40,6 +40,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::canonical::{CanonicalHasher, DomainTag};
 use crate::effects::EffectOutcome;
 use crate::types::{Did, Hash, Signature};
 
@@ -122,20 +123,18 @@ impl ArtifactReceipt {
         provider_did: &Did,
         scope_id: &str,
     ) -> Hash {
-        let mut hasher = blake3::Hasher::new();
-        // Domain separation: prevents hash collisions with other proof types
-        hasher.update(Self::DOMAIN_TAG);
-        // Fixed-length fields: no prefix needed
-        hasher.update(request_id);
-        hasher.update(blob_hash);
-        // Variable-length fields: length-prefix each one
-        hasher.update(&(requester_did.len() as u64).to_le_bytes());
-        hasher.update(requester_did.as_bytes());
-        hasher.update(&(provider_did.len() as u64).to_le_bytes());
-        hasher.update(provider_did.as_bytes());
-        hasher.update(&(scope_id.len() as u64).to_le_bytes());
-        hasher.update(scope_id.as_bytes());
-        *hasher.finalize().as_bytes()
+        // The shared canonical recipe (crate::canonical); bytes unchanged, pinned
+        // by `artifact_receipt_hash_golden_vector`.
+        const TAG: DomainTag = DomainTag::new(ArtifactReceipt::DOMAIN_TAG);
+        CanonicalHasher::new(TAG)
+            // Fixed-length fields: raw, no prefix
+            .fixed(request_id)
+            .digest(blob_hash)
+            // Variable-length fields: u64-LE length prefix each
+            .str(requester_did)
+            .str(provider_did)
+            .str(scope_id)
+            .finish()
     }
 
     /// Verify that the stored `receipt_hash` matches a fresh computation.
