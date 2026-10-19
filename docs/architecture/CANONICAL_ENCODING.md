@@ -361,12 +361,12 @@ hash = BLAKE3( tag || field_1 || field_2 || ... || field_n )
 - **Variants.** An optional or variant value is encoded as a one-byte discriminant, followed by
   the fields that discriminant determines. A fieldless enum MAY instead be encoded as a fixed
   string field. The choice is fixed per tag. Absence MUST NOT be encoded by omission alone.
-- **Per-tag layout.**
-  - **One layout.** Each tag fixes one field order and one encoding, and a tag introduced from
-    version 1.1 on MUST. The only known exceptions are three test-only fixture tags (see
-    "Existing deviations").
-  - **Golden pins.** The layout of a tag introduced from version 1.1 on MUST be pinned by a
-    golden test vector at the hashing site. Existing tags SHOULD be. As of version 1.1 many
+- **Per-tag layout.** An *existing tag* is one present in the workspace at the commit that adopts
+  version 1.1. Any other tag, including a new version of an existing tag, is a *new tag*.
+  - **One layout.** Each tag fixes one field order and one encoding; a new tag MUST do so. The
+    only known exceptions are three test-only fixture tags (see "Existing deviations").
+  - **Golden pins.** The layout of a new tag MUST be pinned by a golden test vector at the
+    hashing site. Existing tags SHOULD be. As of version 1.1 many
     existing tags are not yet pinned, including every tag in `icn-kernel-api` `proofs.rs`.
 - **Existing deviations.** Their bytes are frozen under Rule 2.
   - **Unprefixed trailing value.** A few tags append one trailing serialized value without a
@@ -858,7 +858,7 @@ under §2 and hashed with §4.1.2:
 ### 9.6 Test Coverage
 
 - [ ] Includes test vectors for all objects encoded under §2, and a golden test vector for every
-  field-wise tag (§4.1.3) introduced from version 1.1 on. Existing field-wise tags without one
+  new field-wise tag (§4.1.3). Existing field-wise tags without one
   SHOULD gain one (§4.1.3); this item does not claim that they have one.
 - [ ] Tests hash stability across versions
 - [ ] Tests cross-implementation compatibility
@@ -1009,8 +1009,7 @@ impl CanonicalEncode for GovernanceProof {}
     (§4.1.3, §4.1.5);
   - allows field-wise signed payloads and records the others (§4.2.1);
   - scopes §7.1, §9 and §10.1 to the matching format. §9.6 keeps test vectors a MUST for §2
-    objects and for field-wise tags introduced from 1.1 on, and a SHOULD for existing field-wise
-    tags;
+    objects, makes them a MUST for new field-wise tags and a SHOULD for existing ones;
   - records the three test-only fixture tags hashed under two layouts each (§4.1.3);
   - distinguishes the specified federation `GovernanceProof` (§4.2.3, §8.1, Appendix A) from the
     implemented one.
