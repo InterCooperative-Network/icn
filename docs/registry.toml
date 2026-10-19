@@ -1343,7 +1343,7 @@ category = "architecture"
 status = "living"
 title = "Canonical Encoding"
 description = "Specification for deterministic serialization of ICN data structures"
-last_updated = "2026-03-10"
+last_updated = "2026-10-19"
 owner = "matt"
 audiences = ["developers", "architects"]
 

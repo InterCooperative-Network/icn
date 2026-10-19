@@ -1,8 +1,8 @@
 # Canonical Encoding Specification
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Status:** NORMATIVE  
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-10-19
 
 ## Abstract
 
@@ -21,6 +21,13 @@ Canonical encoding is REQUIRED for:
 - Objects that are cryptographically hashed
 - Objects included in consensus state
 - Objects used in cross-implementation verification
+
+ICN has two distinct, versioned hash formats:
+- §4.1.2 `typed_hash` for objects canonically encoded under §2;
+- §4.1.3, the field-wise format used by the existing receipt and proof hashes.
+
+The field-wise preimage is itself a canonical encoding for the purposes of this section. Neither
+format is a migration target of the other (§4.1.4).
 
 Non-canonical encoding MAY be used for:
 - Wire protocol serialization (where explicit versioning is present)
@@ -316,6 +323,66 @@ fn typed_hash(domain: &str, data: &[u8]) -> [u8; 32] {
 - `icn-ledger:settlement:v1`
 - `icn-ledger:journal-entry:v1`
 
+**Scope.** `typed_hash` applies to objects canonically encoded under §2. Every `typed_hash`
+domain uses the namespace `icn-<component>:`. As of version 1.1 no code in the workspace computes
+`typed_hash`. Existing receipt and proof hashes use §4.1.3 instead, and this section does not
+change them.
+
+#### 4.1.3 Field-wise Receipt and Proof Hashes
+
+The existing receipt and proof hashes (for example `ArtifactReceipt`, `GovernanceProof` in
+`icn-governance`, the governance decision receipts) use a field-wise preimage:
+
+```text
+hash = BLAKE3( tag || field_1 || field_2 || ... || field_n )
+```
+
+- **Tag.** The tag is printable ASCII in the namespace `icn:` and ends in a version, `:vN` (for
+  example `icn:artifact-receipt:v1`, `icn:gov:decision:v3`). No separator follows the tag.
+- **Field encoding.** Each field is one of:
+  - a variable-length string or byte string: its byte length as u64 little-endian, then the
+    bytes;
+  - a fixed-width value (a 32-byte digest, a one-byte enum ordinal): its raw bytes, at the width
+    the type fixes;
+  - an integer: u64 little-endian.
+
+  A serialized embedded value (for example a versioned binding struct) is a byte string.
+- **Variants.** An optional or variant value is encoded as a one-byte discriminant, followed by
+  the fields that discriminant determines. Absence is never encoded by omission alone.
+- **Per-tag layout.** Each tag fixes one field order and one encoding, which the hashing site
+  records with golden test vectors.
+
+Rules:
+1. **Domain separation by tag discipline.** The tags in use MUST be prefix-free: no tag is a
+   proper prefix of another. A tag MUST NOT equal, or be a proper prefix of, any other domain
+   string hashed in the workspace. That includes every `typed_hash` domain, and NUL-terminated
+   domains in the `icn:` namespace such as `icn:budget:liability:v1\0` and
+   `icn:bond:payable:v1\0` (`icn-core` ledger service). The `icn:` and `icn-<component>:`
+   namespaces differ at the fourth byte, so a §4.1.3 tag never collides with a §4.1.2 domain.
+   Other hashed strings in the `icn:` namespace must be checked individually.
+2. **Versioned bytes.** The bytes produced under an existing tag never change. Changing a field,
+   its order, width or encoding, or the serialization of an embedded value requires a new tag
+   version (as `icn:gov:decision:v1` → `v2` → `v3` did). Earlier versions remain verifiable for as
+   long as records that use them exist.
+3. **Signed payloads.** A field-wise payload under its own tag MAY be signed directly (for example
+   `icn:gov:attest:v1`). See §4.2.1.
+
+#### 4.1.4 No Implicit Migration
+
+Receipt and proof hashes are not re-expressed as `typed_hash`. No record type may switch between
+§4.1.2 and §4.1.3 under an existing tag, domain or version.
+
+Any move from one format to the other is an intentional compatibility change. It requires an ADR
+and a new tag or domain version. It also requires a migration plan that states how existing
+records continue to verify, pinned by golden test vectors (AGENTS.md, "Canonical encodings").
+
+#### 4.1.5 Known Exception
+
+`compute_canonical_hash` in `icn-kernel-api` (`receipts.rs`), used by the `CanonicalReceipt`
+types, is `BLAKE3(bincode(value))`. It has no tag, so it does not meet the domain-separation
+requirement of §4.1.2. It is recorded here as existing behaviour and is not endorsed. Changing it
+is an intentional compatibility change under §4.1.4.
+
 ### 4.2 Signatures
 
 #### 4.2.1 Ed25519
@@ -337,7 +404,8 @@ verifying_key.verify(canonical_payload, &signature)?;
 - Signature: 64 bytes
 - Security: ~128-bit (curve25519)
 
-**Payload:** MUST be the canonical CBOR encoding of the signed object.
+**Payload:** MUST be the canonical CBOR encoding of the signed object, or a field-wise payload
+under its own tag as defined in §4.1.3.
 
 #### 4.2.2 ML-DSA (Post-Quantum)
 
@@ -640,6 +708,11 @@ a9                                      # map(9)
    5840 01234567 89abcdef 01234567...   # bytes(64)
 ```
 
+This vector specifies the CBOR-encoded federation governance proof (`federation_id`,
+`decision_records`, …), which no code implements as of version 1.1. It is not
+`icn_governance::proof::GovernanceProof`, whose implemented proof hash uses §4.1.3 under
+`icn:governance-proof:v1`.
+
 **Typed Hash (domain: `icn-federation:governance-proof:v1`):**
 ```
 0x3f8c9d2e1a7b6c4d5e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d
@@ -869,3 +942,8 @@ impl CanonicalEncode for GovernanceProof {}
 
 **Change History:**
 - 2026-02-02: Initial version 1.0
+- 2026-10-19: Version 1.1 records the existing field-wise receipt and proof hash format (§4.1.3)
+  as distinct from `typed_hash` (§4.1.2). It forbids implicit migration between them (§4.1.4) and
+  records the untagged `CanonicalReceipt` hash as a known exception (§4.1.5). It allows
+  field-wise signed payloads (§4.2.1) and distinguishes the §8.1 vector from the implemented
+  `GovernanceProof`. No existing bytes change.
