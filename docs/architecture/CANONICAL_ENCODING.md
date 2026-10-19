@@ -361,15 +361,27 @@ hash = BLAKE3( tag || field_1 || field_2 || ... || field_n )
 - **Variants.** An optional or variant value is encoded as a one-byte discriminant, followed by
   the fields that discriminant determines. A fieldless enum MAY instead be encoded as a fixed
   string field. The choice is fixed per tag. Absence MUST NOT be encoded by omission alone.
-- **Per-tag layout.** Each tag fixes one field order and one encoding. That layout SHOULD be
-  pinned by a golden test vector at the hashing site. As of version 1.1 many existing tags are
-  not yet pinned, including every tag in `icn-kernel-api` `proofs.rs`.
-- **Existing deviations.** A few tags append one trailing serialized value without a length
-  prefix:
-  - `icn:gov:rehearsal_workflow_evidence:v1` (`apps/governance`, serde_json);
-  - the `icn:baseline:*` tags of the test-only `icn-baseline-lock` fixture (postcard).
+- **Per-tag layout.**
+  - **One layout.** Each tag fixes one field order and one encoding, and a tag introduced from
+    version 1.1 on MUST. The only known exceptions are three test-only fixture tags (see
+    "Existing deviations").
+  - **Golden pins.** The layout of a tag introduced from version 1.1 on MUST be pinned by a
+    golden test vector at the hashing site. Existing tags SHOULD be. As of version 1.1 many
+    existing tags are not yet pinned, including every tag in `icn-kernel-api` `proofs.rs`.
+- **Existing deviations.** Their bytes are frozen under Rule 2.
+  - **Unprefixed trailing value.** A few tags append one trailing serialized value without a
+    length prefix:
+    - `icn:gov:rehearsal_workflow_evidence:v1` (`apps/governance`, serde_json);
+    - eight of the nine `icn:baseline:*:v1` tags of the test-only `icn-baseline-lock` fixture
+      (postcard). The ninth, `icn:baseline:process_gate_result:v1`, is fully field-wise.
+  - **Two layouts under one tag.** Three of those fixture tags (`icn:baseline:standing_snapshot:v1`,
+    `icn:baseline:notice_delivered:v1`, `icn:baseline:deliberation_entry:v1`) are each hashed
+    under two layouts:
+    - `tag || prior || len(process_id) || process_id || len(target_ref) || target_ref ||
+      postcard(body)` (`receipt_types.rs`);
+    - `tag || postcard(value)` (`projector.rs`).
 
-  Their bytes are frozen under Rule 2. New tags MUST length-prefix every variable-length field.
+  New tags MUST length-prefix every variable-length field.
 
 Rules:
 1. **Domain separation by tag discipline.**
@@ -845,7 +857,9 @@ under §2 and hashed with §4.1.2:
 
 ### 9.6 Test Coverage
 
-- [ ] Includes test vectors for all canonical objects
+- [ ] Includes test vectors for all objects encoded under §2, and a golden test vector for every
+  field-wise tag (§4.1.3) introduced from version 1.1 on. Existing field-wise tags without one
+  SHOULD gain one (§4.1.3); this item does not claim that they have one.
 - [ ] Tests hash stability across versions
 - [ ] Tests cross-implementation compatibility
 - [ ] Tests edge cases (empty collections, max values, special characters)
@@ -994,6 +1008,9 @@ impl CanonicalEncode for GovernanceProof {}
   - records the untagged hashes and the existing deviations as known exceptions, not endorsed
     (§4.1.3, §4.1.5);
   - allows field-wise signed payloads and records the others (§4.2.1);
-  - scopes §7.1, §9 and §10.1 to the matching format;
+  - scopes §7.1, §9 and §10.1 to the matching format. §9.6 keeps test vectors a MUST for §2
+    objects and for field-wise tags introduced from 1.1 on, and a SHOULD for existing field-wise
+    tags;
+  - records the three test-only fixture tags hashed under two layouts each (§4.1.3);
   - distinguishes the specified federation `GovernanceProof` (§4.2.3, §8.1, Appendix A) from the
     implemented one.
