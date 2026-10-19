@@ -397,8 +397,9 @@ Rules:
    - The `icn:` and `icn-<component>:` namespaces differ at the fourth byte, so a §4.1.3 tag never
      collides with a §4.1.2 domain. Other hashed strings in the `icn:` namespace MUST be checked
      individually.
-2. **Versioned bytes.** The bytes produced under an existing tag MUST NOT change. Changing any
-   of the following requires a new tag version (as `icn:gov:decision:v1` → `v2` → `v3` did):
+2. **Versioned bytes.** The bytes produced under a tag once it is in use (existing or new) MUST
+   NOT change. Changing any of the following requires a new tag version (as
+   `icn:gov:decision:v1` → `v2` → `v3` did):
    a field, its order, width or encoding, or the serialization of an embedded value. Earlier
    versions MUST remain verifiable for as long as records that use them exist.
 3. **Signed payloads.** A field-wise payload under its own tag MAY be signed directly (for example
@@ -407,7 +408,7 @@ Rules:
 #### 4.1.4 No Implicit Migration
 
 Receipt and proof hashes are not re-expressed as `typed_hash`. A record type MUST NOT switch
-between §4.1.2 and §4.1.3 under an existing tag, domain or version. A hash listed in §4.1.5 MUST
+between §4.1.2 and §4.1.3 under a tag, domain or version already in use. A hash listed in §4.1.5 MUST
 NOT move to either format except under the rule below.
 
 Any move from one format to the other is an intentional compatibility change. It requires an ADR
