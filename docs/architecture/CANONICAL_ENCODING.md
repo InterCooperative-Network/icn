@@ -27,8 +27,8 @@ ICN specifies two distinct, versioned hash formats:
 - §4.1.3, the field-wise format used by the existing `icn:`-tagged receipt and proof hashes.
 
 The field-wise preimage is itself a canonical encoding for the purposes of this section. Neither
-format is a migration target of the other (§4.1.4). Existing hashes that follow neither format
-are recorded in §4.1.5.
+format is a migration target of the other (§4.1.4). Existing receipt and proof hashes that
+follow neither format are recorded in §4.1.5.
 
 Non-canonical encoding MAY be used for:
 - Wire protocol serialization (where explicit versioning is present)
@@ -410,10 +410,11 @@ are not endorsed:
 - `compute_canonical_hash` (`icn-kernel-api` `receipts.rs`), `BLAKE3(bincode(value))`, used by
   the `CanonicalReceipt` types;
 - `ExecutionReceipt::receipt_hash` (`icn-compute` `receipt.rs`): BLAKE3 over the untagged
-  `signing_payload()`, with u32 little-endian length prefixes. It is the settlement
-  deduplication key;
+  `signing_payload()`, with u32 little-endian length prefixes;
 - `PowerDiffReceipt::compute_receipt_hash` (`icn-governance` `power_diff.rs`): untagged, with an
-  unprefixed `computed_by`.
+  unprefixed `computed_by`;
+- `ArtifactProof::compute_metadata_hash` (`icn-store` `blob_store.rs`): untagged, with unprefixed
+  adjacent `owner_did` and `scope_id`.
 
 Changing any of them is an intentional compatibility change under §4.1.4.
 
