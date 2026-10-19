@@ -1,8 +1,8 @@
 # Canonical Encoding Specification
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Status:** NORMATIVE  
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-10-19
 
 ## Abstract
 
@@ -21,6 +21,14 @@ Canonical encoding is REQUIRED for:
 - Objects that are cryptographically hashed
 - Objects included in consensus state
 - Objects used in cross-implementation verification
+
+ICN specifies two distinct, versioned hash formats:
+- §4.1.2 `typed_hash` for objects canonically encoded under §2;
+- §4.1.3, the field-wise format used by the existing `icn:`-tagged receipt and proof hashes.
+
+The field-wise preimage is itself a canonical encoding for the purposes of this section. Neither
+format is a migration target of the other (§4.1.4). Existing receipt and proof hashes that
+follow neither format are recorded in §4.1.5.
 
 Non-canonical encoding MAY be used for:
 - Wire protocol serialization (where explicit versioning is present)
@@ -316,6 +324,116 @@ fn typed_hash(domain: &str, data: &[u8]) -> [u8; 32] {
 - `icn-ledger:settlement:v1`
 - `icn-ledger:journal-entry:v1`
 
+**Scope.** `typed_hash` applies to objects canonically encoded under §2. Every `typed_hash`
+domain uses the namespace `icn-<component>:`.
+
+As of version 1.1 no code computes `typed_hash` over a §2 encoding or under a listed domain.
+`propose_surrogate_entity_id` in `icn-entity` uses the same `domain || 0x00 || data` framing
+under `icn:coop-entity-surrogate:v1`, over the raw UTF-8 `coop_id`. It hashes this with SHA-256,
+not BLAKE3: `SHA-256(icn:coop-entity-surrogate:v1 || 0x00 || coop_id)`. It is not a `typed_hash`,
+and the surrogate ID derived from that digest is defined by `icn-entity`, not by this document.
+§4.1.3 Rule 1 still lists its domain string, because Rule 1 covers every hashed domain string,
+whatever the hash function.
+
+Existing `icn:`-tagged receipt and proof hashes use §4.1.3 instead. The exceptions are listed in
+§4.1.5. This section does not change any of them.
+
+#### 4.1.3 Field-wise Receipt and Proof Hashes
+
+The existing `icn:`-tagged receipt and proof hashes (for example `ArtifactReceipt`,
+`GovernanceProof` in `icn-governance`, the governance decision receipts) use a field-wise
+preimage:
+
+```text
+hash = BLAKE3( tag || field_1 || field_2 || ... || field_n )
+```
+
+- **Tag.** The tag is printable ASCII without spaces (0x21–0x7E), in the namespace `icn:`, and
+  ends in a version, `:vN` (for example `icn:artifact-receipt:v1`, `icn:gov:decision:v3`). No
+  separator follows the tag.
+- **Field encoding.** Each field is one of:
+  - a variable-length string or byte string: its byte length as u64 little-endian, then the
+    bytes;
+  - a fixed-width value (a 32-byte digest, a one-byte enum ordinal): its raw bytes, at the width
+    the type fixes;
+  - an integer: u64 little-endian.
+
+  A serialized embedded value (for example a versioned binding struct) is a byte string.
+- **Sequences.** A list is encoded as its element count (u64 little-endian), then each element,
+  in the order the tag's layout defines. Set-like lists use a canonical sort order.
+- **Variants.** An optional or variant value is encoded as a one-byte discriminant, followed by
+  the fields that discriminant determines. A fieldless enum MAY instead be encoded as a fixed
+  string field. The choice is fixed per tag. Absence MUST NOT be encoded by omission alone.
+- **Per-tag layout.** An *existing tag* is one present in the workspace at the commit that adopts
+  version 1.1. Any other tag, including a new version of an existing tag, is a *new tag*.
+  - **One layout.** Each tag fixes one field order and one encoding; a new tag MUST do so. The
+    only known exceptions are three test-only fixture tags (see "Existing deviations").
+  - **Golden pins.** The layout of a new tag MUST be pinned by a golden test vector at the
+    hashing site. Existing tags SHOULD be. As of version 1.1 many
+    existing tags are not yet pinned, including every tag in `icn-kernel-api` `proofs.rs`.
+- **Existing deviations.** Their bytes are frozen under Rule 2.
+  - **Unprefixed trailing value.** A few tags append one trailing serialized value without a
+    length prefix:
+    - `icn:gov:rehearsal_workflow_evidence:v1` (`apps/governance`, serde_json);
+    - eight of the nine `icn:baseline:*:v1` tags of the test-only `icn-baseline-lock` fixture
+      (postcard). The ninth, `icn:baseline:process_gate_result:v1`, is fully field-wise.
+  - **Two layouts under one tag.** Three of those fixture tags (`icn:baseline:standing_snapshot:v1`,
+    `icn:baseline:notice_delivered:v1`, `icn:baseline:deliberation_entry:v1`) are each hashed
+    under two layouts:
+    - `tag || prior || len(process_id) || process_id || len(target_ref) || target_ref ||
+      postcard(body)` (`receipt_types.rs`);
+    - `tag || postcard(value)` (`projector.rs`).
+
+  New tags MUST length-prefix every variable-length field.
+
+Rules:
+1. **Domain separation by tag discipline.**
+   - The tags in use MUST be prefix-free: no tag is a proper prefix of another.
+   - A tag MUST NOT equal any other domain string hashed in the workspace. Neither may be a
+     proper prefix of the other, unless the other string is always followed by a byte that
+     cannot occur in a tag. That byte is the 0x00 of `typed_hash`, and of NUL-separated domains
+     in the `icn:` namespace:
+     - `icn:budget:liability:v1\0` and `icn:bond:payable:v1\0` (`icn-core` ledger service);
+     - `icn:coop-entity-surrogate:v1` followed by 0x00 (`icn-entity`).
+   - For a domain built at runtime (for example `icn:treasury:{coop_id}`), the string to check is
+     its fixed prefix (`icn:treasury:`).
+   - The `icn:` and `icn-<component>:` namespaces differ at the fourth byte, so a §4.1.3 tag never
+     collides with a §4.1.2 domain. Other hashed strings in the `icn:` namespace MUST be checked
+     individually.
+2. **Versioned bytes.** The bytes produced under a tag once it is in use (existing or new) MUST
+   NOT change. Changing any of the following requires a new tag version (as
+   `icn:gov:decision:v1` → `v2` → `v3` did):
+   a field, its order, width or encoding, or the serialization of an embedded value. Earlier
+   versions MUST remain verifiable for as long as records that use them exist.
+3. **Signed payloads.** A field-wise payload under its own tag MAY be signed directly (for example
+   `icn:gov:attest:v1`). See §4.2.1.
+
+#### 4.1.4 No Implicit Migration
+
+Receipt and proof hashes are not re-expressed as `typed_hash`. A record type MUST NOT switch
+between §4.1.2 and §4.1.3 under a tag, domain or version already in use. A hash listed in §4.1.5 MUST
+NOT move to either format except under the rule below.
+
+Any move from one format to the other is an intentional compatibility change. It requires an ADR
+and a new tag or domain version. It also requires a migration plan that states how existing
+records continue to verify, pinned by golden test vectors (AGENTS.md, "Canonical encodings").
+
+#### 4.1.5 Known Exceptions
+
+The following existing hashes follow neither §4.1.2 nor §4.1.3. None has a domain tag, so none
+meets the domain-separation requirement of §4.1.2. They are recorded as existing behaviour and
+are not endorsed:
+- `compute_canonical_hash` (`icn-kernel-api` `receipts.rs`), `BLAKE3(bincode(value))`, used by
+  the `CanonicalReceipt` types;
+- `ExecutionReceipt::receipt_hash` (`icn-compute` `receipt.rs`): BLAKE3 over the untagged
+  `signing_payload()`, with u32 little-endian length prefixes;
+- `PowerDiffReceipt::compute_receipt_hash` (`icn-governance` `power_diff.rs`): untagged, with an
+  unprefixed `computed_by`;
+- `ArtifactProof::compute_metadata_hash` (`icn-store` `blob_store.rs`): untagged, with unprefixed
+  adjacent `owner_did` and `scope_id`.
+
+Changing any of them is an intentional compatibility change under §4.1.4.
+
 ### 4.2 Signatures
 
 #### 4.2.1 Ed25519
@@ -337,7 +455,12 @@ verifying_key.verify(canonical_payload, &signature)?;
 - Signature: 64 bytes
 - Security: ~128-bit (curve25519)
 
-**Payload:** MUST be the canonical CBOR encoding of the signed object.
+**Payload:** MUST be the canonical CBOR encoding of the signed object, or a field-wise payload
+under its own tag as defined in §4.1.3.
+
+Some existing signed payloads follow neither: `icn-naming` `icn:naming:*:v1`, `icn-gossip`
+`icn:svc-response:v1`, and `icn-compute` `icn-receipt-*-v1:`. They are recorded as existing
+behaviour and are not endorsed. Changing them is an intentional compatibility change (§4.1.4).
 
 #### 4.2.2 ML-DSA (Post-Quantum)
 
@@ -510,7 +633,8 @@ impl GovernanceProof {
 
 ### 7.1 Canonicalize Trait
 
-All objects that require canonical encoding MUST implement the `Canonicalize` trait:
+All objects canonically encoded under §2 and hashed with §4.1.2 MUST implement the `Canonicalize`
+trait. Field-wise hashes (§4.1.3) do not use this trait; their layout is fixed per tag.
 
 ```rust
 pub trait Canonicalize {
@@ -640,6 +764,12 @@ a9                                      # map(9)
    5840 01234567 89abcdef 01234567...   # bytes(64)
 ```
 
+This vector specifies the CBOR-encoded federation governance proof (`federation_id`,
+`decision_records`, …), which no code implements as of version 1.1. The same applies to the
+`GovernanceProof` examples in §4.2.3 and Appendix A. It is not
+`icn_governance::proof::GovernanceProof`, whose implemented proof hash uses §4.1.3 under
+`icn:governance-proof:v1`.
+
 **Typed Hash (domain: `icn-federation:governance-proof:v1`):**
 ```
 0x3f8c9d2e1a7b6c4d5e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d
@@ -686,7 +816,11 @@ a1                                      # map(1)
 
 ## 9. Compliance Checklist
 
-Implementations MUST satisfy the following requirements:
+Implementations MUST satisfy the following requirements. The following apply to objects encoded
+under §2 and hashed with §4.1.2:
+- §9.1;
+- the typed-hashing alternative of §9.2;
+- §9.5.
 
 ### 9.1 Encoding Format
 
@@ -701,7 +835,7 @@ Implementations MUST satisfy the following requirements:
 ### 9.2 Cryptographic Primitives
 
 - [ ] Uses BLAKE3 for content hashing
-- [ ] Uses typed hashing with domain separation
+- [ ] Uses typed hashing (§4.1.2) or field-wise tagged hashing (§4.1.3) with domain separation
 - [ ] Uses Ed25519 for signatures
 - [ ] Supports ML-DSA for post-quantum signatures
 - [ ] Verifies signatures against canonical payloads
@@ -727,7 +861,9 @@ Implementations MUST satisfy the following requirements:
 
 ### 9.6 Test Coverage
 
-- [ ] Includes test vectors for all canonical objects
+- [ ] Includes test vectors for all objects encoded under §2, and a golden test vector for every
+  new field-wise tag (§4.1.3). Existing field-wise tags without one
+  SHOULD gain one (§4.1.3); this item does not claim that they have one.
 - [ ] Tests hash stability across versions
 - [ ] Tests cross-implementation compatibility
 - [ ] Tests edge cases (empty collections, max values, special characters)
@@ -742,7 +878,7 @@ Implementations MUST satisfy the following requirements:
 
 **Mitigation:**
 - Use BLAKE3 (128-bit collision resistance)
-- Use typed hashing to prevent cross-protocol collisions
+- Use domain-separated hashing (§4.1.2 or §4.1.3) to prevent cross-protocol collisions
 - Validate object structure before hashing
 
 ### 10.2 Signature Malleability
@@ -869,3 +1005,15 @@ impl CanonicalEncode for GovernanceProof {}
 
 **Change History:**
 - 2026-02-02: Initial version 1.0
+- 2026-10-19: Version 1.1. No existing bytes change. It:
+  - records the existing `icn:`-tagged field-wise receipt and proof hash format (§4.1.3) as
+    distinct from `typed_hash` (§4.1.2);
+  - forbids implicit migration between them (§4.1.4);
+  - records the untagged hashes and the existing deviations as known exceptions, not endorsed
+    (§4.1.3, §4.1.5);
+  - allows field-wise signed payloads and records the others (§4.2.1);
+  - scopes §7.1, §9 and §10.1 to the matching format. §9.6 keeps test vectors a MUST for §2
+    objects, makes them a MUST for new field-wise tags and a SHOULD for existing ones;
+  - records the three test-only fixture tags hashed under two layouts each (§4.1.3);
+  - distinguishes the specified federation `GovernanceProof` (§4.2.3, §8.1, Appendix A) from the
+    implemented one.
