@@ -328,9 +328,12 @@ fn typed_hash(domain: &str, data: &[u8]) -> [u8; 32] {
 domain uses the namespace `icn-<component>:`.
 
 As of version 1.1 no code computes `typed_hash` over a §2 encoding or under a listed domain.
-`propose_surrogate_entity_id` in `icn-entity` uses the same `BLAKE3(domain || 0x00 || data)`
-shape under `icn:coop-entity-surrogate:v1`, over raw UTF-8. It is not a `typed_hash`, and §4.1.3
-Rule 1 applies to it.
+`propose_surrogate_entity_id` in `icn-entity` uses the same `domain || 0x00 || data` framing
+under `icn:coop-entity-surrogate:v1`, over the raw UTF-8 `coop_id`. It hashes this with SHA-256,
+not BLAKE3: `SHA-256(icn:coop-entity-surrogate:v1 || 0x00 || coop_id)`. It is not a `typed_hash`,
+and the surrogate ID derived from that digest is defined by `icn-entity`, not by this document.
+§4.1.3 Rule 1 still lists its domain string, because Rule 1 covers every hashed domain string,
+whatever the hash function.
 
 Existing `icn:`-tagged receipt and proof hashes use §4.1.3 instead. The exceptions are listed in
 §4.1.5. This section does not change any of them.
