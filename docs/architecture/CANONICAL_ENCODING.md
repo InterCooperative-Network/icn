@@ -369,8 +369,9 @@ hash = BLAKE3( tag || field_1 || field_2 || ... || field_n )
   - **One layout.** Each tag fixes one field order and one encoding; a new tag MUST do so. The
     only known exceptions are three test-only fixture tags (see "Existing deviations").
   - **Golden pins.** The layout of a new tag MUST be pinned by a golden test vector at the
-    hashing site. Existing tags SHOULD be. As of version 1.1 many
-    existing tags are not yet pinned, including every tag in `icn-kernel-api` `proofs.rs`.
+    hashing site. Existing tags SHOULD be. When version 1.1 was adopted, many existing tags
+    were not pinned, including every tag in `icn-kernel-api` `proofs.rs`. Since then
+    `icn:artifact-receipt:v1` has been pinned by `artifact_receipt_hash_golden_vector`.
 - **Existing deviations.** Their bytes are frozen under Rule 2.
   - **Unprefixed trailing value.** A few tags append one trailing serialized value without a
     length prefix:
@@ -1017,3 +1018,5 @@ impl CanonicalEncode for GovernanceProof {}
   - records the three test-only fixture tags hashed under two layouts each (§4.1.3);
   - distinguishes the specified federation `GovernanceProof` (§4.2.3, §8.1, Appendix A) from the
     implemented one.
+- 2026-10-20: Editorial, version unchanged. §4.1.3 "Golden pins" now records that
+  `icn:artifact-receipt:v1` is pinned (#2835). No rule or byte changes.
