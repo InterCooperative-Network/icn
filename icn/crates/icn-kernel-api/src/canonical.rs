@@ -25,10 +25,11 @@
 //! # What this module is not
 //!
 //! - **Not `CANONICAL_ENCODING.md` §4.1.2 `typed_hash`** (`BLAKE3(domain || 0x00
-//!   || CBOR)`). That normative layout is a different byte format, which no
-//!   receipt hash implements today. This module codifies the implemented
-//!   receipt recipe; reconciling the two is a documentation and governance
-//!   decision this module does not make. Because `typed_hash` writes
+//!   || CBOR)`). That is a different byte format, which no receipt hash
+//!   implements today. `CANONICAL_ENCODING.md` v1.1 records the recipe this
+//!   module implements as the normative §4.1.3 format, distinct from
+//!   `typed_hash`, and allows no implicit migration between them (§4.1.4).
+//!   Because `typed_hash` writes
 //!   `domain || 0x00 || ...` and a tag here is followed directly by field
 //!   bytes, a recipe tag that **equals or is a proper prefix of** a
 //!   `typed_hash` domain can produce the same preimage (for example tag

@@ -369,8 +369,9 @@ hash = BLAKE3( tag || field_1 || field_2 || ... || field_n )
   - **One layout.** Each tag fixes one field order and one encoding; a new tag MUST do so. The
     only known exceptions are three test-only fixture tags (see "Existing deviations").
   - **Golden pins.** The layout of a new tag MUST be pinned by a golden test vector at the
-    hashing site. Existing tags SHOULD be. As of version 1.1 many
-    existing tags are not yet pinned, including every tag in `icn-kernel-api` `proofs.rs`.
+    hashing site. Existing tags SHOULD be. As of version 1.1 many existing tags are not yet
+    pinned. That includes every tag in `icn-kernel-api` `proofs.rs` except
+    `icn:artifact-receipt:v1`, which `artifact_receipt_hash_golden_vector` pins.
 - **Existing deviations.** Their bytes are frozen under Rule 2.
   - **Unprefixed trailing value.** A few tags append one trailing serialized value without a
     length prefix:
