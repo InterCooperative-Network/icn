@@ -187,8 +187,9 @@ impl CanonicalHasher {
 /// Why an ordered commitment was refused. No hash is returned on refusal.
 ///
 /// The enum is `#[non_exhaustive]`: a later version may add a refusal reason.
-/// A list it accepts still commits to the same bytes (`CANONICAL_ENCODING.md`
-/// §4.1.4). Outside this crate, match it with a wildcard arm:
+/// It will not change the bytes committed for any list it still accepts
+/// (`CANONICAL_ENCODING.md` §4.1.3, Rule 2). Refusing a list accepted today is
+/// a compatibility change. Outside this crate, match it with a wildcard arm:
 ///
 /// ```
 /// use icn_kernel_api::canonical::CommitmentError;
@@ -205,7 +206,7 @@ impl CanonicalHasher {
 ///
 /// The same match without the wildcard arm does not compile:
 ///
-/// ```compile_fail
+/// ```compile_fail,E0004
 /// use icn_kernel_api::canonical::CommitmentError;
 ///
 /// fn reason(e: &CommitmentError) -> &'static str {
