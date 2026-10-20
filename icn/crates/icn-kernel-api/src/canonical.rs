@@ -185,7 +185,38 @@ impl CanonicalHasher {
 }
 
 /// Why an ordered commitment was refused. No hash is returned on refusal.
+///
+/// The enum is `#[non_exhaustive]`: a later version may add a refusal reason.
+/// A list it accepts still commits to the same bytes (`CANONICAL_ENCODING.md`
+/// §4.1.4). Outside this crate, match it with a wildcard arm:
+///
+/// ```
+/// use icn_kernel_api::canonical::CommitmentError;
+///
+/// fn reason(e: &CommitmentError) -> &'static str {
+///     match e {
+///         CommitmentError::Empty => "empty",
+///         CommitmentError::Duplicate { .. } => "duplicate",
+///         _ => "refused",
+///     }
+/// }
+/// assert_eq!(reason(&CommitmentError::Empty), "empty");
+/// ```
+///
+/// The same match without the wildcard arm does not compile:
+///
+/// ```compile_fail
+/// use icn_kernel_api::canonical::CommitmentError;
+///
+/// fn reason(e: &CommitmentError) -> &'static str {
+///     match e {
+///         CommitmentError::Empty => "empty",
+///         CommitmentError::Duplicate { .. } => "duplicate",
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum CommitmentError {
     /// An ordered commitment needs at least one member.
     #[error("an ordered commitment needs at least one member")]
