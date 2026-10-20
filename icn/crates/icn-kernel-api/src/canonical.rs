@@ -29,13 +29,13 @@
 //!   implements today. `CANONICAL_ENCODING.md` v1.1 records the recipe this
 //!   module implements as the normative §4.1.3 format, distinct from
 //!   `typed_hash`, and allows no implicit migration between them (§4.1.4).
-//!   Because `typed_hash` writes
-//!   `domain || 0x00 || ...` and a tag here is followed directly by field
-//!   bytes, a recipe tag that **equals or is a proper prefix of** a
-//!   `typed_hash` domain can produce the same preimage (for example tag
-//!   `icn:x:v1` with a fixed field starting `:ext\0…` against domain
-//!   `icn:x:v1:ext`). No recipe tag may equal or prefix a `typed_hash` domain.
-//!   (The reverse cannot happen: tags hold no 0x00 byte.)
+//!   A domain hashed as `domain || 0x00 || ...` (a `typed_hash` domain, or a
+//!   NUL-separated `icn:` domain) is followed by a 0x00 byte, while a tag here
+//!   is followed directly by field bytes. A recipe tag that **equals or is a
+//!   proper prefix of** such a domain can therefore produce the same preimage:
+//!   tag `icn:x:v1` with a fixed field starting `:ext\0…` matches the domain
+//!   `icn:x:v1:ext` followed by 0x00. The full rule is under
+//!   *Domain separation*.
 //! - **Not a schema.** The caller chooses the tag and the field order, and
 //!   how optional values are represented. **One tag binds exactly one field
 //!   sequence:** different sequences under one tag can share bytes (`str("")`
@@ -52,11 +52,20 @@
 //! # Domain separation
 //!
 //! The tag is hashed first with no separator, so separation relies on the tag
-//! itself: tags are non-empty printable ASCII without spaces ([`DomainTag`]),
-//! and the tags hashed under this recipe in one deployment must be
-//! prefix-free, meaning no tag is a proper prefix of another (check with
-//! [`tags_are_prefix_free`]). With a prefix pair, `tag || fields` and
-//! `tag' || fields'` can share bytes.
+//! itself. [`DomainTag`] checks only the byte alphabet: non-empty printable
+//! ASCII without spaces. The rest is the caller's obligation
+//! (`CANONICAL_ENCODING.md` §4.1.3):
+//! - A tag ends in a version, `:vN`. ICN's own receipt and proof tags use the
+//!   `icn:` namespace. An application uses its own (for example `nycn:`).
+//! - The tags hashed under this recipe are prefix-free: no tag is a proper
+//!   prefix of another (check with [`tags_are_prefix_free`]). With a prefix
+//!   pair, `tag || fields` and `tag' || fields'` can share bytes.
+//! - A tag differs from every other domain string hashed in the same
+//!   deployment, and neither is a proper prefix of the other. That covers a `typed_hash`
+//!   domain, a NUL-separated domain, and the fixed prefix of a domain built at
+//!   runtime, such as `icn:treasury:` in `icn:treasury:{coop_id}`. The one safe
+//!   exception: a string that is always followed by 0x00 may be a proper
+//!   prefix of a tag, because tags hold no 0x00 byte.
 
 use std::collections::BTreeMap;
 
