@@ -527,7 +527,7 @@ impl ComputeActor {
     }
 
     /// Handle divergent results from multi-executor verification (Issue #511)
-    async fn handle_divergent_results(
+    pub(super) async fn handle_divergent_results(
         &self,
         task_hash: &TaskHash,
         executor_groups: std::collections::HashMap<[u8; 32], Vec<String>>,
@@ -537,11 +537,18 @@ impl ComputeActor {
         // Record conflict metric
         icn_obs::metrics::compute::result_conflicts_inc(&task_hash_str);
 
-        // Find the majority group (largest)
-        let majority_group = executor_groups
-            .iter()
-            .max_by_key(|(_, executors)| executors.len())
+        // Find the majority group: only a group strictly larger than every
+        // other one. Tied largest groups have no majority, so no side is
+        // accused (the task stays divergent).
+        let majority_group = unique_largest_group(&executor_groups)
             .map(|(hash, executors)| (hash, executors.clone()));
+        if majority_group.is_none() && !executor_groups.is_empty() {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                result_groups = executor_groups.len(),
+                "Divergent results with tied largest groups: not auto-filing IncorrectResult disputes"
+            );
+        }
 
         // Auto-file disputes against minority groups
         if let Some(ref dispute_system) = self.dispute_resolution {
@@ -1750,6 +1757,24 @@ impl ComputeActor {
                 *count = count.saturating_sub(1);
             }
         }
+    }
+}
+
+/// The result group strictly larger than every other group, if there is one.
+///
+/// `None` when two or more groups share the largest size, or there are no
+/// groups. A tie has no majority to treat as correct, and picking a side by
+/// `HashMap` order would accuse a different half on different nodes.
+pub(super) fn unique_largest_group(
+    executor_groups: &std::collections::HashMap<[u8; 32], Vec<String>>,
+) -> Option<(&[u8; 32], &Vec<String>)> {
+    let largest = executor_groups.values().map(Vec::len).max()?;
+    let mut leaders = executor_groups
+        .iter()
+        .filter(|(_, executors)| executors.len() == largest);
+    match (leaders.next(), leaders.next()) {
+        (Some(leader), None) => Some(leader),
+        _ => None,
     }
 }
 
