@@ -1,5 +1,5 @@
 use super::consensus::{outcome_to_value, results_match};
-use super::lifecycle::apply_commons_charter_priority;
+use super::lifecycle::{apply_commons_charter_priority, unique_largest_group};
 use super::*;
 use crate::policy::{CharterPriority, CommonsPoolPolicy};
 use crate::task::TaskStatus;
@@ -2066,4 +2066,195 @@ fn test_compute_task_scope_default_is_local() {
 fn test_compute_task_commons_scope_explicit() {
     let task = make_commons_task("commons-scope", "did:icn:alice");
     assert_eq!(task.scope, icn_kernel_api::ScopeLevel::Commons);
+}
+
+// ============================================================================
+// Divergent-result dispute filing (Codex P2 on #2837)
+// ============================================================================
+
+type SharedDisputes = Arc<tokio::sync::RwLock<icn_ccl::DisputeResolutionSystem>>;
+
+fn actor_with_disputes() -> (ComputeActor, SharedDisputes) {
+    let trust_cb: TrustCallback = Arc::new(|_| 0.5);
+    let mut actor = ComputeActor::new("did:icn:submitter".into(), trust_cb);
+    let store = Arc::new(icn_store::SledStore::temporary().unwrap()) as Arc<dyn icn_store::Store>;
+    let disputes = Arc::new(tokio::sync::RwLock::new(
+        icn_ccl::DisputeResolutionSystem::new(icn_ccl::DisputeConfig::default(), store),
+    ));
+    actor.set_dispute_resolution(disputes.clone());
+    (actor, disputes)
+}
+
+/// `n` parseable executor DIDs, sorted the way the aggregator lists group members.
+fn executor_dids(n: usize) -> Vec<String> {
+    let mut dids: Vec<String> = (0..n)
+        .map(|_| icn_identity::KeyPair::generate().unwrap().did().to_string())
+        .collect();
+    dids.sort();
+    dids
+}
+
+fn groups(spec: &[(u8, &[String])]) -> std::collections::HashMap<[u8; 32], Vec<String>> {
+    spec.iter()
+        .map(|(tag, dids)| ([*tag; 32], dids.to_vec()))
+        .collect()
+}
+
+/// Disputes are filed on spawned tasks. Wait (bounded) until at least
+/// `at_least` exist, then yield further so any extra filing would also land.
+async fn settled_dispute_count(disputes: &SharedDisputes, at_least: usize) -> usize {
+    for _ in 0..200 {
+        if disputes.read().await.get_stats().total_disputes >= at_least {
+            break;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    }
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    disputes.read().await.get_stats().total_disputes
+}
+
+/// A 3-1 split on its own task: the positive control that proves filing works
+/// in the same system, so a zero count for a tie is not vacuous. Returns the
+/// control task hash, the majority executors and the minority executor.
+async fn file_control_split(actor: &ComputeActor) -> (TaskHash, Vec<String>, String) {
+    let control: TaskHash = [0xC0; 32];
+    let dids = executor_dids(4);
+    let (majority, minority) = (dids[..3].to_vec(), dids[3].clone());
+    actor
+        .handle_divergent_results(
+            &control,
+            groups(&[(1, &majority), (2, std::slice::from_ref(&minority))]),
+        )
+        .await;
+    (control, majority, minority)
+}
+
+#[tokio::test]
+async fn test_divergent_unique_majority_disputes_the_minority() {
+    let (actor, disputes) = actor_with_disputes();
+    let (control, majority, minority) = file_control_split(&actor).await;
+
+    assert_eq!(settled_dispute_count(&disputes, 1).await, 1);
+    let system = disputes.read().await;
+    let filed = system.get_disputes_by_executor(&minority.parse().unwrap());
+    assert_eq!(filed.len(), 1, "the minority executor is accused once");
+    let dispute = filed[0];
+    assert_eq!(dispute.task_hash, control);
+    assert_eq!(dispute.challenger.to_string(), majority[0]);
+    assert!(matches!(
+        &dispute.evidence.reason,
+        icn_ccl::DisputeReason::IncorrectResult { expected, actual }
+            if *expected == icn_ccl::Value::String(hex::encode([1u8; 32]))
+                && *actual == icn_ccl::Value::String(hex::encode([2u8; 32]))
+    ));
+    for did in &majority {
+        assert!(system
+            .get_disputes_by_executor(&did.parse().unwrap())
+            .is_empty());
+    }
+}
+
+#[tokio::test]
+async fn test_divergent_two_way_tie_files_no_dispute() {
+    let (actor, disputes) = actor_with_disputes();
+    let tied = executor_dids(4);
+    actor
+        .handle_divergent_results(&[0x22; 32], groups(&[(1, &tied[..2]), (2, &tied[2..])]))
+        .await;
+    let (control, _, minority) = file_control_split(&actor).await;
+
+    assert_eq!(
+        settled_dispute_count(&disputes, 1).await,
+        1,
+        "a 2-2 tie must accuse no one; only the 3-1 control files"
+    );
+    let system = disputes.read().await;
+    for did in &tied {
+        assert!(system
+            .get_disputes_by_executor(&did.parse().unwrap())
+            .is_empty());
+    }
+    assert_eq!(
+        system.get_disputes_by_executor(&minority.parse().unwrap())[0].task_hash,
+        control
+    );
+}
+
+#[tokio::test]
+async fn test_divergent_three_way_split_files_no_dispute() {
+    let (actor, disputes) = actor_with_disputes();
+    let split = executor_dids(3);
+    actor
+        .handle_divergent_results(
+            &[0x33; 32],
+            groups(&[(1, &split[..1]), (2, &split[1..2]), (3, &split[2..])]),
+        )
+        .await;
+    file_control_split(&actor).await;
+
+    assert_eq!(
+        settled_dispute_count(&disputes, 1).await,
+        1,
+        "a 1-1-1 split must accuse no one; only the 3-1 control files"
+    );
+    let system = disputes.read().await;
+    for did in &split {
+        assert!(system
+            .get_disputes_by_executor(&did.parse().unwrap())
+            .is_empty());
+    }
+}
+
+/// Every insertion order of `spec`, each built into several fresh `HashMap`s
+/// (each with its own random hasher seed).
+fn group_orderings(spec: &[(u8, usize)]) -> Vec<std::collections::HashMap<[u8; 32], Vec<String>>> {
+    fn permutations(items: &[(u8, usize)]) -> Vec<Vec<(u8, usize)>> {
+        if items.len() <= 1 {
+            return vec![items.to_vec()];
+        }
+        let mut out = Vec::new();
+        for i in 0..items.len() {
+            let mut rest = items.to_vec();
+            let head = rest.remove(i);
+            for mut tail in permutations(&rest) {
+                tail.insert(0, head);
+                out.push(tail);
+            }
+        }
+        out
+    }
+    let mut maps = Vec::new();
+    for order in permutations(spec) {
+        for _ in 0..16 {
+            let mut map = std::collections::HashMap::new();
+            for (tag, size) in &order {
+                let members = (0..*size).map(|i| format!("did:icn:{tag}-{i}")).collect();
+                map.insert([*tag; 32], members);
+            }
+            maps.push(map);
+        }
+    }
+    maps
+}
+
+#[test]
+fn test_unique_largest_group_ignores_hashmap_order() {
+    // (group tag, size) layouts and the group that must be chosen, if any.
+    type Case = (&'static [(u8, usize)], Option<u8>);
+    let cases: [Case; 6] = [
+        (&[(1, 3), (2, 1)], Some(1)),
+        (&[(1, 1), (2, 2), (3, 1)], Some(2)),
+        (&[(1, 2), (2, 2)], None),
+        (&[(1, 1), (2, 1), (3, 1)], None),
+        (&[(1, 2), (2, 2), (3, 1)], None),
+        (&[], None),
+    ];
+    for (spec, expected) in cases {
+        for map in group_orderings(spec) {
+            let chosen = unique_largest_group(&map).map(|(hash, _)| hash[0]);
+            assert_eq!(chosen, expected, "layout {spec:?}");
+        }
+    }
 }
