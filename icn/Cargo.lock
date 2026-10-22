@@ -3022,6 +3022,7 @@ dependencies = [
  "icn-ledger",
  "icn-obs",
  "icn-security",
+ "icn-store",
  "icn-time",
  "icn-trust",
  "num_cpus",

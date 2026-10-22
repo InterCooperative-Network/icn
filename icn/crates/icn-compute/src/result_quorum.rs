@@ -29,11 +29,31 @@
 //! ```
 
 use crate::error::{ComputeError, Result};
-use crate::types::{ComputeResult, TaskHash};
+use crate::types::{ComputeResult, ExecutionOutcome, TaskHash};
 use icn_identity::Did;
+use icn_kernel_api::canonical::{CanonicalHasher, DomainTag};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
+
+/// Domain tag of the quorum's outcome comparison key
+/// (CANONICAL_ENCODING.md §4.1.3).
+const QUORUM_OUTCOME_TAG: DomainTag = DomainTag::new(b"icn:compute:quorum-outcome:v1");
+
+/// The key results are grouped by: BLAKE3 over the tag, a one-byte variant
+/// discriminant (the values `ComputeResult::signing_payload` uses), then the
+/// variant's payload as a length-prefixed field. Two outcomes share a key only
+/// if they are the same variant with the same payload.
+fn outcome_hash(outcome: &ExecutionOutcome) -> [u8; 32] {
+    let mut hasher = CanonicalHasher::new(QUORUM_OUTCOME_TAG);
+    match outcome {
+        ExecutionOutcome::Success(data) => hasher.fixed(&[0x00]).bytes(data),
+        ExecutionOutcome::Failed(msg) => hasher.fixed(&[0x01]).str(msg),
+        ExecutionOutcome::OutOfFuel => hasher.fixed(&[0x02]),
+        ExecutionOutcome::Timeout => hasher.fixed(&[0x03]),
+    };
+    hasher.finish()
+}
 
 /// Task value classification for verification requirements
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -182,12 +202,25 @@ pub enum QuorumStatus {
     Timeout { received: usize, required: usize },
 }
 
+/// What the majority rule decided over the collected results
+enum Majority<'a> {
+    /// One strictly largest group meets the threshold
+    Consensus {
+        result_hash: [u8; 32],
+        agreeing: usize,
+        /// The group's member with the smallest executor DID
+        canonical: &'a ComputeResult,
+    },
+    /// No group meets the threshold, or the largest groups tie
+    Divergent { result_groups: usize },
+}
+
 /// Collected result from an executor
 #[derive(Debug, Clone)]
 pub struct CollectedResult {
     /// The compute result
     pub result: ComputeResult,
-    /// Hash of the result output (for comparison)
+    /// Comparison key of the outcome, variant included (see `outcome_hash`)
     pub output_hash: [u8; 32],
     /// When the result was received
     pub received_at: u64,
@@ -196,12 +229,7 @@ pub struct CollectedResult {
 impl CollectedResult {
     /// Create from a ComputeResult
     pub fn from_result(result: ComputeResult, received_at: u64) -> Self {
-        let output_hash = match &result.outcome {
-            crate::types::ExecutionOutcome::Success(data) => *blake3::hash(data).as_bytes(),
-            crate::types::ExecutionOutcome::Failed(msg) => *blake3::hash(msg.as_bytes()).as_bytes(),
-            crate::types::ExecutionOutcome::OutOfFuel => *blake3::hash(b"OUT_OF_FUEL").as_bytes(),
-            crate::types::ExecutionOutcome::Timeout => *blake3::hash(b"TIMEOUT").as_bytes(),
-        };
+        let output_hash = outcome_hash(&result.outcome);
 
         Self {
             result,
@@ -218,8 +246,8 @@ pub struct ResultAggregator {
     task_hash: TaskHash,
     /// Verification requirements
     verification: TaskVerification,
-    /// Collected results by executor DID
-    results: HashMap<String, CollectedResult>,
+    /// Collected results by executor DID, iterated in DID order
+    results: BTreeMap<String, CollectedResult>,
     /// When collection started (for debugging and timeout calculations)
     #[allow(dead_code)]
     started_at: u64,
@@ -258,7 +286,7 @@ impl ResultAggregator {
         Self {
             task_hash,
             verification,
-            results: HashMap::new(),
+            results: BTreeMap::new(),
             started_at,
             deadline,
         }
@@ -354,8 +382,34 @@ impl ResultAggregator {
 
     /// Evaluate consensus among collected results
     fn evaluate_consensus(&self) -> QuorumStatus {
-        // Group results by output hash
-        let mut groups: HashMap<[u8; 32], Vec<&CollectedResult>> = HashMap::new();
+        let total = self.results.len();
+        match self.majority() {
+            Majority::Consensus {
+                result_hash,
+                agreeing,
+                ..
+            } => QuorumStatus::Consensus {
+                result_hash,
+                agreeing,
+                total,
+            },
+            Majority::Divergent { result_groups } => QuorumStatus::Divergent {
+                result_groups,
+                total,
+            },
+        }
+    }
+
+    /// The one majority rule behind both `status()` and `canonical_result()`.
+    ///
+    /// Results are grouped by `output_hash`. A group qualifies when its size
+    /// reaches `ceil(total * consensus_threshold)`. Consensus needs a single,
+    /// strictly largest qualifying group; a tie for largest is divergence. The
+    /// canonical member is the one with the smallest executor DID.
+    fn majority(&self) -> Majority<'_> {
+        // `results` iterates in DID order, so each group's first member has
+        // the smallest DID.
+        let mut groups: BTreeMap<[u8; 32], Vec<&CollectedResult>> = BTreeMap::new();
         for result in self.results.values() {
             groups.entry(result.output_hash).or_default().push(result);
         }
@@ -363,32 +417,28 @@ impl ResultAggregator {
         let total = self.results.len();
         let threshold = (total as f64 * self.verification.consensus_threshold).ceil() as usize;
 
-        // Find majority group
-        let (majority_hash, majority_group) = groups
+        let largest = groups.values().map(Vec::len).max().unwrap_or(0);
+        let mut qualifying = groups
             .iter()
-            .max_by_key(|(_, group)| group.len())
-            .map(|(hash, group)| (*hash, group.len()))
-            .unwrap_or(([0u8; 32], 0));
+            .filter(|(_, group)| group.len() == largest && largest >= threshold);
 
-        // Check if majority meets threshold
-        if majority_group >= threshold {
-            QuorumStatus::Consensus {
-                result_hash: majority_hash,
-                agreeing: majority_group,
-                total,
-            }
-        } else {
-            QuorumStatus::Divergent {
+        match (qualifying.next(), qualifying.next()) {
+            (Some((hash, group)), None) => Majority::Consensus {
+                result_hash: *hash,
+                agreeing: group.len(),
+                canonical: &group[0].result,
+            },
+            _ => Majority::Divergent {
                 result_groups: groups.len(),
-                total,
-            }
+            },
         }
     }
 
     /// Get the canonical result (if consensus reached)
     ///
-    /// This method evaluates consensus and returns the canonical result in one pass,
-    /// avoiding redundant computation compared to calling status() then looking up the result.
+    /// Uses the same majority rule as `status()`, so this is `Some` exactly when
+    /// `status()` reports `Consensus`, and it is that group's member with the
+    /// smallest executor DID.
     pub fn canonical_result(&self) -> Option<&ComputeResult> {
         let received = self.results.len();
         let required = self.verification.required_executors;
@@ -398,29 +448,18 @@ impl ResultAggregator {
             return None;
         }
 
-        // Find majority group directly
-        let mut groups: HashMap<[u8; 32], Vec<&CollectedResult>> = HashMap::new();
-        for result in self.results.values() {
-            groups.entry(result.output_hash).or_default().push(result);
+        match self.majority() {
+            Majority::Consensus { canonical, .. } => Some(canonical),
+            Majority::Divergent { .. } => None,
         }
-
-        let total = self.results.len();
-        let threshold = (total as f64 * self.verification.consensus_threshold).ceil() as usize;
-
-        // Find and return canonical result if consensus met
-        groups
-            .iter()
-            .find(|(_, group)| group.len() >= threshold)
-            .and_then(|(_, group)| group.first())
-            .map(|r| &r.result)
     }
 
-    /// Get all collected results
+    /// Get all collected results, in executor DID order
     pub fn all_results(&self) -> impl Iterator<Item = &ComputeResult> {
         self.results.values().map(|r| &r.result)
     }
 
-    /// Get executors grouped by their result
+    /// Get executors grouped by their result, each group in DID order
     pub fn executor_groups(&self) -> HashMap<[u8; 32], Vec<String>> {
         let mut groups: HashMap<[u8; 32], Vec<String>> = HashMap::new();
         for (executor, result) in &self.results {
@@ -636,11 +675,15 @@ mod tests {
         }
 
         fn signed_result(&self, task_hash: TaskHash, output: &[u8]) -> ComputeResult {
+            self.signed(task_hash, ExecutionOutcome::Success(output.to_vec()))
+        }
+
+        fn signed(&self, task_hash: TaskHash, outcome: ExecutionOutcome) -> ComputeResult {
             let mut result = ComputeResult {
                 task_hash,
                 task_id: "test-task".into(),
                 executor: self.did.clone(),
-                outcome: ExecutionOutcome::Success(output.to_vec()),
+                outcome,
                 fuel_used: 1000,
                 duration_ms: 100,
                 completed_at: icn_time::current_timestamp_millis(),
@@ -651,6 +694,328 @@ mod tests {
             let signature = self.keypair.sign(&payload);
             result.signature = signature.to_bytes().to_vec();
             result
+        }
+    }
+
+    /// `n` executors in ascending DID order, so a test can name the smallest.
+    fn executors(n: usize) -> Vec<TestExecutor> {
+        let mut executors: Vec<_> = (0..n).map(|_| TestExecutor::new()).collect();
+        executors.sort_by(|a, b| a.did.cmp(&b.did));
+        executors
+    }
+
+    fn aggregator(
+        task_hash: TaskHash,
+        required_executors: usize,
+        consensus_threshold: f64,
+    ) -> ResultAggregator {
+        ResultAggregator::with_default_window(
+            task_hash,
+            TaskVerification {
+                value: TaskValue::High,
+                required_executors,
+                consensus_threshold,
+                assigned_executors: vec![],
+            },
+            icn_time::current_timestamp_millis(),
+        )
+    }
+
+    /// The quorum comparison key of `outcome`. `from_result` reads only the
+    /// outcome, so the other fields and the signature do not matter here.
+    fn quorum_hash(outcome: ExecutionOutcome) -> [u8; 32] {
+        let result = ComputeResult {
+            task_hash: [0u8; 32],
+            task_id: "t".into(),
+            executor: "did:icn:x".into(),
+            outcome,
+            fuel_used: 0,
+            duration_ms: 0,
+            completed_at: 0,
+            signature: vec![],
+        };
+        CollectedResult::from_result(result, 0).output_hash
+    }
+
+    /// `status()` and `canonical_result()` must describe the same decision.
+    fn assert_status_agrees_with_canonical(aggregator: &ResultAggregator) {
+        let status = aggregator.status();
+        let canonical = aggregator.canonical_result();
+        match status {
+            QuorumStatus::Consensus { result_hash, .. } => {
+                let canonical = canonical
+                    .unwrap_or_else(|| panic!("{status:?} but canonical_result() is None"));
+                assert_eq!(
+                    quorum_hash(canonical.outcome.clone()),
+                    result_hash,
+                    "{status:?} but canonical_result() is {:?}",
+                    canonical.outcome
+                );
+            }
+            _ => assert!(
+                canonical.is_none(),
+                "{status:?} but canonical_result() is {canonical:?}"
+            ),
+        }
+    }
+
+    #[test]
+    fn quorum_hash_binds_the_outcome_variant() {
+        let outcomes = [
+            ExecutionOutcome::Success(b"OUT_OF_FUEL".to_vec()),
+            ExecutionOutcome::OutOfFuel,
+            ExecutionOutcome::Success(b"TIMEOUT".to_vec()),
+            ExecutionOutcome::Failed("TIMEOUT".into()),
+            ExecutionOutcome::Timeout,
+            ExecutionOutcome::Failed("x".into()),
+            ExecutionOutcome::Success(b"x".to_vec()),
+            ExecutionOutcome::Success(vec![]),
+            ExecutionOutcome::Failed(String::new()),
+        ];
+
+        let mut aliases = Vec::new();
+        for (i, a) in outcomes.iter().enumerate() {
+            assert_eq!(quorum_hash(a.clone()), quorum_hash(a.clone()));
+            for b in &outcomes[i + 1..] {
+                if quorum_hash(a.clone()) == quorum_hash(b.clone()) {
+                    aliases.push(format!("{a:?} = {b:?}"));
+                }
+            }
+        }
+        assert!(aliases.is_empty(), "aliased outcomes: {aliases:#?}");
+    }
+
+    #[test]
+    fn quorum_outcome_hash_golden_vectors() {
+        // The preimages are built by hand from the documented layout, not
+        // through CanonicalHasher. The pinned hex was computed with a separate
+        // BLAKE3 implementation.
+        let tag: &[u8] = b"icn:compute:quorum-outcome:v1";
+        let cases = [
+            (
+                ExecutionOutcome::Success(b"output".to_vec()),
+                [tag, &[0x00], &6u64.to_le_bytes(), b"output"].concat(),
+                "9297c9194c895c7e4cbd50da05e1053ee19c15ef0c6f3d197fc88cd920018ff4",
+            ),
+            (
+                ExecutionOutcome::Failed("boom".into()),
+                [tag, &[0x01], &4u64.to_le_bytes(), b"boom"].concat(),
+                "eff743d7c7c56fe505f9a7dc07536a7623bc452cb0cb5222b87ce74086254d7c",
+            ),
+            (
+                ExecutionOutcome::OutOfFuel,
+                [tag, &[0x02]].concat(),
+                "36acc8ca7bc6d1f74a874d11fb1d156ea922a7452d9a60f84ade59ebc88a9101",
+            ),
+            (
+                ExecutionOutcome::Timeout,
+                [tag, &[0x03]].concat(),
+                "150ec4752d9e61742f52d9b4c86ecbffbb92b090ffc2c073712fa1cef9f9ba36",
+            ),
+        ];
+
+        for (outcome, preimage, pinned) in cases {
+            let hash = quorum_hash(outcome.clone());
+            assert_eq!(
+                hash,
+                *blake3::hash(&preimage).as_bytes(),
+                "{outcome:?} does not hash its documented preimage"
+            );
+            assert_eq!(hex::encode(hash), pinned, "{outcome:?} moved");
+        }
+    }
+
+    #[test]
+    fn aliased_outcomes_do_not_form_a_consensus_group() {
+        let task_hash = [11u8; 32];
+        let execs = executors(3);
+        // (what two honest executors report, a different outcome whose payload
+        // bytes used to hash the same)
+        let pairs = [
+            (
+                ExecutionOutcome::OutOfFuel,
+                ExecutionOutcome::Success(b"OUT_OF_FUEL".to_vec()),
+            ),
+            (
+                ExecutionOutcome::Timeout,
+                ExecutionOutcome::Failed("TIMEOUT".into()),
+            ),
+            (
+                ExecutionOutcome::Failed("x".into()),
+                ExecutionOutcome::Success(b"x".to_vec()),
+            ),
+        ];
+
+        for (honest, impostor) in pairs {
+            let results = [
+                execs[0].signed(task_hash, honest.clone()),
+                execs[1].signed(task_hash, honest.clone()),
+                execs[2].signed(task_hash, impostor.clone()),
+            ];
+
+            let mut simple = aggregator(task_hash, 3, 0.50);
+            for result in results.clone() {
+                simple.add_result(result).unwrap();
+            }
+            let status = simple.status();
+            assert!(
+                matches!(
+                    status,
+                    QuorumStatus::Consensus {
+                        agreeing: 2,
+                        total: 3,
+                        ..
+                    }
+                ),
+                "{honest:?} vs {impostor:?} at 0.50: {status:?}"
+            );
+            assert_eq!(
+                simple.canonical_result().map(|r| &r.outcome),
+                Some(&honest),
+                "{honest:?} vs {impostor:?} at 0.50"
+            );
+            assert_status_agrees_with_canonical(&simple);
+
+            let mut strict = aggregator(task_hash, 3, 0.67);
+            for result in results {
+                strict.add_result(result).unwrap();
+            }
+            assert_eq!(
+                strict.status(),
+                QuorumStatus::Divergent {
+                    result_groups: 2,
+                    total: 3
+                },
+                "{honest:?} vs {impostor:?} at 0.67"
+            );
+            assert_status_agrees_with_canonical(&strict);
+        }
+    }
+
+    #[test]
+    fn each_variant_reaches_consensus_with_itself() {
+        let task_hash = [12u8; 32];
+        let execs = executors(3);
+        let outcomes = [
+            ExecutionOutcome::Success(b"o".to_vec()),
+            ExecutionOutcome::Failed("e".into()),
+            ExecutionOutcome::OutOfFuel,
+            ExecutionOutcome::Timeout,
+        ];
+
+        for outcome in outcomes {
+            // The default threshold. `add_result` verifies each signature, so
+            // this also shows every variant signs and verifies.
+            let mut aggregator = aggregator(task_hash, 3, 0.67);
+            for exec in &execs {
+                aggregator
+                    .add_result(exec.signed(task_hash, outcome.clone()))
+                    .unwrap();
+            }
+            assert_eq!(
+                aggregator.status(),
+                QuorumStatus::Consensus {
+                    result_hash: quorum_hash(outcome.clone()),
+                    agreeing: 3,
+                    total: 3
+                },
+                "{outcome:?}"
+            );
+            assert_eq!(
+                aggregator.canonical_result().map(|r| &r.outcome),
+                Some(&outcome)
+            );
+            assert_status_agrees_with_canonical(&aggregator);
+        }
+    }
+
+    #[test]
+    fn a_tie_between_qualifying_groups_is_divergent() {
+        let task_hash = [13u8; 32];
+        let execs = executors(4);
+        let mut aggregator = aggregator(task_hash, 4, 0.50);
+        for (exec, output) in execs.iter().zip([b"a", b"a", b"b", b"b"]) {
+            aggregator
+                .add_result(exec.signed_result(task_hash, output))
+                .unwrap();
+        }
+
+        assert_eq!(
+            aggregator.status(),
+            QuorumStatus::Divergent {
+                result_groups: 2,
+                total: 4
+            }
+        );
+        assert!(aggregator.canonical_result().is_none());
+        assert_status_agrees_with_canonical(&aggregator);
+    }
+
+    #[test]
+    fn canonical_selection_is_deterministic() {
+        let task_hash = [14u8; 32];
+        let execs = executors(3);
+        let results: Vec<_> = execs
+            .iter()
+            .map(|exec| exec.signed_result(task_hash, b"same"))
+            .collect();
+
+        for round in 0..20 {
+            let mut aggregator = aggregator(task_hash, 3, 0.67);
+            for i in 0..results.len() {
+                aggregator
+                    .add_result(results[(i + round) % results.len()].clone())
+                    .unwrap();
+            }
+
+            assert_eq!(
+                aggregator.canonical_result(),
+                Some(&results[0]),
+                "round {round}: the canonical member is the smallest executor DID"
+            );
+            let groups = aggregator.executor_groups();
+            let members = groups.values().next().unwrap();
+            let sorted: Vec<_> = execs.iter().map(|e| e.did.clone()).collect();
+            assert_eq!(members, &sorted, "round {round}: groups are sorted");
+        }
+    }
+
+    #[test]
+    fn signing_payload_is_unchanged() {
+        // Pinned before the quorum hash changed: the quorum hash must not move
+        // signed bytes. The layout itself is ambiguous (no length prefixes);
+        // fixing that is a separate protocol change.
+        let cases = [
+            (
+                ExecutionOutcome::Success(b"output".to_vec()),
+                "11111111111111111111111111111111111111111111111111111111111111117461736b2d316469643a69636e3a7a65786563006f7574707574e80300000000000064000000000000000068e5cf8b010000",
+            ),
+            (
+                ExecutionOutcome::Failed("boom".into()),
+                "11111111111111111111111111111111111111111111111111111111111111117461736b2d316469643a69636e3a7a6578656301626f6f6de80300000000000064000000000000000068e5cf8b010000",
+            ),
+            (
+                ExecutionOutcome::OutOfFuel,
+                "11111111111111111111111111111111111111111111111111111111111111117461736b2d316469643a69636e3a7a6578656302e80300000000000064000000000000000068e5cf8b010000",
+            ),
+            (
+                ExecutionOutcome::Timeout,
+                "11111111111111111111111111111111111111111111111111111111111111117461736b2d316469643a69636e3a7a6578656303e80300000000000064000000000000000068e5cf8b010000",
+            ),
+        ];
+
+        for (outcome, pinned) in cases {
+            let result = ComputeResult {
+                task_hash: [0x11; 32],
+                task_id: "task-1".into(),
+                executor: "did:icn:zexec".into(),
+                outcome: outcome.clone(),
+                fuel_used: 1000,
+                duration_ms: 100,
+                completed_at: 1_700_000_000_000,
+                signature: vec![],
+            };
+            assert_eq!(hex::encode(result.signing_payload()), pinned, "{outcome:?}");
         }
     }
 
