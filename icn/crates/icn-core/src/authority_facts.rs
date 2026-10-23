@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use icn_identity::authority_log::{AuthorityFactStore, FactStoreError, PersistedFact};
-use icn_store::Store;
+use icn_store::{SledStore, Store};
 
 /// Key prefix owning the authority-fact namespace in a shared store.
 ///
@@ -23,17 +23,43 @@ use icn_store::Store;
 /// and a second spelling of a namespace is a second owner of it.
 pub const AUTHORITY_FACT_PREFIX: &[u8] = b"authority/fact/";
 
-/// A restart-durable [`AuthorityFactStore`] over any [`Store`] backend.
+/// A [`Store`] that can make its accepted writes durable on demand.
+///
+/// [`Store::flush`] defaults to a no-op, which is right for in-memory backends and wrong for
+/// anything that promises restart durability. [`SledAuthorityFactStore`] acknowledges a fact only
+/// after this trait's barrier returns, so over a backend whose barrier did nothing it would
+/// acknowledge durability it never provided.
+///
+/// Two things keep that from happening by accident. A backend is eligible only through an explicit
+/// `impl`, and that `impl` must write [`DurableStore::sync_durable`] itself: there is no default to
+/// inherit, so a no-op barrier can exist only where someone wrote one and a reviewer can see it.
+/// This is a claim, not a proof. Nothing here can check that a backend's barrier really reaches
+/// stable storage.
+pub trait DurableStore: Store {
+    /// Return only once every write this store accepted before the call is on stable storage, or
+    /// fail. Must not return `Ok` for a write that a crash could still lose.
+    fn sync_durable(&self) -> anyhow::Result<()>;
+}
+
+impl DurableStore for SledStore {
+    /// Sled's flush writes its buffered log and page cache out and syncs them
+    /// ([`SledStore::flush`]).
+    fn sync_durable(&self) -> anyhow::Result<()> {
+        SledStore::flush(self).map(|_| ())
+    }
+}
+
+/// A restart-durable [`AuthorityFactStore`] over a [`DurableStore`].
 ///
 /// Named for the backend the runtime actually configures (sled), matching `SledMembershipStore`
-/// and its siblings, though it constrains itself to the `Store` trait and so is not sled-specific.
+/// and its siblings, though it constrains itself to [`DurableStore`] and so is not sled-specific.
 pub struct SledAuthorityFactStore {
-    store: Arc<dyn Store>,
+    store: Arc<dyn DurableStore>,
 }
 
 impl SledAuthorityFactStore {
     /// Wrap a backing store.
-    pub fn new(store: Arc<dyn Store>) -> Self {
+    pub fn new(store: Arc<dyn DurableStore>) -> Self {
         SledAuthorityFactStore { store }
     }
 
@@ -52,16 +78,19 @@ impl SledAuthorityFactStore {
 impl AuthorityFactStore for SledAuthorityFactStore {
     /// Persist one record and force it durable before returning.
     ///
-    /// The flush is not optional and not a caller's responsibility. [`Store::put`] writes through
-    /// the backend but does not sync; `icn-store` documents [`Store::flush`] as the barrier a
-    /// durable backend overrides to push its page cache and write-ahead log to disk, which is why
-    /// the governance close journal forces it before any cross-store artifact is written.
+    /// The barrier is not optional and not a caller's responsibility. [`Store::put`] writes
+    /// through the backend but does not sync; [`DurableStore::sync_durable`] is the backend's
+    /// explicit promise to do so, the same barrier the governance close journal forces before any
+    /// cross-store artifact is written.
     ///
     /// Without it this type would return `Ok(())` for a fact that a crash or power loss can still
     /// erase, and the contract it implements says facts *successfully persisted through this store*
     /// survive a restart. A put that is not durable makes that claim false rather than merely
     /// weaker. Dropping a sled handle happens to flush, so a graceful reopen would have hidden this
     /// — which is exactly why the guarantee cannot rest on how the process happened to exit.
+    ///
+    /// On `Err` the fact may or may not be on the medium. It was not acknowledged, and writing it
+    /// again is safe because a record's key is its identity.
     ///
     /// The cost is an fsync per fact. That is the honest price of the guarantee at this scale: N1
     /// events are rare, bounded per subject, and written at authority transitions rather than in a
@@ -72,7 +101,7 @@ impl AuthorityFactStore for SledAuthorityFactStore {
             .put(&Self::storage_key(&fact.key()), fact.value())
             .map_err(|error| FactStoreError::Backend(error.to_string()))?;
         self.store
-            .flush()
+            .sync_durable()
             .map_err(|error| FactStoreError::Backend(error.to_string()))
     }
 

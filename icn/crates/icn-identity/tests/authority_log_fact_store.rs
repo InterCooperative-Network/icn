@@ -1,8 +1,8 @@
 //! N1-D: the local durable fact store contract (icn#2799).
 //!
 //! These tests own the *contract*, not a backend. They run against the in-memory implementation
-//! that ships with the trait; `icn-core` proves the same contract against a real persistent store
-//! that is closed and reopened.
+//! below, which is test code and not part of the crate's API (ADR-0087); `icn-core` proves the same
+//! contract against a real persistent store that is closed and reopened, and that is killed.
 //!
 //! The claim under test is narrow: facts successfully persisted through this store rehydrate into
 //! the exact same durable N1 sets, and therefore into the exact same pure derivation. It is not a
@@ -15,9 +15,43 @@ mod authority_log_support;
 
 use authority_log_support::{authorize_at, device, permutations, subject};
 use icn_identity::authority_log::{
-    derive, AuthorityFactStore, AuthorityStore, FactStoreError, InMemoryAuthorityFactStore,
-    PersistedFact,
+    derive, AuthorityFactStore, AuthorityStore, FactStoreError, PersistedFact,
 };
+
+/// An in-memory [`AuthorityFactStore`], so the contract can be exercised without a medium.
+///
+/// It holds records in a map keyed by record key, so it gets put idempotence the same way a real
+/// backend does. "Durable" here means only "held for the life of this value": these tests are
+/// about the record layout and rehydration, not about surviving a process.
+#[derive(Default)]
+struct InMemoryAuthorityFactStore {
+    records: std::sync::Mutex<std::collections::BTreeMap<Vec<u8>, Vec<u8>>>,
+}
+
+impl InMemoryAuthorityFactStore {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl AuthorityFactStore for InMemoryAuthorityFactStore {
+    fn put_fact(&self, fact: &PersistedFact) -> Result<(), FactStoreError> {
+        self.records
+            .lock()
+            .unwrap()
+            .insert(fact.key(), fact.value().to_vec());
+        Ok(())
+    }
+
+    fn load_facts(&self) -> Result<Vec<PersistedFact>, FactStoreError> {
+        self.records
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(key, value)| PersistedFact::from_key_value(key, value))
+            .collect()
+    }
+}
 
 /// Persist every event, then rehydrate a fresh store from the records alone.
 fn persist_all(
@@ -337,7 +371,8 @@ fn an_unauthorized_body_survives_the_round_trip_and_is_still_ignored_by_derive()
     // It is admissible live, and that is the intended behaviour, not an accident.
     let mut live = AuthorityStore::new();
     live.ingest(&inception).expect("inception must be admitted");
-    live.ingest(&a1).expect("the authorized event must be admitted");
+    live.ingest(&a1)
+        .expect("the authorized event must be admitted");
     live.ingest(&spam)
         .expect("a well-formed unauthorized body is admissible by design");
     assert_eq!(live.body_count(), 3);

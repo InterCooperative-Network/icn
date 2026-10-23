@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use icn_core::authority_facts::{SledAuthorityFactStore, AUTHORITY_FACT_PREFIX};
+use icn_core::authority_facts::{DurableStore, SledAuthorityFactStore, AUTHORITY_FACT_PREFIX};
 use icn_identity::authority_log::{
     authorize_event, derive, rehydrate, AuthorityFactStore, AuthorityStore, CapabilitySet,
     ContextNonce, ContinuityRoot, DeviceCapability, PersistedFact, PrincipalKey,
@@ -70,7 +70,7 @@ fn authorize(
 /// Open a fact store over a sled database at `path`.
 fn open_at(path: &std::path::Path) -> SledAuthorityFactStore {
     let sled = SledStore::open(path).expect("sled must open");
-    SledAuthorityFactStore::new(Arc::new(sled) as Arc<dyn Store>)
+    SledAuthorityFactStore::new(Arc::new(sled) as Arc<dyn DurableStore>)
 }
 
 #[test]

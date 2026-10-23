@@ -45,9 +45,6 @@
 //! store, or which disappeared from the medium, can be detected here. Frontier and completeness
 //! proofs are a separate concern and are not attempted.
 
-use std::collections::BTreeMap;
-use std::sync::RwLock;
-
 use super::admission::{admissible_bytes, AdmissionError};
 use super::body::EventId;
 use super::store::{AuthorityStore, SignedAuthorityEvent, WitnessSignature};
@@ -57,7 +54,7 @@ const KEY_EVENT_ID_LEN: usize = 32;
 /// Length of the signature half of a record key.
 const KEY_SIGNATURE_LEN: usize = 64;
 /// Total record-key length.
-pub const FACT_KEY_LEN: usize = KEY_EVENT_ID_LEN + KEY_SIGNATURE_LEN;
+const FACT_KEY_LEN: usize = KEY_EVENT_ID_LEN + KEY_SIGNATURE_LEN;
 
 /// Why a durable record could not become an admitted fact.
 ///
@@ -152,7 +149,9 @@ impl PersistedFact {
     ///
     /// The admission check is [`super::admissible_bytes`], the same free function of body and
     /// signature that gates a live event. Storage therefore cannot widen what is admissible.
-    pub fn into_admitted(self) -> Result<SignedAuthorityEvent, FactStoreError> {
+    /// Crate-private so that [`rehydrate`] is the only way a stored record becomes an admitted
+    /// event.
+    pub(crate) fn into_admitted(self) -> Result<SignedAuthorityEvent, FactStoreError> {
         let body = admissible_bytes(&self.canonical_body, &self.signature)?;
         if body.event_id() != self.event_id {
             return Err(FactStoreError::KeyDisagreesWithValue);
@@ -168,6 +167,11 @@ impl PersistedFact {
 /// parse would be taking over part of [`super::derive`]'s job.
 pub trait AuthorityFactStore: Send + Sync {
     /// Persist one record. Writing a record that is already present is a no-op, not an error.
+    ///
+    /// `Ok` is the durability acknowledgment: the record has crossed this implementation's
+    /// persistence barrier and survives a restart of the process. An implementation that cannot
+    /// make that true must not return `Ok`. On `Err` the record may or may not be held; it was not
+    /// acknowledged, and writing it again is safe because a record's key is its identity.
     fn put_fact(&self, fact: &PersistedFact) -> Result<(), FactStoreError>;
 
     /// Every record currently held, in any order.
@@ -189,55 +193,4 @@ pub fn rehydrate(store: &dyn AuthorityFactStore) -> Result<AuthorityStore, FactS
         rebuilt.ingest(&event)?;
     }
     Ok(rebuilt)
-}
-
-/// An in-memory [`AuthorityFactStore`] for tests and for callers that want no medium at all.
-///
-/// This is not a cache and not a fallback for a failed backend. It exists so the contract can be
-/// tested without a filesystem, and so a caller can compose against the trait before choosing one.
-#[derive(Debug, Default)]
-pub struct InMemoryAuthorityFactStore {
-    records: RwLock<BTreeMap<Vec<u8>, Vec<u8>>>,
-}
-
-impl InMemoryAuthorityFactStore {
-    /// An empty store.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// How many records are held.
-    pub fn len(&self) -> usize {
-        self.records
-            .read()
-            .map(|records| records.len())
-            .unwrap_or(0)
-    }
-
-    /// Whether the store holds no records.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl AuthorityFactStore for InMemoryAuthorityFactStore {
-    fn put_fact(&self, fact: &PersistedFact) -> Result<(), FactStoreError> {
-        let mut records = self
-            .records
-            .write()
-            .map_err(|_| FactStoreError::Backend("in-memory store lock poisoned".into()))?;
-        records.insert(fact.key(), fact.value().to_vec());
-        Ok(())
-    }
-
-    fn load_facts(&self) -> Result<Vec<PersistedFact>, FactStoreError> {
-        let records = self
-            .records
-            .read()
-            .map_err(|_| FactStoreError::Backend("in-memory store lock poisoned".into()))?;
-        records
-            .iter()
-            .map(|(key, value)| PersistedFact::from_key_value(key, value))
-            .collect()
-    }
 }
