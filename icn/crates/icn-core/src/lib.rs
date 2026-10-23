@@ -39,10 +39,16 @@ pub mod data_dir_lock;
 pub use data_dir_lock::new_files_here_belong_to_the_directory_account;
 pub use data_dir_lock::refuse_if_new_files_would_not_belong_to_the_data_root_account;
 pub use data_dir_lock::DataDirLock;
+pub mod restore_marker;
 #[cfg(unix)]
 pub use data_dir_lock::{classify_ownership_transfer, AccessIdentity, OwnershipTransfer};
 #[cfg(unix)]
 pub use data_dir_lock::{data_root_account, identity_new_files_receive};
+pub use restore_marker::{
+    marker_seen, read_restore_record, refuse_if_restore_incomplete, restore_marker_path,
+    sync_directory, InventoryEntry, MarkerSeen, RestoreInProgress, RestorePhase, RestoreRecord,
+    RESTORE_INCOMPLETE_FILE_NAME,
+};
 
 pub use config::{Config, GenesisBundle, InitialContract, InitialCoop, GENESIS_SCHEMA_VERSION};
 pub use dead_letter::{DeadLetterQueue, EntryStatus, FailedOperation, FailureType};
