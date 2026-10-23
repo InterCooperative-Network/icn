@@ -7251,13 +7251,13 @@ fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
 /// contents aside would move the name itself and leave the restore writing
 /// somewhere the exclusion anchor does not cover. A root with no parent (`/`)
 /// is refused rather than guessed at.
-fn sibling_backup_dir(data_dir: &Path, created_at: u64) -> Result<PathBuf> {
-    let root = data_dir.canonicalize().with_context(|| {
-        format!(
-            "Failed to resolve the data directory {}",
-            data_dir.display()
-        )
-    })?;
+///
+/// `root` is the data dir already resolved by [`resolve_restore_root`], not
+/// resolved again here: restore names one root, once, and every step after the
+/// locks works on that one. `data_dir` is the operator's spelling, consulted
+/// only for the question of where the *name* lives.
+fn sibling_backup_dir(data_dir: &Path, root: &Path, created_at: u64) -> Result<PathBuf> {
+    let root = root.to_path_buf();
     // Where the name itself lives: its resolved parent plus its final
     // component (a symlink is not followed for this, only its parent is).
     if let Some(name) = data_dir.file_name() {
@@ -7846,6 +7846,53 @@ fn move_entries_back(
     stranded
 }
 
+/// The one root a restore works on: what `data_dir` resolves to, bound to the
+/// exclusion this process already holds over it.
+///
+/// Resolved after the locks, as the store guard's root is, so a root the lock
+/// itself created resolves -- and resolved *once*, before anything is moved:
+/// the move-aside empties the root entry by entry, so a spelling that passes
+/// through one of its entries cannot be resolved again partway through.
+///
+/// The resolved path is then held to the locks. Both lock files were placed
+/// through the same `data_dir` when they were taken; if either no longer
+/// resolves into this root, or is no longer the inode this process locked, the
+/// path no longer names the root this process excludes others from, and
+/// restore refuses before it has moved or extracted anything.
+fn resolve_restore_root(
+    data_dir: &Path,
+    storage: &icn_core::DataDirLock,
+    config: &icn_core::DataDirLock,
+) -> Result<PathBuf> {
+    let root = std::fs::canonicalize(data_dir).with_context(|| {
+        format!(
+            "Failed to resolve the data directory {}",
+            data_dir.display()
+        )
+    })?;
+    // Compared by what each lock file resolves to, not by its recorded path: a
+    // lock taken before the root existed (the first of a fresh restore's two)
+    // was placed through the spelling as given, since there was nothing yet to
+    // resolve. A lock file that cannot be resolved covers nothing.
+    let resolves_to = |lock: &icn_core::DataDirLock, expected: PathBuf| {
+        std::fs::canonicalize(lock.path()).is_ok_and(|found| found == expected)
+    };
+    let covered = resolves_to(storage, icn_core::DataDirLock::lock_path(&root))
+        && resolves_to(config, icn_core::DataDirLock::config_lock_path(&root));
+    if !covered || !storage.still_anchored() || !config.still_anchored() {
+        bail!(
+            "Refusing to restore into {}: it now resolves to {}, which is not the directory \
+             whose locks this restore holds ({}). Something changed what that path names \
+             after the locks were taken. Nothing has been moved; re-run once the data \
+             directory is settled.",
+            data_dir.display(),
+            root.display(),
+            storage.path().display()
+        );
+    }
+    Ok(root)
+}
+
 fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<()> {
     // Check if input backup file exists
     if !input.exists() {
@@ -7908,6 +7955,15 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
         (config, storage)
     };
 
+    // From here on the root is addressed by what `--data-dir` resolves to now,
+    // never by the operator's spelling. Moving the contents aside empties the
+    // root one entry at a time, and a spelling that passes through one of those
+    // entries -- `<root>/store/..`, or `..` typed from inside `<root>/store` --
+    // stops resolving the moment that entry leaves: every later move, the
+    // rollback and the extraction would then fail against a root already
+    // half-emptied, stranding live state in the backup.
+    let root = resolve_restore_root(data_dir, &restore_storage, &restore_config)?;
+
     println!("Restoring backup from {}...", input.display());
 
     // Open the backup archive
@@ -7945,7 +8001,7 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
             input.display()
         );
     }
-    let inventory = root_inventory(data_dir)?;
+    let inventory = root_inventory(&root)?;
     // Recorded resolved: a recovery run from another directory must find it.
     let archive_path = input
         .canonicalize()
@@ -7953,8 +8009,8 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     let mut marker = None;
     if replacing_existing {
         println!("Backing up existing data directory...");
-        let backup_dir = sibling_backup_dir(data_dir, metadata.created_at)?;
-        match prepare_move_aside_dir(data_dir, &backup_dir)? {
+        let backup_dir = sibling_backup_dir(data_dir, &root, metadata.created_at)?;
+        match prepare_move_aside_dir(&root, &backup_dir)? {
             Some(created) => {
                 // The move-aside directory's own entry, on disk before anything
                 // is moved into it.
@@ -7962,7 +8018,7 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
                     icn_core::sync_directory(parent)?;
                 }
                 let begun = icn_core::RestoreInProgress::begin(
-                    data_dir,
+                    &root,
                     icn_core::RestoreRecord {
                         phase: icn_core::RestorePhase::Moving,
                         archive: archive_path.clone(),
@@ -7971,17 +8027,16 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
                         inventory: inventory.clone(),
                     },
                 )?;
-                if let Err(failure) = move_data_root_contents_aside(data_dir, &backup_dir, created)
-                {
+                if let Err(failure) = move_data_root_contents_aside(&root, &backup_dir, created) {
                     return Err(settle_failed_move(
                         begun,
-                        data_dir,
+                        &root,
                         &backup_dir,
                         &inventory,
                         failure,
                     ));
                 }
-                icn_core::sync_directory(data_dir)?;
+                icn_core::sync_directory(&root)?;
                 icn_core::sync_directory(&backup_dir)?;
                 println!(
                     "  Existing data moved to: {} (owner-only; remove it once the restored node \
@@ -7990,16 +8045,13 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
                 );
                 marker = Some(begun);
             }
-            None => println!(
-                "  Nothing to move aside: {} holds no data",
-                data_dir.display()
-            ),
+            None => println!("  Nothing to move aside: {} holds no data", root.display()),
         }
     }
     let marker = match marker {
         Some(marker) => marker,
         None => icn_core::RestoreInProgress::begin(
-            data_dir,
+            &root,
             icn_core::RestoreRecord {
                 phase: icn_core::RestorePhase::Extracting,
                 archive: archive_path.clone(),
@@ -8011,28 +8063,24 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     };
 
     let marker_path = marker.path().to_path_buf();
-    let restored_checksum = extract_and_verify(
-        data_dir,
-        input,
-        &metadata,
-        &restore_storage,
-        &restore_config,
-    )
-    .map_err(|e| {
-        e.context(format!(
-            "The restore did not finish. {} records it, and nothing will open this data \
+    let restored_checksum =
+        extract_and_verify(&root, input, &metadata, &restore_storage, &restore_config).map_err(
+            |e| {
+                e.context(format!(
+                    "The restore did not finish. {} records it, and nothing will open this data \
                      directory's stores until it is recovered: run `icnctl --data-dir {} restore \
                      --recover-incomplete`.",
-            marker_path.display(),
-            data_dir.display()
-        ))
-    })?;
+                    marker_path.display(),
+                    root.display()
+                ))
+            },
+        )?;
     marker
         .finish()
         .context("The restore finished and verified, but clearing its marker did not complete")?;
 
     println!("✓ Backup restored successfully");
-    println!("  Restored to: {}", data_dir.display());
+    println!("  Restored to: {}", root.display());
     println!("  Checksum verified: {restored_checksum}");
     println!();
     println!("You can now use 'icnctl id show' to verify your restored identity.");
@@ -16727,13 +16775,15 @@ mod exclusion_domain_tests {
         let root = base.join("var").join("lib").join("icn");
         std::fs::create_dir_all(&root).unwrap();
         let expected = base.join("var").join("lib").join("icn.backup-7");
+        // What restore resolves the spelling to before asking where the backup goes.
+        let resolved = |p: &dyn AsRef<Path>| std::fs::canonicalize(p).unwrap();
         for spelled in [
             root.display().to_string(),
             format!("{}/", root.display()),
             format!("{}//", root.display()),
         ] {
             assert_eq!(
-                sibling_backup_dir(Path::new(&spelled), 7).unwrap(),
+                sibling_backup_dir(Path::new(&spelled), &resolved(&spelled), 7).unwrap(),
                 expected,
                 "spelled {spelled:?}"
             );
@@ -16741,16 +16791,19 @@ mod exclusion_domain_tests {
         // A symlink to the root: the backup goes beside the real root.
         let link = base.join("link");
         std::os::unix::fs::symlink(&root, &link).unwrap();
-        assert_eq!(sibling_backup_dir(&link, 7).unwrap(), expected);
+        assert_eq!(
+            sibling_backup_dir(&link, &resolved(&link), 7).unwrap(),
+            expected
+        );
         // A symlink living inside the root it points at is refused.
         let inside = root.join("self");
         std::os::unix::fs::symlink(&root, &inside).unwrap();
         assert!(
-            sibling_backup_dir(&inside, 7).is_err(),
+            sibling_backup_dir(&inside, &resolved(&inside), 7).is_err(),
             "a name inside the root it resolves to must be refused"
         );
         assert!(
-            sibling_backup_dir(Path::new("/"), 7).is_err(),
+            sibling_backup_dir(Path::new("/"), Path::new("/"), 7).is_err(),
             "a root with no parent has nowhere to put a sibling"
         );
     }

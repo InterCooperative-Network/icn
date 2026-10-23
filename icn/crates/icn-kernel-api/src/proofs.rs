@@ -40,6 +40,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::canonical::{CanonicalHasher, DomainTag};
 use crate::effects::EffectOutcome;
 use crate::types::{Did, Hash, Signature};
 
@@ -122,20 +123,18 @@ impl ArtifactReceipt {
         provider_did: &Did,
         scope_id: &str,
     ) -> Hash {
-        let mut hasher = blake3::Hasher::new();
-        // Domain separation: prevents hash collisions with other proof types
-        hasher.update(Self::DOMAIN_TAG);
-        // Fixed-length fields: no prefix needed
-        hasher.update(request_id);
-        hasher.update(blob_hash);
-        // Variable-length fields: length-prefix each one
-        hasher.update(&(requester_did.len() as u64).to_le_bytes());
-        hasher.update(requester_did.as_bytes());
-        hasher.update(&(provider_did.len() as u64).to_le_bytes());
-        hasher.update(provider_did.as_bytes());
-        hasher.update(&(scope_id.len() as u64).to_le_bytes());
-        hasher.update(scope_id.as_bytes());
-        *hasher.finalize().as_bytes()
+        // The shared canonical recipe (crate::canonical); bytes unchanged, pinned
+        // by `artifact_receipt_hash_golden_vector`.
+        const TAG: DomainTag = DomainTag::new(ArtifactReceipt::DOMAIN_TAG);
+        CanonicalHasher::new(TAG)
+            // Fixed-length fields: raw, no prefix
+            .fixed(request_id)
+            .digest(blob_hash)
+            // Variable-length fields: u64-LE length prefix each
+            .str(requester_did)
+            .str(provider_did)
+            .str(scope_id)
+            .finish()
     }
 
     /// Verify that the stored `receipt_hash` matches a fresh computation.
@@ -166,6 +165,25 @@ mod tests {
             "coop:test-scope".to_string(),
             1700000000,
         )
+    }
+
+    /// Pinned receipt hash for `make_receipt()`. The expected value was derived
+    /// independently of this crate (a hand-written preimage hashed by two
+    /// separate BLAKE3 implementations), and matched the pre-refactor code. It
+    /// guards the encoding: any change to the bytes of `compute_receipt_hash`
+    /// fails here. Layout: DOMAIN_TAG || request_id || blob_hash ||
+    /// lp(requester_did) || lp(provider_did) || lp(scope_id), lp = u64-LE length
+    /// then UTF-8 bytes.
+    #[test]
+    fn artifact_receipt_hash_golden_vector() {
+        assert_eq!(
+            hex32(&make_receipt().receipt_hash),
+            "9b5a58e21a1d50a994f861a41137a119334c9de6cc00d1b1598c6232582ebc1d"
+        );
+    }
+
+    fn hex32(bytes: &[u8; 32]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
     }
 
     #[test]
