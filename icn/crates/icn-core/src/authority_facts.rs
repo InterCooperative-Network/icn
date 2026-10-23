@@ -33,17 +33,22 @@ pub const AUTHORITY_FACT_PREFIX: &[u8] = b"authority/fact/";
 /// Two things keep that from happening by accident. A backend is eligible only through an explicit
 /// `impl`, and that `impl` must write [`DurableStore::sync_durable`] itself: there is no default to
 /// inherit, so a no-op barrier can exist only where someone wrote one and a reviewer can see it.
-/// This is a claim, not a proof. Nothing here can check that a backend's barrier really reaches
-/// stable storage.
+/// This is a claim, not a proof. Nothing here can check what a backend's barrier reaches.
 pub trait DurableStore: Store {
-    /// Return only once every write this store accepted before the call is on stable storage, or
-    /// fail. Must not return `Ok` for a write that a crash could still lose.
+    /// Return only once every write this store accepted before the call has left the process for
+    /// the backend's medium, or fail. Must not return `Ok` for a write that a crash of this
+    /// process could still lose. Each implementation documents how far its barrier goes beyond
+    /// that, toward power-loss safety.
     fn sync_durable(&self) -> anyhow::Result<()>;
 }
 
 impl DurableStore for SledStore {
-    /// Sled's flush writes its buffered log and page cache out and syncs them
-    /// ([`SledStore::flush`]).
+    /// Sled's flush ([`SledStore::flush`]) writes its buffered log out of the process and waits
+    /// for it to be written back, which survives a crash of this process.
+    ///
+    /// It is best-effort against power loss. In sled 0.34 on Linux the wait is `sync_file_range`,
+    /// which neither flushes the drive's write cache nor syncs file metadata; sled issues a full
+    /// `fsync` only from its periodic flusher and on close.
     fn sync_durable(&self) -> anyhow::Result<()> {
         SledStore::flush(self).map(|_| ())
     }
@@ -83,8 +88,8 @@ impl AuthorityFactStore for SledAuthorityFactStore {
     /// explicit promise to do so, the same barrier the governance close journal forces before any
     /// cross-store artifact is written.
     ///
-    /// Without it this type would return `Ok(())` for a fact that a crash or power loss can still
-    /// erase, and the contract it implements says facts *successfully persisted through this store*
+    /// Without it this type would return `Ok(())` for a fact that a crash of the writing process
+    /// can still erase, and the contract it implements says facts *successfully persisted through this store*
     /// survive a restart. A put that is not durable makes that claim false rather than merely
     /// weaker. Dropping a sled handle happens to flush, so a graceful reopen would have hidden this
     /// — which is exactly why the guarantee cannot rest on how the process happened to exit.
@@ -92,7 +97,7 @@ impl AuthorityFactStore for SledAuthorityFactStore {
     /// On `Err` the fact may or may not be on the medium. It was not acknowledged, and writing it
     /// again is safe because a record's key is its identity.
     ///
-    /// The cost is an fsync per fact. That is the honest price of the guarantee at this scale: N1
+    /// The cost is a flush per fact. That is the honest price of the guarantee at this scale: N1
     /// events are rare, bounded per subject, and written at authority transitions rather than in a
     /// hot path. A batched `put_facts` that flushes once per batch is the right optimisation if a
     /// caller ever needs it, and belongs with that caller's evidence, not ahead of it.

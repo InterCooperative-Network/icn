@@ -10,8 +10,14 @@
 //!   with no chance to drop a handle or run a destructor; the parent reopens the directory. That
 //!   shows acknowledged facts outlive the process that wrote them. It is **not** a power-loss
 //!   test: the kernel's page cache survives a process kill, so it cannot tell an fsync from a
-//!   plain write. Durability against power loss rests on sled's flush syncing, which this suite
-//!   does not and cannot observe.
+//!   plain write, and sled's flush is only best-effort against power loss anyway (see
+//!   `DurableStore for SledStore`).
+//!
+//! The kill test also guards the barrier only probabilistically. Sled flushes in the background
+//! (every 500 ms by default), so without the barrier an acknowledged write is lost only if the
+//! kill lands before that tick. Here the kill follows the acknowledgment within milliseconds, and
+//! removing the barrier failed it every time on icn-dev, but a slow enough runner could let the
+//! mutant through. The recording-backend tests above are the timing-independent guard.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

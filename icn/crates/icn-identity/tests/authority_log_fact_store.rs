@@ -150,13 +150,20 @@ fn persistence_order_does_not_change_what_rehydrates() {
     let a1 = authorize_at(&alpha, 0, 1, alpha.genesis(), device(10));
     let a2 = authorize_at(&alpha, 0, 2, a1.body.event_id(), device(11));
     let a3 = authorize_at(&alpha, 0, 3, a2.body.event_id(), device(12));
-    let events = vec![a1, a2, a3];
+    // With the inception, `derive` answers `Live`; without it every order would agree on `Unknown`.
+    let events = vec![alpha.inception.clone(), a1, a2, a3];
 
     let mut expected = AuthorityStore::new();
     expected.ingest_all(&events);
+    assert!(matches!(
+        derive(alpha.subject, &expected),
+        icn_identity::authority_log::AuthorityView::Live { .. }
+    ));
 
     for order in permutations(&events) {
-        let disk = InMemoryAuthorityFactStore::new();
+        // `RawStore` returns rows in the order they were written. A sorted map would hand
+        // `rehydrate` the same order every time, and the test would prove nothing about order.
+        let disk = RawStore::default();
         persist_all(&disk, &order);
         let after =
             icn_identity::authority_log::rehydrate(&disk).expect("rehydration must succeed");
@@ -357,12 +364,14 @@ fn an_unauthorized_body_survives_the_round_trip_and_is_still_ignored_by_derive()
     // assertion comparing two `Unknown`s would hold no matter what storage did to the spam.
     let inception = alpha.inception.clone();
     let a1 = authorize_at(&alpha, 0, 1, alpha.genesis(), device(10));
+    // Signed by a key the log never authorized, at the very position an authorized successor of
+    // `a1` would take -- so the fold reaches it, and ignoring it is a decision `derive` makes.
     let (stranger_key, _) = authority_log_support::stranger(200);
     let spam = icn_identity::authority_log::authorize_event(
         &stranger_key,
         alpha.subject,
-        7,
-        alpha.genesis(),
+        2,
+        a1.body.event_id(),
         device(13),
         authority_log_support::caps(),
         None,
@@ -378,7 +387,7 @@ fn an_unauthorized_body_survives_the_round_trip_and_is_still_ignored_by_derive()
     assert_eq!(live.body_count(), 3);
 
     let disk = InMemoryAuthorityFactStore::new();
-    persist_all(&disk, &[inception, a1, spam.clone()]);
+    persist_all(&disk, &[inception.clone(), a1.clone(), spam.clone()]);
     let after = icn_identity::authority_log::rehydrate(&disk).expect("rehydration must succeed");
 
     // Round-trips intact: storage neither drops it nor promotes it.
@@ -390,15 +399,27 @@ fn an_unauthorized_body_survives_the_round_trip_and_is_still_ignored_by_derive()
     assert_eq!(after.bodies(), live.bodies());
     assert_eq!(after.witnesses(), live.witnesses());
 
-    // And derive still ignores it, before and after the round trip alike.
-    assert_eq!(derive(alpha.subject, &after), derive(alpha.subject, &live));
-    match derive(alpha.subject, &after) {
+    // And derive ignores it, before and after the round trip alike: the answer is exactly the one
+    // for the honest history alone, and the stranger's device was granted nothing.
+    let mut honest = AuthorityStore::new();
+    honest.ingest_all(&[inception.clone(), a1.clone()]);
+    assert_eq!(derive(alpha.subject, &live), derive(alpha.subject, &honest));
+    assert_eq!(
+        derive(alpha.subject, &after),
+        derive(alpha.subject, &honest)
+    );
+    let granted = |store: &AuthorityStore| match derive(alpha.subject, store) {
         icn_identity::authority_log::AuthorityView::Live { state, .. } => {
-            assert_eq!(
-                state.generation, 0,
-                "the unauthorized body must not advance authority"
-            );
+            state.devices.keys().copied().collect::<Vec<_>>()
         }
         other => panic!("expected a Live view, got {other:?}"),
-    }
+    };
+    assert_eq!(granted(&after), vec![device(10)]);
+
+    // Control: the same grant at the same position, signed by the subject's authority key, does
+    // take effect -- so "device 13 was not granted" above is a decision, not an unreached fold.
+    let authorized = authorize_at(&alpha, 0, 2, a1.body.event_id(), device(13));
+    let mut with_authorized = AuthorityStore::new();
+    with_authorized.ingest_all(&[inception, a1, authorized]);
+    assert!(granted(&with_authorized).contains(&device(13)));
 }

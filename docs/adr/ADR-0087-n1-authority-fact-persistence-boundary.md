@@ -60,9 +60,11 @@ made durable.
 | `FactStoreError` | the one error type both sides speak |
 | `fn rehydrate(&dyn AuthorityFactStore) -> Result<AuthorityStore, FactStoreError>` | the only way back from records to an admitted store |
 
-Everything else is crate-private. In particular the conversion from a record
-to an admitted event is reachable only through `rehydrate`, so storage cannot
-become a second admission path. An in-memory store is test code, not API.
+Everything else is crate-private. The conversion from a record to an admitted
+event is reachable only through `rehydrate`. That narrows the surface; it is
+not what makes storage safe. Admission is enforced at `AuthorityStore::ingest`,
+which re-checks every body whatever its source, so storage cannot widen what
+is admitted either way. An in-memory store is test code, not API.
 
 `icn_core::authority_facts` exports the adapter (`SledAuthorityFactStore`), its
 namespace prefix (`AUTHORITY_FACT_PREFIX = "authority/fact/"`), and the
@@ -159,9 +161,13 @@ change for implementors and needs this ADR amended.
 
 - No claim that a fact which never reached the store, or which vanished from
   the medium, is detectable. Frontier and completeness proofs are separate.
-- No power-loss proof. The tests show acknowledged facts survive the writing
-  process being killed. Survival across power loss rests on sled's flush
-  syncing to stable storage, which no test here observes.
+- No power-loss proof, and no claim of power-loss safety from sled.
+  The tests show acknowledged facts survive the writing process being killed.
+  In sled 0.34 on Linux, `flush` waits with `sync_file_range`. That does not
+  flush the drive's write cache or sync file metadata; sled issues a full
+  `fsync` only from its periodic flusher and on close. So the
+  acknowledgment is crash-of-process safe, and only best-effort against power
+  loss.
 - No daemon integration. Nothing in the runtime constructs this store yet.
 
 ## Consequences
@@ -198,7 +204,7 @@ wiring is separate follow-on work.
 
 | Alternative | Why rejected |
 |---|---|
-| Keep the first draft's wider exports (in-memory store, key-length constant, public record-to-event conversion) | Freezes test scaffolding and internals as API, and opens a second admission path beside `rehydrate`. |
+| Keep the first draft's wider exports (in-memory store, key-length constant, public record-to-event conversion) | Freezes test scaffolding and internals as API. The conversion was not a safety hole, because `AuthorityStore::ingest` re-checks admission whatever a body's source. But it was a second public route to the same place, with nothing to gain. |
 | Let callers call `Store::flush` themselves | Makes durability depend on every caller remembering it. The acknowledgment should mean one thing. |
 | Accept any `Store` and trust its `flush` | The trait's default `flush` is a no-op, so an in-memory or test store would acknowledge durability it does not provide. |
 | A plain marker trait `DurableStore: Store {}` over `Store::flush` | A first draft of this PR. A marker still lets an implementation claim durability while inheriting the no-op `flush`. A required method without a default does not. |

@@ -149,8 +149,9 @@ impl PersistedFact {
     ///
     /// The admission check is [`super::admissible_bytes`], the same free function of body and
     /// signature that gates a live event. Storage therefore cannot widen what is admissible.
-    /// Crate-private so that [`rehydrate`] is the only way a stored record becomes an admitted
-    /// event.
+    /// Crate-private because [`rehydrate`] is the supported way back from storage; this narrows the
+    /// API rather than closing a hole, since [`super::AuthorityStore::ingest`] re-checks admission
+    /// for any body whatever its source.
     pub(crate) fn into_admitted(self) -> Result<SignedAuthorityEvent, FactStoreError> {
         let body = admissible_bytes(&self.canonical_body, &self.signature)?;
         if body.event_id() != self.event_id {
