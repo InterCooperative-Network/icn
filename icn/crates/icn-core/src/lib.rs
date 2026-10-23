@@ -36,6 +36,7 @@ pub use apps::{
     Reducer, Request, Response, RuntimeError, Service, StateDelta, StateSnapshot,
 };
 pub mod data_dir_lock;
+pub use data_dir_lock::new_files_here_belong_to_the_directory_account;
 pub use data_dir_lock::refuse_if_new_files_would_not_belong_to_the_data_root_account;
 pub use data_dir_lock::DataDirLock;
 #[cfg(unix)]

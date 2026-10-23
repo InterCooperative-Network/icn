@@ -3410,7 +3410,7 @@ category = "guide"
 status = "living"
 title = "Backup and Recovery Guide"
 description = "Operator procedures for node backup and recovery"
-last_updated = "2026-03-10"
+last_updated = "2026-10-08"
 owner = "matt"
 audiences = ["operators"]
 
