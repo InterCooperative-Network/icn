@@ -1,111 +1,793 @@
 {
-  "schema": "icn-agents/v1",
-  "description": "Registry of all available specialist agents. Routing table for orchestrator and icn-dev skill. Edit here — do not maintain separate lists in prompt files.",
+  "schema": "icn-agents/v2",
+  "description": "Registry of every agent definition in a declared scope, the provider surface(s) that expose it, and the relationship between those surfaces. A provider directory is NOT canonical merely because a provider loads it: canonical routing identity lives here, prompt bodies live on the surfaces. Edit here -- scripts/check-agent-registry.py fails if this file and the trees disagree in either direction.",
+  "provider_surfaces": {
+    "claude": {
+      "tree": ".claude/agents",
+      "provider_type": "claude-code",
+      "loaded_by": "Claude Code, by directory convention."
+    },
+    "agent_pack": {
+      "tree": "tools/claude-code/plugins/icn-agent-pack/agents",
+      "provider_type": "claude-code",
+      "loaded_by": "The icn-agent-pack Claude Code plugin (tools/claude-code/plugins/icn-agent-pack/.claude-plugin/plugin.json), loaded when a developer installs the plugin. Its README states it complements rather than replaces the project-local .claude/ config, so an agent name here can coexist with a different body under .claude/agents."
+    },
+    "copilot": {
+      "tree": ".github/agents",
+      "provider_type": "github-copilot",
+      "loaded_by": "GitHub Copilot custom agents. Routed by .github/copilot-instructions.md; .github/agents/README.md documents the surface. NOTE: this field deliberately makes NO claim about which agents are automatically invocable. An earlier revision summarised that here and the summary was wrong -- it said every agent but icn-orchestrator declared infer: false, while icn-docs-synchronizer declares neither invocation key and is therefore automatically invocable. Nothing validated the prose. Per-agent automatic_invocation is the mechanically enforced answer; do not restate it here."
+    }
+  },
+  "mirror_pairs_note": "A record may additionally name mirror_pairs: surface pairs whose bodies MUST stay byte-identical, enforced by the checker even when the record as a whole is divergent. This exists because .github/copilot-instructions.md states that icn-code-reviewer 'mirrors its Claude counterpart' -- a claim that was documented and unenforced. A record-level relationship cannot express it once a third surface diverges.",
+  "relationship_model": {
+    "single_surface": "Exposed by exactly one provider. No cross-surface claim is made.",
+    "exact_mirror": "Exposed by every named surface with byte-identical bodies modulo provider front matter. MECHANICALLY ENFORCED: the checker re-compares the bodies, so a mirror that drifts fails rather than silently becoming a variant.",
+    "provider_variant": "Exposed by both providers with deliberately different bodies. Requires divergence.adjudicated = true and a why. Not enforced byte-wise, by definition.",
+    "divergent_unreviewed": "Exposed by both providers with different bodies whose intent has NOT been adjudicated. Requires divergence.owning_issue. This value exists so an unreviewed divergence is explicit debt rather than two unrelated definitions silently sharing one name."
+  },
+  "declared_scope": {
+    "out_of_scope": [
+      "Agent directories outside the repository -- for example a project-level ~/.claude/agents/ -- are machine-local. They are neither registered nor enforceable here. The icn-agents/v1 'orchestrator' record pointed at ../../../.claude/agents/orchestrator.md, which escapes the repository root; it named no in-repo file and no checker covered it, so it never failed. Removed rather than repointed: see the note on icn-orchestrator below.",
+      ".github/agents/README.md documents the Copilot surface and is not an agent definition. The same applies to any README.md in a surface tree.",
+      "`.codex/skills/*/agents/` directories exist but hold no agent definitions today. They sit inside skill trees owned by ops/state/truth/skills.json#enforcement.scan_scope, so they are that registry's territory, not this one's. If an agent definition ever lands there it must be declared as a surface here rather than absorbed silently.",
+      "Prompt CONTENT is out of scope here: this registry owns inventory and provider topology. An earlier revision said stale doctrine 'is enforced by forbidden_patterns'. That was FALSE and gave a false assurance. The only forbidden_patterns implementation is scripts/check-skill-registry.py, and skills.json#enforcement.scan_scope covers ops/automation/skills, .agents/skills and .claude/skills -- ZERO overlap with the three agent trees registered here. Prompt content on these surfaces is therefore enforced by NOTHING today, and known stale doctrine remains reachable, including a DID form the code rejects sitting behind an automatically invocable Copilot router. Closing that gap is icn#2632 STAGE 2, which must clean the existing violations and extend scan_scope in one tranche -- adding dirty trees to scan scope first would only turn a silent gap into a red gate. This file states the gap; it does not gate it.",
+      "The registry does not describe its own enforcement. An earlier revision carried an `enforcement` block naming the checker, its tests and its callers; nothing outside the checker ever dereferenced it, and four review rounds went into machinery proving a self-description no consumer needed. The gates are real and unchanged -- ops/scripts/drift-check.sh, scripts/check-preflight-consistency.sh and .github/workflows/agent-drift-check.yml each invoke the checker directly -- they simply do not need their identities copied into the agent-routing registry to do it."
+    ],
+    "completeness_claim": "Across every surface declared in provider_surfaces, every provider-loaded agent definition is represented exactly once, and every registered path maps back to a real provider definition. provider_surfaces is the ONE machine-readable owner of provider topology: an earlier revision also listed the in-scope globs here, which nothing read -- inventory is driven by provider_surfaces[].tree and the direct-child *.md convention -- so a glob added to that list changed no behaviour while making this claim false. scripts/check-agent-registry.py fails if either direction breaks.",
+    "supported_input_domain": {
+      "note": "The exact inputs scripts/check-agent-registry.py claims to decide correctly, and the ownership boundary it decides them under. Written down so a review finding can be classified rather than argued: a counterexample INSIDE this domain that the checker gets wrong is a defect; one outside it is a documented limitation. Derived from what the repository actually contains, what the implementation intentionally supports, and the provider conventions we claim to honour -- not from what is convenient to exclude. Adopted icn#2632 after ten consecutive review rounds in one defect class established that an unwritten domain cannot terminate a review.",
+      "ownership": {
+        "yaml_parse_validity": "A real YAML parser (PyYAML). The checker does not decide whether front matter is valid YAML and must never reimplement that. If ICN accepts a definition, a parser accepts it; the converse deliberately does not hold.",
+        "duplicate_top_level_keys": "ICN, explicitly. A YAML loader accepts a repeated key and silently keeps the last value; ICN refuses the ambiguity outright, because a routing or capability field certified as whichever value a loader happened to keep is not a certified field.",
+        "icn_registry_schema": "ICN. Root, record, surface-declaration and divergence vocabularies are CLOSED allowlists. An unrecognised key fails: it is most often a misspelling, which otherwise drops its meaning silently.",
+        "provider_surface_relationships": "ICN. single_surface, exact_mirror, provider_variant and divergent_unreviewed, plus mirror_pairs, with the declared and implemented vocabularies required equal in both directions.",
+        "logical_name_derivation": "ICN, provider-aware. github-copilot definitions may be spelled <name>.md or <name>.agent.md -- GitHub's configuration reference takes the file name 'minus .md or .agent.md'. claude-code has no .agent.md convention, so there the suffix is part of the name.",
+        "reachable_agent_routing": "ICN. routing_triggers must be nonempty: this file is the canonical owner of agent routing, and an empty list is the absence of a routing record wearing the shape of a satisfied field. not_for may be empty -- excluding nothing is an answer.",
+        "filesystem_and_truth_owner_accessibility": "ICN, fail-closed. A repository-controlled path is untrusted input: a directory named like a definition, a non-UTF-8 file, an unreadable truth owner, a symlink escaping the tree and a symlink cycle must each produce a FINDING. A checker that crashes reports nothing, and nothing reads as clean.",
+        "provider_native_syntax": "The provider definition. description, color, model, tools, target, mcp-servers, metadata, infer, disable-model-invocation and user-invocable are never copied here; the registry records derived SEMANTICS. A provider-owned key at any level of this document is refused."
+      },
+      "supported_front_matter": [
+        "A `---` delimited block whose root mapping begins at column 0.",
+        "Plain unquoted top-level keys. Quoted, explicit (`? key`), flow-mapping and space-before-colon spellings are valid YAML and are refused, because the line-based semantic readers would treat them as absent.",
+        "Values ICN CONSUMES (name, description, infer, disable-model-invocation, and provider-required fields) must be read identically by the line reader and by the parser. A value the two disagree about is refused rather than guessed at.",
+        "Values ICN does not consume are the provider's business: booleans, numbers, flow collections and multi-line forms are all accepted so long as the document parses."
+      ],
+      "required_execution_surfaces": [
+        {
+          "path": ".github/workflows/agent-drift-check.yml",
+          "kind": "ci",
+          "note": "Required check `Agent Tooling Drift Check`. Provisions the dependency and runs the checker."
+        },
+        {
+          "path": "ops/scripts/drift-check.sh",
+          "kind": "standalone",
+          "note": "Documented as runnable standalone; runs the checker, so it needs the dependency locally."
+        },
+        {
+          "path": "scripts/check-preflight-consistency.sh",
+          "kind": "standalone",
+          "note": "Same: runs the checker as part of preflight."
+        },
+        {
+          "path": "scripts/check-agent-registry.py",
+          "kind": "direct",
+          "note": "Run directly by contributors and by the invariants suite."
+        }
+      ],
+      "dependency_contract": "PyYAML is REQUIRED, declared in scripts/requirements.txt, installed by the workflow from that file, and its absence exits 1 with instructions rather than skipping the check. A correctness check that silently disappears reports the skip as a pass. Every authoritative description of the scripts/ surface -- including the generated agent context spine -- must say so.",
+      "explicitly_out_of_contract": [
+        "Deciding what a valid-YAML document MEANS beyond the keys listed above. Front matter ICN does not consume is the provider's contract, not this one's.",
+        "Repairing or normalising malformed input. Every unsupported form fails explicitly; nothing is interpreted as absence, default, or harmlessness.",
+        "Provider behaviour beyond the semantic projections declared in provider_metadata_ownership.",
+        "Agent directories outside the repository, which are machine-local and unenforceable -- see out_of_scope above."
+      ]
+    }
+  },
   "agents": [
     {
       "name": "icn-architect",
-      "path": ".claude/agents/icn-architect.md",
-      "color": "purple",
-      "routing_triggers": ["crate boundary", "cross-crate refactor", "public API", "kernel/app separation", "ADR", "protocol shape", "concurrency", "architecture"],
-      "not_for": ["economics/ledger (use icn-economist)", "deployment/ops (use icn-ops)"]
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
+      },
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-architect.md"
+        },
+        "claude": {
+          "path": ".claude/agents/icn-architect.md"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-architect.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "crate boundary",
+        "cross-crate refactor",
+        "public API",
+        "kernel/app separation",
+        "ADR",
+        "protocol shape",
+        "concurrency",
+        "architecture"
+      ],
+      "not_for": [
+        "economics/ledger (use icn-economist)",
+        "deployment/ops (use icn-ops)"
+      ]
+    },
+    {
+      "name": "icn-ci-reliability",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-ci-reliability.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "flaky or timing-dependent tests",
+        "CI/local build parity",
+        "nondeterministic build failures"
+      ],
+      "not_for": []
     },
     {
       "name": "icn-code-reviewer",
-      "path": ".claude/agents/icn-code-reviewer.md",
-      "routing_triggers": ["PR review", "diff review", "staged changes", "invariant check"],
+      "relationship": "divergent_unreviewed",
+      "mirror_pairs": [
+        [
+          "claude",
+          "copilot"
+        ]
+      ],
+      "divergence": {
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
+      },
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-code-reviewer.md"
+        },
+        "claude": {
+          "path": ".claude/agents/icn-code-reviewer.md"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-code-reviewer.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "PR review",
+        "diff review",
+        "staged changes",
+        "invariant check"
+      ],
       "not_for": []
     },
     {
       "name": "icn-design-advisor",
-      "path": ".claude/agents/icn-design-advisor.md",
-      "routing_triggers": ["docs/design", "docs/design-language", "website styles", "design system", "design tokens", "design language", "visual primitives", "closure loop", "accessibility audit", "WCAG", "content style", "regulatory-safe vocabulary", "action card", "receipt UI", "Claude Design", "design briefing", "concept map"],
-      "not_for": ["mobile-specific (use icn-mobile-advisor)", "kernel architecture (use icn-architect)"]
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-design-advisor.md"
+        }
+      },
+      "routing_triggers": [
+        "docs/design",
+        "docs/design-language",
+        "website styles",
+        "design system",
+        "design tokens",
+        "design language",
+        "visual primitives",
+        "closure loop",
+        "accessibility audit",
+        "WCAG",
+        "content style",
+        "regulatory-safe vocabulary",
+        "action card",
+        "receipt UI",
+        "Claude Design",
+        "design briefing",
+        "concept map"
+      ],
+      "not_for": [
+        "mobile-specific (use icn-mobile-advisor)",
+        "kernel architecture (use icn-architect)"
+      ]
+    },
+    {
+      "name": "icn-devnet-deploy",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-devnet-deploy.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "Docker/K8s manifests and Helm charts",
+        "deployment automation and config templates"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-docs-spec",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-docs-spec.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "documentation that disagrees with implementation",
+        "canonical docs updates after a semantic change"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-docs-synchronizer",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-docs-synchronizer.md",
+          "automatic_invocation": true
+        }
+      },
+      "routing_triggers": [
+        "onboarding guides and architecture references drifting from code"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-docs-truth-auditor",
+      "relationship": "single_surface",
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-docs-truth-auditor.md"
+        }
+      },
+      "routing_triggers": [
+        "claim safety and proof level in docs, READMEs, website copy",
+        "public API descriptions"
+      ],
+      "not_for": []
     },
     {
       "name": "icn-economics-advisor",
-      "path": ".claude/agents/icn-economics-advisor.md",
-      "routing_triggers": ["icn-ledger", "apps/ledger", "commons credit", "JournalEntry", "settlement flow", "EarningTracker", "credit ceiling", "commons earn", "commons spend"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-economics-advisor.md"
+        }
+      },
+      "routing_triggers": [
+        "icn-ledger",
+        "apps/ledger",
+        "commons credit",
+        "JournalEntry",
+        "settlement flow",
+        "EarningTracker",
+        "credit ceiling",
+        "commons earn",
+        "commons spend"
+      ],
       "not_for": []
     },
     {
       "name": "icn-economist",
-      "path": ".claude/agents/icn-economist.md",
-      "color": "green",
-      "routing_triggers": ["ledger logic", "CCL contracts", "mutual credit", "treasury", "mana", "settlement", "regulatory terminology", "payment->settlement renaming"],
-      "not_for": ["protocol architecture (use icn-architect)", "deployment (use icn-ops)"]
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
+      },
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-economist.md"
+        },
+        "claude": {
+          "path": ".claude/agents/icn-economist.md"
+        }
+      },
+      "routing_triggers": [
+        "ledger logic",
+        "CCL contracts",
+        "mutual credit",
+        "treasury",
+        "mana",
+        "settlement",
+        "regulatory terminology",
+        "payment->settlement renaming"
+      ],
+      "not_for": [
+        "protocol architecture (use icn-architect)",
+        "deployment (use icn-ops)"
+      ]
+    },
+    {
+      "name": "icn-gateway-api",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-gateway-api.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "icn-gateway HTTP API and validation changes",
+        "OpenAPI export and TypeScript type drift"
+      ],
+      "not_for": []
     },
     {
       "name": "icn-gossip-net",
-      "path": ".claude/agents/icn-gossip-net.md",
-      "routing_triggers": ["icn-gossip", "icn-net", "icn-protocol", "gossip", "anti-entropy", "QUIC", "TLS", "mDNS", "SignedEnvelope", "topic subscription"],
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
+      },
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-gossip-net.md"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-gossip-net.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "icn-gossip",
+        "icn-net",
+        "icn-protocol",
+        "gossip",
+        "anti-entropy",
+        "QUIC",
+        "TLS",
+        "mDNS",
+        "SignedEnvelope",
+        "topic subscription"
+      ],
       "not_for": []
     },
     {
       "name": "icn-governance-advisor",
-      "path": ".claude/agents/icn-governance-advisor.md",
-      "routing_triggers": ["icn-governance", "icn-ccl", "icn-community", "icn-coop", "icn-entity", "apps/governance", "proposal", "voting", "CCL semantics", "civic engine", "cooperative constitution"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-governance-advisor.md"
+        }
+      },
+      "routing_triggers": [
+        "icn-governance",
+        "icn-ccl",
+        "icn-community",
+        "icn-coop",
+        "icn-entity",
+        "apps/governance",
+        "proposal",
+        "voting",
+        "CCL semantics",
+        "civic engine",
+        "cooperative constitution"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-governance-ccl",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-governance-ccl.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "constitutions, proposals, voting, policy oracles",
+        "Cooperative Contract Language",
+        "governance proofs"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-homelab-infra",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-homelab-infra.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "K3s cluster, NFS storage, runner and network topology",
+        "homelab operational procedures"
+      ],
       "not_for": []
     },
     {
       "name": "icn-identity-iam-advisor",
-      "path": ".claude/agents/icn-identity-iam-advisor.md",
-      "routing_triggers": ["icn-identity", "icn-naming", "DID", "keystore", "key rotation", "capability token", "DID-TLS", "bearer token", "IAM"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-identity-iam-advisor.md"
+        }
+      },
+      "routing_triggers": [
+        "icn-identity",
+        "icn-naming",
+        "DID",
+        "keystore",
+        "key rotation",
+        "capability token",
+        "DID-TLS",
+        "bearer token",
+        "IAM"
+      ],
       "not_for": []
     },
     {
       "name": "icn-invariants-guardian",
-      "path": ".claude/agents/icn-invariants-guardian.md",
-      "routing_triggers": ["invariant check", "safety review", "pre-merge review", "adversarial-by-default", "determinism", "canonical encodings"],
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
+      },
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-invariants-guardian.md"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-invariants-guardian.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "invariant check",
+        "safety review",
+        "pre-merge review",
+        "adversarial-by-default",
+        "determinism",
+        "canonical encodings"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-ledger-econ",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-ledger-econ.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "mutual credit and balance integrity",
+        "demurrage and transaction validation",
+        "economic policy primitives"
+      ],
       "not_for": []
     },
     {
       "name": "icn-mobile-advisor",
-      "path": ".claude/agents/icn-mobile-advisor.md",
-      "routing_triggers": ["sdk/react-native", "mobile", "React Native", "CoopWallet", "five-tab navigation", "mobile SDK", "offline-first", "mobile identity"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-mobile-advisor.md"
+        }
+      },
+      "routing_triggers": [
+        "sdk/react-native",
+        "mobile",
+        "React Native",
+        "CoopWallet",
+        "five-tab navigation",
+        "mobile SDK",
+        "offline-first",
+        "mobile identity"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-monitoring",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-monitoring.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "Prometheus rules and Grafana dashboards",
+        "alerting and distributed tracing",
+        "alert cardinality"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-navigator",
+      "relationship": "single_surface",
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-navigator.md"
+        }
+      },
+      "routing_triggers": [
+        "mapping crates, subsystems and claims",
+        "tracing a concept or claim to its source"
+      ],
       "not_for": []
     },
     {
       "name": "icn-ops",
-      "path": ".claude/agents/icn-ops.md",
-      "color": "orange",
-      "routing_triggers": ["K3s", "cluster", "demo flow", "CI/CD health", "pod", "release readiness", "pre-deployment", "ops/mcp", "disk space", "icn-dev VM"],
-      "not_for": ["protocol design (use icn-architect)", "economics (use icn-economist)"]
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
+      },
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-ops.md"
+        },
+        "claude": {
+          "path": ".claude/agents/icn-ops.md"
+        }
+      },
+      "routing_triggers": [
+        "K3s",
+        "cluster",
+        "demo flow",
+        "CI/CD health",
+        "pod",
+        "release readiness",
+        "pre-deployment",
+        "ops/mcp",
+        "disk space",
+        "icn-dev VM"
+      ],
+      "not_for": [
+        "protocol design (use icn-architect)",
+        "economics (use icn-economist)"
+      ]
+    },
+    {
+      "name": "icn-orchestrator",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-orchestrator.md",
+          "automatic_invocation": true
+        }
+      },
+      "routing_triggers": [
+        "work spanning multiple subsystems",
+        "decomposing a request into a parallelizable plan"
+      ],
+      "not_for": []
     },
     {
       "name": "icn-planner",
-      "path": ".claude/agents/icn-planner.md",
-      "routing_triggers": ["planning", "task breakdown", "dependency analysis", "merge ordering", "sprint planning"],
-      "not_for": ["implementation (plans only)"]
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
+      },
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-planner.md"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-planner.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "planning",
+        "task breakdown",
+        "dependency analysis",
+        "merge ordering",
+        "sprint planning"
+      ],
+      "not_for": [
+        "implementation (plans only)"
+      ]
+    },
+    {
+      "name": "icn-pr-writer",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-pr-writer.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "PR descriptions, commit messages and changelog entries"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-refactoring",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-refactoring.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "behaviour-preserving transformations",
+        "crate restructuring and API migrations"
+      ],
+      "not_for": []
     },
     {
       "name": "icn-rust-core",
-      "path": ".claude/agents/icn-rust-core.md",
-      "routing_triggers": ["Rust implementation", "crate change", "daemon", "kernel interface", "actor runtime", "storage", "encoding", "protocol implementation"],
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
+      },
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-rust-core.md"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-rust-core.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "Rust implementation",
+        "crate change",
+        "daemon",
+        "kernel interface",
+        "actor runtime",
+        "storage",
+        "encoding",
+        "protocol implementation"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-sdk-web",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-sdk-web.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "TypeScript and React Native SDKs",
+        "Pilot UI and web dashboard changes"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-security-auditor",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-security-auditor.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "threat modelling and attack-surface analysis",
+        "security-focused code review"
+      ],
       "not_for": []
     },
     {
       "name": "icn-security-reviewer",
-      "path": ".claude/agents/icn-security-reviewer.md",
-      "routing_triggers": ["cryptography", "authentication", "key handling", "replay attack", "JWT", "signed envelope", "rate limiting", "security review"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-security-reviewer.md"
+        }
+      },
+      "routing_triggers": [
+        "cryptography",
+        "authentication",
+        "key handling",
+        "replay attack",
+        "JWT",
+        "signed envelope",
+        "rate limiting",
+        "security review"
+      ],
       "not_for": []
     },
     {
       "name": "icn-test-generator",
-      "path": ".claude/agents/icn-test-generator.md",
-      "routing_triggers": ["icn-testkit", "write tests", "integration test", "multi-node", "property-based test", "TestNode", "convergence test"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-test-generator.md"
+        }
+      },
+      "routing_triggers": [
+        "icn-testkit",
+        "write tests",
+        "integration test",
+        "multi-node",
+        "property-based test",
+        "TestNode",
+        "convergence test"
+      ],
       "not_for": []
     },
     {
       "name": "icn-trust-federation-advisor",
-      "path": ".claude/agents/icn-trust-federation-advisor.md",
-      "routing_triggers": ["icn-trust", "icn-federation", "TrustPolicyOracle", "trust score", "trust-gated", "federation treaty", "cross-coop", "bottleneck algorithm"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-trust-federation-advisor.md"
+        }
+      },
+      "routing_triggers": [
+        "icn-trust",
+        "icn-federation",
+        "TrustPolicyOracle",
+        "trust score",
+        "trust-gated",
+        "federation treaty",
+        "cross-coop",
+        "bottleneck algorithm"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-trust-identity",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-trust-identity.md",
+          "automatic_invocation": false
+        }
+      },
+      "routing_triggers": [
+        "DIDs, credentials and trust graphs",
+        "scope-bounded and trust-gated behaviour",
+        "SDIS enrolment and membership credentials"
+      ],
       "not_for": []
     }
   ],
-  "orchestrator": {
-    "name": "orchestrator",
-    "path": "../../../.claude/agents/orchestrator.md",
-    "note": "Lives at project-level .claude/agents/. Cross-repo coordinator.",
-    "routing_triggers": ["cross-repo task", "birds-eye view", "unfamiliar area", "multiple repos"]
-  }
+  "provider_metadata_ownership": {
+    "principle": "The registry owns logical identity, surface topology, relationships, and semantic projections that are organizationally meaningful. A provider definition owns its own native syntax. The translation between them is owned by scripts/check-agent-registry.py, so the shape is provider syntax -> provider adapter -> stable registry claim, never provider syntax <-> duplicated provider syntax. A value appears in both places only when the checker pins the registry's claim: an enforced projection is not a second owner; an unenforced copy is.",
+    "owned_here": {
+      "surfaces.<surface>.automatic_invocation": "Can this provider surface cause the agent to be selected WITHOUT an explicit invocation? That question is organizationally meaningful -- it is the difference between an agent that influences ICN work on request and one that can influence it unbidden, which is the population this registry exists to enumerate. It is a SEMANTIC projection, not a provider key: the previous revision stored Copilot's raw `infer`, which GitHub has since retired, so the registry was pinned to obsolete syntax. Derived per surface by the checker's adapter and re-derived on every run.",
+      "derivation.copilot": "disable-model-invocation when present (inverted), else the retired `infer`, else true. Verified against https://docs.github.com/en/copilot/reference/custom-agents-configuration on 2026-08-30: `infer` is RETIRED with default true; `disable-model-invocation` replaces it, defaults to false, and takes precedence when both are present. An agent declaring neither key IS automatically invocable -- recording that absence as unknown would be truthful about syntax and false about behaviour."
+    },
+    "owned_by_the_provider": {
+      "description / color / model / tools / target / mcp-servers / metadata": "Provider-native. No consumer read them from the registry -- verified across every agents.json reader -- so 71 copies were removed and the checker now rejects them coming back.",
+      "infer / disable-model-invocation / user-invocable": "Provider SYNTAX. The registry records the derived automatic_invocation semantic instead, so a provider renaming its key does not change the registry's concept. Recording the raw keys is rejected.",
+      "provider_front_matter_keys (removed)": "This surface field listed each provider's front-matter keys and had ZERO consumers -- verified across the branch. It had already rotted: the copilot surface still listed `infer`, the key GitHub retired and this registry stopped modelling. Removed rather than synchronised, per the rule this file now follows."
+    },
+    "deliberately_not_projected": {
+      "user-invocable": "GitHub documents it (default true) and it would project cleanly as manual_invocation. NOT added: no ICN consumer or invariant needs to answer 'can a person pick this agent by hand', and the registry must not grow a projection merely because the provider supports the field. Add it when a real consumer appears, not before."
+    },
+    "registry_native": "name, surfaces, relationship, mirror_pairs, divergence, routing_triggers and not_for exist only here. They are cross-provider routing intent and topology, so no provider file is their source and nothing needs pinning."
+  },
+  "provider_type_note": "provider_type names the provider TECHNOLOGY and is what semantic adapters dispatch on. The surface key beside it ('claude', 'copilot', 'agent_pack') is an arbitrary logical label and carries no behaviour: renaming it must not change enforcement. Two surfaces may share a provider_type -- .claude/agents and the icn-agent-pack plugin tree are both loaded by Claude Code -- and a provider_type with no adapter in scripts/check-agent-registry.py#PROVIDER_ADAPTERS fails rather than silently projecting nothing. A type that genuinely projects no organizational behaviour maps to an explicit empty adapter, so 'projects nothing' is a decision rather than an omission."
 }
