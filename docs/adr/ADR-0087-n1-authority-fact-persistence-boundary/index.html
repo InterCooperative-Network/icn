@@ -1,0 +1,329 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="ACCEPTED 2026-10-23. The N1-D persistence boundary between icn-identity and icn-core. Four public items: the AuthorityFactStore trait, the opaque PersistedFact record (key = event_id || signature, value = canonical body bytes), FactStoreError and rehydrate. Duplicate writes are semantically idempotent. put_fact Ok is the durability acknowledgment, behind a required DurableStore::sync_durable barrier: process-crash safe, best-effort against power loss with sled 0.34. put_fact does not validate admission; producers must, and rehydration re-validates every record and fails closed. No daemon integration exists."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR-0087: N1 authority-fact persistence boundary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0087 n1 authority fact persistence boundary</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Decision record</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-10-23</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="adr-0087-n1-authority-fact-persistence-boundary">ADR-0087: N1 authority-fact persistence boundary</h1>
+<h2 id="status">Status</h2>
+<p><strong><code>accepted</code> (2026-10-23).</strong> Drafted with #2800. The maintainer (Matt Faherty,
+the decider) approved its direction and substantive decisions on 2026-10-23,
+with three documentation clarifications that are applied in this text:</p>
+<ul>
+<li>§1: the four-item surface is the persistence boundary, not every export of
+the module;</li>
+<li>§3: duplicate writes are semantically idempotent, not skipped;</li>
+<li>§5: <code>put_fact</code> does not validate admission.</li>
+</ul>
+<p>The approval was given as a written instruction in #2800&#39;s delivery session.
+ADR-0018 requires no separate signature.</p>
+<p>Decision status and implementation status are separate axes (ADR-0018). The
+implementation is on #2800&#39;s branch and is not merged, and nothing in the
+daemon uses it yet.</p>
+<h2 id="context">Context</h2>
+<p>N1&#39;s durable layer is two grow-only sets — admitted authority bodies and their
+witnesses — from which <code>derive</code> computes authority as a pure function
+(HUMAN_IDENTITY_ARCHITECTURE §9.2). N1-D (#2799) makes those sets survive a
+restart of the process that holds them.</p>
+<p>That needs a boundary between two crates. <code>icn-identity</code> is kernel-class and
+carries no storage dependency, so it cannot own a backend. <code>icn-core</code> owns the
+runtime&#39;s storage, so it cannot be trusted to decide what a stored record
+means. Whatever crosses between them becomes a compatibility surface: other
+crates can depend on it, and records written through it outlive the code that
+wrote them.</p>
+<p>Review of #2800 found that the first draft exported more than that boundary
+needs (an in-memory test store, a key-length constant, a method that turns a
+record into an admitted event without going through <code>rehydrate</code>), had no
+recorded decision behind any of it, and acknowledged writes that had not been
+made durable.</p>
+<h2 id="decision">Decision</h2>
+<h3 id="1-the-persistence-boundarys-public-surface-is-four-items">1. The persistence boundary&#39;s public surface is four items</h3>
+<p>For the N1-D persistence boundary, <code>icn_identity::authority_log</code> exports
+exactly these four items. The module exports other things — bodies,
+construction, derivation, the in-memory <code>AuthorityStore</code> — which this ADR
+neither adds nor governs.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Why it is public</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>trait AuthorityFactStore { put_fact, load_facts }</code></td>
+<td>the contract a medium implements; <code>icn-core</code> implements it</td>
+</tr>
+<tr>
+<td><code>PersistedFact</code> (opaque) with <code>from_event</code>, <code>key</code>, <code>value</code>, <code>from_key_value</code></td>
+<td>the record a medium moves; a writer builds it from an admitted event, a backend round-trips its bytes</td>
+</tr>
+<tr>
+<td><code>FactStoreError</code></td>
+<td>the one error type both sides speak</td>
+</tr>
+<tr>
+<td><code>fn rehydrate(&amp;dyn AuthorityFactStore) -&gt; Result&lt;AuthorityStore, FactStoreError&gt;</code></td>
+<td>the only way back from records to an admitted store</td>
+</tr>
+</tbody></table>
+<p>Everything else of the persistence module is crate-private. The conversion from a record to an admitted
+event is reachable only through <code>rehydrate</code>. That narrows the surface; it is
+not what makes storage safe. Admission is enforced at <code>AuthorityStore::ingest</code>,
+which re-checks every body whatever its source, so storage cannot widen what
+is admitted either way. An in-memory store is test code, not API.</p>
+<p><code>icn_core::authority_facts</code> exports the adapter (<code>SledAuthorityFactStore</code>), its
+namespace prefix (<code>AUTHORITY_FACT_PREFIX = &quot;authority/fact/&quot;</code>), and the
+<code>DurableStore</code> durability trait (§4).</p>
+<h3 id="2-the-record-encoding">2. The record encoding</h3>
+<pre><code class="language-text">key   = event_id (32 bytes) || witness signature (64 bytes)
+value = canonical_bytes(body)
+</code></pre>
+<p>The key is the witness element itself. The value is the body&#39;s canonical
+encoding (<code>authority_log/body.rs</code>), which opens with the length-prefixed
+<code>icn.authority-log</code> domain separator and the protocol version. The record adds no framing of its own.
+The adapter stores a record under its namespace prefix followed by the key
+verbatim, and never re-encodes the key.</p>
+<h3 id="3-idempotence-and-duplicates">3. Idempotence and duplicates</h3>
+<p>A record&#39;s key is its identity, so writing a record that is already present is
+<strong>semantically idempotent</strong>: the held set is unchanged, and the write is not an
+error. That describes the outcome, not a skipped operation. The <code>icn-core</code>
+adapter still performs the physical write and the durability barrier on every
+call, duplicate or not. Two valid signatures over one body are two records, which
+rehydrate to one body and two witnesses. Choosing between them would be a
+content tiebreak the durable lattice forbids (§9.2.1).</p>
+<h3 id="4-the-durability-acknowledgment">4. The durability acknowledgment</h3>
+<p><code>put_fact</code> returning <code>Ok</code> is the acknowledgment. It means the record has
+crossed the implementation&#39;s persistence barrier and survives a restart of the
+process. An implementation that cannot make that true must not return <code>Ok</code>. On
+<code>Err</code> the record may or may not be held. It was not acknowledged, and writing
+it again is safe (§3).</p>
+<p>The <code>icn-core</code> adapter writes, then calls the backend&#39;s durability barrier,
+and acknowledges only if both succeed. <code>Store::flush</code> cannot be that barrier,
+because it defaults to a no-op that any implementation inherits silently. So
+the adapter accepts only <code>Arc&lt;dyn DurableStore&gt;</code>, where
+<code>DurableStore: Store</code> has one required method, <code>sync_durable</code>, with <strong>no
+default</strong>. <code>SledStore</code> implements it with its flush (how far that reaches is
+in §9); nothing else in production implements it.</p>
+<p>A backend becomes eligible only through an explicit <code>impl</code> that writes its
+barrier out. A no-op barrier can exist only where someone wrote one, in code a
+reviewer reads. The constructor&#39;s type enforces this at compile time: a plain
+<code>Arc&lt;dyn Store&gt;</code> is rejected.</p>
+<p>This is a claim made visible, not a proof. Nothing can check that an
+implementation&#39;s barrier really does what it claims. The trait is not
+sealed, because tests in other crates need fault-injecting implementations.</p>
+<p>The cost is one flush per fact. N1 events are rare, bounded per subject and
+written at authority transitions. A batched write that flushes once per batch
+is the right optimization when a caller shows it needs one.</p>
+<h3 id="5-rehydration-and-admission">5. Rehydration and admission</h3>
+<p><code>rehydrate</code> re-admits every record through <code>admissible_bytes</code>, the same
+state-independent gate a live event passes, then checks that the key&#39;s digest
+matches the decoded body, then ingests. Admission proves only that some key
+signed these bytes. A well-formed body signed by an unauthorized key is
+admitted, stored and rehydrated like any other, and is excluded by <code>derive</code>,
+exactly as it is live. Storage neither drops nor promotes it.</p>
+<p><strong><code>put_fact</code> does not validate admission.</strong> It persists whatever record it is
+handed. A runtime producer must admit a fact through <code>AuthorityStore::ingest</code>,
+or <code>admissible</code>, before persisting it.</p>
+<p>Rehydration validates every loaded record again, independently, and fails
+closed (§7). So a record that should never have been written cannot become
+admitted state. It can, however, make every later rehydration refuse. That is
+why validation on the producer side is required, not optional.</p>
+<h3 id="6-ordering">6. Ordering</h3>
+<p>None is promised and none is needed. Bodies order by their canonical bytes, so
+the rebuilt sets do not depend on the order a backend returns rows. A backend
+may return records in any order.</p>
+<h3 id="7-corruption-fails-closed">7. Corruption fails closed</h3>
+<p><code>rehydrate</code> stops at the first record it cannot admit and returns the error:</p>
+<ul>
+<li>a key of the wrong length;</li>
+<li>a value that does not decode, or carries an unknown protocol version;</li>
+<li>a key that names a different body than its value encodes;</li>
+<li>a row outside the namespace.</li>
+</ul>
+<p>There is no &quot;skipped&quot; or &quot;repaired&quot; outcome. A partially rehydrated store is a
+different history from the one persisted, and returning it would let one bad
+row silently change derived authority. What a caller does with the refusal is
+the caller&#39;s decision (see the follow-on daemon design in #2800). It must not
+be &quot;start empty&quot;.</p>
+<h3 id="8-versioning-and-evolution">8. Versioning and evolution</h3>
+<p>The version lives in the body encoding. A record written by a future encoding
+is refused as inadmissible, not guessed at. A change to the record layout
+(key shape or value framing) is a breaking change to persisted data. It must
+use a new namespace prefix or an explicit migration, and must never reinterpret
+existing rows in place. Adding a method to <code>AuthorityFactStore</code> is a breaking
+change for implementors and needs this ADR amended.</p>
+<h3 id="9-what-this-does-not-claim">9. What this does not claim</h3>
+<ul>
+<li>No claim that a fact which never reached the store, or which vanished from
+the medium, is detectable. Frontier and completeness proofs are separate.</li>
+<li>No power-loss proof, and no claim of power-loss safety from sled.
+The tests show acknowledged facts survive the writing process being killed.
+In sled 0.34 on Linux, <code>flush</code> waits with <code>sync_file_range</code>. That does not
+flush the drive&#39;s write cache or sync file metadata; sled issues a full
+<code>fsync</code> only from its periodic flusher and on close. So the
+acknowledgment is crash-of-process safe, and only best-effort against power
+loss.</li>
+<li>No daemon integration. Nothing in the runtime constructs this store yet.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li><code>icn-identity</code> gains a small, deliberate, documented storage contract and no
+storage dependency.</li>
+<li>Every acknowledged fact costs a flush.</li>
+<li>A new backend must opt in to <code>DurableStore</code>. Someone wiring an in-memory
+store into the adapter &quot;for now&quot; gets a compile error, not a silent loss of
+durability.</li>
+<li>The persisted record layout becomes a compatibility commitment from the
+first write on a real node (§8).</li>
+</ul>
+<h2 id="implementation-status">Implementation status</h2>
+<p>Implemented by #2800, which covers §1–§7:</p>
+<ul>
+<li>the narrowed exports;</li>
+<li>the flush-then-acknowledge adapter;</li>
+<li>the <code>DurableStore</code> trait with its required barrier;</li>
+<li>fail-closed rehydration.</li>
+</ul>
+<p>The evidence is in #2800&#39;s tests:</p>
+<ul>
+<li>the contract against an in-memory store;</li>
+<li>a real sled store closed and reopened;</li>
+<li>a deterministic fault-injection backend proving acknowledgment only after a
+successful flush, failure propagation, and safe retry;</li>
+<li>a child process SIGKILLed after acknowledging, with its facts present on
+reopen.</li>
+</ul>
+<p>The decision is accepted. The implementation counts as landed only once #2800
+merges. Daemon wiring is separate follow-on work, and no producer exists yet
+to do the admission §5 requires before persisting.</p>
+<h2 id="alternatives-considered">Alternatives Considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Keep the first draft&#39;s wider exports (in-memory store, key-length constant, public record-to-event conversion)</td>
+<td>Freezes test scaffolding and internals as API. The conversion was not a safety hole, because <code>AuthorityStore::ingest</code> re-checks admission whatever a body&#39;s source. But it was a second public route to the same place, with nothing to gain.</td>
+</tr>
+<tr>
+<td>Let callers call <code>Store::flush</code> themselves</td>
+<td>Makes durability depend on every caller remembering it. The acknowledgment should mean one thing.</td>
+</tr>
+<tr>
+<td>Accept any <code>Store</code> and trust its <code>flush</code></td>
+<td>The trait&#39;s default <code>flush</code> is a no-op, so an in-memory or test store would acknowledge durability it does not provide.</td>
+</tr>
+<tr>
+<td>A plain marker trait <code>DurableStore: Store {}</code> over <code>Store::flush</code></td>
+<td>A first draft of this PR. A marker still lets an implementation claim durability while inheriting the no-op <code>flush</code>. A required method without a default does not.</td>
+</tr>
+<tr>
+<td>A sealed trait</td>
+<td>Tests in other crates (fault injection) could not implement it, so the failure paths would go untested.</td>
+</tr>
+<tr>
+<td>Add an <code>is_durable()</code> method to <code>Store</code> and check it at runtime</td>
+<td>Widens a shared trait for one consumer, and moves the failure to run time.</td>
+</tr>
+<tr>
+<td>Skip unreadable records during rehydration</td>
+<td>Silently changes the derived authority. A refusal is the only outcome that cannot be mistaken for a smaller history.</td>
+</tr>
+</tbody></table>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0087-n1-authority-fact-persistence-boundary.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
