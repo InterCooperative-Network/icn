@@ -416,16 +416,19 @@ impl MarkerSeen {
 }
 
 /// A [`MarkerSeen`] for `root` if anything is at its marker's name, `None` if
-/// nothing is. Being unable to tell is an error, as everywhere here.
+/// nothing is. Being unable to tell is an error, as everywhere here -- and that
+/// includes a `root` that does not resolve. Nothing found through a path that
+/// leads nowhere was never looked for: after a restore moved `store` aside,
+/// `<root>/store/..` is such a path, and answering `None` for it would report
+/// a root with an incomplete restore as one with nothing to recover.
 pub fn marker_seen(root: &Path) -> Result<Option<MarkerSeen>> {
-    let path = restore_marker_path(root);
+    let resolved = std::fs::canonicalize(root)
+        .with_context(|| format!("Failed to resolve {}", root.display()))?;
+    let path = resolved.join(RESTORE_INCOMPLETE_FILE_NAME);
     match std::fs::symlink_metadata(&path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e).with_context(|| format!("Failed to inspect {}", path.display())),
-        Ok(_) => Ok(Some(MarkerSeen {
-            root: std::fs::canonicalize(root)
-                .with_context(|| format!("Failed to resolve {}", root.display()))?,
-        })),
+        Ok(_) => Ok(Some(MarkerSeen { root: resolved })),
     }
 }
 
@@ -687,6 +690,18 @@ mod tests {
         assert!(
             RestoreRecord::parse(&text.replacen(" 1790000000123456789 ", " soon ", 1)).is_err()
         );
+    }
+
+    #[test]
+    fn a_root_that_does_not_resolve_is_not_one_without_a_marker() {
+        let dir = tempfile::TempDir::new().unwrap();
+        assert!(marker_seen(dir.path()).unwrap().is_none());
+        drop(RestoreInProgress::begin(dir.path(), record()).unwrap());
+        assert!(marker_seen(dir.path()).unwrap().is_some());
+        // Through an entry that is not there, the marker cannot be looked for.
+        let through_a_missing_entry = dir.path().join("store").join("..");
+        assert!(marker_seen(&through_a_missing_entry).is_err());
+        assert!(marker_seen(&dir.path().join("absent")).is_err());
     }
 
     #[test]

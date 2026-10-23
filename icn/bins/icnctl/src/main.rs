@@ -8879,6 +8879,29 @@ fn refuse_unless_restore_made_this_move_aside_dir(data_dir: &Path, aside: &Path)
     Ok(())
 }
 
+/// The data root whose incomplete restore moved its previous contents into
+/// `dir`, if that is what `dir` is: named as restore names a move-aside
+/// directory (`<root>.backup-<digits>`, beside the root), with a marker on that
+/// root whose record names `dir` -- or a marker whose record cannot be read,
+/// which cannot rule it out.
+fn root_whose_move_aside_is(dir: &Path) -> Option<PathBuf> {
+    let (stem, stamp) = dir.file_name()?.to_str()?.rsplit_once(".backup-")?;
+    if stem.is_empty() || stamp.is_empty() || !stamp.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let root = dir.parent()?.join(stem);
+    std::fs::symlink_metadata(icn_core::restore_marker_path(&root)).ok()?;
+    match icn_core::read_restore_record(&root) {
+        Ok(Some(record)) => record
+            .move_aside
+            .as_deref()
+            .is_some_and(|aside| std::fs::canonicalize(aside).is_ok_and(|aside| aside == dir))
+            .then_some(root),
+        Ok(None) => None,
+        Err(_) => Some(root),
+    }
+}
+
 /// `icnctl restore --recover-incomplete`: put a root whose restore did not
 /// finish back as it was, verify it, and only then clear the restore's marker.
 ///
@@ -8902,19 +8925,58 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
             data_dir.display()
         );
     }
+    // The one root this recovery works on: resolved once, before anything else,
+    // and the only path used from here on. An interrupted restore can have moved
+    // some of the root's entries aside, and a spelling that passes through one of
+    // them -- `<root>/store/..`, or `..` typed from inside one -- then leads
+    // nowhere, or somewhere else. No marker found that way says nothing about the
+    // root, so it is never reported as nothing to recover.
+    let root = match std::fs::canonicalize(data_dir) {
+        Ok(root) if root.is_dir() => root,
+        Ok(root) => bail!(
+            "Refusing to recover {}: it resolves to {}, which is not a directory. Name the data \
+             directory itself.",
+            data_dir.display(),
+            root.display()
+        ),
+        Err(e) => bail!(
+            "Refusing to recover {}: that path does not lead to a directory ({e}), so whether a \
+             restore is incomplete cannot be checked through it. An interrupted restore may have \
+             moved some of the data directory's entries aside, and a path through one of them \
+             (such as `<data-dir>/store/..`, or `..` typed from inside one) then leads nowhere. \
+             Name the data directory itself, by the absolute path the interrupted restore \
+             printed. Nothing was changed.",
+            data_dir.display()
+        ),
+    };
     // Nothing at the marker's name: nothing to recover, and nothing to lock or
     // touch. (A restore that is running holds the root; once its marker is
     // there, the lock below refuses this recovery until that restore ends.)
-    let Some(seen) = icn_core::marker_seen(data_dir).with_context(|| {
+    let Some(seen) = icn_core::marker_seen(&root).with_context(|| {
         format!(
             "Failed to tell whether a restore of {} is incomplete",
-            data_dir.display()
+            root.display()
         )
     })?
     else {
+        // Unless this is not a data root at all, but the directory a restore
+        // moved one's contents into -- where `..` from inside a moved entry
+        // leads.
+        if let Some(owner) = root_whose_move_aside_is(&root) {
+            bail!(
+                "Refusing to recover {}: it resolves to {}, which is not a data directory but \
+                 where the incomplete restore of {} moved that directory's previous contents. \
+                 Recover that one: run `icnctl --data-dir {} restore --recover-incomplete`. \
+                 Nothing was changed.",
+                data_dir.display(),
+                root.display(),
+                owner.display(),
+                owner.display()
+            );
+        }
         println!(
             "No restore of {} is incomplete; there is nothing to recover.",
-            data_dir.display()
+            root.display()
         );
         return Ok(());
     };
@@ -8922,7 +8984,7 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
     // someone removed it by hand); the configuration lock may create its file,
     // so it is taken only once the account is known to own the directory.
     let storage =
-        icn_core::DataDirLock::acquire_for_restore_recovery(data_dir, "this recovery", &seen)?;
+        icn_core::DataDirLock::acquire_for_restore_recovery(&root, "this recovery", &seen)?;
     // Recovery moves files where its record says, and the record lives in the
     // data directory: whoever can write that directory can write it. So
     // recovery runs only as the account that owns the directory -- the rule
@@ -8930,53 +8992,48 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
     // anything that account could not move on its own. A root-run recovery
     // over a service-owned directory is exactly the crossing this refuses.
     // Asked under the lock, as restore asks it.
-    institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(
-        data_dir,
-    )?;
-    refuse_unless_only_the_owner_can_write(data_dir)?;
-    let config = icn_core::DataDirLock::acquire_config_for_restore_recovery(
-        data_dir,
-        "this recovery",
-        &seen,
-    )?;
-    let record = match icn_core::read_restore_record(data_dir).with_context(|| {
+    institution_runtime_root::refuse_if_new_files_would_not_belong_to_the_data_root_account(&root)?;
+    refuse_unless_only_the_owner_can_write(&root)?;
+    let config =
+        icn_core::DataDirLock::acquire_config_for_restore_recovery(&root, "this recovery", &seen)?;
+    let record = match icn_core::read_restore_record(&root).with_context(|| {
         format!(
             "Refusing to recover {}: its restore marker cannot be read, so what it held before \
              cannot be checked. Recover it by hand (see \"If a restore does not finish\" in the \
              backup and recovery guide), then remove the marker yourself.",
-            data_dir.display()
+            root.display()
         )
     })? {
         Some(record) => record,
         None => {
             println!(
                 "No restore of {} is incomplete; there is nothing to recover.",
-                data_dir.display()
+                root.display()
             );
             return Ok(());
         }
     };
     if let Some(aside) = record.move_aside.as_deref() {
-        refuse_unless_restore_made_this_move_aside_dir(data_dir, aside)?;
+        refuse_unless_restore_made_this_move_aside_dir(&root, aside)?;
     }
 
-    let root_dev = device_of(data_dir)?;
+    let root_dev = device_of(&root)?;
 
     // A restore can have got all the way through -- moved, extracted, flushed
     // and verified -- and been stopped before its marker was gone. The root
     // then holds the archive, and treating that as "not there before" would
     // walk the operator into undoing a finished restore. So the archive the
     // record names is checked first, strictly (see `archive_verdict`).
-    let verdict = archive_verdict(data_dir, &record, root_dev)?;
+    let verdict = archive_verdict(&root, &record, root_dev)?;
     if matches!(verdict, ArchiveVerdict::Matches) {
-        sync_tree(data_dir)?;
+        sync_tree(&root)?;
         storage.assert_still_anchored("this recovery")?;
         config.assert_still_anchored("this recovery")?;
-        icn_core::RestoreInProgress::resume(data_dir)?.finish()?;
+        icn_core::RestoreInProgress::resume(&root)?.finish()?;
         println!(
             "✓ The restore of {} had finished: every entry, its type and permissions, and every \
              file's contents match {:?}. Its marker is cleared.",
-            data_dir.display(),
+            root.display(),
             record.archive
         );
         if let Some(aside) = record.move_aside.as_deref() {
@@ -9005,7 +9062,7 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
         })
     };
     let (mut foreign, mut changed) = (Vec::new(), Vec::new());
-    for e in root_inventory(data_dir)? {
+    for e in root_inventory(&root)? {
         if e.dev != root_dev {
             // A mount point inside the root: whatever it is, removing it would
             // reach into another filesystem.
@@ -9031,7 +9088,7 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
              is on another filesystem. Each may be the only copy of what it holds: compare them \
              with what you expect, and do not delete them. Recovery deletes nothing; the marker \
              stays.",
-            data_dir.display(),
+            root.display(),
             changed.join(", ")
         );
     }
@@ -9042,7 +9099,7 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
         let (extracted, others): (Vec<_>, Vec<_>) = match &verdict {
             ArchiveVerdict::Differs { listing } => foreign
                 .iter()
-                .partition(|name| archive_holds_exactly(data_dir, name, listing, root_dev)),
+                .partition(|name| archive_holds_exactly(&root, name, listing, root_dev)),
             _ => (Vec::new(), foreign.iter().collect()),
         };
         let list = |names: &[&std::ffi::OsString]| {
@@ -9085,7 +9142,7 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
              began. Where one shares a name with an earlier entry, that earlier entry is safe in \
              the move-aside directory. Recovery deletes nothing, and the marker stays.\n  {}\n\
              Then run this again.",
-            data_dir.display(),
+            root.display(),
             what_to_do.join("\n  ")
         );
     }
@@ -9111,17 +9168,17 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
                         "Refusing to recover {}: {:?} is not one of the entries it held before \
                          the restore began. {moved_back} entries were moved back before this; \
                          the marker stays.",
-                        data_dir.display(),
+                        root.display(),
                         entry.path()
                     );
                 }
-                let home = data_dir.join(&name);
+                let home = root.join(&name);
                 let placed = move_without_replacing(&entry.path(), &home).with_context(|| {
                     format!(
                         "Failed to move {} back into {}; {moved_back} entries were moved back \
                          before this, and the marker stays",
                         entry.path().display(),
-                        data_dir.display()
+                        root.display()
                     )
                 })?;
                 if placed {
@@ -9147,21 +9204,21 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
                 bail!(
                     "Refusing to recover {}: {name:?} is both in it and in {aside:?}, as two \
                      different objects. Compare the two; the marker stays.",
-                    data_dir.display()
+                    root.display()
                 );
             }
             icn_core::sync_directory(aside)?;
         }
     }
-    icn_core::sync_directory(data_dir)?;
+    icn_core::sync_directory(&root)?;
 
     // Verified, then -- and only then -- cleared.
-    let differences = inventory_differences(data_dir, &record.inventory)?;
+    let differences = inventory_differences(&root, &record.inventory)?;
     if !differences.is_empty() {
         bail!(
             "Refusing to clear the marker: {} is not as it was before the restore began ({}). \
              The marker stays.",
-            data_dir.display(),
+            root.display(),
             differences.join("; ")
         );
     }
@@ -9172,12 +9229,12 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
     }
     storage.assert_still_anchored("this recovery")?;
     config.assert_still_anchored("this recovery")?;
-    icn_core::RestoreInProgress::resume(data_dir)?.finish()?;
+    icn_core::RestoreInProgress::resume(&root)?.finish()?;
 
     println!(
         "✓ Recovered {}: it holds exactly the {} entries it held before the restore began \
          ({moved_back} moved back), and the restore's marker is cleared.",
-        data_dir.display(),
+        root.display(),
         record.inventory.len()
     );
     if let Some(aside) = record.move_aside.as_deref() {

@@ -1305,3 +1305,221 @@ fn recovery_works_after_the_lock_file_was_removed_by_hand() {
         assert_eq!(identity(&root.join(name)), *id, "{name}");
     }
 }
+
+/// Everything under `dir`, recursively and without following links: each
+/// path's type, permission bits and (for a file) contents.
+fn tree(dir: &Path) -> std::collections::BTreeMap<PathBuf, String> {
+    let mut out = std::collections::BTreeMap::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(at) = pending.pop() {
+        for entry in std::fs::read_dir(&at).unwrap() {
+            let path = entry.unwrap().path();
+            let meta = std::fs::symlink_metadata(&path).unwrap();
+            let mode = meta.mode() & 0o7777;
+            let what = if meta.file_type().is_symlink() {
+                format!("link {:?}", std::fs::read_link(&path).unwrap())
+            } else if meta.is_dir() {
+                pending.push(path.clone());
+                format!("dir {mode:o}")
+            } else {
+                format!("file {mode:o} {:?}", std::fs::read(&path).unwrap())
+            };
+            out.insert(path.strip_prefix(dir).unwrap().to_path_buf(), what);
+        }
+    }
+    out
+}
+
+/// A data root's contents, as an operator would compare them: [`tree`] without
+/// the lock files and the restore marker.
+fn manifest(root: &Path) -> std::collections::BTreeMap<PathBuf, String> {
+    let mut m = tree(root);
+    for name in [".icn-data-dir.lock", ".icn-config.lock", MARKER] {
+        m.remove(Path::new(name));
+    }
+    m
+}
+
+/// A root whose restore did not finish *after* `store` left it: the archive
+/// holds no `store` of its own, so the old one is only in the move-aside
+/// directory and `<root>/store` names nothing -- the state a restore stopped
+/// part-way through its move-aside leaves too. Returns the scratch directory,
+/// the root, its move-aside directory and the root's manifest before the
+/// restore.
+fn a_root_whose_store_is_only_in_the_move_aside() -> (
+    TempDir,
+    PathBuf,
+    PathBuf,
+    std::collections::BTreeMap<PathBuf, String>,
+) {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    std::fs::create_dir_all(&source).unwrap();
+    std::fs::write(source.join("icn.toml"), b"# archived\n").unwrap();
+    let bad = scratch.path().join("bad.tar");
+    archive_with_a_wrong_checksum(&source, &bad);
+
+    let root = scratch.path().join("parent").join("icn");
+    seeded_root(&root, "pre-restore\n");
+    let before = manifest(&root);
+    let out = icnctl(&root)
+        .arg("restore")
+        .arg(&bad)
+        .arg("--force")
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(!out.status.success(), "the restore must fail: {text}");
+    assert!(text.contains("Checksum mismatch"), "{text}");
+    assert!(root.join(MARKER).exists(), "{text}");
+    let aside = move_aside_dir(root.parent().unwrap());
+    assert!(!root.join("store").exists(), "store must be only aside");
+    assert!(aside.join("store").is_dir());
+    (scratch, root, aside, before)
+}
+
+/// The operator's part of a recovery from [`a_root_whose_store_is_only_in_the_move_aside`]:
+/// recovery first refuses the `icn.toml` the archive extracted (deleting
+/// nothing), the operator removes it, and the retry puts the root back exactly.
+fn recover_by_the_root_itself(root: &Path, before: &std::collections::BTreeMap<PathBuf, String>) {
+    let out = icnctl(root)
+        .args(["restore", "--recover-incomplete"])
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(!out.status.success(), "{text}");
+    assert!(text.contains("were not there before"), "{text}");
+    assert!(
+        root.join(MARKER).exists(),
+        "a refused recovery keeps the marker"
+    );
+
+    std::fs::remove_file(root.join("icn.toml")).unwrap();
+    let out = icnctl(root)
+        .args(["restore", "--recover-incomplete"])
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(out.status.success(), "{text}");
+    assert!(text.contains("Recovered"), "{text}");
+    assert!(!root.join(MARKER).exists());
+    assert_eq!(
+        &manifest(root),
+        before,
+        "the root must be exactly as it was"
+    );
+}
+
+/// `<root>/store/..` stops leading anywhere once `store` has been moved aside.
+/// Recovery through it must not report that nothing is incomplete -- it could
+/// not look -- and must change nothing; the root itself then recovers exactly.
+#[test]
+fn recovery_through_a_path_that_passed_through_a_moved_entry_is_refused() {
+    let (scratch, root, _aside, before) = a_root_whose_store_is_only_in_the_move_aside();
+    let untouched = tree(scratch.path());
+
+    let out = icnctl(&root.join("store").join(".."))
+        .args(["restore", "--recover-incomplete"])
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(!out.status.success(), "{text}");
+    assert!(!text.contains("nothing to recover"), "{text}");
+    assert!(text.contains("does not lead to a directory"), "{text}");
+    assert!(text.contains("Name the data directory itself"), "{text}");
+    assert_eq!(tree(scratch.path()), untouched, "a refusal changes nothing");
+
+    recover_by_the_root_itself(&root, &before);
+}
+
+/// `..` typed from inside the moved-aside `store` resolves -- to the move-aside
+/// directory, which is not a data root. Recovery names the root to recover
+/// instead of reporting that nothing is incomplete.
+#[test]
+fn recovery_from_inside_a_moved_entry_names_the_root_to_recover() {
+    let (scratch, root, aside, before) = a_root_whose_store_is_only_in_the_move_aside();
+    let untouched = tree(scratch.path());
+
+    let out = icnctl(Path::new(".."))
+        .current_dir(aside.join("store"))
+        .args(["restore", "--recover-incomplete"])
+        .output()
+        .unwrap();
+    let text = combined(&out);
+    assert!(!out.status.success(), "{text}");
+    assert!(!text.contains("nothing to recover"), "{text}");
+    let resolved = root.canonicalize().unwrap();
+    assert!(
+        text.contains(&format!(
+            "--data-dir {} restore --recover-incomplete",
+            resolved.display()
+        )),
+        "{text}"
+    );
+    assert_eq!(tree(scratch.path()), untouched, "a refusal changes nothing");
+
+    recover_by_the_root_itself(&root, &before);
+}
+
+/// A spelling that does resolve to the root -- relative with a parent
+/// reference, or through a link -- recovers that root, and says which.
+#[test]
+fn recovery_through_a_spelling_that_resolves_to_the_root_recovers_it() {
+    for through_a_link in [false, true] {
+        let (scratch, root, _aside, before) = a_root_whose_store_is_only_in_the_move_aside();
+        std::fs::remove_file(root.join("icn.toml")).unwrap();
+        let parent = root.parent().unwrap();
+        let mut cmd = if through_a_link {
+            let link = scratch.path().join("link");
+            std::os::unix::fs::symlink(&root, &link).unwrap();
+            icnctl(&link)
+        } else {
+            std::fs::create_dir(parent.join("sub")).unwrap();
+            let mut cmd = icnctl(Path::new("sub/../icn"));
+            cmd.current_dir(parent);
+            cmd
+        };
+        let out = cmd
+            .args(["restore", "--recover-incomplete"])
+            .output()
+            .unwrap();
+        let text = combined(&out);
+        assert!(out.status.success(), "{text}");
+        assert!(
+            text.contains(&format!(
+                "Recovered {}",
+                root.canonicalize().unwrap().display()
+            )),
+            "{text}"
+        );
+        assert!(!root.join(MARKER).exists());
+        assert_eq!(manifest(&root), before);
+    }
+}
+
+/// A data directory that is not there is not one with nothing to recover:
+/// recovery says so, exits non-zero, and creates nothing.
+#[test]
+fn recovery_of_a_data_directory_that_is_not_there_is_refused() {
+    let scratch = TempDir::new().unwrap();
+    let missing = scratch.path().join("icn");
+    let not_a_directory = scratch.path().join("file");
+    std::fs::write(&not_a_directory, b"").unwrap();
+    for (spelled, why) in [
+        (&missing, "does not lead to a directory"),
+        (&not_a_directory, "is not a directory"),
+    ] {
+        let out = icnctl(spelled)
+            .args(["restore", "--recover-incomplete"])
+            .output()
+            .unwrap();
+        let text = combined(&out);
+        assert!(!out.status.success(), "{text}");
+        assert!(!text.contains("nothing to recover"), "{text}");
+        assert!(text.contains(why), "{text}");
+    }
+    assert!(
+        !missing.exists(),
+        "recovery must not create a data directory"
+    );
+}
