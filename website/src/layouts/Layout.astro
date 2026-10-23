@@ -19,6 +19,12 @@ export interface Props {
 const { title, description = 'Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.', activeNav = '', robots } = Astro.props;
 const currentPath = Astro.url.pathname;
 
+// Title and canonical URL are derived once and reused by <title>, the
+// OpenGraph tags, and the Twitter tags, so a page cannot present one title to
+// a browser tab and a different one to a link preview.
+const fullTitle = `${title} | InterCooperative Network`;
+const canonicalUrl = new URL(currentPath, Astro.site ?? 'https://intercooperative.network').href;
+
 /**
  * Top-level navigation.
  *
@@ -86,12 +92,33 @@ const jsonLd = {
   <meta name="description" content={description} />
   {robots && <meta name="robots" content={robots} />}
   <meta name="theme-color" content="#06090f" />
+  <link rel="canonical" href={canonicalUrl} />
+
+  {/* Social cards. The site had none, so every shared link — which is how a
+      large share of first-time visitors arrive — rendered as a bare URL with
+      no title, no description, and whatever the platform chose to guess.
+
+      No og:image. There is no social card asset in public/, and pointing at
+      a file that does not exist is worse than omitting the tag: most platforms
+      then render a broken-image placeholder rather than falling back cleanly.
+      `summary` is the correct card type without one. When a card image is
+      designed, add it and switch to `summary_large_image` — subject to
+      MUST_NOT_SHIP §1, since the current wordmark is still a placeholder. */}
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="InterCooperative Network" />
+  <meta property="og:title" content={fullTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:locale" content="en" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content={fullTitle} />
+  <meta name="twitter:description" content={description} />
   <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
-  <title>{title} | InterCooperative Network</title>
+  <title>{fullTitle}</title>
   <script is:inline>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');

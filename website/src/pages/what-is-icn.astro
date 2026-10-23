@@ -1,6 +1,5 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import ClosureLoop from '../components/ClosureLoop.astro';
 import ScopeModel from '../components/ScopeModel.astro';
 import Term from '../components/Term.astro';
 import PublicLoop from '../components/PublicLoop.astro';
@@ -9,7 +8,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 
 <Layout title="What is ICN" activeNav="what-is-icn" description="ICN is digital infrastructure for cooperatives, communities, and federations — a substrate where membership, governance, rules, and accountability are native rather than layered on.">
 
-  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+  <section class="section section-page-top">
     <div class="container narrow">
       <div class="page-hero">
         <span class="badge badge-teal">What is ICN</span>
@@ -60,16 +59,17 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         decisions, action, and the records a cooperative can stand behind. The framing is laid out in
         <a href="/cooperative-economy">The cooperative economy needs its own machinery</a>.
       </p>
+      <!-- Two paragraphs here made the same move — "today that machinery is
+           improvised", then the named-stack inventory that /why-icn owns and
+           that appears in the homepage's FragmentationFigure. One sentence
+           carries what this page needs; the argument itself is a link. -->
       <p>
-        Today that machinery is improvised. It lives in spreadsheets, chat threads, documents,
-        staff memory, and disconnected tools that were never designed to carry institutional weight.
-        ICN is an attempt to provide a durable alternative.
-      </p>
-      <p>
-        Today that usually means relying on systems such as Google Workspace or Microsoft 365 for records,
-        Loomio for voting, QuickBooks for accounting, Slack or Teams for coordination, and a CRM or spreadsheet
-        for membership. ICN is not trying to flatter that stack with better integrations. It is trying to reduce
-        the institution's dependence on it.
+        Today that machinery is improvised — spreadsheets, chat threads,
+        documents, staff memory, and tools never designed to carry institutional
+        weight. ICN is not trying to improve that stack with better integrations;
+        it is trying to reduce an institution's dependence on it.
+        <a href="/why-icn">Why that is structural</a> rather than a tooling
+        complaint is its own argument.
       </p>
 
       <h2>What ICN models directly</h2>
@@ -102,26 +102,25 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         across unrelated tools. The loop that matters is specific, and the system is built
         to carry every station of it.
       </p>
-      <p>
-        There are two views of that loop. The short one is enough to follow the
-        rest of this site:
-      </p>
-
       <PublicLoop />
 
-      <p>
-        The longer view is what the implementation actually models — nine
-        stations rather than six, because several of the plain-language stages
-        above are two distinct things underneath. Read them in order:
-      </p>
-
-      <ClosureLoop variant="full" title="The nine-station closure" showTruthLabelChip />
-
+      <!-- The full nine-station ClosureLoop used to render here as well, with a
+           six-vs-nine explanation between the two figures. That made this page
+           carry the mechanism in full — which is /how-it-works' single job — and
+           put two versions of the same diagram on one screen, so the reader had
+           to work out which one to learn. The conceptual model stops at six; the
+           mapping to nine is stated inside PublicLoop itself, on each stage. -->
       <p class="after-loop">
-        That is the loop. ICN exists to close it.
-        Parts of it are already closed today; other parts are still being filled in.
-        See <a href="/whats-real-now">What's Real Now</a> for the direct account
-        of which stations are strongest, where work is focused, and which are still behind.
+        That is the loop, and ICN exists to close it. Underneath, the
+        implementation models nine stations rather than six — several of these
+        plain-language stages are two distinct things once you look — and each
+        stage above names the stations it covers.
+        <a href="/how-it-works">How it works</a> takes them one at a time.
+      </p>
+      <p class="after-loop">
+        Parts of the loop are closed today and other parts are still being filled
+        in. <a href="/whats-real-now">What's real now</a> is the direct account of
+        which are strongest and which are behind.
       </p>
 
       <h2>What ICN is not</h2>
