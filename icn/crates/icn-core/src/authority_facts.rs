@@ -50,9 +50,29 @@ impl SledAuthorityFactStore {
 }
 
 impl AuthorityFactStore for SledAuthorityFactStore {
+    /// Persist one record and force it durable before returning.
+    ///
+    /// The flush is not optional and not a caller's responsibility. [`Store::put`] writes through
+    /// the backend but does not sync; `icn-store` documents [`Store::flush`] as the barrier a
+    /// durable backend overrides to push its page cache and write-ahead log to disk, which is why
+    /// the governance close journal forces it before any cross-store artifact is written.
+    ///
+    /// Without it this type would return `Ok(())` for a fact that a crash or power loss can still
+    /// erase, and the contract it implements says facts *successfully persisted through this store*
+    /// survive a restart. A put that is not durable makes that claim false rather than merely
+    /// weaker. Dropping a sled handle happens to flush, so a graceful reopen would have hidden this
+    /// — which is exactly why the guarantee cannot rest on how the process happened to exit.
+    ///
+    /// The cost is an fsync per fact. That is the honest price of the guarantee at this scale: N1
+    /// events are rare, bounded per subject, and written at authority transitions rather than in a
+    /// hot path. A batched `put_facts` that flushes once per batch is the right optimisation if a
+    /// caller ever needs it, and belongs with that caller's evidence, not ahead of it.
     fn put_fact(&self, fact: &PersistedFact) -> Result<(), FactStoreError> {
         self.store
             .put(&Self::storage_key(&fact.key()), fact.value())
+            .map_err(|error| FactStoreError::Backend(error.to_string()))?;
+        self.store
+            .flush()
             .map_err(|error| FactStoreError::Backend(error.to_string()))
     }
 

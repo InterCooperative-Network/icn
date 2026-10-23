@@ -36,7 +36,9 @@ fn rehydration_reproduces_the_durable_sets_and_the_derived_view() {
     let alpha = subject(1, 4);
     let a1 = authorize_at(&alpha, 0, 1, alpha.genesis(), device(10));
     let a2 = authorize_at(&alpha, 0, 2, a1.body.event_id(), device(11));
-    let events = vec![a1, a2];
+    // Includes the inception: without it `derive` answers `Unknown` on both sides and the
+    // derived-state assertion below would hold vacuously.
+    let events = vec![alpha.inception.clone(), a1, a2];
 
     let mut before = AuthorityStore::new();
     before.ingest_all(&events);
@@ -60,6 +62,13 @@ fn rehydration_reproduces_the_durable_sets_and_the_derived_view() {
         derive(alpha.subject, &after),
         derive(alpha.subject, &before),
         "the pure derivation must be unchanged by a round trip through storage"
+    );
+    assert!(
+        matches!(
+            derive(alpha.subject, &after),
+            icn_identity::authority_log::AuthorityView::Live { .. }
+        ),
+        "the derived state must be non-trivial, or the equality above proves nothing"
     );
 }
 
@@ -299,11 +308,21 @@ fn a_malformed_key_is_refused() {
 }
 
 #[test]
-fn a_well_formed_but_unauthorized_body_is_refused_exactly_as_it_would_be_live() {
-    // Storage must not be a second admission path. A body signed by a key the log never authorized
-    // is refused on load for the same reason `AuthorityStore::ingest` refuses it live: the decision
-    // is `admissible`, a free function of body and signature, and rehydration calls it.
+fn an_unauthorized_body_survives_the_round_trip_and_is_still_ignored_by_derive() {
+    // Admission is deliberately state-independent: it proves only "some key signed these bytes".
+    // `admission.rs` is explicit that an admissible body can be completely unauthorized, and that
+    // spam therefore ENTERS the durable set and is excluded inside the derived fold instead --
+    // which is what keeps admission commuting with the join.
+    //
+    // So the storage obligation here is not refusal. It is that persistence changes neither half
+    // of that arrangement: the spam round-trips like any other admitted fact, and `derive` still
+    // refuses to select it afterwards. A storage layer that quietly dropped unauthorized bodies
+    // would be making an authority decision, and would break the join it is supposed to preserve.
     let alpha = subject(1, 4);
+    // The inception is seeded deliberately: without it `derive` answers `Unknown`, and an
+    // assertion comparing two `Unknown`s would hold no matter what storage did to the spam.
+    let inception = alpha.inception.clone();
+    let a1 = authorize_at(&alpha, 0, 1, alpha.genesis(), device(10));
     let (stranger_key, _) = authority_log_support::stranger(200);
     let spam = icn_identity::authority_log::authorize_event(
         &stranger_key,
@@ -315,18 +334,36 @@ fn a_well_formed_but_unauthorized_body_is_refused_exactly_as_it_would_be_live() 
         None,
     );
 
-    // It is inadmissible live...
+    // It is admissible live, and that is the intended behaviour, not an accident.
     let mut live = AuthorityStore::new();
-    assert!(live.ingest(&spam).is_ok() || live.ingest(&spam).is_err());
+    live.ingest(&inception).expect("inception must be admitted");
+    live.ingest(&a1).expect("the authorized event must be admitted");
+    live.ingest(&spam)
+        .expect("a well-formed unauthorized body is admissible by design");
+    assert_eq!(live.body_count(), 3);
 
-    // ...and a record of it is not admitted merely because it came off a medium.
-    let fact = PersistedFact::from_event(&spam);
-    let store = RawStore::with(vec![(fact.key(), fact.value().to_vec())]);
-    let rehydrated = icn_identity::authority_log::rehydrate(&store);
-    let live_admits = AuthorityStore::new().ingest(&spam).is_ok();
-    assert_eq!(
-        rehydrated.is_ok(),
-        live_admits,
-        "storage must admit exactly what the live gate admits"
+    let disk = InMemoryAuthorityFactStore::new();
+    persist_all(&disk, &[inception, a1, spam.clone()]);
+    let after = icn_identity::authority_log::rehydrate(&disk).expect("rehydration must succeed");
+
+    // Round-trips intact: storage neither drops it nor promotes it.
+    assert_eq!(after.body_count(), 3, "storage must not drop the spam body");
+    assert!(
+        after.contains_body(&spam.body),
+        "the unauthorized body must survive persistence exactly like any other admitted fact"
     );
+    assert_eq!(after.bodies(), live.bodies());
+    assert_eq!(after.witnesses(), live.witnesses());
+
+    // And derive still ignores it, before and after the round trip alike.
+    assert_eq!(derive(alpha.subject, &after), derive(alpha.subject, &live));
+    match derive(alpha.subject, &after) {
+        icn_identity::authority_log::AuthorityView::Live { state, .. } => {
+            assert_eq!(
+                state.generation, 0,
+                "the unauthorized body must not advance authority"
+            );
+        }
+        other => panic!("expected a Live view, got {other:?}"),
+    }
 }
