@@ -8880,25 +8880,53 @@ fn refuse_unless_restore_made_this_move_aside_dir(data_dir: &Path, aside: &Path)
 }
 
 /// The data root whose incomplete restore moved its previous contents into
-/// `dir`, if that is what `dir` is: named as restore names a move-aside
-/// directory (`<root>.backup-<digits>`, beside the root), with a marker on that
-/// root whose record names `dir` -- or a marker whose record cannot be read,
-/// which cannot rule it out.
-fn root_whose_move_aside_is(dir: &Path) -> Option<PathBuf> {
-    let (stem, stamp) = dir.file_name()?.to_str()?.rsplit_once(".backup-")?;
-    if stem.is_empty() || stamp.is_empty() || !stamp.bytes().all(|b| b.is_ascii_digit()) {
+/// `dir`, if that is what `dir` is, or cannot be ruled out as being: named as
+/// restore names a move-aside directory (`<root>.backup-<digits>`, beside the
+/// root), with a marker on that root whose record names `dir`. Returned with
+/// what is known of it, for the refusal to say. Being unable to inspect that
+/// marker, read its record or resolve the directory it names does not rule
+/// `dir` out: not finding out is never taken for "no".
+fn root_whose_move_aside_is(dir: &Path) -> Option<(PathBuf, &'static str)> {
+    // Compared as bytes where names are bytes, as
+    // `refuse_unless_restore_made_this_move_aside_dir` compares them: a root
+    // whose name is not UTF-8 has a move-aside directory all the same.
+    #[cfg(unix)]
+    let (stem, stamp) = {
+        use std::os::unix::ffi::OsStrExt as _;
+        let name = dir.file_name()?.as_bytes();
+        let at = name.windows(8).rposition(|w| w == b".backup-")?;
+        (std::ffi::OsStr::from_bytes(&name[..at]), &name[at + 8..])
+    };
+    #[cfg(not(unix))]
+    let (stem, stamp) = {
+        let (stem, stamp) = dir.file_name()?.to_str()?.rsplit_once(".backup-")?;
+        (std::ffi::OsStr::new(stem), stamp.as_bytes())
+    };
+    if stem.is_empty() || stamp.is_empty() || !stamp.iter().all(u8::is_ascii_digit) {
         return None;
     }
     let root = dir.parent()?.join(stem);
-    std::fs::symlink_metadata(icn_core::restore_marker_path(&root)).ok()?;
-    match icn_core::read_restore_record(&root) {
-        Ok(Some(record)) => record
-            .move_aside
-            .as_deref()
-            .is_some_and(|aside| std::fs::canonicalize(aside).is_ok_and(|aside| aside == dir))
-            .then_some(root),
-        Ok(None) => None,
-        Err(_) => Some(root),
+    const RECORDED: &str = "where that root's incomplete restore moved its previous contents";
+    const NOT_RULED_OUT: &str = "named as where a restore of that root moves its previous \
+         contents, and that root's restore marker could not be checked, so it cannot be ruled \
+         out as one";
+    let not_found = |e: &std::io::Error| e.kind() == std::io::ErrorKind::NotFound;
+    match std::fs::symlink_metadata(icn_core::restore_marker_path(&root)) {
+        Err(e) if not_found(&e) => return None,
+        Err(_) => return Some((root, NOT_RULED_OUT)),
+        Ok(_) => {}
+    }
+    let record = match icn_core::read_restore_record(&root) {
+        Ok(Some(record)) => record,
+        Ok(None) => return None,
+        Err(_) => return Some((root, NOT_RULED_OUT)),
+    };
+    match record.move_aside.as_deref().map(std::fs::canonicalize) {
+        None => None,
+        Some(Ok(aside)) => (aside == dir).then_some((root, RECORDED)),
+        // What the record names is not there, so it is not `dir`, which is.
+        Some(Err(e)) if not_found(&e) => None,
+        Some(Err(_)) => Some((root, NOT_RULED_OUT)),
     }
 }
 
@@ -8962,12 +8990,11 @@ fn handle_restore_recovery(data_dir: &Path) -> Result<()> {
         // Unless this is not a data root at all, but the directory a restore
         // moved one's contents into -- where `..` from inside a moved entry
         // leads.
-        if let Some(owner) = root_whose_move_aside_is(&root) {
+        if let Some((owner, what)) = root_whose_move_aside_is(&root) {
             bail!(
-                "Refusing to recover {}: it resolves to {}, which is not a data directory but \
-                 where the incomplete restore of {} moved that directory's previous contents. \
-                 Recover that one: run `icnctl --data-dir {} restore --recover-incomplete`. \
-                 Nothing was changed.",
+                "Refusing to recover {}: it resolves to {}, which is not a data directory. It \
+                 belongs to the data directory {}: it is {what}. Recover that one: run `icnctl \
+                 --data-dir {} restore --recover-incomplete`. Nothing was changed.",
                 data_dir.display(),
                 root.display(),
                 owner.display(),

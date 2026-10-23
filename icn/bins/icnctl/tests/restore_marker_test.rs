@@ -1352,6 +1352,18 @@ fn a_root_whose_store_is_only_in_the_move_aside() -> (
     PathBuf,
     std::collections::BTreeMap<PathBuf, String>,
 ) {
+    a_root_named_whose_store_is_only_in_the_move_aside(std::ffi::OsStr::new("icn"))
+}
+
+/// [`a_root_whose_store_is_only_in_the_move_aside`], with the root named `name`.
+fn a_root_named_whose_store_is_only_in_the_move_aside(
+    name: &std::ffi::OsStr,
+) -> (
+    TempDir,
+    PathBuf,
+    PathBuf,
+    std::collections::BTreeMap<PathBuf, String>,
+) {
     let scratch = TempDir::new().unwrap();
     let source = scratch.path().join("source");
     std::fs::create_dir_all(&source).unwrap();
@@ -1359,7 +1371,7 @@ fn a_root_whose_store_is_only_in_the_move_aside() -> (
     let bad = scratch.path().join("bad.tar");
     archive_with_a_wrong_checksum(&source, &bad);
 
-    let root = scratch.path().join("parent").join("icn");
+    let root = scratch.path().join("parent").join(name);
     seeded_root(&root, "pre-restore\n");
     let before = manifest(&root);
     let out = icnctl(&root)
@@ -1372,7 +1384,12 @@ fn a_root_whose_store_is_only_in_the_move_aside() -> (
     assert!(!out.status.success(), "the restore must fail: {text}");
     assert!(text.contains("Checksum mismatch"), "{text}");
     assert!(root.join(MARKER).exists(), "{text}");
-    let aside = move_aside_dir(root.parent().unwrap());
+    // The root's only sibling is the directory the restore moved its contents into.
+    let aside = std::fs::read_dir(root.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.file_name() != Some(name))
+        .expect("the restore moved the old contents aside");
     assert!(!root.join("store").exists(), "store must be only aside");
     assert!(aside.join("store").is_dir());
     (scratch, root, aside, before)
@@ -1522,4 +1539,49 @@ fn recovery_of_a_data_directory_that_is_not_there_is_refused() {
         !missing.exists(),
         "recovery must not create a data directory"
     );
+}
+
+/// Recovery run from inside a moved entry is refused, naming the root, however
+/// that root is named -- a name is bytes, not text -- and also when the root's
+/// marker cannot be inspected: not being able to look is not "no marker".
+#[test]
+fn a_move_aside_directory_is_not_taken_for_a_root_with_nothing_to_recover() {
+    use std::os::unix::ffi::OsStrExt as _;
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let refused_from_inside = |aside: &Path| {
+        let out = icnctl(Path::new(".."))
+            .current_dir(aside.join("store"))
+            .args(["restore", "--recover-incomplete"])
+            .output()
+            .unwrap();
+        let text = combined(&out);
+        assert!(!out.status.success(), "{text}");
+        assert!(!text.contains("nothing to recover"), "{text}");
+        assert!(text.contains("Recover that one"), "{text}");
+    };
+
+    // A root whose name is not UTF-8.
+    let (scratch, root, aside, before) =
+        a_root_named_whose_store_is_only_in_the_move_aside(std::ffi::OsStr::from_bytes(b"icn\xff"));
+    let untouched = tree(scratch.path());
+    refused_from_inside(&aside);
+    assert_eq!(tree(scratch.path()), untouched, "a refusal changes nothing");
+    recover_by_the_root_itself(&root, &before);
+
+    // A root this account cannot look into, so its marker cannot be inspected.
+    let (_scratch, root, aside, before) = a_root_whose_store_is_only_in_the_move_aside();
+    let mode = std::fs::metadata(&root).unwrap().permissions().mode();
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let unreadable = std::fs::read_dir(&root).is_err();
+    if unreadable {
+        refused_from_inside(&aside);
+    }
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(mode)).unwrap();
+    assert!(
+        unreadable,
+        "fixture: the root must be unreadable to this account (not run as root)"
+    );
+    assert!(root.join(MARKER).exists(), "a refusal keeps the marker");
+    recover_by_the_root_itself(&root, &before);
 }
