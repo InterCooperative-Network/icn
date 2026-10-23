@@ -1549,7 +1549,7 @@ fn a_move_aside_directory_is_not_taken_for_a_root_with_nothing_to_recover() {
     use std::os::unix::ffi::OsStrExt as _;
     use std::os::unix::fs::PermissionsExt as _;
 
-    let refused_from_inside = |aside: &Path| {
+    let refused_from_inside = |aside: &Path, because: &str| {
         let out = icnctl(Path::new(".."))
             .current_dir(aside.join("store"))
             .args(["restore", "--recover-incomplete"])
@@ -1559,29 +1559,36 @@ fn a_move_aside_directory_is_not_taken_for_a_root_with_nothing_to_recover() {
         assert!(!out.status.success(), "{text}");
         assert!(!text.contains("nothing to recover"), "{text}");
         assert!(text.contains("Recover that one"), "{text}");
+        assert!(text.contains(because), "{text}");
     };
 
     // A root whose name is not UTF-8.
     let (scratch, root, aside, before) =
         a_root_named_whose_store_is_only_in_the_move_aside(std::ffi::OsStr::from_bytes(b"icn\xff"));
     let untouched = tree(scratch.path());
-    refused_from_inside(&aside);
+    refused_from_inside(&aside, "incomplete restore moved");
     assert_eq!(tree(scratch.path()), untouched, "a refusal changes nothing");
     recover_by_the_root_itself(&root, &before);
 
     // A root this account cannot look into, so its marker cannot be inspected.
-    let (_scratch, root, aside, before) = a_root_whose_store_is_only_in_the_move_aside();
-    let mode = std::fs::metadata(&root).unwrap().permissions().mode();
-    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o000)).unwrap();
-    let unreadable = std::fs::read_dir(&root).is_err();
-    if unreadable {
-        refused_from_inside(&aside);
+    // Its mode is put back however this ends, so the scratch directory can go.
+    struct ModeRestored<'a>(&'a Path, u32);
+    impl Drop for ModeRestored<'_> {
+        fn drop(&mut self) {
+            let _ = std::fs::set_permissions(self.0, std::fs::Permissions::from_mode(self.1));
+        }
     }
-    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(mode)).unwrap();
-    assert!(
-        unreadable,
-        "fixture: the root must be unreadable to this account (not run as root)"
-    );
+    let (_scratch, root, aside, before) = a_root_whose_store_is_only_in_the_move_aside();
+    {
+        let mode = std::fs::metadata(&root).unwrap().permissions().mode();
+        let _restored = ModeRestored(&root, mode);
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o000)).unwrap();
+        assert!(
+            std::fs::read_dir(&root).is_err(),
+            "fixture: the root must be unreadable to this account (not run as root)"
+        );
+        refused_from_inside(&aside, "cannot be ruled out");
+    }
     assert!(root.join(MARKER).exists(), "a refusal keeps the marker");
     recover_by_the_root_itself(&root, &before);
 }
