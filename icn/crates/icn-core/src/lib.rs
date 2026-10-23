@@ -12,6 +12,7 @@ mod meaning_firewall;
 
 pub mod anti_entropy;
 pub mod apps;
+pub mod authority_facts;
 pub mod config;
 pub mod dead_letter;
 pub mod error;
