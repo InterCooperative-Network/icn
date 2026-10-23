@@ -498,7 +498,7 @@ The initial review focused on the Rust backend (icn/ directory). A comprehensive
 - React Native SDK (~19,000 lines) - iOS & Android
 
 ✅ **Web UI** (`web/pilot-ui/`)
-- Production-ready web interface (~4,500 files)
+- Pilot web interface (~4,500 files)
 - PWA, offline support, real-time updates
 - SDIS identity enrollment UI
 

@@ -20,8 +20,14 @@ practices on docs/deployment/*.md (see the already-bannered siblings).
 This complements compliance_linter.py (fintech vocabulary in API surfaces); it
 does NOT replace it. See docs/dev/language-guide.md and docs/ci/GATE_RATCHET_PLAN.md.
 
-Config (optional, --config PATH): a JSON object with either or both of
-`scan_dirs` / `exclude_dirs` (lists of strings). Each key present REPLACES the
+Config (optional, --config PATH): a JSON object with any of `scan_dirs` /
+`exclude_dirs` (lists of strings) and `scan_manifest` (a repo-relative path to a
+{"files": [{"path", "bannered"}]} manifest of the files that actually reach a
+public surface — see load_manifest). `scan_manifest` exists because the public
+docs surface is not a directory: `docs/` is mostly withheld from the site, so
+"scan all of docs/" would gate private material while "scan none of it" leaves
+every republished page ungated. A missing or malformed manifest is a hard error
+(exit 2), never a quiet empty scan. Each key present REPLACES the
 corresponding default list wholesale (not merged) — e.g. icn's own
 .claim-lint.json lists every current default dir plus "website" so a reader
 sees the full authoritative scope in one file. With no --config, scan scope
@@ -101,18 +107,22 @@ EXCLUDE_DIRS = {"generated", "archive", "dev-journal"}
 SCAN_EXTENSIONS = (".md", ".astro")
 
 
-def load_scan_config(config_path: Optional[str]) -> Tuple[Sequence[str], Set[str]]:
-    """Resolve (scan_dirs, exclude_dirs) from an optional --config JSON file.
+def load_scan_config(
+    config_path: Optional[str],
+) -> Tuple[Sequence[str], Set[str], Optional[str]]:
+    """Resolve (scan_dirs, exclude_dirs, scan_manifest) from an optional --config
+    JSON file.
 
     No path -> the hardcoded defaults, unchanged. A present `scan_dirs` or
     `exclude_dirs` key REPLACES the corresponding default list wholesale (not
-    merged); an absent key keeps that default. Raises ValueError on any
-    problem (missing file, invalid JSON, wrong value types) so main() can
-    report it and exit with the documented "script error" code rather than
-    silently falling back to defaults.
+    merged); an absent key keeps that default. `scan_manifest` is a repo-relative
+    path to a published-file manifest (see load_manifest) and defaults to None,
+    i.e. directory scanning only. Raises ValueError on any problem (missing file,
+    invalid JSON, wrong value types) so main() can report it and exit with the
+    documented "script error" code rather than silently falling back to defaults.
     """
     if config_path is None:
-        return SCAN_DIRS, EXCLUDE_DIRS
+        return SCAN_DIRS, EXCLUDE_DIRS, None
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -138,7 +148,79 @@ def load_scan_config(config_path: Optional[str]) -> Tuple[Sequence[str], Set[str
     else:
         exclude_dirs = EXCLUDE_DIRS
 
-    return scan_dirs, exclude_dirs
+    if "scan_manifest" in data:
+        scan_manifest = data["scan_manifest"]
+        if not isinstance(scan_manifest, str) or not scan_manifest:
+            raise ValueError("config scan_manifest must be a non-empty string")
+    else:
+        scan_manifest = None
+
+    return scan_dirs, exclude_dirs, scan_manifest
+
+
+def load_manifest(repo_root: str, manifest_rel: str) -> List[Tuple[str, bool]]:
+    """Read a published-file manifest and return sorted [(rel_path, bannered)].
+
+    The manifest names the files that actually reach a public surface, which a
+    directory walk cannot express: `docs/` is mostly WITHHELD from the site, so
+    scanning all of it would gate private material, and scanning none of it (the
+    previous state) left every republished page ungated. `bannered` means the
+    published RENDERING of that file carries a stale/archive banner, and is
+    honoured exactly as a banner found in the source text.
+
+    Shape:
+        {"files": [{"path": "docs/X.md", "bannered": false}, ...]}
+
+    FAILS CLOSED. Every problem raises ValueError so main() exits 2. The manifest
+    is a build artifact, so "absent" means "generation did not run" — a gate that
+    then quietly scanned nothing and passed would be worse than no gate at all,
+    because it would report success.
+    """
+    abs_path = os.path.join(repo_root, manifest_rel)
+    try:
+        with open(abs_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        raise ValueError(
+            "cannot read/parse scan_manifest " + manifest_rel + ": " + str(e)
+        ) from e
+    if not isinstance(data, dict) or not isinstance(data.get("files"), list):
+        raise ValueError(
+            "scan_manifest " + manifest_rel + " must be a JSON object with a 'files' list"
+        )
+
+    entries: Dict[str, bool] = {}
+    for i, item in enumerate(data["files"]):
+        where = manifest_rel + " files[" + str(i) + "]"
+        if not isinstance(item, dict):
+            raise ValueError(where + " must be an object")
+        rel = item.get("path")
+        bannered = item.get("bannered", False)
+        if not isinstance(rel, str) or not rel:
+            raise ValueError(where + " needs a non-empty string 'path'")
+        if not isinstance(bannered, bool):
+            raise ValueError(where + " 'bannered' must be a boolean")
+        slashed = rel.replace(os.sep, "/")
+        norm = os.path.normpath(rel).replace(os.sep, "/")
+        # Reject absolute paths, parent escapes, and un-normalised spellings
+        # ("docs/./x.md") rather than normalising them: a manifest that does not
+        # say plainly which file it means is a generator bug.
+        if os.path.isabs(rel) or norm != slashed or norm.startswith(".."):
+            raise ValueError(
+                where + " path must be a normalised repo-relative path: " + rel
+            )
+        if not os.path.isfile(os.path.join(repo_root, norm)):
+            raise ValueError(where + " path does not exist in the repo: " + rel)
+        # Deduplicate. Conflicting metadata for one path is a generator bug, not
+        # something to silently resolve in favour of the laxer value.
+        if norm in entries and entries[norm] != bannered:
+            raise ValueError(
+                manifest_rel + " lists " + norm + " twice with conflicting 'bannered'"
+            )
+        entries[norm] = bannered
+    if not entries:
+        raise ValueError("scan_manifest " + manifest_rel + " lists no files")
+    return sorted(entries.items())
 
 # Affirmative readiness-claim patterns (case-insensitive).
 OVERCLAIM_PATTERNS = [
@@ -163,8 +245,12 @@ NEGATION_RE = re.compile(
     r"(?i)("
     r"\bnot\b|n't|\bno\b|\bnone\b|\bnothing\b|\bnever\b|not yet|\bwould\b|\bif\b|\bonce\b|\bwhen\b|"
     r"\btarget\b|\bgoal\b|aspir|roadmap|\bfuture\b|do not|don't|must not|\bavoid\b|"
+    r"\bneither\b|"  # "Neither proof claims production reachability or live federation"
     r"forbidden|prerequisite|before production|in a production deployment|in production:|"
-    r"\U0001F7E1"  # yellow-circle status marker used for "assessed, not production-ready"
+    r"\U0001F7E1|"  # yellow-circle status marker used for "assessed, not production-ready"
+    # Same precedent, other markers the corpus actually uses: "❌ **General
+    # Availability**: not yet in this snapshot" and "⏳" for pending.
+    r"\u274C|\u23F3"
     r")"
 )
 # NOTE: the bare word "without" is deliberately NOT a negation here — it is too
@@ -197,6 +283,67 @@ ALLOWLIST = {
         "('that any of this is production or live federation'). The leading "
         "'Must not claim:' negates the whole bullet, but it sits in an earlier "
         "clause than the matched phrase, so the line-local negation guard misses it.",
+
+    # ── Policy/meta documents that must name the phrases they govern ─────────
+    # These four files DEFINE the claim discipline. They cannot describe a
+    # forbidden phrase without writing it, and no parser rule should try to tell
+    # "quoting the rule" from "breaking the rule" in prose.
+    "docs/dev/language-guide.md:222":
+        "The language guide itself: the line enumerates what a reader must not be "
+        "led to believe ('... that ICN is production-ready, that a live federation "
+        "is operating ...'). Quoting the forbidden claim IS this document's job.",
+    "docs/dev/language-guide.md:223":
+        "Continuation of the same enumeration in docs/dev/language-guide.md:222 "
+        "('... proposal/vote/member-standing governance is complete').",
+    "docs/ci/GATE_RATCHET_PLAN.md:121":
+        "Specification of this very linter's precision rules; the line lists the "
+        "shapes it must tolerate, including the question form 'Is this ready for "
+        "production?'. Naming the pattern is not asserting it.",
+    "docs/ci/GATE_RATCHET_PLAN.md:123":
+        "Same specification: the line enumerates caveat prefixes and quoted "
+        "avoid-lists that the linter must not flag, one of which is the literal "
+        "string \"production-ready\".",
+    "docs/guides/developer/agent-context-spine.md:68":
+        "Describes a validation step that greps for overclaim language, quoting the "
+        "terms it greps for ('production ready', 'live federation').",
+
+    # ── Nonclaim framing the line-local guards cannot reach ─────────────────
+    # Each is a red line being drawn, not a claim being made. They are listed
+    # individually rather than as a parser rule because each sits in a DIFFERENT
+    # syntactic position, and widening the guards to cover them would weaken the
+    # clause scoping that keeps a genuine claim catchable on the same line.
+    "docs/design/CLAUDE_DESIGN_REVIEW_PROTOCOL.md:110":
+        "The negation is an em-dash appositive: 'Generated UI kits depict signed "
+        "actions, live federation, ... - none of which the repo has shipped "
+        "end-to-end'. The em dash is a clause delimiter, so the negation lands in "
+        "the next clause and the line-local guard cannot see it.",
+    "docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md:145":
+        "The phrase is an 'e.g.' example inside parentheses ('(e.g. live "
+        "federation between two coops)') whose host sentence labels such surfaces "
+        "'future-state / roadmap'. Parentheses are clause delimiters, so the "
+        "labelling is out of the matched clause.",
+    "docs/design/assets/briefs/VE-002-scope-model.md:14":
+        "Same shape as docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md:145: '(e.g. a live "
+        "federation between two real cooperatives)' introduced as an example and "
+        "labelled 'future-state / roadmap' outside the parenthetical.",
+    "docs/design/assets/ASSET_REGISTER.md:43":
+        "Register table cell reading 'future-state / roadmap (live federation)' - "
+        "the qualifier immediately precedes the parenthetical it qualifies, and the "
+        "row's own status column says 'planned'.",
+    "docs/design/evidence-packet-produced-receipt-decision-rung.md:173":
+        "Final bullet of a red-line list opened by \"':v1' 'produced' **explicitly "
+        "excludes** (must be stated as non-claims ...):\". The avoid-list block is "
+        "tracked, but it only exempts phrases that are QUOTED, and this list writes "
+        "them bare.",
+    "docs/demo/GOVERNANCE_PROPOSAL_FIXTURE_HANDOFF.md:31":
+        "Scope exclusion: '... without adding backend demo mode, real signing, real "
+        "vote submission, live federation, ... or production claims.' The narrow "
+        "'without ...' exemption in NONCLAIM_LINE_RE is scoped to 'without "
+        "requiring', deliberately not a blanket 'without'.",
+    "docs/demo/ICN_SYSTEM_DEMO_READINESS_MAP.md:258":
+        "Acceptance criterion describing the term list an overclaim grep must "
+        "cover, and asserting those terms may appear 'only in explicit non-claim / "
+        "red-line / out-of-scope contexts'.",
 }
 
 
@@ -262,6 +409,251 @@ def _framing_segment(line, start, end):
     return line[lo:hi]
 
 
+# --- Rendered-text normalisation -------------------------------------------
+#
+# An HTML comment is not a public claim: the docs site renders markdown, and
+# `<!-- ... -->` never reaches the page. docs/STATE.md carries machine-readable
+# sync notes in comments that enumerate what a change does NOT claim; scanning
+# the raw bytes reported those as 23 affirmative overclaims on a surface no
+# reader can see.
+#
+# Comment spans are blanked with SPACES rather than deleted, so line numbers AND
+# column offsets survive — every column-based guard below (_clause_around,
+# _framing_segment, _phrase_is_quoted) keeps working unchanged.
+#
+# Two things deliberately keep reading the RAW lines, not this view:
+#   - is_banner_exempt(), so stripping cannot silently revoke an exemption;
+#   - parse_historical_marker(), because the claim-class marker IS a comment.
+#
+# Inside a fenced code block a comment is displayed literally, so it IS rendered
+# and is left intact.
+_FENCE_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+
+
+def fenced_line_numbers(lines):
+    """1-based line numbers of fence markers and the lines they enclose.
+
+    A fenced block is a code sample, not prose: "backend = \"age\"  # Software
+    keystore (production-ready)" is configuration being shown, and
+    "/etc/letsencrypt/live/api.example.org/..." is a path, not a live endpoint.
+    Skipping these lines BEFORE the heading/avoid-list state machine also fixes a
+    latent bug: a "# comment" inside a shell fence otherwise parses as a markdown
+    heading and can reset nonclaim-section state mid-document.
+    """
+    fenced = set()
+    fence = None
+    for i, line in enumerate(lines, start=1):
+        m = _FENCE_RE.match(line)
+        if m:
+            tok = m.group(1)[0] * 3
+            if fence is None:
+                fence = tok
+            elif fence == tok:
+                fence = None
+            fenced.add(i)
+            continue
+        if fence is not None:
+            fenced.add(i)
+    return fenced
+
+
+def strip_html_comments(lines):
+    """Return `lines` with HTML-comment spans replaced by spaces.
+
+    Line count and column offsets are preserved exactly. Fenced code blocks are
+    left untouched (a comment shown as code is rendered text)."""
+    out = []
+    in_comment = False
+    fence = None
+    for line in lines:
+        if not in_comment:
+            m = _FENCE_RE.match(line)
+            if m:
+                tok = m.group(1)[0] * 3
+                if fence is None:
+                    fence = tok
+                elif fence == tok:
+                    fence = None
+                out.append(line)
+                continue
+        if fence is not None:
+            out.append(line)
+            continue
+        if not in_comment and "<!--" not in line:
+            out.append(line)
+            continue
+        chars = list(line)
+        i, n = 0, len(line)
+        while i < n:
+            if in_comment:
+                j = line.find("-->", i)
+                end = n if j < 0 else j + 3
+                for k in range(i, end):
+                    chars[k] = " "
+                if j < 0:
+                    i = n
+                else:
+                    in_comment = False
+                    i = end
+            else:
+                j = line.find("<!--", i)
+                if j < 0:
+                    break
+                in_comment = True
+                for k in range(j, min(j + 4, n)):
+                    chars[k] = " "
+                i = j + 4
+        out.append("".join(chars))
+    return out
+
+
+# --- Inline negating lead-in ------------------------------------------------
+#
+# `_is_avoid_leadin` only recognises a lead-in that ENDS a line ("Must not
+# claim:" followed by bullets). A lead-in can also govern an enumeration on its
+# OWN line:
+#
+#   This sync explicitly does NOT claim: a session lifecycle; ...; live
+#   federation; Phase 2 completion.
+#
+# `_clause_around` splits on ";" and hands the guard the bare fragment
+# " live federation", so the negation two clauses earlier never reaches it and a
+# red-line list reads as an affirmative claim. The scope of such a lead-in runs
+# from its ":" to the end of the sentence it opens — a following sentence is
+# NOT covered, so "... does not claim X. ICN is production-ready." still flags.
+
+# The ":" must follow the framing phrase IMMEDIATELY — only whitespace and
+# closing markdown emphasis may intervene. Words between the two can invert the
+# meaning: "Nonclaims no longer apply: ICN is production-ready." carries avoid
+# framing and a colon, but it REVOKES the nonclaims and then makes a real claim.
+# Requiring adjacency keeps "does NOT claim:" in and "no longer apply:" out.
+# One notion of "the sentence ended", shared by the inline and cross-line
+# negation scopes.
+_SENTENCE_END_ANY_RE = re.compile(r"[.!?](?=\s|$)")
+
+# (No "^" anchor: Pattern.match(line, pos) already anchors at pos, whereas "^"
+# would only ever match at offset 0.)
+_LEADIN_COLON_GAP_RE = re.compile(r"[\s*_`)\]]*:")
+
+
+def _inline_negation_scope(line, start):
+    """True if an inline negating lead-in earlier on `line` governs the match at
+    `start` — i.e. a "does not claim"-style framing is immediately followed by
+    ":" before the match, with no sentence boundary in between."""
+    colon = None
+    for m in _AVOID_LEADIN_FRAMING.finditer(line):
+        gap = _LEADIN_COLON_GAP_RE.match(line, m.end())
+        if gap is None:
+            continue
+        c = gap.end() - 1
+        if c < start and (colon is None or c > colon):
+            colon = c
+    if colon is None:
+        return False
+    term = _SENTENCE_END_ANY_RE.search(line, colon)
+    return not (term and term.start() < start)
+
+
+# --- negated sentences that wrap across lines --------------------------------
+#
+# Every guard above is line-local, so a negated sentence that soft-wraps puts its
+# framing out of reach. The corpus hard-wraps prose at ~80 columns, so this is
+# structural, not incidental:
+#
+#   "... It does not"                            <- framing ends the line
+#   "adopt itself, authorize a production deployment, or certify any profile as"
+#   "production-ready."                          <- flagged, with no negation in sight
+#
+#   "**It may not claim:** production-ready, pilot-ready, organizer-approved,"
+#   "accessibility-complete, live federation, real institutional deployment, formal"
+#
+# The scope is deliberately bounded by the SENTENCE, not the paragraph: on a
+# continuation line only matches BEFORE the first sentence terminator are
+# excused, so "...does not claim: a, b," / "c. ICN is production-ready." still
+# flags the second sentence. A blank line, a heading, or a fence also ends it.
+# Deliberately the "not claiming" family only. The copulas (is/are/was/were not)
+# are ordinary prose negation: including them would open a continuation scope on
+# any wrapped sentence containing "is not", which is far more of the corpus than
+# this rule needs. `does not` is the only form the corpus actually exercises; the
+# red-line modals are kept beside it because they carry the same intent.
+_DANGLING_NEGATOR_RE = re.compile(
+    r"(?i)(?:\b(?:does|do|did|must|may|can|could|will|would|shall)\s+not"
+    r"|\b(?:cannot|never))\s*[:,]?\s*$"
+)
+
+
+def _opens_negated_continuation(line):
+    """True if `line` leaves a negating sentence unfinished."""
+    if _DANGLING_NEGATOR_RE.search(line):
+        return True
+    # A nonclaim lead-in whose enumeration STARTS on this line and has not ended.
+    # The enumeration must actually begin here: a line ending at its own colon
+    # ("We do not claim:") hands off to the next line, where the existing
+    # avoid-list state machine governs — and that machine deliberately requires
+    # BULLETS, so a plain prose sentence after such a lead-in still flags.
+    for m in _AVOID_LEADIN_FRAMING.finditer(line):
+        gap = _LEADIN_COLON_GAP_RE.match(line, m.end())
+        if gap is None:
+            continue
+        rest = line[gap.end():]
+        if not rest.strip(" \t*_`"):
+            continue
+        if not _SENTENCE_END_ANY_RE.search(rest):
+            return True
+    return False
+
+
+# --- label: value pairs -----------------------------------------------------
+#
+# ":" is a _CLAUSE_DELIMS member, which is right for splitting independent
+# assertions ("ICN is not experimental; it is PRODUCTION READY.") but wrong for a
+# label and the value that qualifies it. The qualifier can sit on either side:
+#
+#   "**Target:** Production-ready Q1 2026"        qualifier in the LABEL
+#   "❌ **General Availability**: not yet ..."     qualifier in the VALUE
+#
+# Both are ONE assertion, and _clause_around hands the guard only half of it.
+# This crosses exactly ONE ":" boundary and never a "." or ";", so a genuinely
+# separate assertion later on the line is still out of reach — "Status: ICN is
+# production-ready." has no qualifier on either side and still flags.
+
+
+# A label position only qualifies when the label IS essentially the qualifier —
+# a field name, not a clause. "Nonclaims no longer apply: ICN is production-ready."
+# carries a negation word in its label but ASSERTS something, and must still flag;
+# requiring the label to reduce to a bare qualifier keeps it out.
+_QUALIFIER_LABEL_RE = re.compile(
+    r"(?i)^[\s*_`#>\d.)\-]*"
+    r"(target|goal|objective|milestone|aspiration|roadmap|planned|eta|future)"
+    r"[\s*_`]*$"
+)
+
+
+def _label_value_negation(line, start):
+    """True if the match is the VALUE of a `qualifier-label:` pair.
+
+    Only this direction needs handling. The mirror case ("❌ **General
+    Availability**: not yet in this snapshot", where the qualifier sits in the
+    value) is covered by the ordinary clause mechanism, because the ❌ status
+    marker is itself in NEGATION_RE — no extra machinery required.
+    """
+    lo = start
+    while lo > 0 and line[lo - 1] not in _CLAUSE_DELIMS:
+        lo -= 1
+
+    # The label qualifies the match only if it reduces to a bare forward-looking
+    # field name ("**Target:**"). Exactly one ":" boundary is crossed, and never a
+    # "." or ";", so a separate assertion later on the line stays in reach.
+    if lo > 0 and line[lo - 1] == ":":
+        lo2 = lo - 1
+        while lo2 > 0 and line[lo2 - 1] not in _CLAUSE_DELIMS:
+            lo2 -= 1
+        if _QUALIFIER_LABEL_RE.match(line[lo2:lo - 1]):
+            return True
+
+    return False
+
+
 # --- Nonclaim CONTEXT precision (line-local + nearest-heading; no parsing) ----
 # A markdown heading whose text matches this starts a block that is, by
 # construction, a list of things ICN does NOT claim. Every line until the next
@@ -274,7 +666,16 @@ NONCLAIM_SECTION_RE = re.compile(
     r"forbidden collapses?|"
     r"claims? to avoid|"                            # "Claims to avoid", "Public/demo claims to avoid"
     r"what is not\b|"                               # "What is not organizer-ready / included / working"
-    r"must not (?:imply|claim|be (?:shown|presented|claimed))"  # "What the website must not imply"
+    r"must not (?:imply|claim|be (?:shown|presented|claimed))|"  # "What the website must not imply"
+    # Scope-boundary headings. A section that names itself as work NOT done by
+    # this document enumerates red lines exactly like a "Non-goals" section does;
+    # the receipt-contract family writes it as "N. Deferred work (explicitly out
+    # of scope of this contract ...)". Kept to explicit scope-exclusion wording —
+    # "Future work" and "Roadmap" are deliberately NOT here, because those
+    # sections do make forward-looking assertions of their own.
+    r"deferred work|out of scope|not in scope|"
+    r"not[\s-]yet[\s-]done|"                            # "What stays explicitly not-yet-done"
+    r"claims?\b[^.]{0,40}does not make"                 # "Claims this doctrine does not make"
     r")\b"
 )
 
@@ -356,6 +757,12 @@ _AVOID_LEADIN_FRAMING = re.compile(
     r"(?i)\b("
     r"avoid|forbidden|red[\s-]?lines?|nonclaims?|non-?claims?|claims? to avoid|"
     r"claim past the evidence|do(?:es)? not claim|must not (?:claim|be|say|use)|"
+    # "**It may not claim:** production-ready, ..." — same act of not-claiming,
+    # different modal. cannot/can not included; NONCLAIM_LINE_RE already knows
+    # "cannot claim" for its own (line-level) purpose.
+    r"(?:may|can|could|shall|will|would) ?not,? (?:claim|be claimed)|cannot claim|"
+    r"never (?:be used to )?claim|"        # "must never be used to claim: ..."
+    r"not (?:built|implemented|shipped)|"  # "Future lanes ... **not built**: ..."
     r"do not (?:claim|say|use)|don't (?:claim|say|use)|never (?:claim|say)"
     r")\b"
 )
@@ -399,15 +806,29 @@ def scan_lines(rel_path, lines):
     if is_banner_exempt(lines):
         return []
 
+    # Banner detection above reads the RAW lines; claim scanning below reads the
+    # rendered view, because an HTML comment is not a public claim.
+    lines = strip_html_comments(lines)
+    fenced = fenced_line_numbers(lines)
+
     violations = []
     in_nonclaim_section = False
     in_avoid_list = False
+    negated_cont = False
     for line_num, line in enumerate(lines, start=1):
+        # Fenced content is a code sample, never a prose claim. Checked before the
+        # heading/avoid-list bookkeeping so fence content cannot drive that state.
+        if line_num in fenced:
+            negated_cont = False
+            continue
+        if not line.strip():
+            negated_cont = False
         heading = _HEADING_RE.match(line)
         if heading:
             # Entering/leaving a nonclaim/red-line section toggles the context.
             in_nonclaim_section = bool(NONCLAIM_SECTION_RE.search(heading.group(1)))
             in_avoid_list = False  # a heading ends any open avoid-list block
+            negated_cont = False   # ...and any open negated sentence
         elif _is_avoid_leadin(line):
             # An "Avoid: ..."-style lead-in opens an avoid-list block: the bullet
             # lines it introduces are red-line phrases being forbidden.
@@ -422,6 +843,23 @@ def scan_lines(rel_path, lines):
         # checked PER-MATCH below, scoped to the matched phrase's segment.)
         if in_nonclaim_section or _is_interrogative(line):
             continue
+
+        # How far into this line an unfinished negated sentence still reaches: up
+        # to the first sentence terminator OR the first ":" — a colon on a
+        # continuation line introduces a fresh assertion ("... is not" /
+        # "a drill: ICN is production-ready."), and no wrapped red-line list in
+        # the corpus needs to cross one.
+        cont_cutoff = -1
+        if negated_cont:
+            stops = [m.start() for m in (_SENTENCE_END_ANY_RE.search(line),) if m]
+            colon = line.find(":")
+            if colon >= 0:
+                stops.append(colon)
+            cont_cutoff = min(stops) if stops else len(line)
+        if negated_cont and _SENTENCE_END_ANY_RE.search(line):
+            negated_cont = False
+        if _opens_negated_continuation(line):
+            negated_cont = True
 
         key = rel_path + ":" + str(line_num)
         if key in ALLOWLIST:
@@ -445,6 +883,9 @@ def scan_lines(rel_path, lines):
                     or (in_avoid_list and _phrase_is_quoted(line, m.start(), m.end()))
                     or _labels_a_risk(line, m.end())
                     or _describes_a_claim(line, m.end())
+                    or _inline_negation_scope(line, m.start())
+                    or _label_value_negation(line, m.start())
+                    or m.start() < cont_cutoff
                 ):
                     continue
                 # Only the overclaim's own clause exempts it — not an unrelated
@@ -528,9 +969,13 @@ def scan_historical_liveness(rel_path, lines) -> List[Violation]:
         return []
     if parse_historical_marker(lines) is not None:
         return []
+    # The marker lookup above needs the RAW lines (the marker is itself an HTML
+    # comment). Liveness language is then matched against the rendered view.
+    lines = strip_html_comments(lines)
+    fenced = fenced_line_numbers(lines)
     violations = []
     for line_num, line in enumerate(lines, start=1):
-        if _is_interrogative(line):
+        if line_num in fenced or _is_interrogative(line):
             continue
         for m in LIVENESS_RE.finditer(line):
             if NEGATION_RE.search(_clause_around(line, m.start(), m.end())):
@@ -557,11 +1002,8 @@ def scan_file(rel_path, abs_path):
     return scan_lines(rel_path, lines)
 
 
-def run_lint(repo_root, scan_dirs: Optional[Sequence[str]] = None,
-             exclude_dirs: Optional[Set[str]] = None):
-    scan_dirs = SCAN_DIRS if scan_dirs is None else scan_dirs
-    exclude_dirs = EXCLUDE_DIRS if exclude_dirs is None else exclude_dirs
-    result = LintResult()
+def _walk_targets(repo_root, scan_dirs, exclude_dirs):
+    """Yield repo-relative paths of scannable files under each scan_dir."""
     for scan_dir in scan_dirs:
         abs_dir = os.path.join(repo_root, scan_dir)
         if not os.path.isdir(abs_dir):
@@ -574,30 +1016,53 @@ def run_lint(repo_root, scan_dirs: Optional[Sequence[str]] = None,
                 if not name.endswith(SCAN_EXTENSIONS):
                     continue
                 abs_path = os.path.join(dirpath, name)
-                rel_path = os.path.relpath(abs_path, repo_root).replace(os.sep, "/")
-                result.files_scanned += 1
-                try:
-                    with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
-                        lines = f.read().splitlines()
-                except OSError as e:
-                    # Mirror scan_file()'s per-file tolerance: an unreadable
-                    # file must not fail the whole run, only be skipped.
-                    print("Warning: could not read " + rel_path + ": " + str(e), file=sys.stderr)
-                    continue
-                # The historical-liveness category runs regardless of banner
-                # exemption — that is the point of this category: a banner
-                # alone must not be enough to launder liveness language.
-                historical_violations = scan_historical_liveness(rel_path, lines)
-                result.violations.extend(historical_violations)
-                if is_banner_exempt(lines):
-                    # Only count the file as "exempt" in the summary when it
-                    # is genuinely clean — a file with historical_violations
-                    # is not exempt, it has findings, even though the banner
-                    # skips the (separate) affirmative-overclaim scan below.
-                    if not historical_violations:
-                        result.files_exempt.append(rel_path)
-                    continue
-                result.violations.extend(scan_lines(rel_path, lines))
+                yield os.path.relpath(abs_path, repo_root).replace(os.sep, "/")
+
+
+def run_lint(repo_root, scan_dirs: Optional[Sequence[str]] = None,
+             exclude_dirs: Optional[Set[str]] = None,
+             manifest_entries: Optional[Sequence[Tuple[str, bool]]] = None):
+    scan_dirs = SCAN_DIRS if scan_dirs is None else scan_dirs
+    exclude_dirs = EXCLUDE_DIRS if exclude_dirs is None else exclude_dirs
+
+    # rel_path -> bannered, so a file reachable BOTH by directory walk and by the
+    # manifest is read and reported exactly once. A walked file carries no banner
+    # metadata of its own (False); where the manifest says `bannered`, that wins,
+    # because it carries the rendered-site invariant a source walk cannot see.
+    targets: Dict[str, bool] = {}
+    for rel_path in _walk_targets(repo_root, scan_dirs, exclude_dirs):
+        targets.setdefault(rel_path, False)
+    for rel_path, bannered in manifest_entries or ():
+        targets[rel_path] = targets.get(rel_path, False) or bannered
+
+    result = LintResult()
+    for rel_path in sorted(targets):
+        bannered = targets[rel_path]
+        abs_path = os.path.join(repo_root, rel_path)
+        result.files_scanned += 1
+        try:
+            with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.read().splitlines()
+        except OSError as e:
+            # Mirror scan_file()'s per-file tolerance: an unreadable file must
+            # not fail the whole run, only be skipped.
+            print("Warning: could not read " + rel_path + ": " + str(e), file=sys.stderr)
+            continue
+        # The historical-liveness category runs regardless of banner exemption —
+        # that is the point of this category: a banner alone must not be enough
+        # to launder liveness language. This holds for a manifest `bannered`
+        # file exactly as it holds for a source banner.
+        historical_violations = scan_historical_liveness(rel_path, lines)
+        result.violations.extend(historical_violations)
+        if bannered or is_banner_exempt(lines):
+            # Only count the file as "exempt" in the summary when it is genuinely
+            # clean — a file with historical_violations is not exempt, it has
+            # findings, even though the banner skips the (separate)
+            # affirmative-overclaim scan below.
+            if not historical_violations:
+                result.files_exempt.append(rel_path)
+            continue
+        result.violations.extend(scan_lines(rel_path, lines))
     return result
 
 
@@ -614,7 +1079,10 @@ def main():
     repo_root = os.path.abspath(args.repo_root)
 
     try:
-        scan_dirs, exclude_dirs = load_scan_config(args.config)
+        scan_dirs, exclude_dirs, scan_manifest = load_scan_config(args.config)
+        manifest_entries = (
+            load_manifest(repo_root, scan_manifest) if scan_manifest else None
+        )
     except ValueError as e:
         print("ERROR: " + str(e), file=sys.stderr)
         return 2
@@ -625,14 +1093,20 @@ def main():
     print("=" * 70)
     print()
     print("Repo root: " + repo_root)
-    print("Scope: " + ", ".join(scan_dirs))
+    scope_parts = list(scan_dirs)
+    if scan_manifest:
+        scope_parts.append(
+            scan_manifest + " (" + str(len(manifest_entries)) + " published files)"
+        )
+    print("Scope: " + (", ".join(scope_parts) if scope_parts else "(empty)"))
     if args.config:
         print("Config: " + args.config)
     print("Reference: docs/dev/language-guide.md")
     print()
 
     try:
-        result = run_lint(repo_root, scan_dirs=scan_dirs, exclude_dirs=exclude_dirs)
+        result = run_lint(repo_root, scan_dirs=scan_dirs, exclude_dirs=exclude_dirs,
+                          manifest_entries=manifest_entries)
     except Exception as e:  # documented exit code 2 for unexpected script errors
         print("ERROR: readiness linter failed: " + str(e), file=sys.stderr)
         return 2
