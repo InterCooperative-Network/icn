@@ -1376,3 +1376,328 @@ fn a_restore_that_fails_part_way_moves_back_everything_it_moved() {
         "the directory restore made must be gone: {text}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// A `--data-dir` spelled through one of the root's own entries
+// ---------------------------------------------------------------------------
+
+/// Everything under a directory, keyed by path relative to it, without the two
+/// coordination files at its top: what a file holds, that a directory is one,
+/// or where a link points. Two trees are the same state exactly when these are
+/// equal.
+fn manifest(dir: &Path) -> std::collections::BTreeMap<String, String> {
+    fn walk(base: &Path, dir: &Path, out: &mut std::collections::BTreeMap<String, String>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let rel = path
+                .strip_prefix(base)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            if rel == ".icn-data-dir.lock" || rel == ".icn-config.lock" {
+                continue;
+            }
+            let meta = std::fs::symlink_metadata(&path).unwrap();
+            if meta.file_type().is_symlink() {
+                let target = std::fs::read_link(&path).unwrap();
+                out.insert(rel, format!("link -> {}", target.display()));
+            } else if meta.is_dir() {
+                out.insert(rel, "dir".to_string());
+                walk(base, &path, out);
+            } else {
+                let bytes = std::fs::read(&path).unwrap();
+                out.insert(rel, format!("file {}", String::from_utf8_lossy(&bytes)));
+            }
+        }
+    }
+    let mut out = std::collections::BTreeMap::new();
+    walk(dir, dir, &mut out);
+    out
+}
+
+/// A live root shaped like a node's: identity, genesis, configuration and
+/// several stores, each with content that says it predates the restore.
+fn live_root(root: &Path) {
+    for d in ["store", "keys", "ledger", "gateway"] {
+        std::fs::create_dir_all(root.join(d)).unwrap();
+        std::fs::write(root.join(d).join("marker"), format!("pre-restore {d}\n")).unwrap();
+    }
+    std::fs::write(root.join("icn.toml"), b"# live\n").unwrap();
+    std::fs::write(root.join("identity.age"), b"live identity\n").unwrap();
+    std::fs::write(root.join("genesis.json"), b"{\"live\":true}\n").unwrap();
+}
+
+/// The one backup restore made beside `root`, whole.
+fn the_backup_beside(root: &Path) -> PathBuf {
+    let parent = root.parent().unwrap();
+    let prefix = format!("{}.backup-", root.file_name().unwrap().to_string_lossy());
+    let backups: Vec<PathBuf> = std::fs::read_dir(parent)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with(&prefix))
+        })
+        .collect();
+    assert_eq!(
+        backups.len(),
+        1,
+        "exactly one backup beside the root: {backups:?}"
+    );
+    backups.into_iter().next().unwrap()
+}
+
+/// A restore that must have replaced `root` completely: the archive's state in
+/// the root, all of the replaced state in the backup beside it, nothing of
+/// either stranded in the other -- and every message naming the root itself,
+/// never a spelling that stopped resolving.
+fn assert_replaced_whole(
+    root: &Path,
+    before: &std::collections::BTreeMap<String, String>,
+    out: &Output,
+) {
+    let text = combined(out);
+    assert!(out.status.success(), "restore must succeed: {text}");
+
+    let backup = the_backup_beside(root);
+    assert_eq!(
+        &manifest(&backup),
+        before,
+        "every replaced entry -- identity, genesis, every store -- must be in the backup, \
+         whole: {text}"
+    );
+    assert_eq!(
+        root_contents(root),
+        vec!["icn.toml".to_string(), "store".to_string()],
+        "the root must hold the archive's state and nothing left over from before: {text}"
+    );
+    assert_eq!(
+        std::fs::read(root.join("icn.toml")).unwrap(),
+        b"# fixture\n"
+    );
+    assert_eq!(
+        std::fs::read(root.join("store").join("marker")).unwrap(),
+        b"original\n"
+    );
+
+    let resolved = root.canonicalize().unwrap();
+    assert!(
+        text.contains(&format!("Restored to: {}", resolved.display())),
+        "must report the root it restored, resolved: {text}"
+    );
+    assert!(
+        !text.contains("/.."),
+        "no message may repeat a spelling through a parent reference: {text}"
+    );
+}
+
+/// `--data-dir <root>/store/..` resolves to the root, through one of its own
+/// entries. The restore used to keep using that spelling after moving `store`
+/// aside, at which point it named nothing: the remaining moves failed, the
+/// rollback failed for the same reason, and the live root was left split, with
+/// identity and stores in the backup and the rest in the root. (The whole-root
+/// `rename` before contents moved individually failed outright on this path,
+/// before anything moved.)
+#[test]
+fn restore_force_through_a_parent_reference_into_its_own_entry_replaces_the_whole_root() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let root = scratch.path().join("case").join("icn");
+    live_root(&root);
+    let before = manifest(&root);
+    let spelled = root.join("store").join("..");
+
+    let out = icnctl(&spelled)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+
+    assert_replaced_whole(&root, &before, &out);
+}
+
+/// The same alias as an operator would actually type it: `--data-dir ..` from a
+/// shell sitting in the root's `store` directory. Here the spelling also moves
+/// with the process's working directory, which travels into the backup along
+/// with `store`.
+#[test]
+fn restore_force_with_dotdot_typed_from_inside_one_of_its_entries_replaces_the_whole_root() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let root = scratch.path().join("case").join("icn");
+    live_root(&root);
+    let before = manifest(&root);
+
+    let out = icnctl(Path::new(".."))
+        .current_dir(root.join("store"))
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+
+    assert_replaced_whole(&root, &before, &out);
+}
+
+/// A move-aside that fails part-way, through such a spelling, must still roll
+/// back completely. The spelling passes through the *first* directory in
+/// listing order, so it has moved before the *last* one -- which cannot move
+/// (`rename(2)` must rewrite its `..`) -- fails the restore. Every entry must be
+/// put back, the directory restore made removed, and the message must name the
+/// root by a path that still exists.
+#[cfg(unix)]
+#[test]
+fn a_restore_through_a_parent_reference_that_fails_part_way_moves_everything_back() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let parent = scratch.path().join("case");
+    let root = parent.join("icn");
+    live_root(&root);
+    let dirs: Vec<PathBuf> = std::fs::read_dir(&root)
+        .unwrap()
+        .map(|e| e.unwrap())
+        .filter(|e| e.file_type().unwrap().is_dir())
+        .map(|e| e.path())
+        .collect();
+    let (first, last) = (dirs.first().unwrap().clone(), dirs.last().unwrap().clone());
+    assert_ne!(first, last);
+    set_mode(&last, 0o555);
+    let bound = permissions_bind_this_process(&last);
+    let before = manifest(&root);
+    let spelled = first.join("..");
+
+    let out = icnctl(&spelled)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+    set_mode(&last, 0o755);
+    if !bound {
+        eprintln!("skipped: directory permissions do not bind this process (running as root)");
+        return;
+    }
+
+    let text = combined(&out);
+    assert!(!out.status.success(), "must fail: {text}");
+    assert!(
+        text.contains("were moved back") && text.contains("Nothing has been moved"),
+        "entries moved before the failure, including the one the spelling passes through, \
+         must all be put back: {text}"
+    );
+    assert_eq!(
+        manifest(&root),
+        before,
+        "the root must be whole again: {text}"
+    );
+    assert_eq!(
+        root_contents(&parent),
+        vec!["icn".to_string()],
+        "the directory restore made must be gone: {text}"
+    );
+    assert!(
+        text.contains(&root.canonicalize().unwrap().display().to_string()),
+        "the message must name the root itself: {text}"
+    );
+    assert!(
+        !text.contains("/.."),
+        "no message may repeat a spelling through a parent reference: {text}"
+    );
+}
+
+/// The same shape through a symlink: `--data-dir <root>/up/icn`, where `up` is a
+/// link inside the root to its parent. The link is the root's own content and
+/// is moved aside with the rest; the restore must still land in the root its
+/// locks were taken on, leave their anchor where it was, and keep the link in
+/// the backup.
+#[cfg(unix)]
+#[test]
+fn restore_force_through_a_link_inside_the_root_stays_on_the_locked_root() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+
+    let parent = scratch.path().join("case");
+    let root = parent.join("icn");
+    live_root(&root);
+    std::os::unix::fs::symlink(&parent, root.join("up")).unwrap();
+    let lock_path = {
+        let held = icn_core::DataDirLock::acquire(&root, "a daemon").unwrap();
+        held.path().to_path_buf()
+    };
+    let anchor = inode_at(&lock_path).expect("the anchor must exist");
+    let before = manifest(&root);
+    let spelled = root.join("up").join("icn");
+
+    let out = icnctl(&spelled)
+        .arg("restore")
+        .arg(&archive)
+        .arg("--force")
+        .output()
+        .unwrap();
+
+    assert_replaced_whole(&root, &before, &out);
+    assert_eq!(
+        inode_at(&lock_path),
+        Some(anchor),
+        "the exclusion anchor must be the one the restore was locked on"
+    );
+}
+
+/// Restoring onto a new host, into a data directory that does not exist yet and
+/// is named relatively -- `--data-dir ./node-data`, `sub/../node-data` -- must
+/// work as it always has. The root is created by the locks themselves, so the
+/// first of them is taken before there is anything to resolve, and its path is
+/// the spelling as given; binding the resolved root to the locks has to compare
+/// the files they are, not how they were first spelled.
+#[test]
+fn restore_into_a_fresh_relatively_named_data_dir_succeeds() {
+    let scratch = TempDir::new().unwrap();
+    let source = scratch.path().join("source");
+    seeded_root(&source);
+    let archive = scratch.path().join("backup.tar");
+    archive_from(&source, &archive);
+    std::fs::create_dir(scratch.path().join("sub")).unwrap();
+
+    for spelled in ["./node-data", "sub/../other-node"] {
+        let out = icnctl(Path::new(spelled))
+            .current_dir(scratch.path())
+            .arg("restore")
+            .arg(&archive)
+            .output()
+            .unwrap();
+        let text = combined(&out);
+        assert!(
+            out.status.success(),
+            "restore into a fresh `{spelled}` must succeed: {text}"
+        );
+        let root = scratch.path().join(Path::new(spelled).file_name().unwrap());
+        assert_eq!(
+            std::fs::read(root.join("store").join("marker")).unwrap(),
+            b"original\n",
+            "`{spelled}`: {text}"
+        );
+        assert!(
+            text.contains(&format!(
+                "Restored to: {}",
+                root.canonicalize().unwrap().display()
+            )),
+            "`{spelled}`: {text}"
+        );
+    }
+}

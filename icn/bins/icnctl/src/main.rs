@@ -7222,13 +7222,13 @@ fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
 /// contents aside would move the name itself and leave the restore writing
 /// somewhere the exclusion anchor does not cover. A root with no parent (`/`)
 /// is refused rather than guessed at.
-fn sibling_backup_dir(data_dir: &Path, created_at: u64) -> Result<PathBuf> {
-    let root = data_dir.canonicalize().with_context(|| {
-        format!(
-            "Failed to resolve the data directory {}",
-            data_dir.display()
-        )
-    })?;
+///
+/// `root` is the data dir already resolved by [`resolve_restore_root`], not
+/// resolved again here: restore names one root, once, and every step after the
+/// locks works on that one. `data_dir` is the operator's spelling, consulted
+/// only for the question of where the *name* lives.
+fn sibling_backup_dir(data_dir: &Path, root: &Path, created_at: u64) -> Result<PathBuf> {
+    let root = root.to_path_buf();
     // Where the name itself lives: its resolved parent plus its final
     // component (a symlink is not followed for this, only its parent is).
     if let Some(name) = data_dir.file_name() {
@@ -7754,6 +7754,53 @@ fn move_entries_back(
     stranded
 }
 
+/// The one root a restore works on: what `data_dir` resolves to, bound to the
+/// exclusion this process already holds over it.
+///
+/// Resolved after the locks, as the store guard's root is, so a root the lock
+/// itself created resolves -- and resolved *once*, before anything is moved:
+/// the move-aside empties the root entry by entry, so a spelling that passes
+/// through one of its entries cannot be resolved again partway through.
+///
+/// The resolved path is then held to the locks. Both lock files were placed
+/// through the same `data_dir` when they were taken; if either no longer
+/// resolves into this root, or is no longer the inode this process locked, the
+/// path no longer names the root this process excludes others from, and
+/// restore refuses before it has moved or extracted anything.
+fn resolve_restore_root(
+    data_dir: &Path,
+    storage: &icn_core::DataDirLock,
+    config: &icn_core::DataDirLock,
+) -> Result<PathBuf> {
+    let root = std::fs::canonicalize(data_dir).with_context(|| {
+        format!(
+            "Failed to resolve the data directory {}",
+            data_dir.display()
+        )
+    })?;
+    // Compared by what each lock file resolves to, not by its recorded path: a
+    // lock taken before the root existed (the first of a fresh restore's two)
+    // was placed through the spelling as given, since there was nothing yet to
+    // resolve. A lock file that cannot be resolved covers nothing.
+    let resolves_to = |lock: &icn_core::DataDirLock, expected: PathBuf| {
+        std::fs::canonicalize(lock.path()).is_ok_and(|found| found == expected)
+    };
+    let covered = resolves_to(storage, icn_core::DataDirLock::lock_path(&root))
+        && resolves_to(config, icn_core::DataDirLock::config_lock_path(&root));
+    if !covered || !storage.still_anchored() || !config.still_anchored() {
+        bail!(
+            "Refusing to restore into {}: it now resolves to {}, which is not the directory \
+             whose locks this restore holds ({}). Something changed what that path names \
+             after the locks were taken. Nothing has been moved; re-run once the data \
+             directory is settled.",
+            data_dir.display(),
+            root.display(),
+            storage.path().display()
+        );
+    }
+    Ok(root)
+}
+
 fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<()> {
     // Check if input backup file exists
     if !input.exists() {
@@ -7816,6 +7863,15 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
         (config, storage)
     };
 
+    // From here on the root is addressed by what `--data-dir` resolves to now,
+    // never by the operator's spelling. Moving the contents aside empties the
+    // root one entry at a time, and a spelling that passes through one of those
+    // entries -- `<root>/store/..`, or `..` typed from inside `<root>/store` --
+    // stops resolving the moment that entry leaves: every later move, the
+    // rollback and the extraction would then fail against a root already
+    // half-emptied, stranding live state in the backup.
+    let root = resolve_restore_root(data_dir, &restore_storage, &restore_config)?;
+
     println!("Restoring backup from {}...", input.display());
 
     // Open the backup archive
@@ -7841,25 +7897,22 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     // If force, move the existing data aside — contents only, never the root.
     if replacing_existing {
         println!("Backing up existing data directory...");
-        let backup_dir = sibling_backup_dir(data_dir, metadata.created_at)?;
-        match prepare_move_aside_dir(data_dir, &backup_dir)? {
+        let backup_dir = sibling_backup_dir(data_dir, &root, metadata.created_at)?;
+        match prepare_move_aside_dir(&root, &backup_dir)? {
             Some(created) => {
-                move_data_root_contents_aside(data_dir, &backup_dir, created)?;
+                move_data_root_contents_aside(&root, &backup_dir, created)?;
                 println!(
                     "  Existing data moved to: {} (owner-only; remove it once the restored node \
                      is verified)",
                     backup_dir.display()
                 );
             }
-            None => println!(
-                "  Nothing to move aside: {} holds no data",
-                data_dir.display()
-            ),
+            None => println!("  Nothing to move aside: {} holds no data", root.display()),
         }
     }
 
     // Create data directory if it doesn't exist
-    std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
+    std::fs::create_dir_all(&root).context("Failed to create data directory")?;
 
     // Extract the archive (excluding metadata file)
     println!("Extracting backup...");
@@ -7903,7 +7956,7 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
             continue;
         }
 
-        entry.unpack_in(data_dir)?;
+        entry.unpack_in(&root)?;
     }
 
     // Verify checksum.
@@ -7919,11 +7972,9 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     let minted_here: Vec<PathBuf> = COORDINATION_FILE_NAMES
         .iter()
         .map(PathBuf::from)
-        .filter(|name| {
-            !coordination_files_in_archive.contains(name) && data_dir.join(name).exists()
-        })
+        .filter(|name| !coordination_files_in_archive.contains(name) && root.join(name).exists())
         .collect();
-    let restored_checksum = calculate_dir_checksum_ignoring(data_dir, &minted_here)?;
+    let restored_checksum = calculate_dir_checksum_ignoring(&root, &minted_here)?;
     if restored_checksum != metadata.checksum {
         bail!(
             "Checksum mismatch! Expected: {}, Got: {}. Restore may be corrupted.",
@@ -7945,7 +7996,7 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     restore_config.assert_still_anchored("this restore")?;
 
     println!("✓ Backup restored successfully");
-    println!("  Restored to: {}", data_dir.display());
+    println!("  Restored to: {}", root.display());
     println!("  Checksum verified: {restored_checksum}");
     println!();
     println!("You can now use 'icnctl id show' to verify your restored identity.");
@@ -15467,13 +15518,15 @@ mod exclusion_domain_tests {
         let root = base.join("var").join("lib").join("icn");
         std::fs::create_dir_all(&root).unwrap();
         let expected = base.join("var").join("lib").join("icn.backup-7");
+        // What restore resolves the spelling to before asking where the backup goes.
+        let resolved = |p: &dyn AsRef<Path>| std::fs::canonicalize(p).unwrap();
         for spelled in [
             root.display().to_string(),
             format!("{}/", root.display()),
             format!("{}//", root.display()),
         ] {
             assert_eq!(
-                sibling_backup_dir(Path::new(&spelled), 7).unwrap(),
+                sibling_backup_dir(Path::new(&spelled), &resolved(&spelled), 7).unwrap(),
                 expected,
                 "spelled {spelled:?}"
             );
@@ -15481,16 +15534,19 @@ mod exclusion_domain_tests {
         // A symlink to the root: the backup goes beside the real root.
         let link = base.join("link");
         std::os::unix::fs::symlink(&root, &link).unwrap();
-        assert_eq!(sibling_backup_dir(&link, 7).unwrap(), expected);
+        assert_eq!(
+            sibling_backup_dir(&link, &resolved(&link), 7).unwrap(),
+            expected
+        );
         // A symlink living inside the root it points at is refused.
         let inside = root.join("self");
         std::os::unix::fs::symlink(&root, &inside).unwrap();
         assert!(
-            sibling_backup_dir(&inside, 7).is_err(),
+            sibling_backup_dir(&inside, &resolved(&inside), 7).is_err(),
             "a name inside the root it resolves to must be refused"
         );
         assert!(
-            sibling_backup_dir(Path::new("/"), 7).is_err(),
+            sibling_backup_dir(Path::new("/"), Path::new("/"), 7).is_err(),
             "a root with no parent has nowhere to put a sibling"
         );
     }
