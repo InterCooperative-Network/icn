@@ -1,14 +1,15 @@
 ---
 id: "0087"
 title: "N1 authority-fact persistence boundary"
-status: "proposed"
+status: "accepted"
 date: "2026-10-23"
+accepted_date: "2026-10-23"
 deciders: ["Matt Faherty"]
 tags: ["identity", "n1", "authority-log", "persistence", "durability", "api-boundary"]
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "proposed"
+implementation_status: "implemented on the #2800 branch (not yet merged); no daemon integration"
 references:
   - "icn#2799 (N1-D: local restart durability)"
   - "icn#2800 (the implementing PR)"
@@ -23,9 +24,20 @@ references:
 
 ## Status
 
-`proposed` — drafted by an agent with #2800 and awaiting the maintainer's
-decision. Nothing in it is in force until it is accepted. Decision status and
-implementation status are separate axes (ADR-0018).
+**`accepted` (2026-10-23).** Drafted with #2800. The maintainer (Matt Faherty,
+the decider) approved its direction and substantive decisions on 2026-10-23,
+with three documentation clarifications that are applied in this text:
+- §1: the four-item surface is the persistence boundary, not every export of
+  the module;
+- §3: duplicate writes are semantically idempotent, not skipped;
+- §5: `put_fact` does not validate admission.
+
+The approval was given as a written instruction in #2800's delivery session.
+ADR-0018 requires no separate signature.
+
+Decision status and implementation status are separate axes (ADR-0018). The
+implementation is on #2800's branch and is not merged, and nothing in the
+daemon uses it yet.
 
 ## Context
 
@@ -49,9 +61,12 @@ made durable.
 
 ## Decision
 
-### 1. The public surface is four items
+### 1. The persistence boundary's public surface is four items
 
-`icn_identity::authority_log` exports exactly:
+For the N1-D persistence boundary, `icn_identity::authority_log` exports
+exactly these four items. The module exports other things — bodies,
+construction, derivation, the in-memory `AuthorityStore` — which this ADR
+neither adds nor governs.
 
 | Item | Why it is public |
 |---|---|
@@ -60,7 +75,7 @@ made durable.
 | `FactStoreError` | the one error type both sides speak |
 | `fn rehydrate(&dyn AuthorityFactStore) -> Result<AuthorityStore, FactStoreError>` | the only way back from records to an admitted store |
 
-Everything else is crate-private. The conversion from a record to an admitted
+Everything else of the persistence module is crate-private. The conversion from a record to an admitted
 event is reachable only through `rehydrate`. That narrows the surface; it is
 not what makes storage safe. Admission is enforced at `AuthorityStore::ingest`,
 which re-checks every body whatever its source, so storage cannot widen what
@@ -85,8 +100,11 @@ verbatim, and never re-encodes the key.
 
 ### 3. Idempotence and duplicates
 
-A record's key is its identity. Writing a record that is already present is a
-no-op, not an error. Two valid signatures over one body are two records, which
+A record's key is its identity, so writing a record that is already present is
+**semantically idempotent**: the held set is unchanged, and the write is not an
+error. That describes the outcome, not a skipped operation. The `icn-core`
+adapter still performs the physical write and the durability barrier on every
+call, duplicate or not. Two valid signatures over one body are two records, which
 rehydrate to one body and two witnesses. Choosing between them would be a
 content tiebreak the durable lattice forbids (§9.2.1).
 
@@ -127,6 +145,15 @@ matches the decoded body, then ingests. Admission proves only that some key
 signed these bytes. A well-formed body signed by an unauthorized key is
 admitted, stored and rehydrated like any other, and is excluded by `derive`,
 exactly as it is live. Storage neither drops nor promotes it.
+
+**`put_fact` does not validate admission.** It persists whatever record it is
+handed. A runtime producer must admit a fact through `AuthorityStore::ingest`,
+or `admissible`, before persisting it.
+
+Rehydration validates every loaded record again, independently, and fails
+closed (§7). So a record that should never have been written cannot become
+admitted state. It can, however, make every later rehydration refuse. That is
+why validation on the producer side is required, not optional.
 
 ### 6. Ordering
 
@@ -183,7 +210,7 @@ change for implementors and needs this ADR amended.
 
 ## Implementation status
 
-Proposed together with #2800, which implements §1–§7:
+Implemented by #2800, which covers §1–§7:
 - the narrowed exports;
 - the flush-then-acknowledge adapter;
 - the `DurableStore` trait with its required barrier;
@@ -197,8 +224,9 @@ The evidence is in #2800's tests:
 - a child process SIGKILLed after acknowledging, with its facts present on
   reopen.
 
-Calling it `implemented` would need #2800 merged and this ADR accepted. Daemon
-wiring is separate follow-on work.
+The decision is accepted. The implementation counts as landed only once #2800
+merges. Daemon wiring is separate follow-on work, and no producer exists yet
+to do the admission §5 requires before persisting.
 
 ## Alternatives Considered
 

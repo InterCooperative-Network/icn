@@ -167,7 +167,13 @@ impl PersistedFact {
 /// that inspected a body, preferred one record over another, or dropped a record it could not
 /// parse would be taking over part of [`super::derive`]'s job.
 pub trait AuthorityFactStore: Send + Sync {
-    /// Persist one record. Writing a record that is already present is a no-op, not an error.
+    /// Persist one record. Writing a record that is already present is semantically idempotent:
+    /// the held set is unchanged and it is not an error, though an implementation may still
+    /// perform the physical write and its barrier.
+    ///
+    /// This does not validate admission: it persists whatever record it is handed. A producer
+    /// must admit a fact before persisting it, and [`rehydrate`] independently re-validates every
+    /// loaded record and fails closed (ADR-0087 §5).
     ///
     /// `Ok` is the durability acknowledgment: the record has crossed this implementation's
     /// persistence barrier and survives a restart of the process. An implementation that cannot
