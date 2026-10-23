@@ -103,8 +103,8 @@ and acknowledges only if both succeed. `Store::flush` cannot be that barrier,
 because it defaults to a no-op that any implementation inherits silently. So
 the adapter accepts only `Arc<dyn DurableStore>`, where
 `DurableStore: Store` has one required method, `sync_durable`, with **no
-default**. `SledStore` implements it with its syncing flush; nothing else in
-production implements it.
+default**. `SledStore` implements it with its flush (how far that reaches is
+in §9); nothing else in production implements it.
 
 A backend becomes eligible only through an explicit `impl` that writes its
 barrier out. A no-op barrier can exist only where someone wrote one, in code a
@@ -112,7 +112,7 @@ reviewer reads. The constructor's type enforces this at compile time: a plain
 `Arc<dyn Store>` is rejected.
 
 This is a claim made visible, not a proof. Nothing can check that an
-implementation's barrier really reaches stable storage. The trait is not
+implementation's barrier really does what it claims. The trait is not
 sealed, because tests in other crates need fault-injecting implementations.
 
 The cost is one flush per fact. N1 events are rare, bounded per subject and
