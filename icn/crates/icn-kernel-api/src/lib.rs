@@ -35,6 +35,7 @@
 pub mod authz;
 pub mod bootstrap;
 pub mod budget;
+pub mod canonical;
 pub mod comms;
 pub mod compute;
 pub mod container;
@@ -73,6 +74,9 @@ pub use bootstrap::{
 };
 pub use budget::{
     BeginSpendOutcome, BudgetRecord, BudgetSpendError, BudgetStatus, BudgetStore, PendingSpend,
+};
+pub use canonical::{
+    ordered_commitment, tags_are_prefix_free, CanonicalHasher, CommitmentError, DomainTag,
 };
 pub use comms::{PubSub, RequestResponse, Streams};
 pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyClass, Trigger};

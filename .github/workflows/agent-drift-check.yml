@@ -39,6 +39,7 @@ on:
       - 'scripts/check-preflight-consistency.sh'
       - 'scripts/check-truth-spine.py'
       - 'scripts/tests/test_public_docs_boundary.py'
+      - 'scripts/tests/test_repo_pointer_guard.py'
       - 'ops/state/config/**'
       - 'CLAUDE.md'
       - 'ops/CLAUDE.md'
@@ -108,6 +109,9 @@ jobs:
 
       - name: Sprint-state currency + SessionStart source guard tests (Refs icn#2634)
         run: python3 scripts/tests/test_sprint_state_invariants.py
+
+      - name: Provider-pointer guard rejects deceptive repo-map pointers (Refs icn#2809)
+        run: python3 scripts/tests/test_repo_pointer_guard.py
 
       - name: Systemic-leverage policy has one canonical owner and live projections
         run: python3 scripts/check-engineering-leverage.py
