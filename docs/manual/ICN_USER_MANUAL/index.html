@@ -1029,6 +1029,16 @@ icnctl backup ~/backups/icn-$(date +%Y%m%d).tar.gz.age
 # - Configuration
 </code></pre>
 <h3 id="restore-procedures">Restore Procedures</h3>
+<p>Restore is <strong>exclusive</strong>. It replaces every byte under the data directory and
+republishes the configuration in it, so it joins the same exclusion domain the
+daemon and <code>icnctl institution runtime-root create</code> use, and is refused while
+either of them holds that directory. <code>--force</code> overrides &quot;this directory is not
+empty&quot;; it has never overridden &quot;another ICN process is using it&quot;, and since
+icn#2758 the command enforces that rather than leaving it to procedure.</p>
+<p>Stopping the daemon is therefore still the first step, and now the command says
+so instead of proceeding:</p>
+<pre><code>Refusing to start this restore: another ICN process already holds /var/lib/icn.
+</code></pre>
 <pre><code class="language-bash"># Stop daemon first
 sudo systemctl stop icnd
 
