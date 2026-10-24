@@ -25,7 +25,7 @@ no merge.
 
 ## Observed checkout at handoff time
 
-- repo root: `~/icn-dev/worktrees/icn/katie-home-identity-integration`
+- repo root: a local worktree of this repository (machine path omitted)
 - branch: `task/katie-home-identity-integration`
 - HEAD: `473cb0372` (feat(identity): evaluate delegated device authority at a relying-party position (N4-A))
 - base / observed `origin/main`: `7ef8a670a`
@@ -143,7 +143,7 @@ This is a **recommendation, not current truth**.
 4. If the premise holds, the next executable entry point is:
 
    ```bash
-   cd ~/icn-dev/worktrees/icn/katie-home-identity-integration/icn
+   cd "$(git rev-parse --show-toplevel)/icn"
    cargo test -p icn-identity --test device_authority
    ```
 
