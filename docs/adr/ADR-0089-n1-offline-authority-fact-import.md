@@ -149,10 +149,16 @@ Proposed rule:
 
 - **Allowlist.** An owner-only retention file lists each Subject the node may keep, with the context
   it belongs to, the basis for keeping it (a reference, not personal data), who added it, and when.
-  A bundle whose Subject is not listed is refused before anything is written.
-- **One context per node store.** Until GEN (#2602) binds a Subject to a context structurally, the
-  context is the operator's recorded claim. The node keeps only Subjects recorded under its own
-  institutional context.
+  A bundle whose Subject is not listed is refused before anything is written. The allowlist is the
+  operator's **record** of a retention decision. It is not, by itself, the person's consent or the
+  institution's authorization, and nothing may treat an allowlist entry as either (§9).
+- **Context is recorded per Subject, not assumed per node.** A node may host several autonomous
+  institutional domains, and a person may belong to overlapping communities, cooperatives,
+  federations and other institutions under context-specific Subjects. Each allowlist entry
+  therefore names the context it is retained for. Until GEN (#2602) binds a Subject to a context
+  structurally, that context is the operator's recorded claim, not a verified fact. A first
+  importer may choose to accept a single context per store as an **implementation limitation**.
+  That limitation must not become an ICN substrate invariant.
 - **Bounds.** A maximum bundle size, a maximum number of facts per import, and a maximum number of
   facts per Subject, each checked before allocation or writing. Their values are a decision
   (§10). N1 deliberately left storage pressure open (O-N8), and N4-B deliberately added no cap at
@@ -216,6 +222,31 @@ Before any fact about a real participant is retained:
 - Whether a governed abandon or erasure procedure exists, and who may invoke it.
 - Whether the allowlist is a file the operator edits, or a governed record.
 - Whether the import report is kept, rotated or removed at the next daemon start.
+
+## Open architectural concerns (recorded 2026-10-24, before any implementation)
+
+These were raised by the maintainer on review of the first draft. They are reasons this ADR stays
+PROPOSED, not items it claims to have resolved:
+
+- **Node ≠ institution.** A node may host several autonomous institutional domains. Retention,
+  bounds and reports must be scoped per domain or per context, never per node by assumption.
+- **Overlapping, context-specific membership.** One person may hold Subjects in several
+  communities and institutions on the same node. Retention for one context must never imply
+  retention, or reveal membership, in another (IDENTITY_SEMANTICS §5).
+- **Institution neutrality.** Nothing in the import may assume the governing institution is a
+  cooperative; a community, cooperative or federation must be treated alike.
+- **Operator allowlist ≠ consent.** Who may authorize retention of a person's facts in a context,
+  and how that authorization is recorded and withdrawn, is an institutional governance question
+  this ADR does not answer.
+- **Append-only, no erasure.** Permanent retention with no erasure path is a serious privacy and
+  governance constraint, not a detail. It may block real-participant use until an erasure or
+  re-keying design exists.
+- **Crash safety without wedging.** The recovery protocol in §4 must be shown, by fault injection,
+  never to leave a node permanently refused. An abandon path may be needed.
+- **Validation ≠ atomic persistence.** Admitting the whole bundle in memory proves the bundle is
+  well-formed. It does not make the store write atomic; §4's marker covers the gap, and nothing
+  may describe an import as atomic.
+- **Read-only checks leave the receipt alone** (§3, §7).
 
 ## Effect on ADR-0088, if accepted
 
