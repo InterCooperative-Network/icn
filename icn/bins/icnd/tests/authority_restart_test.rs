@@ -23,6 +23,7 @@
 //! | E | an incomplete restore: refused before the store is opened |
 //! | F | the N2-A gate audits a populated authority store and clears it |
 //! | G | a fresh node initializes, records it, and reopens as the same instance |
+//! | H | a start the N2-A gate refuses leaves no receipt from the previous start |
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
@@ -433,6 +434,38 @@ fn a_fresh_node_initializes_records_it_and_reopens_as_the_same_instance() {
     let second = node.receipt();
     assert_eq!(second.startup, Startup::Rehydrated);
     assert_eq!(second.instance, first.instance);
+}
+
+// ── H: a receipt never outlives the start it describes ─────────────────────────────────────────
+
+#[test]
+fn a_start_refused_by_the_n2a_gate_leaves_no_receipt_from_the_previous_start() {
+    let node = Node::init("n1r1-h");
+    node.seed_offline();
+    let mut daemon = node.start();
+    assert!(daemon.sigterm().success());
+    assert!(
+        receipt_path(node.dir()).exists(),
+        "fixture: a successful start wrote one"
+    );
+
+    // Make the gate refuse, before the registry is ever reached.
+    std::fs::write(
+        icn_store::n2a_startup_gate::receipt_path(node.dir()),
+        b"not a gate receipt",
+    )
+    .unwrap();
+
+    let (status, log) = node.run_expecting_refusal();
+    assert_refused(&node, status, &log, "is unreadable");
+    assert!(
+        !log.contains("N1 authority registry: open"),
+        "fixture: the refusal came before the registry:\n{log}"
+    );
+    assert!(
+        !receipt_path(node.dir()).exists(),
+        "the previous start's receipt must not survive to be read as this start's"
+    );
 }
 
 // ── the daemon process ──────────────────────────────────────────────────────────────────────────

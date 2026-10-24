@@ -42,12 +42,16 @@
 //!
 //! Each successful [`AuthorityRegistry::open`] writes [`RECEIPT_FILE_NAME`]: counts, and per
 //! subject a summary of what [`derive`] returns over the rehydrated state, with a digest of those
-//! decisions. It is deterministic (no clock, no process data), holds no secret, and is read by
-//! tests and operators; nothing in the runtime reads it back. Once its lock and restore-marker
-//! checks pass, [`AuthorityRegistry::open`] removes a stale receipt before it opens anything, so a
-//! refusal after that point leaves none. A start refused earlier — by those checks, before the
-//! daemon holds the data-directory lock, or by the N2-A gate — writes nothing, and the previous
-//! start's receipt remains: a record of that start, not of this one.
+//! decisions. It is deterministic (no clock, no process data) and holds no cryptographic secret,
+//! but it names subjects, public authority keys and device grants, so it is created owner-only
+//! and stays local. Its readers are tests and operators; nothing in the runtime reads it back, and
+//! it is neither an authority certificate nor proof that a daemon is running (ADR-0088 §10).
+//!
+//! The daemon discards the previous receipt ([`AuthorityRegistry::discard_receipt`]) as soon as it
+//! holds the data-directory lock, before the N2-A gate, and [`AuthorityRegistry::open`] does the
+//! same once its own checks pass. So a start refused at the gate or here leaves none. A start
+//! refused before the lock (another holder, an incomplete restore) cannot touch the directory,
+//! and an earlier receipt may remain: a record of that start, not of this one.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -314,22 +318,24 @@ impl AuthorityRegistry {
                         facts,
                     });
                 }
-                let instance = match read_instance(&store, &store_dir)? {
-                    Some(instance) => instance,
-                    None => write_new_instance(&store, &store_dir)?,
-                };
-                // Also when adopting: a process that wrote the row may have died before this.
-                fsync_store(&store_dir).map_err(|e| store_error(&store_dir, e))?;
-                lock_still_held(data_dir, lock)?;
-                write_record(data_dir, &record_path, instance)?;
+                let instance = initialize(&OnDisk {
+                    store: &store,
+                    store_dir: &store_dir,
+                    data_dir,
+                    record_path: &record_path,
+                    lock,
+                })?;
                 (store, instance, Startup::CompletedInterruptedInitialization)
             }
             (None, false) => {
                 let store = open_store(&store_dir)?;
-                let instance = write_new_instance(&store, &store_dir)?;
-                fsync_store(&store_dir).map_err(|e| store_error(&store_dir, e))?;
-                lock_still_held(data_dir, lock)?;
-                write_record(data_dir, &record_path, instance)?;
+                let instance = initialize(&OnDisk {
+                    store: &store,
+                    store_dir: &store_dir,
+                    data_dir,
+                    record_path: &record_path,
+                    lock,
+                })?;
                 (store, instance, Startup::Initialized)
             }
         };
@@ -339,6 +345,17 @@ impl AuthorityRegistry {
         lock_still_held(data_dir, lock)?;
         write_receipt(data_dir, &receipt, &receipt_body)?;
         Ok((registry, receipt_body))
+    }
+
+    /// Remove the previous start's receipt without opening anything.
+    ///
+    /// The daemon calls this as soon as it holds the data-directory lock, so a start refused
+    /// before [`Self::open`] runs — by the N2-A gate, say — does not leave the previous start's
+    /// receipt in place to be read as this one's. Needs this directory's storage lock. Removing
+    /// nothing is not an error.
+    pub fn discard_receipt(data_dir: &Path, lock: &DataDirLock) -> Result<(), RegistryError> {
+        check_lock(data_dir, lock)?;
+        remove_stale_receipt(data_dir, &receipt_path(data_dir))
     }
 
     fn rehydrated(
@@ -614,6 +631,11 @@ fn read_record(path: &Path) -> Result<Option<[u8; INSTANCE_LEN]>, RegistryError>
     match std::fs::symlink_metadata(path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(unreadable(format!("cannot inspect: {e}"))),
+        // This module writes the record as a regular file. A link or anything else at its name
+        // was put there by something else, and is not followed.
+        Ok(meta) if !meta.file_type().is_file() => {
+            return Err(unreadable("not a regular file".into()));
+        }
         Ok(_) => {}
     }
     let bytes = std::fs::read(path).map_err(|e| unreadable(format!("cannot read: {e}")))?;
@@ -683,33 +705,90 @@ fn read_instance(
     }
 }
 
-/// Write a fresh instance row. [`fsync_store`] then gets it onto disk before the record that
-/// names it exists.
+// ── initialization ──────────────────────────────────────────────────────────────────────────────
+
+/// The steps that establish a store's identity.
 ///
-/// The barrier alone survives a crash of this process but not power loss: sled's flush waits with
-/// `sync_file_range` (ADR-0087 §9), while the record gets a full `fsync`. Power lost between the
-/// two would leave a record naming an instance the store never kept, and the next start would
-/// refuse a node that has nothing to restore.
+/// A trait only so their order can be observed and failed on demand in this module's tests. It is
+/// private, and production has exactly one implementation, [`OnDisk`].
+trait InitSteps {
+    /// The instance row the store already holds, if any.
+    fn existing_instance(&self) -> Result<Option<[u8; INSTANCE_LEN]>, RegistryError>;
+    /// Write a new instance row, returning only after the store's durability barrier.
+    fn write_instance(&self, instance: [u8; INSTANCE_LEN]) -> Result<(), RegistryError>;
+    /// `fsync` the store's files and the directories that name them.
+    fn fsync_store(&self) -> Result<(), RegistryError>;
+    /// Confirm the exclusion still holds, then write the record atomically: the commit point.
+    fn commit_record(&self, instance: [u8; INSTANCE_LEN]) -> Result<(), RegistryError>;
+}
+
+/// Establish the store's instance, then commit the record that names it.
 ///
-/// So after the barrier, every file of the store and the directories that name it are fsynced
-/// through descriptors of their own: `fsync` acts on the inode, whoever wrote it. Closing and
-/// reopening the database would also fsync, but sled can release its file lock a moment after
-/// the handle drops, so an immediate reopen could refuse a first start, and its close path
-/// unwraps a failed fsync. Once per node lifetime.
-fn write_new_instance(
-    store: &Arc<dyn DurableStore>,
-    store_dir: &Path,
-) -> Result<[u8; INSTANCE_LEN], RegistryError> {
-    let instance: [u8; INSTANCE_LEN] = rand::random();
-    store
-        .put(INSTANCE_KEY, &instance)
-        .and_then(|()| store.sync_durable())
-        .map_err(|e| store_error(store_dir, e))?;
+/// The record is the commit point: once it exists, a missing or different instance is a refusal
+/// ([`RegistryError::StoreReplaced`]). So everything it names must be on disk first, in this
+/// order, and any failure stops before the record:
+///
+/// 1. reuse the instance row an interrupted start left, or write a new one behind the store's
+///    barrier — which survives a crash of this process, not power loss (sled's flush waits with
+///    `sync_file_range`, ADR-0087 §9);
+/// 2. `fsync` the store's files and directories through descriptors of their own (`fsync` acts on
+///    the inode, whoever wrote it) — also when adopting, because the process that wrote the row
+///    may have died before this step;
+/// 3. commit the record (synced temporary, rename, directory sync).
+///
+/// The order is pinned by this module's tests. Those prove the calls happen in this order; they
+/// cannot prove what a disk keeps through a power cut.
+///
+/// Closing and reopening the database would also `fsync`, but sled can release its file lock a
+/// moment after the handle drops, so an immediate reopen could refuse a first start, and its close
+/// path unwraps a failed `fsync`.
+fn initialize(steps: &dyn InitSteps) -> Result<[u8; INSTANCE_LEN], RegistryError> {
+    let instance = match steps.existing_instance()? {
+        Some(instance) => instance,
+        None => {
+            let instance: [u8; INSTANCE_LEN] = rand::random();
+            steps.write_instance(instance)?;
+            instance
+        }
+    };
+    steps.fsync_store()?;
+    steps.commit_record(instance)?;
     Ok(instance)
 }
 
+/// [`InitSteps`] over a real store and data directory.
+struct OnDisk<'a> {
+    store: &'a Arc<dyn DurableStore>,
+    store_dir: &'a Path,
+    data_dir: &'a Path,
+    record_path: &'a Path,
+    lock: &'a DataDirLock,
+}
+
+impl InitSteps for OnDisk<'_> {
+    fn existing_instance(&self) -> Result<Option<[u8; INSTANCE_LEN]>, RegistryError> {
+        read_instance(self.store, self.store_dir)
+    }
+
+    fn write_instance(&self, instance: [u8; INSTANCE_LEN]) -> Result<(), RegistryError> {
+        self.store
+            .put(INSTANCE_KEY, &instance)
+            .and_then(|()| self.store.sync_durable())
+            .map_err(|e| store_error(self.store_dir, e))
+    }
+
+    fn fsync_store(&self) -> Result<(), RegistryError> {
+        fsync_store_files(self.store_dir).map_err(|e| store_error(self.store_dir, e))
+    }
+
+    fn commit_record(&self, instance: [u8; INSTANCE_LEN]) -> Result<(), RegistryError> {
+        lock_still_held(self.data_dir, self.lock)?;
+        write_record(self.data_dir, self.record_path, instance)
+    }
+}
+
 /// `fsync` each regular file directly in `store_dir`, then `store_dir` and its parent.
-fn fsync_store(store_dir: &Path) -> anyhow::Result<()> {
+fn fsync_store_files(store_dir: &Path) -> anyhow::Result<()> {
     use anyhow::Context as _;
 
     for entry in std::fs::read_dir(store_dir).context("listing the store")? {
@@ -808,8 +887,23 @@ fn write_atomically(data_dir: &Path, path: &Path, bytes: &[u8]) -> Result<(), St
         .unwrap_or_default();
     tmp_name.push(".tmp");
     let tmp = path.with_file_name(tmp_name);
+    // A leftover temporary is removed, never reused, and the new one is created exclusively:
+    // `create_new` is `O_CREAT | O_EXCL`, which refuses any existing name — a link planted there
+    // included — instead of following it out of the data directory. Owner-only from creation, so
+    // no umask can widen it: these files name subjects, keys and device grants.
+    match std::fs::remove_file(&tmp) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            return Err(format!("remove stale {} failed: {e}", tmp.display()));
+        }
+        _ => {}
+    }
     {
-        let mut file = std::fs::File::create(&tmp)
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        let mut file = options
+            .open(&tmp)
             .map_err(|e| format!("create {} failed: {e}", tmp.display()))?;
         file.write_all(bytes)
             .map_err(|e| format!("write failed: {e}"))?;
@@ -1025,5 +1119,199 @@ mod tests {
         }
         let restarted = registry_over(&store);
         assert_eq!(restarted.state().body_count(), 2);
+    }
+
+    // ── initialization order (M9) ───────────────────────────────────────────────────────────────
+    //
+    // These prove the order of calls and that a failure stops before the record. They cannot prove
+    // what a disk keeps through a power cut; nothing in-process can.
+
+    /// One recorded step: its name, and the instance it was given, if any.
+    type Call = (&'static str, Option<[u8; INSTANCE_LEN]>);
+
+    /// Records each step and can fail any one of them.
+    struct RecordingSteps {
+        existing: Option<[u8; INSTANCE_LEN]>,
+        fail_at: Option<&'static str>,
+        calls: Mutex<Vec<Call>>,
+    }
+
+    impl RecordingSteps {
+        fn new(existing: Option<[u8; INSTANCE_LEN]>, fail_at: Option<&'static str>) -> Self {
+            RecordingSteps {
+                existing,
+                fail_at,
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn step(
+            &self,
+            name: &'static str,
+            instance: Option<[u8; INSTANCE_LEN]>,
+        ) -> Result<(), RegistryError> {
+            self.calls.lock().unwrap().push((name, instance));
+            if self.fail_at == Some(name) {
+                return Err(RegistryError::Store {
+                    store: PathBuf::from("/recording"),
+                    reason: format!("injected failure at {name}"),
+                });
+            }
+            Ok(())
+        }
+
+        fn names(&self) -> Vec<&'static str> {
+            self.calls.lock().unwrap().iter().map(|(n, _)| *n).collect()
+        }
+    }
+
+    impl InitSteps for RecordingSteps {
+        fn existing_instance(&self) -> Result<Option<[u8; INSTANCE_LEN]>, RegistryError> {
+            self.step("existing_instance", None)?;
+            Ok(self.existing)
+        }
+        fn write_instance(&self, instance: [u8; INSTANCE_LEN]) -> Result<(), RegistryError> {
+            self.step("write_instance", Some(instance))
+        }
+        fn fsync_store(&self) -> Result<(), RegistryError> {
+            self.step("fsync_store", None)
+        }
+        fn commit_record(&self, instance: [u8; INSTANCE_LEN]) -> Result<(), RegistryError> {
+            self.step("commit_record", Some(instance))
+        }
+    }
+
+    #[test]
+    fn a_fresh_instance_is_written_and_fsynced_before_the_record_names_it() {
+        let steps = RecordingSteps::new(None, None);
+        let instance = initialize(&steps).unwrap();
+
+        assert_eq!(
+            steps.names(),
+            [
+                "existing_instance",
+                "write_instance",
+                "fsync_store",
+                "commit_record"
+            ]
+        );
+        let calls = steps.calls.lock().unwrap();
+        assert_eq!(
+            calls[1].1,
+            Some(instance),
+            "the row written is the instance"
+        );
+        assert_eq!(
+            calls[3].1,
+            Some(instance),
+            "the record names that same instance"
+        );
+    }
+
+    #[test]
+    fn an_adopted_instance_is_fsynced_again_before_the_record_names_it() {
+        let steps = RecordingSteps::new(Some([9; INSTANCE_LEN]), None);
+        assert_eq!(initialize(&steps).unwrap(), [9; INSTANCE_LEN]);
+        assert_eq!(
+            steps.names(),
+            ["existing_instance", "fsync_store", "commit_record"],
+            "no second row, and the row a dead process wrote is fsynced before the commit"
+        );
+    }
+
+    #[test]
+    fn any_failure_before_the_commit_point_leaves_no_record() {
+        for (existing, fail_at) in [
+            (None, "existing_instance"),
+            (None, "write_instance"),
+            (None, "fsync_store"),
+            (Some([9; INSTANCE_LEN]), "existing_instance"),
+            (Some([9; INSTANCE_LEN]), "fsync_store"),
+        ] {
+            let steps = RecordingSteps::new(existing, Some(fail_at));
+            assert!(initialize(&steps).is_err(), "{fail_at} must fail the init");
+            let names = steps.names();
+            assert_eq!(names.last(), Some(&fail_at), "nothing runs after {fail_at}");
+            assert!(!names.contains(&"commit_record"), "{fail_at}: {names:?}");
+        }
+    }
+
+    #[test]
+    fn a_failed_commit_is_reported_not_swallowed() {
+        let steps = RecordingSteps::new(None, Some("commit_record"));
+        assert!(initialize(&steps).is_err());
+    }
+
+    /// The real steps over a fault-injecting store, a real directory and a real lock.
+    fn on_disk(
+        store: &Arc<FlakyStore>,
+        dir: &Path,
+        f: impl FnOnce(&OnDisk<'_>) -> Result<[u8; INSTANCE_LEN], RegistryError>,
+    ) -> Result<[u8; INSTANCE_LEN], RegistryError> {
+        let lock = DataDirLock::acquire(dir, "the init-order test").unwrap();
+        let store_dir = crate::config::authority_fact_store_path(dir);
+        std::fs::create_dir_all(&store_dir).unwrap();
+        let store: Arc<dyn DurableStore> = Arc::clone(store) as Arc<dyn DurableStore>;
+        f(&OnDisk {
+            store: &store,
+            store_dir: &store_dir,
+            data_dir: dir,
+            record_path: &init_record_path(dir),
+            lock: &lock,
+        })
+    }
+
+    #[test]
+    fn a_failed_instance_barrier_leaves_no_record_and_the_next_start_adopts_the_row() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(FlakyStore::default());
+
+        *store.fail_sync.lock().unwrap() = true;
+        assert!(matches!(
+            on_disk(&store, dir.path(), |steps| initialize(steps)),
+            Err(RegistryError::Store { .. })
+        ));
+        assert!(
+            !init_record_path(dir.path()).exists(),
+            "no record may name an instance whose barrier failed"
+        );
+        // The write reached the backend before its barrier failed: the crash-equivalent state.
+        let written = store.get(INSTANCE_KEY).unwrap().unwrap();
+
+        *store.fail_sync.lock().unwrap() = false;
+        let adopted = on_disk(&store, dir.path(), |steps| initialize(steps)).unwrap();
+        assert_eq!(
+            adopted.as_slice(),
+            written.as_slice(),
+            "adopted, not replaced"
+        );
+        assert_eq!(
+            read_record(&init_record_path(dir.path())).unwrap(),
+            Some(adopted)
+        );
+    }
+
+    #[test]
+    fn a_failed_instance_write_leaves_neither_row_nor_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(FlakyStore::default());
+        *store.fail_put.lock().unwrap() = true;
+
+        assert!(on_disk(&store, dir.path(), |steps| initialize(steps)).is_err());
+        assert_eq!(store.get(INSTANCE_KEY).unwrap(), None);
+        assert!(!init_record_path(dir.path()).exists());
+    }
+
+    #[test]
+    fn a_successful_init_records_the_instance_the_store_holds() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(FlakyStore::default());
+
+        let instance = on_disk(&store, dir.path(), |steps| initialize(steps)).unwrap();
+        assert_eq!(store.get(INSTANCE_KEY).unwrap(), Some(instance.to_vec()));
+        assert_eq!(
+            read_record(&init_record_path(dir.path())).unwrap(),
+            Some(instance)
+        );
     }
 }

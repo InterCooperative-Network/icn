@@ -3410,7 +3410,7 @@ category = "guide"
 status = "living"
 title = "Backup and Recovery Guide"
 description = "Operator procedures for node backup and recovery"
-last_updated = "2026-10-08"
+last_updated = "2026-10-24"
 owner = "matt"
 audiences = ["operators"]
 
@@ -4773,6 +4773,17 @@ description = "ACCEPTED 2026-10-23. The N1-D persistence boundary between icn-id
 last_updated = "2026-10-24"
 owner = "matt"
 audiences = ["architects", "developers"]
+
+[docs."docs/adr/ADR-0088-n1-runtime-authority-store-initialization-and-recovery.md"]
+# PROPOSED 2026-10-24 with #2843; not the project's decision until the maintainer accepts it.
+category = "architecture"
+status = "living"
+truth_class = "draft"
+title = "ADR-0088: N1 Runtime Authority-Store Initialization and Recovery"
+description = "PROPOSED. The runtime boundary on top of ADR-0087: where icnd keeps the N1 authority store, the versioned initialization record and the store's instance row that let a start tell a fresh node from a lost or replaced store, the order and barriers of initialization, the fail-closed states, what cannot be detected (whole data-directory loss, rollback), manual recovery, and the startup receipt as an owner-only local diagnostic rather than an authority certificate."
+last_updated = "2026-10-24"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
 
 [docs."docs/ci/GATE_RATCHET_PLAN.md"]
 category = "reference"

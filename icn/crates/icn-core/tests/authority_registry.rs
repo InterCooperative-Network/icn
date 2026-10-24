@@ -288,6 +288,30 @@ fn a_store_that_cannot_be_inspected_is_not_mistaken_for_a_fresh_node() {
 }
 
 #[test]
+fn a_start_that_fails_after_its_record_is_committed_is_not_a_fresh_node_next_time() {
+    let dir = tempfile::tempdir().unwrap();
+    // Initialization commits the record, then the receipt write fails: the start is refused
+    // after the commit point.
+    let obstacle = dir.path().join("n1-authority-receipt.json.tmp");
+    std::fs::create_dir(&obstacle).unwrap();
+    assert!(matches!(
+        open(dir.path()),
+        Err(RegistryError::ReceiptUnwritable { .. })
+    ));
+    let record = std::fs::read(init_record_path(dir.path())).unwrap();
+    std::fs::remove_dir(&obstacle).unwrap();
+
+    let (registry, receipt) = open(dir.path()).unwrap();
+    assert_eq!(
+        receipt.startup,
+        Startup::Rehydrated,
+        "a committed record makes the next start a rehydration, never a fresh initialization"
+    );
+    assert_eq!(std::fs::read(init_record_path(dir.path())).unwrap(), record);
+    assert_eq!(hex::encode(registry.instance()), receipt.instance);
+}
+
+#[test]
 fn a_leftover_temporary_record_is_never_read_and_is_replaced() {
     let dir = tempfile::tempdir().unwrap();
     let tmp = dir.path().join("n1-authority-initialized.json.tmp");
@@ -405,7 +429,10 @@ fn a_receipt_that_cannot_be_written_refuses_the_start() {
         matches!(error, RegistryError::ReceiptUnwritable { .. }),
         "{error}"
     );
-    assert!(error.to_string().contains("create"), "{error}");
+    assert!(
+        error.to_string().contains("n1-authority-receipt.json.tmp"),
+        "the failure is in writing the receipt: {error}"
+    );
     assert!(!receipt_path(dir.path()).exists());
 }
 
@@ -422,6 +449,100 @@ fn a_refusal_before_the_store_is_opened_still_removes_the_stale_receipt() {
         Err(RegistryError::RecordUnreadable { .. })
     ));
     assert!(!receipt_path(dir.path()).exists());
+}
+
+// ── file safety ─────────────────────────────────────────────────────────────────────────────────
+
+#[cfg(unix)]
+fn mode(path: &Path) -> u32 {
+    use std::os::unix::fs::PermissionsExt as _;
+    std::fs::symlink_metadata(path)
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777
+}
+
+/// The receipt names subjects, authority keys and device grants: not secrets, but metadata a node
+/// has no reason to show other local accounts. Both files are created owner-only, so a lax umask
+/// cannot widen them (it only ever removes bits).
+#[cfg(unix)]
+#[test]
+fn the_record_and_the_receipt_are_owner_only_whatever_the_umask() {
+    let dir = tempfile::tempdir().unwrap();
+    let probe = dir.path().join("probe");
+    std::fs::File::create(&probe).unwrap();
+    if mode(&probe) == 0o600 {
+        eprintln!("NOTE: this process's umask already yields 0600; the assertion is weaker here");
+    }
+
+    drop(open(dir.path()).unwrap());
+    assert_eq!(mode(&init_record_path(dir.path())), 0o600);
+    assert_eq!(mode(&receipt_path(dir.path())), 0o600);
+}
+
+/// Whoever can place a link at the temporary's name must not be able to direct the write to a
+/// file outside the data directory.
+#[cfg(unix)]
+#[test]
+fn a_link_planted_at_a_temporary_name_is_not_written_through() {
+    for name in [
+        "n1-authority-initialized.json.tmp",
+        "n1-authority-receipt.json.tmp",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let victim = outside.path().join("victim");
+        std::fs::write(&victim, b"untouched").unwrap();
+        std::os::unix::fs::symlink(&victim, dir.path().join(name)).unwrap();
+
+        drop(open(dir.path()).unwrap());
+        assert_eq!(std::fs::read(&victim).unwrap(), b"untouched", "{name}");
+        for path in [init_record_path(dir.path()), receipt_path(dir.path())] {
+            assert!(
+                std::fs::symlink_metadata(&path)
+                    .unwrap()
+                    .file_type()
+                    .is_file(),
+                "{name}: {} must be a regular file",
+                path.display()
+            );
+        }
+    }
+}
+
+/// The record this module writes is a regular file. Anything else at its name was put there by
+/// something else, and is refused rather than followed.
+#[cfg(unix)]
+#[test]
+fn a_record_that_is_a_link_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    seeded(dir.path());
+    let elsewhere = tempfile::tempdir().unwrap();
+    let moved = elsewhere.path().join("record.json");
+    std::fs::rename(init_record_path(dir.path()), &moved).unwrap();
+    std::os::unix::fs::symlink(&moved, init_record_path(dir.path())).unwrap();
+
+    let error = open(dir.path()).unwrap_err();
+    assert!(
+        matches!(error, RegistryError::RecordUnreadable { .. }),
+        "{error}"
+    );
+}
+
+#[test]
+fn discarding_a_receipt_needs_this_directorys_lock() {
+    let (dir, other) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    seeded(dir.path());
+    let wrong = lock(other.path());
+    assert!(AuthorityRegistry::discard_receipt(dir.path(), &wrong).is_err());
+    assert!(receipt_path(dir.path()).exists());
+
+    let right = lock(dir.path());
+    AuthorityRegistry::discard_receipt(dir.path(), &right).unwrap();
+    assert!(!receipt_path(dir.path()).exists());
+    // Idempotent: nothing to discard is not an error.
+    AuthorityRegistry::discard_receipt(dir.path(), &right).unwrap();
 }
 
 // ── the lock ────────────────────────────────────────────────────────────────────────────────────

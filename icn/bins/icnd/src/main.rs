@@ -905,6 +905,14 @@ async fn main() -> Result<()> {
     // lives beside the lock and both binaries ask it.
     icn_core::refuse_if_new_files_would_not_belong_to_the_data_root_account(&config.data_dir)?;
     let data_dir_lock = icn_core::DataDirLock::acquire(&config.data_dir, "the daemon")?;
+    // The N1 authority receipt describes one start. Discard the previous start's now, before the
+    // N2-A gate, so a start refused there leaves no receipt to be read as this one's. Removing a
+    // file opens no store.
+    icn_core::authority_registry::AuthorityRegistry::discard_receipt(
+        &config.data_dir,
+        &data_dir_lock,
+    )
+    .map_err(anyhow::Error::new)?;
 
     // N2-A startup gate (#2627). `Did` equality now names the principal, not
     // the spelling (I7), so the first start of this binary over a store holding

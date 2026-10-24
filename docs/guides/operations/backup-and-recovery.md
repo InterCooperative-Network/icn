@@ -385,6 +385,44 @@ Store recovery instructions separately from backups:
 3. Inform cooperative members of new DID
 4. Rebuild trust relationships
 
+### Scenario 5: `icnd` refuses to start over N1 authority state
+
+**Situation**: `icnd` exits at startup with a message beginning `refusing to start` that names the N1 authority store (`store/authority`) or its initialization record (`n1-authority-initialized.json`).
+
+`icnd` keeps N1 authority facts in `store/authority/`, and a small record beside the stores says the node created that store. Both carry the same instance ID. The daemon refuses rather than start without its authority state, because a node that silently started empty would lose every authority fact it held. The decision behind this is ADR-0088 (proposed).
+
+**Before you change anything**, stop the daemon and copy the whole data directory somewhere safe, as the data directory's account. Keep the record and the store together. Every recovery below starts from that copy:
+
+```bash
+cp -a -- '<data-dir>' '<somewhere-safe>/icn-data-before-recovery'
+```
+
+Find the message in the daemon's log, then match it here:
+
+| Message contains | What happened | What to do |
+|---|---|---|
+| (no refusal; the log line `N1 authority registry: open` shows `startup=Initialized`) | **Fresh initialization.** A data directory with neither record nor store. | Nothing. |
+| (no refusal; `startup=CompletedInterruptedInitialization`) | **An interrupted first start** left a store with no facts and no record. The daemon finished it. | Nothing. |
+| `did not rehydrate` | **Corrupt authority data.** A persisted fact cannot be decoded or admitted. The whole store is refused, not just that fact. | Do not delete or edit rows. Keep the copy for analysis, and restore the data directory from the most recent good backup (Scenario 2). |
+| `records an initialized N1 authority store, but … does not exist` | **Missing initialized storage.** The record is there; `store/authority/` is gone. | Restore the data directory from a backup that holds the store. |
+| `is not the one … records` | **Replaced instance.** The store holds a different instance, or none (a recreated, empty database). Often a store copied from another node, or a partial restore of `store/` alone. | Find where the original store went and restore the whole data directory from a backup that holds it. Do not copy a store between nodes. |
+| `holds N fact(s) but its initialization record … is missing` | **Missing record** next to a store that holds facts. | Restore the data directory from a backup. Do not write a record by hand: its instance must be the one the store was created with. |
+| `initialization record … is unreadable` | **Unreadable record**: damaged, truncated, a newer format version, or not a regular file. | Look at it. A newer `version` means this binary is older than the one that wrote it: run the newer binary. Otherwise restore from a backup. Do not hand-edit it to match the store; that would hide a replaced store. |
+| `a restore of … did not finish` | **Incomplete restore.** | Follow [If a restore does not finish](#if-a-restore-does-not-finish). The authority store is not opened until that is resolved. |
+| `could not write the N1 authority …` or `cannot inspect` | The data directory or a file in it cannot be written or read by the daemon's account. | Fix ownership or permissions (the daemon runs as `icn` with `UMask=0077`), then start again. Nothing needs restoring. |
+
+**Restoring the history versus starting a new one.** Restoring the data directory from a backup brings back the authority history it holds. A backup older than the last authority change rolls that history back, and nothing can detect that afterwards. Use the newest good backup.
+
+Removing the record, or the record and the store, does not repair anything. The next start initializes a **new, empty** authority history on this node, and every fact the old store held is gone from it. Do it only when one of these holds:
+- you have established that the store held no facts. The `bodyCount` in the last `n1-authority-receipt.json` you have (in a backup, or in your copy) is `0`, which is true of every node before a runtime producer of authority facts exists;
+- the maintainers have decided to abandon that history.
+
+Record which one, and keep the copy you made.
+
+**What the daemon cannot catch for you.** If the whole data directory is lost or replaced, record included, the next start looks like a fresh node and initializes. If the directory is restored from an old backup, the older history is accepted. Keep backups, and know which one you restored.
+
+**`n1-authority-receipt.json` is a diagnostic.** It shows what the last successful start rehydrated. It is not proof that a daemon is running now, and it is not an authority certificate; use the process and its log for that. The daemon deletes it as soon as it holds the data directory's lock, so a run refused at the gate or by the authority registry leaves none behind. Like the record, it is created readable only by the daemon's account.
+
 ## Integrity Verification
 
 ### Understanding Checksums
