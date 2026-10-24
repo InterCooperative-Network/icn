@@ -202,6 +202,17 @@ pub fn ledger_store_path(data_dir: &Path) -> PathBuf {
     store_path(data_dir).join("ledger")
 }
 
+/// The N1 authority-fact store path for a data directory
+/// (`{data_dir}/store/authority/`).
+///
+/// Named here from its first caller rather than after a third one re-derives it
+/// (#2717, #2718). The daemon opens it through
+/// [`crate::authority_registry::AuthorityRegistry`], which also owns the
+/// initialization record that says whether this directory must exist.
+pub fn authority_fact_store_path(data_dir: &Path) -> PathBuf {
+    store_path(data_dir).join("authority")
+}
+
 /// The canonical native daemon configuration file inside a data directory.
 ///
 /// One name, owned here, because this path had four spellings and no owner
@@ -281,6 +292,7 @@ impl Config {
     /// - `store/ledger/`          — Double-entry transactions, disputes, treasury
     /// - `store/governance/`      — Governance actor state (proposals, votes)
     /// - `store/dead_letter/`     — Failed operation recovery queue
+    /// - `store/authority/`       — N1 authority facts (ADR-0087)
     pub fn store_path(&self) -> PathBuf {
         store_path(&self.data_dir)
     }
@@ -298,6 +310,11 @@ impl Config {
     /// Get the ledger store path (sled DB for double-entry ledger)
     pub fn ledger_store_path(&self) -> PathBuf {
         ledger_store_path(&self.data_dir)
+    }
+
+    /// Get the N1 authority-fact store path (sled DB for authority facts)
+    pub fn authority_fact_store_path(&self) -> PathBuf {
+        authority_fact_store_path(&self.data_dir)
     }
 
     /// Validate configuration and return a list of warnings/errors

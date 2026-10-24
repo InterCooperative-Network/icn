@@ -390,6 +390,7 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.gen.initial-device-binding-ref", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.gen.subject-context", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.gen.subject-context-ref", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
+    d(b"icn.n1.authority-receipt.decisions.v1\0", Sha256, Raw, Production, &["icn/crates/icn-core/src/authority_registry.rs"]),
     d(b"icn:anti-entropy-probe:v1", Blake3, Raw, Production, &["icn/crates/icn-kernel-api/src/proofs.rs"]),
     d(b"icn:artifact-receipt:v1", Blake3, Raw, Production, &["icn/crates/icn-kernel-api/src/proofs.rs", "icn/crates/icn-kernel-api/src/canonical.rs"]),
     d(b"icn:baseline:agreement_ctx:fixture", Blake3, Whole, TestOnly, &["icn/crates/icn-baseline-lock/src/projector.rs"]),

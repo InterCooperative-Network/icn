@@ -230,7 +230,7 @@ pub use derive::{
     derive, resolve, supersede, AuthorityState, AuthorityView, DeviceGrant, Resolution,
 };
 pub use encoding::CodecError;
-// The persistence boundary (ADR-0087, proposed): the trait a medium implements, the opaque
+// The persistence boundary (ADR-0087): the trait a medium implements, the opaque
 // record it moves, its error, and the one rehydration path. Nothing else of the module is public.
 pub use fact_store::{rehydrate, AuthorityFactStore, FactStoreError, PersistedFact};
 pub use store::{AuthorityStore, SignedAuthorityEvent, Witness, WitnessSignature};
