@@ -1387,7 +1387,7 @@ category = "architecture"
 status = "living"
 title = "Canonical Encoding"
 description = "Specification for deterministic serialization of ICN data structures"
-last_updated = "2026-03-10"
+last_updated = "2026-10-19"
 owner = "matt"
 audiences = ["developers", "architects"]
 
@@ -3454,7 +3454,7 @@ category = "guide"
 status = "living"
 title = "Backup and Recovery Guide"
 description = "Operator procedures for node backup and recovery"
-last_updated = "2026-03-10"
+last_updated = "2026-10-24"
 owner = "matt"
 audiences = ["operators"]
 
@@ -4801,6 +4801,33 @@ truth_class = "normative"
 title = "ADR-0086: ICN Deployment Profiles and Public/Private Infrastructure Boundary"
 description = "ACCEPTED 2026-09-15; Alpha profile frozen at main 860c6f6c22f18de0f7bc4cfb55e35b1143b3b4f1. Four-profile deployment decision: Debian appliance as the canonical sovereign-node artifact; disposable Compose devnet for development; Kubernetes/K3s as optional hosted/operator infrastructure; advanced native Linux. Separates generic public product artifacts from private deployment automation and preserves explicit recovery, signing, two-node, production, and federation nonclaims. Independent appliance restoration is recorded as blocked by TWO independent causes: the backup omits the secret-bearing environment file, and a restored ledger cannot be shown to be complete (#2746; the independent evidence this needs is owned by #2786, where the mechanism is not yet selected). Acceptance settles the classification and the frozen revision; it certifies no production readiness and closes no open item."
 last_updated = "2026-09-15"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+
+[docs."docs/adr/ADR-0087-n1-authority-fact-persistence-boundary.md"]
+# ACCEPTED 2026-10-23 by the maintainer with three documentation clarifications
+# applied in the text. Decision status and implementation status stay separate
+# axes (ADR-0018 § 3): the implementation merged with #2800 (b10f266d9); daemon
+# integration (N1-R1) is a separate concern this ADR does not decide.
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0087: N1 Authority-Fact Persistence Boundary"
+description = "ACCEPTED 2026-10-23. The N1-D persistence boundary between icn-identity and icn-core. Four public items: the AuthorityFactStore trait, the opaque PersistedFact record (key = event_id || signature, value = canonical body bytes), FactStoreError and rehydrate. Duplicate writes are semantically idempotent. put_fact Ok is the durability acknowledgment, behind a required DurableStore::sync_durable barrier: process-crash safe, best-effort against power loss with sled 0.34. put_fact does not validate admission; producers must, and rehydration re-validates every record and fails closed. Implemented by #2800; daemon integration is separate (N1-R1), and no runtime service produces facts or serves authority decisions."
+last_updated = "2026-10-24"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/adr/ADR-0088-n1-runtime-authority-store-initialization-and-recovery.md"]
+# ACCEPTED 2026-10-24 by the maintainer, with one change to the proposal: store/authority
+# is owner-only (0700) whatever the umask (§11). Decision status and implementation
+# status stay separate axes (ADR-0018 § 3): the implementation is in #2843, not merged.
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0088: N1 Runtime Authority-Store Initialization and Recovery"
+description = "ACCEPTED 2026-10-24. The runtime boundary on top of ADR-0087: where icnd keeps the N1 authority store, the versioned initialization record and the store's instance row that let a start tell a fresh node from a lost or replaced store, the order and barriers of initialization, the fail-closed states, what cannot be detected (whole data-directory loss, rollback), manual recovery, the startup receipt as an owner-only local diagnostic rather than an authority certificate, and store/authority as the one store directory kept owner-only (0700) whatever the umask. Implemented in #2843 (not merged)."
+last_updated = "2026-10-24"
 owner = "matt"
 audiences = ["architects", "developers", "operators"]
 

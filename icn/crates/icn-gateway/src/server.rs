@@ -330,6 +330,38 @@ pub fn sdis_scope(flags: SdisMountFlags) -> actix_web::Scope {
         )
 }
 
+/// The `/invites` scope, exactly as [`GatewayServer::run`] mounts it.
+///
+/// Shared for the same reason as [`sdis_scope`]: `tests/invite_join_containment.rs`
+/// drives this constructor, so it observes production's route set, middleware
+/// and nesting rather than a test-local rebuild.
+///
+/// `POST /invites/join` is deliberately **not mounted** (#2589). It issued a
+/// session token whose subject was whatever DID the request body named --
+/// with `coop:write` and `ledger:transact` -- and never asked the caller to
+/// prove control of that DID. Every authority gate downstream (office,
+/// steward, `sub == path`, ownership) trusts `claims.sub`, so a caller-chosen
+/// subject defeats all of them: any bearer holding an invite code could mint
+/// a session as anyone. The three known call sites -- two in
+/// `web/pilot-ui/app.js` and one in the gateway's static `app.js` -- never
+/// sent the bearer this scope requires, so no working flow depended on it.
+/// Mounting it again needs a redemption that proves possession of the named
+/// DID, not a flag.
+pub fn invites_scope() -> actix_web::Scope {
+    // As in `sdis_scope`, the middleware sits on an inner scope so the returned
+    // type stays a plain `Scope`; request order is unchanged (auth, then rate
+    // limiting, then the handler).
+    web::scope("/invites").service(
+        web::scope("")
+            .service(api::invites::create_invite)
+            .service(api::invites::list_invites)
+            .wrap(middleware::from_fn(
+                crate::rate_limit::trust_rate_limit_middleware,
+            ))
+            .wrap(HttpAuthentication::bearer(crate::middleware::jwt_auth)),
+    )
+}
+
 impl GatewayServer {
     /// Create a new gateway server (uses temporary storage for testing)
     pub fn new(bind_addr: SocketAddr, jwt_secret: Vec<u8>) -> Self {
@@ -2430,17 +2462,9 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
-                        // Protected invite endpoints (auth + rate limiting)
-                        .service(
-                            web::scope("/invites")
-                                .service(api::invites::create_invite)
-                                .service(api::invites::list_invites)
-                                .service(api::invites::join_via_invite)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
+                        // Protected invite endpoints (auth + rate limiting). Shared
+                        // constructor so tests drive this exact scope (#2589).
+                        .service(invites_scope())
                         // Protected compute endpoints (auth + rate limiting)
                         .service(
                             web::scope("/compute")

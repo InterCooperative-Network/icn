@@ -103,9 +103,91 @@ icnctl restore /path/to/backup.tar --force
 ```
 
 This will:
-1. Move existing data directory to `<data-dir>.backup-<timestamp>`
-2. Extract the backup to the original location
-3. Preserve the old data in case you need it
+1. Take the data directory's locks. Restore is refused while `icnd` or another `icnctl` command holds the directory, so stop the daemon first. On a systemd install, use `sudo systemctl disable --now icnd` rather than just `stop`, so the daemon doesn't keep trying to start (it refuses while a restore is incomplete, see below). Re-enable it once the restored node is verified.
+2. Move the existing *contents* (not the directory itself) into `<data-dir>.backup-<archive-timestamp>`, beside the real data directory (symlinks resolved). That directory is owner-only (`0700`) whatever your umask, so files that a `0700` data directory protected stay protected.
+3. Extract the backup into the data directory and verify its checksum.
+4. Leave the old data in the `.backup-` directory in case you need it. Remove it once the restored node is verified.
+
+The data directory's two lock files (`.icn-data-dir.lock` and `.icn-config.lock`) stay where they are. They are coordination files, not state. A data directory that holds nothing else has nothing to move aside, so no `.backup-` directory is created.
+
+Restore checks everything it can before moving anything. It refuses, saying `Nothing has been moved`, when:
+
+- a `.backup-` directory of that name already exists and isn't empty (an earlier restore of the same archive). It may be the only copy of what the data directory held before, so move it somewhere safe rather than deleting it;
+- the data directory is a mount point or btrfs subvolume, or contains one. The `.backup-` directory would be on a different filesystem, and contents can't be renamed across filesystems;
+- the account running restore can't create the `.backup-` directory (see the native install below).
+
+**If the move fails part-way, restore puts everything back.** An entry can turn out to be unmovable only once restore tries to move it, for example a directory the account can't write or an immutable file. Restore then moves every entry it had already moved back into the data directory, removes the `.backup-` directory it created, and reports `Nothing has been moved; <data-dir> is unchanged`. Restore doesn't put an entry back over anything that holds data at its original name (the same rule as recovery below). If an entry can't be put back, restore says the data directory is split, and names each entry still in the `.backup-` directory and why.
+
+#### Native install (`/var/lib/icn`): supported, with one administrator step
+
+`deploy/install.sh` gives the `icn` service account `/var/lib/icn` but not its parent `/var/lib`. Restore must run as the account that owns the data directory: it refuses to run as root over a directory the service account owns, because files it created would belong to root. So the first attempt refuses, having moved nothing, and prints the one administrator step that makes the restore possible: creating the empty `.backup-` directory for the `icn` account.
+
+Restore prints that step as a command only when every directory from the parent up to `/` belongs to root and nobody else can write it, as `/var/lib`, `/var` and `/` do. In any other layout someone else could plant a link at that name, or swap a directory on the way to it, before you ran it. So restore describes the directory instead.
+
+```bash
+sudo systemctl disable --now icnd
+sudo -u icn icnctl --data-dir /var/lib/icn restore /path/to/backup.tar --force
+#   Refusing to move the existing data aside: this account cannot create
+#   /var/lib/icn.backup-<timestamp> beside the data directory ... Nothing has been moved.
+#       sudo mkdir -m 0700 -- '/var/lib/icn.backup-<timestamp>' && sudo chown -h +<uid>:+<gid> -- '/var/lib/icn.backup-<timestamp>'
+
+# Run the exact line it printed, then the same restore again:
+sudo mkdir -m 0700 -- '/var/lib/icn.backup-<timestamp>' && sudo chown -h +<uid>:+<gid> -- '/var/lib/icn.backup-<timestamp>'
+sudo -u icn icnctl --data-dir /var/lib/icn restore /path/to/backup.tar --force
+```
+
+The command uses `mkdir` and `chown -h` rather than `install -d` because `install -d` follows a symlink that already exists at that name and re-owns its target. Restore accepts the directory only if it is a real directory (not a symlink), owned by the data directory's account, on the same filesystem, and empty. It makes the directory owner-only before moving anything into it. The `icn` account must be able to read the archive.
+
+#### Mount-point data directory (container volume, PVC): not supported in place
+
+When the data directory is itself a mount point, as with the Kubernetes and Helm deployments, Compose volumes and a PVC, there is nowhere on the same filesystem beside it to move the contents to. Restore refuses with `Nothing has been moved`. To restore one:
+
+1. Stop the node, so nothing holds the data directory.
+2. Move or copy the contents off the volume yourself, to storage you control, including dotfiles. That copy is your only backup of the previous state, so verify it before going on.
+3. Leave nothing in the directory except the two lock files. On an ext4-formatted volume that includes removing `lost+found`, which `fsck` recreates when it needs it.
+4. Run `icnctl restore /path/to/backup.tar --force`. A data directory with nothing in it needs no `.backup-` directory.
+
+#### If a restore does not finish
+
+Before it changes anything, restore writes a marker into the data directory, `.icn-restore-incomplete`, and flushes it to disk. The marker records what the directory held and where restore was moving it. Restore removes it only once the directory is verified: the restore finished with its data on disk, or a failed move put back exactly what it took.
+
+A restore that is stopped part-way (Ctrl-C, `kill`, power loss) or fails after moving the old contents aside leaves the marker in place. **While it is there, nothing opens the data directory's stores.** `icnd`, every `icnctl` command that uses them, `icnctl backup`, `icnctl snapshot create`, `delete` and `cleanup`, `icnctl device add`, and another restore all refuse and name the marker. That holds across a reboot too, so a daemon that starts on its own refuses instead of coming up with its stores empty.
+
+To recover, run, as the data directory's account and with nothing else running against it:
+
+```bash
+icnctl --data-dir '<data-dir>' restore --recover-incomplete
+```
+
+Name the data directory itself, by the absolute path the failed restore printed. A path through one of its entries, such as `<data-dir>/store/..` or `..` typed from inside `store`, can lead nowhere, or into the `.backup-` directory, once restore has moved that entry aside. Recovery refuses such a path and says which directory to name. It never reports that there is nothing to recover for a directory it could not look into.
+
+Recovery puts the previous contents back from `<data-dir>.backup-<timestamp>`, but only the same objects restore recorded, never copies. It never puts anything over an object that holds data: a file goes back by a hard link that fails if the name is taken. The one thing that could be replaced is an empty directory created at the same name in the instant a directory is moved back. (Where a hard link can't be made, such as a file another account owns, or a filesystem without hard links, a file is checked and then renamed, and a file created at that name in that instant could be replaced.) It then checks that the data directory holds exactly what it held before the restore began, and only then removes the marker. It deletes no data. (The one name it may remove is a second link to an object already back in place, which an interrupted put-back leaves.) It stops and says why in two cases:
+
+- **Entries that were not there before.** These came from the archive, or from somewhere else. For each one, recovery checks whether the archive holds it **exactly**: every name in it, and every file's contents, compared by SHA-256 against the archive's own bytes. You may remove the entries it holds exactly, for example `rm -rf --one-file-system -- '<data-dir>/<name>'` for each one, because the archive can extract them again. Any it doesn't hold exactly may be the only copy of what they hold: a file written into one after the restore, a partly written file, or a different archive at that path. The same goes for all of them if the archive can't be read, or declares a different backup from the one the marker recorded. Move those somewhere safe instead of deleting them.
+- **Entries it can't account for.** These carry an earlier name but are not the same objects, or are on another filesystem (a mount point). One may be the only copy of what it holds. Compare it with what you expect, and don't delete it.
+
+It runs only as the account that owns the data directory. It refuses if every account can write the directory, or can replace entries in its parent, because then its record could have been written by someone else. In those cases, recover by hand.
+
+Then run the recovery again. It is safe to run any number of times, including after it was itself interrupted, because it works from where things are now. Once it succeeds, the empty `.backup-` directory can stay; a later restore accepts it.
+
+If recovery can't read the marker, or you recover the directory some other way:
+
+1. Move what the archive extracted out of the data directory, leaving only the two lock files and the marker. If the archive is gone or has been replaced by a different backup, keep those entries somewhere safe. Otherwise, delete only what you have checked the archive holds unchanged.
+2. Move the `.backup-` directory's entries back without overwriting:
+
+   ```bash
+   find '<data-dir>.backup-<timestamp>' -mindepth 1 -maxdepth 1 -exec mv -n -t '<data-dir>' -- {} +
+   ls -A '<data-dir>.backup-<timestamp>'   # must print nothing
+   ```
+
+   `mv -n` skips a name that is already taken without saying so. If `ls -A` prints anything, that name exists in both places: stop and compare the two.
+3. When you are certain the data directory is whole, remove `.icn-restore-incomplete` yourself. Nothing removes it automatically.
+
+While the marker is there, `icnd --init`, `icnctl id init` and anything that writes the configuration refuse as well, so nothing mints a fresh identity or configuration into a half-restored directory.
+
+**What the marker relies on.** Restore flushes (`fsync`) the marker and its directory before it changes anything, and flushes everything it restored before removing the marker. That ordering holds across power loss only on storage that honours flushes. ext4, XFS and btrfs with default options do. Network and user-space filesystems (NFS, SMB, FUSE), and disks or controllers with a volatile write cache that ignore flushes, may not. Interrupting a running restore or recovery (an injected `SIGKILL`) has been tested against the real binary, outside the automated test suite. Block-level power loss has not.
+
+**If a restore was stopped after it had restored and verified everything, but before its marker was gone,** recovery recognizes it, as long as the archive is still at the path the marker recorded, readable, and declaring the same backup. Recognizing it means every entry, type and permission, and every file's contents, match the archive, and everything the directory held before is in the `.backup-` directory. Recovery then flushes the directory and removes the marker instead of asking you to undo the restore. What the directory held before stays in the `.backup-` directory. If the archive has moved or changed, recovery lists the restored entries instead and the marker stays: put the archive back at its path, or handle them as above.
 
 ### Restore to Custom Location
 
@@ -302,6 +384,59 @@ Store recovery instructions separately from backups:
 2. Must create new identity with `icnctl id init`
 3. Inform cooperative members of new DID
 4. Rebuild trust relationships
+
+### Scenario 5: `icnd` refuses to start over N1 authority state
+
+**Situation**: `icnd` exits at startup with a message beginning `refusing to start` that names the N1 authority store (`store/authority`) or its initialization record (`n1-authority-initialized.json`).
+
+`icnd` keeps N1 authority facts in `store/authority/`, and a small record beside the stores says the node created that store. Both carry the same instance ID. The daemon refuses rather than start without its authority state, because a node that silently started empty would lose every authority fact it held. The decision behind this is ADR-0088 (accepted 2026-10-24).
+
+**Before you change anything**, stop the daemon and copy the whole data directory somewhere safe, as the data directory's account. Keep the record and the store together. Every recovery below starts from that copy:
+
+```bash
+cp -a -- '<data-dir>' '<somewhere-safe>/icn-data-before-recovery'
+```
+
+Find the message in the daemon's log, then match it here:
+
+| Message contains | What happened | What to do |
+|---|---|---|
+| (no refusal; the log line `N1 authority registry: open` shows `startup=Initialized`) | **Fresh initialization.** A data directory with neither record nor store. | Nothing. |
+| (no refusal; `startup=CompletedInterruptedInitialization`) | **An interrupted first start** left a store with no facts and no record. The daemon finished it. | Nothing. |
+| `did not rehydrate` | **Corrupt authority data.** A persisted fact cannot be decoded or admitted. The whole store is refused, not just that fact. | Do not delete or edit rows. Keep the copy for analysis, and restore the data directory from the most recent good backup (Scenario 2). |
+| `records an initialized N1 authority store, but … does not exist` | **Missing initialized storage.** The record is there; `store/authority/` is gone. | Restore the data directory from a backup that holds the store. |
+| `is not the one … records` | **Replaced instance.** The store holds a different instance, or none (a recreated, empty database). Often a store copied from another node, or a partial restore of `store/` alone. | Find where the original store went and restore the whole data directory from a backup that holds it. Do not copy a store between nodes. |
+| `holds N fact(s) but its initialization record … is missing` | **Missing record** next to a store that holds facts. | Restore the data directory from a backup. Do not write a record by hand: its instance must be the one the store was created with. |
+| `initialization record … is unreadable (cannot read: Permission denied)` or `(cannot inspect: …)` | The daemon's account **cannot read the record**. Nothing is wrong with its contents. | Fix ownership or permissions (`icn`, mode 0600), then start again. Do not restore: an older backup would roll the history back. |
+| `initialization record … is unreadable` (any other reason) | **Unreadable record**: damaged, truncated, a newer format version, or not a regular file. | Look at it. A newer `version` means this binary is older than the one that wrote it: run the newer binary. Otherwise restore from a backup. Do not hand-edit it to match the store; that would hide a replaced store. |
+| `the N1 authority store at … cannot be kept owner-only`, or an N2-A gate refusal naming `store/authority`: `sled discovery found a symlink`, `cannot enumerate`, or `open failed` | **`store/authority` is not this account's directory.** It is a link, not a directory, or owned by another account, for example after `icnd` ran once as root. The N2-A gate runs first and usually refuses a link or another account's directory itself. | Do not `chmod` or `chown` a link's target blindly. If it is a link, find the real store, confirm it is this node's own (not one copied from another node), and move it back into place as a directory. If another account owns it, confirm the same, then `chown -R icn:icn` it. Start again; the daemon sets the mode itself. |
+| `the N1 authority store at … failed: …` | **The store could not be opened, read or synced**: a damaged database, a full disk, an I/O error, or permissions. | Read the reason. For permissions or a full disk, fix that and start again. For a damaged database or I/O errors, check the disk, keep the copy, and restore the data directory from a backup. |
+| `a restore of … did not finish` | **Incomplete restore.** | Follow [If a restore does not finish](#if-a-restore-does-not-finish). The authority store is not opened until that is resolved. |
+| `could not write the N1 authority …` | The record or receipt could not be written: permissions, a full disk, or an I/O error. | Fix ownership or permissions (the daemon runs as `icn` with `UMask=0077`) or free space, then start again. For I/O errors, check the disk first. |
+
+**Restoring the history versus starting a new one.** Restoring the data directory from a backup brings back the authority history it holds. A backup older than the last authority change rolls that history back, and nothing can detect that afterwards. Use the newest good backup.
+
+Removing the record, or the record and the store, does not repair anything. The next start initializes a **new, empty** authority history on this node, and every fact the old store held is gone from it. Do it only when one of these holds:
+- you have established that the store held no facts: the `bodies=` count in the journal's last `N1 authority registry: open` line is `0`, or so is `bodyCount` in an `n1-authority-receipt.json` kept in a backup. The daemon deletes the receipt before it refuses, so the copy you just made will not hold one. Both are `0` on every node before a runtime producer of authority facts exists;
+- the maintainers have decided to abandon that history.
+
+Record which one, and keep the copy you made.
+
+**Who can read the authority facts.** The record and the receipt are created owner-only (0600) whatever the umask. The `store/authority` directory is owner-only (0700) whatever the umask: the daemon creates it that way, and every start checks it before the authority registry opens the store (ADR-0088 §11). On an existing store the N2-A gate's audit opens it first, with whatever mode it had. The files inside take the daemon's umask, but no other account can reach them through that directory.
+
+If a start finds the directory wider than that, as a restore or a manual copy can leave it, it sets it back to 0700, keeps everything in it, and logs `N1 authority store: directory mode set to 700` with the old mode. No action is needed for the store. While the directory was wider, its files could be read by other local accounts; decide whether that matters on this host. An account that opened the store's files then can keep reading them afterwards, including facts written later and by later runs, until the store is rebuilt into new files. Setting the mode does not revoke that.
+
+That protects `store/authority` only. Every other store, and the data directory itself, still take the daemon's umask. The shipped units (`icnd.service`, `icn-appliance-firstboot.service`) pin `UMask=0077`, so under them every file is owner-only. If you start `icnd`, `icnd --init` or `icnctl` by hand, use the `icn` account with `umask 077`. Otherwise the other stores can be readable by other local accounts. Check with:
+
+```bash
+find '<data-dir>' -perm /077 -not -type l
+```
+
+Under the shipped units it should print only the data directory itself, if anything. After a start by hand under a looser umask it also lists files inside `store/authority`; those are still unreachable through its 0700 directory.
+
+**What the daemon cannot catch for you.** If the whole data directory is lost or replaced, record included, the next start looks like a fresh node and initializes. If the directory is restored from an old backup, the older history is accepted. Keep backups, and know which one you restored.
+
+**`n1-authority-receipt.json` is a diagnostic.** It shows what the last start that got through the authority registry rehydrated; that start may still have failed later (a wrong keystore passphrase, for instance). It is not proof that a daemon is running now, and it is not an authority certificate; use the process and its log for that. The daemon deletes it as soon as it holds the data directory's lock, so a run refused at the gate or by the authority registry leaves none behind. Like the record, it is created readable only by the daemon's account.
 
 ## Integrity Verification
 

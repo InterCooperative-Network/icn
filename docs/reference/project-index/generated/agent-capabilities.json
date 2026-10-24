@@ -140,7 +140,7 @@
     },
     {
       "name": "repo_status",
-      "summary": "Get current branch, dirty files, and sync status for all ICN repos."
+      "summary": "Get current branch, dirty files, and sync status for the ICN monorepo."
     },
     {
       "name": "search_decisions",

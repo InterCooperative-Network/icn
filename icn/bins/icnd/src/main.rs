@@ -392,6 +392,9 @@ fn handle_init(args: &Args) -> Result<()> {
 
     std::fs::create_dir_all(&data_dir)
         .with_context(|| format!("Failed to create data directory: {}", data_dir.display()))?;
+    // A half-restored root is not a fresh one: initializing it would mint an
+    // identity and configuration into a directory a restore has not finished.
+    icn_core::refuse_if_restore_incomplete(&data_dir, "icnd --init")?;
 
     let keystore_path = data_dir.join("identity.age");
     // The canonical native configuration path, owned by `icn-core` rather than
@@ -901,7 +904,15 @@ async fn main() -> Result<()> {
     // commits; the daemon's did not, because the rule lived in `icnctl`. It now
     // lives beside the lock and both binaries ask it.
     icn_core::refuse_if_new_files_would_not_belong_to_the_data_root_account(&config.data_dir)?;
-    let _data_dir_lock = icn_core::DataDirLock::acquire(&config.data_dir, "the daemon")?;
+    let data_dir_lock = icn_core::DataDirLock::acquire(&config.data_dir, "the daemon")?;
+    // The N1 authority receipt describes one start. Discard the previous start's now, before the
+    // N2-A gate, so a start refused there leaves no receipt to be read as this one's. Removing a
+    // file opens no store.
+    icn_core::authority_registry::AuthorityRegistry::discard_receipt(
+        &config.data_dir,
+        &data_dir_lock,
+    )
+    .map_err(anyhow::Error::new)?;
 
     // N2-A startup gate (#2627). `Did` equality now names the principal, not
     // the spelling (I7), so the first start of this binary over a store holding
@@ -931,6 +942,31 @@ async fn main() -> Result<()> {
             icn_store::n2a_startup_gate::receipt_path(&config.data_dir).display()
         );
     }
+
+    // N1 authority state (N1-R1, ADR-0087). After the lock and its restore
+    // refusal, so a half-restored root is never read; after the N2-A gate, so
+    // the store has been audited; before any service starts, so nothing can
+    // answer an authority question from a state that was not rehydrated.
+    //
+    // Fails closed: a corrupt record, a missing or replaced store on a node
+    // that initialized one, or an unreadable initialization record stops
+    // startup here. There is no fallback to an empty authority state.
+    //
+    // Held for the daemon's lifetime. Nothing reads it yet and nothing writes
+    // facts into it: a producer and a consumer each need their own reviewed
+    // design.
+    let (_authority_registry, authority_receipt) =
+        icn_core::authority_registry::AuthorityRegistry::open(&config.data_dir, &data_dir_lock)
+            .map_err(anyhow::Error::new)?;
+    tracing::info!(
+        startup = ?authority_receipt.startup,
+        bodies = authority_receipt.body_count,
+        witnesses = authority_receipt.witness_count,
+        subjects = authority_receipt.subjects.len(),
+        decisions = %authority_receipt.decisions_digest,
+        "N1 authority registry: open; receipt at {}",
+        icn_core::authority_registry::receipt_path(&config.data_dir).display()
+    );
     tracing::info!("Log level: {}", config.observability.log_level);
 
     if config.gateway.enabled {
