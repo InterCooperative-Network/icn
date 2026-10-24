@@ -407,21 +407,31 @@ Find the message in the daemon's log, then match it here:
 | `records an initialized N1 authority store, but … does not exist` | **Missing initialized storage.** The record is there; `store/authority/` is gone. | Restore the data directory from a backup that holds the store. |
 | `is not the one … records` | **Replaced instance.** The store holds a different instance, or none (a recreated, empty database). Often a store copied from another node, or a partial restore of `store/` alone. | Find where the original store went and restore the whole data directory from a backup that holds it. Do not copy a store between nodes. |
 | `holds N fact(s) but its initialization record … is missing` | **Missing record** next to a store that holds facts. | Restore the data directory from a backup. Do not write a record by hand: its instance must be the one the store was created with. |
-| `initialization record … is unreadable` | **Unreadable record**: damaged, truncated, a newer format version, or not a regular file. | Look at it. A newer `version` means this binary is older than the one that wrote it: run the newer binary. Otherwise restore from a backup. Do not hand-edit it to match the store; that would hide a replaced store. |
+| `initialization record … is unreadable (cannot read: Permission denied)` or `(cannot inspect: …)` | The daemon's account **cannot read the record**. Nothing is wrong with its contents. | Fix ownership or permissions (`icn`, mode 0600), then start again. Do not restore: an older backup would roll the history back. |
+| `initialization record … is unreadable` (any other reason) | **Unreadable record**: damaged, truncated, a newer format version, or not a regular file. | Look at it. A newer `version` means this binary is older than the one that wrote it: run the newer binary. Otherwise restore from a backup. Do not hand-edit it to match the store; that would hide a replaced store. |
+| `the N1 authority store at … failed: …` | **The store could not be opened, read or synced**: a damaged database, a full disk, an I/O error, or permissions. | Read the reason. For permissions or a full disk, fix that and start again. For a damaged database or I/O errors, check the disk, keep the copy, and restore the data directory from a backup. |
 | `a restore of … did not finish` | **Incomplete restore.** | Follow [If a restore does not finish](#if-a-restore-does-not-finish). The authority store is not opened until that is resolved. |
-| `could not write the N1 authority …` or `cannot inspect` | The data directory or a file in it cannot be written or read by the daemon's account. | Fix ownership or permissions (the daemon runs as `icn` with `UMask=0077`), then start again. Nothing needs restoring. |
+| `could not write the N1 authority …` | The record or receipt could not be written: permissions, a full disk, or an I/O error. | Fix ownership or permissions (the daemon runs as `icn` with `UMask=0077`) or free space, then start again. For I/O errors, check the disk first. |
 
 **Restoring the history versus starting a new one.** Restoring the data directory from a backup brings back the authority history it holds. A backup older than the last authority change rolls that history back, and nothing can detect that afterwards. Use the newest good backup.
 
 Removing the record, or the record and the store, does not repair anything. The next start initializes a **new, empty** authority history on this node, and every fact the old store held is gone from it. Do it only when one of these holds:
-- you have established that the store held no facts. The `bodyCount` in the last `n1-authority-receipt.json` you have (in a backup, or in your copy) is `0`, which is true of every node before a runtime producer of authority facts exists;
+- you have established that the store held no facts: the `bodies=` count in the journal's last `N1 authority registry: open` line is `0`, or so is `bodyCount` in an `n1-authority-receipt.json` kept in a backup. The daemon deletes the receipt before it refuses, so the copy you just made will not hold one. Both are `0` on every node before a runtime producer of authority facts exists;
 - the maintainers have decided to abandon that history.
 
 Record which one, and keep the copy you made.
 
+**Who can read the authority facts.** The record and the receipt are created owner-only (0600) whatever the umask. The store's own files are not: like every other store in the data directory, they take the daemon's umask. The shipped units (`icnd.service`, `icn-appliance-firstboot.service`) pin `UMask=0077`, so under them every file is owner-only. If you start `icnd`, `icnd --init` or `icnctl` by hand, use the `icn` account with `umask 077`. Otherwise the stores, including `store/authority`, can be readable by other local accounts. Check with:
+
+```bash
+find '<data-dir>' -perm /077 -not -type l
+```
+
+It should print only the data directory itself, if anything.
+
 **What the daemon cannot catch for you.** If the whole data directory is lost or replaced, record included, the next start looks like a fresh node and initializes. If the directory is restored from an old backup, the older history is accepted. Keep backups, and know which one you restored.
 
-**`n1-authority-receipt.json` is a diagnostic.** It shows what the last successful start rehydrated. It is not proof that a daemon is running now, and it is not an authority certificate; use the process and its log for that. The daemon deletes it as soon as it holds the data directory's lock, so a run refused at the gate or by the authority registry leaves none behind. Like the record, it is created readable only by the daemon's account.
+**`n1-authority-receipt.json` is a diagnostic.** It shows what the last start that got through the authority registry rehydrated; that start may still have failed later (a wrong keystore passphrase, for instance). It is not proof that a daemon is running now, and it is not an authority certificate; use the process and its log for that. The daemon deletes it as soon as it holds the data directory's lock, so a run refused at the gate or by the authority registry leaves none behind. Like the record, it is created readable only by the daemon's account.
 
 ## Integrity Verification
 

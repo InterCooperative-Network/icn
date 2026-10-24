@@ -107,8 +107,10 @@ record exists:
 1. Reuse the instance row an interrupted start left, or write a new one behind
    the store's durability barrier (ADR-0087 §4: survives a crash of the process,
    not power loss).
-2. `fsync` every file of the store and the directories that name it, through
-   descriptors of their own. This also runs when adopting a row, because the
+2. `fsync` each regular file directly in the store directory (sled's `db`,
+   `conf` and any snapshots, not its `blobs/` subdirectory, which a 16-byte row
+   never uses), then the store directory and its parent, through descriptors
+   of their own. This also runs when adopting a row, because the
    process that wrote it may have died before this step.
 3. Confirm the data-directory lock is still anchored, then commit the record:
    synced temporary file, rename, directory sync.
@@ -176,7 +178,8 @@ These limits are not bugs to be fixed inside the data directory:
 ### 10. The startup receipt is a diagnostic
 
 `n1-authority-receipt.json` (format `icn.n1.authority-receipt`, version 1)
-records what one successful start rehydrated:
+records what the last start that got through the registry rehydrated. That
+start may still have failed afterwards, at the keystore or a service. It records:
 - the instance;
 - how the directory was found (`initialized`,
   `completed-interrupted-initialization` or `rehydrated`);
@@ -212,6 +215,23 @@ data directory is, so they follow the process umask. The shipped unit sets
 `UMask=0077`, which makes all of them owner-only. A daemon started by hand with
 a lax umask (022) leaves the data directory and the stores readable by other
 local accounts. Hardening the data directory itself is outside this ADR.
+
+So the confidentiality of the authority facts against other local accounts is a
+**deployment-boundary dependency**, not something this code enforces:
+
+- **Assumption:** the daemon, and any `icnd --init` or `icnctl` run against its
+  data directory, run as the data directory's account with umask `0077`.
+- **Enforcement point:** the shipped units pin `UMask=0077` (ADR-0086), and an
+  `icnctl` test fails if either unit stops pinning it.
+- **Operational check:** `find <data-dir> -perm /077 -not -type l` prints
+  nothing below the data directory.
+- **Not covered:** hand-started processes with a lax umask, and the generic
+  OCI image and development network, which ADR-0086 does not treat as custody
+  profiles.
+
+Creating `store/authority/` with mode 0700 regardless of umask would close
+the gap for this store alone. It is left to the maintainer, because no other
+store does so and it would split the data directory's permission convention.
 
 Its JSON fields may change in a later version. A change bumps `version`. Only
 the format name, the version field and the digest domain are fixed by this ADR.

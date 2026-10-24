@@ -258,11 +258,7 @@ impl AuthorityRegistry {
         lock: &DataDirLock,
     ) -> Result<(Self, AuthorityReceipt), RegistryError> {
         check_lock(data_dir, lock)?;
-        crate::restore_marker::refuse_if_restore_incomplete(data_dir, "the N1 authority registry")
-            .map_err(|e| RegistryError::Lock {
-                data_dir: data_dir.to_path_buf(),
-                reason: format!("{e:#}"),
-            })?;
+        refuse_incomplete_restore(data_dir)?;
 
         let store_dir = crate::config::authority_fact_store_path(data_dir);
         let record_path = init_record_path(data_dir);
@@ -355,6 +351,7 @@ impl AuthorityRegistry {
     /// nothing is not an error.
     pub fn discard_receipt(data_dir: &Path, lock: &DataDirLock) -> Result<(), RegistryError> {
         check_lock(data_dir, lock)?;
+        refuse_incomplete_restore(data_dir)?;
         remove_stale_receipt(data_dir, &receipt_path(data_dir))
     }
 
@@ -838,6 +835,16 @@ fn check_lock(data_dir: &Path, lock: &DataDirLock) -> Result<(), RegistryError> 
     lock_still_held(data_dir, lock)
 }
 
+/// Asked here rather than assumed from the lock: `acquire_for_restore_recovery` is a storage lock
+/// that skips it by design.
+fn refuse_incomplete_restore(data_dir: &Path) -> Result<(), RegistryError> {
+    crate::restore_marker::refuse_if_restore_incomplete(data_dir, "the N1 authority registry")
+        .map_err(|e| RegistryError::Lock {
+            data_dir: data_dir.to_path_buf(),
+            reason: format!("{e:#}"),
+        })
+}
+
 fn lock_still_held(data_dir: &Path, lock: &DataDirLock) -> Result<(), RegistryError> {
     lock.assert_still_anchored("opening the N1 authority registry")
         .map_err(|e| RegistryError::Lock {
@@ -876,8 +883,8 @@ fn write_receipt(
 }
 
 /// Write so a reader sees the previous file or the new one, never a partial one: a synced sibling
-/// temporary, renamed over the target, then the directory synced. The temporary is never read,
-/// and a leftover one is truncated by the next write.
+/// temporary, renamed over the target, then the directory synced. The temporary is never read; a
+/// leftover one is removed and the new one created exclusively, owner-only.
 fn write_atomically(data_dir: &Path, path: &Path, bytes: &[u8]) -> Result<(), String> {
     use std::io::Write as _;
 

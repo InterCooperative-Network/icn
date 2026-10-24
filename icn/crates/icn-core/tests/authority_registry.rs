@@ -463,20 +463,44 @@ fn mode(path: &Path) -> u32 {
         & 0o777
 }
 
+/// Set by [`the_record_and_the_receipt_are_owner_only_whatever_the_umask`] for its child.
+const UMASK_CHILD_DIR: &str = "ICN_N1R1_UMASK_CHILD_DIR";
+
+/// Not a test on its own: the child half of the next test, and a no-op without its variable.
+/// It creates an ordinary file as a control, then opens a fresh registry.
+#[test]
+fn umask_child_creates_a_probe_then_opens_a_fresh_registry() {
+    let Some(dir) = std::env::var_os(UMASK_CHILD_DIR) else {
+        return;
+    };
+    let dir = std::path::PathBuf::from(dir);
+    std::fs::File::create(dir.join("probe")).unwrap();
+    drop(open(&dir).unwrap());
+}
+
 /// The receipt names subjects, authority keys and device grants: not secrets, but metadata a node
 /// has no reason to show other local accounts. Both files are created owner-only, so a lax umask
 /// cannot widen them (it only ever removes bits).
+///
+/// The mask is set explicitly, to a permissive 022, in a child process, so the result cannot
+/// depend on whatever mask this test inherited. The child's probe shows the mask really applied.
 #[cfg(unix)]
 #[test]
 fn the_record_and_the_receipt_are_owner_only_whatever_the_umask() {
     let dir = tempfile::tempdir().unwrap();
-    let probe = dir.path().join("probe");
-    std::fs::File::create(&probe).unwrap();
-    if mode(&probe) == 0o600 {
-        eprintln!("NOTE: this process's umask already yields 0600; the assertion is weaker here");
-    }
-
-    drop(open(dir.path()).unwrap());
+    let status = std::process::Command::new("/bin/sh")
+        .arg("-c")
+        .arg(r#"umask 022 && exec "$0" --exact umask_child_creates_a_probe_then_opens_a_fresh_registry --test-threads=1 -q"#)
+        .arg(std::env::current_exe().unwrap())
+        .env(UMASK_CHILD_DIR, dir.path())
+        .status()
+        .unwrap();
+    assert!(status.success(), "the child must open the registry");
+    assert_eq!(
+        mode(&dir.path().join("probe")),
+        0o644,
+        "control: the child ran, under umask 022"
+    );
     assert_eq!(mode(&init_record_path(dir.path())), 0o600);
     assert_eq!(mode(&receipt_path(dir.path())), 0o600);
 }
