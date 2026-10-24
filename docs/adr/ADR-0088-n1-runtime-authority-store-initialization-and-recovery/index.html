@@ -1,0 +1,504 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="ACCEPTED 2026-10-24. The runtime boundary on top of ADR-0087: where icnd keeps the N1 authority store, the versioned initialization record and the store's instance row that let a start tell a fresh node from a lost or replaced store, the order and barriers of initialization, the fail-closed states, what cannot be detected (whole data-directory loss, rollback), manual recovery, the startup receipt as an owner-only local diagnostic rather than an authority certificate, and store/authority as the one store directory kept owner-only (0700) whatever the umask. Implemented in #2843 (not merged)."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR-0088: N1 runtime authority-store initialization and recovery boundary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0088 n1 runtime authority store initialization and recovery</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Decision record</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-10-24</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="adr-0088-n1-runtime-authority-store-initialization-and-recovery-boundary">ADR-0088: N1 runtime authority-store initialization and recovery boundary</h1>
+<h2 id="status">Status</h2>
+<p><strong><code>accepted</code> (2026-10-24).</strong> Drafted with #2843. The maintainer (Matt
+Faherty, the decider) accepted it on 2026-10-24:</p>
+<ul>
+<li>the substantive architecture as proposed: the initialization state machine
+(§5, §6), the compatibility commitments for the record and the instance row
+(§3, §4, §8), fail-closed recovery (§6, §7, §12) and the receipt as a
+diagnostic only (§10);</li>
+<li>one change to the proposal: <code>store/authority/</code> is owner-only (<code>0700</code>)
+whatever the process umask, as a deliberate defense-in-depth exception to
+the data directory&#39;s storage convention (§11). The proposal had left this
+to the maintainer.</li>
+</ul>
+<p>The decision was given as a written instruction in #2843&#39;s delivery session.
+ADR-0018 requires no separate signature. The reviews of the implementation
+were by independent review agents; no other human review is claimed.</p>
+<p>Decision status and implementation status are separate axes (ADR-0018). The
+implementation is in #2843, not yet merged.</p>
+<h2 id="context">Context</h2>
+<p>ADR-0087 (accepted) fixes the library contract: the record layout, the
+durability acknowledgment, and fail-closed rehydration. It deliberately leaves
+open what a daemon does with a store: where it lives, when it must exist, and
+what a refusal looks like to an operator.</p>
+<p>That gap is a safety question. A store that vanished and a node that never had
+one look the same from inside the store. Unless something outside the store
+records that it once existed, <code>icnd</code> would start a node whose store was lost
+with an empty authority state, and every persisted fact would disappear
+without anything saying so.</p>
+<p>This ADR decides the runtime boundary that #2843 implements. It does not reopen
+ADR-0087&#39;s semantics.</p>
+<h2 id="decision">Decision</h2>
+<h3 id="1-where-the-state-lives">1. Where the state lives</h3>
+<table>
+<thead>
+<tr>
+<th>Path, under the data directory</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>store/authority/</code></td>
+<td>the sled database holding ADR-0087&#39;s records (<code>authority/fact/…</code>) and the instance row; the directory is owner-only (§11)</td>
+</tr>
+<tr>
+<td><code>n1-authority-initialized.json</code></td>
+<td>the initialization record</td>
+</tr>
+<tr>
+<td><code>n1-authority-receipt.json</code></td>
+<td>the startup receipt (§10), diagnostic only</td>
+</tr>
+</tbody></table>
+<p>All three live inside the data directory, behind its storage lock and the
+incomplete-restore refusal. <code>icnctl backup</code> and <code>restore</code> already treat the
+data directory as one unit, so they carry the three together.</p>
+<h3 id="2-why-the-record-is-a-separate-file">2. Why the record is a separate file</h3>
+<p>A marker inside the database disappears with the database, so it cannot detect
+the database&#39;s loss. The record is a small file beside the stores, so:</p>
+<ul>
+<li>it survives the store directory being removed or replaced;</li>
+<li>it can be read before sled is opened (sled has no read-only open, and opening
+creates a fresh database in an empty directory);</li>
+<li>it is written with the atomic-file pattern the N2-A receipt already uses.</li>
+</ul>
+<h3 id="3-the-record-format-version-1">3. The record format (version 1)</h3>
+<pre><code class="language-json">{
+  &quot;format&quot;: &quot;icn.n1.authority-store-initialized&quot;,
+  &quot;version&quot;: 1,
+  &quot;instance&quot;: &quot;&lt;32 lowercase hex characters&gt;&quot;,
+  &quot;store&quot;: &quot;store/authority&quot;
+}
+</code></pre>
+<ul>
+<li>A regular file, created owner-only (0600) whatever the process umask.</li>
+<li>Unknown fields, another <code>format</code>, another <code>version</code>, another <code>store</code>, or a
+malformed <code>instance</code> make the record <strong>unreadable</strong>, and an unreadable record
+refuses startup. It is never treated as absent.</li>
+<li>A link or any other non-regular file at its name is refused, not followed.</li>
+</ul>
+<h3 id="4-the-instance-row">4. The instance row</h3>
+<ul>
+<li>Key <code>authority/meta/instance</code>, value 16 random bytes. It sits outside ADR-0087&#39;s
+<code>authority/fact/</code> namespace, so <code>rehydrate</code> never sees it as a fact.</li>
+<li>It identifies <strong>this store</strong>: one database&#39;s lifetime. It is not a node
+identity, a principal, a subject or a key. It is not secret and is derived
+from nothing.</li>
+<li>Its key holds no <code>did:icn:</code> text, so the N2-A gate does not treat it as
+principal-bearing.</li>
+</ul>
+<p>The record and the row carry the same instance. That shared value is what lets
+a start tell &quot;my store&quot; from &quot;a store&quot;.</p>
+<h3 id="5-order-and-barriers">5. Order and barriers</h3>
+<p>Initialization runs these steps in this order. Any failure stops before the
+record exists:</p>
+<ol>
+<li>Reuse the instance row an interrupted start left, or write a new one behind
+the store&#39;s durability barrier (ADR-0087 §4: survives a crash of the process,
+not power loss).</li>
+<li><code>fsync</code> each regular file directly in the store directory (sled&#39;s <code>db</code>,
+<code>conf</code> and any snapshots, not its <code>blobs/</code> subdirectory, which a 16-byte row
+never uses), then the store directory and its parent, through descriptors
+of their own. This also runs when adopting a row, because the
+process that wrote it may have died before this step.</li>
+<li>Confirm the data-directory lock is still anchored, then commit the record:
+synced temporary file, rename, directory sync.</li>
+</ol>
+<p>The record is the commit point. The implementation pins this order with
+call-order tests and fault injection. Those prove the calls happen in this
+order; they cannot prove what a disk keeps through a power cut.</p>
+<p>The store is not closed and reopened to force a sync. sled can release its file
+lock a moment after a handle drops, so an immediate reopen could refuse a
+first start, and its close path panics on a failed <code>fsync</code>.</p>
+<h3 id="6-states">6. States</h3>
+<table>
+<thead>
+<tr>
+<th>record</th>
+<th>store</th>
+<th>outcome</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>absent</td>
+<td>absent</td>
+<td><strong>fresh</strong>: initialize (§5)</td>
+</tr>
+<tr>
+<td>absent</td>
+<td>present, no facts</td>
+<td><strong>interrupted initialization</strong>: adopt or write the row, then §5 steps 2–3</td>
+</tr>
+<tr>
+<td>present</td>
+<td>matching instance</td>
+<td><strong>rehydrate</strong></td>
+</tr>
+<tr>
+<td>present</td>
+<td>absent</td>
+<td><strong>refuse</strong>: <code>StoreMissing</code>; nothing is created</td>
+</tr>
+<tr>
+<td>present</td>
+<td>no instance row, or a different one</td>
+<td><strong>refuse</strong>: <code>StoreReplaced</code></td>
+</tr>
+<tr>
+<td>absent</td>
+<td>present, with facts</td>
+<td><strong>refuse</strong>: <code>RecordMissing</code></td>
+</tr>
+<tr>
+<td>unreadable</td>
+<td>any</td>
+<td><strong>refuse</strong>: <code>RecordUnreadable</code>; the store is not opened</td>
+</tr>
+<tr>
+<td>store cannot be inspected</td>
+<td></td>
+<td><strong>refuse</strong>: only <code>NotFound</code> counts as absence</td>
+</tr>
+<tr>
+<td>any</td>
+<td>a link, not a directory, or another account&#39;s directory</td>
+<td><strong>refuse</strong>: <code>StoreUnprotected</code>; nothing in it is opened (§11)</td>
+</tr>
+</tbody></table>
+<p>Before any row above that opens the store, its directory is checked and, if
+needed, set owner-only (§11). That never changes which row applies.</p>
+<p>A start that fails after the record is committed is not a fresh node next time:
+the record exists, so the next start rehydrates or refuses.</p>
+<h3 id="7-startup-ordering-in-icnd">7. Startup ordering in <code>icnd</code></h3>
+<ol>
+<li>data-directory lock (refuses an incomplete restore);</li>
+<li>discard the previous start&#39;s receipt;</li>
+<li>N2-A startup gate (audits <code>store/authority</code> with every other store);</li>
+<li>the registry: §6, then ADR-0087 rehydration, then the receipt;</li>
+<li>services.</li>
+</ol>
+<p>Every refusal exits nonzero before any service starts. There is no flag that
+starts with an empty authority state.</p>
+<h3 id="8-compatibility-and-future-formats">8. Compatibility and future formats</h3>
+<ul>
+<li>The record&#39;s <code>format</code> and <code>version</code>, the store path, the instance row&#39;s key
+and length, and ADR-0087&#39;s record layout are compatibility surfaces from the
+first real node on.</li>
+<li>A binary meeting a record version it does not know refuses (fail closed). A
+downgrade past a format change therefore refuses rather than guessing.</li>
+<li>A change to any of these needs a new version and an explicit migration step,
+decided by an amendment to this ADR. Rows are never reinterpreted in place.</li>
+<li>A new reader must keep reading every earlier version it may meet, or say in
+its amendment that it does not.</li>
+</ul>
+<h3 id="9-what-cannot-be-detected">9. What cannot be detected</h3>
+<p>These limits are not bugs to be fixed inside the data directory:</p>
+<ul>
+<li><strong>The whole data directory, record included, lost or replaced by an empty
+one.</strong> Indistinguishable from a fresh node. Detecting it needs an anchor
+retained outside the directory, which does not exist.</li>
+<li><strong>The store rolled back to an earlier copy of itself.</strong> The instance matches,
+and there are fewer facts. Restoring an older backup of the whole directory
+does exactly this.</li>
+<li><strong>Individual facts vanishing from an intact store</strong> (ADR-0087 §9).</li>
+<li><strong>Power loss beyond the barriers described in §5.</strong></li>
+</ul>
+<h3 id="10-the-startup-receipt-is-a-diagnostic">10. The startup receipt is a diagnostic</h3>
+<p><code>n1-authority-receipt.json</code> (format <code>icn.n1.authority-receipt</code>, version 1)
+records what the last start that got through the registry rehydrated. That
+start may still have failed afterwards, at the keystore or a service. It records:</p>
+<ul>
+<li>the instance;</li>
+<li>how the directory was found (<code>initialized</code>,
+<code>completed-interrupted-initialization</code> or <code>rehydrated</code>);</li>
+<li>body and witness counts;</li>
+<li>for each subject, a summary of what <code>derive</code> returns;</li>
+<li>a SHA-256 digest of those summaries under the domain
+<code>icn.n1.authority-receipt.decisions.v1\0</code>. <code>icn-core</code>&#39;s authority registry
+owns that domain, and the workspace domain-separation audit registers it.</li>
+</ul>
+<p>What it is not:</p>
+<ul>
+<li><strong>Not an authority certificate.</strong> It is unsigned, and nothing may make an
+identity or authorization decision from it. Live decisions come from
+<code>derive</code> over the rehydrated state, inside the process.</li>
+<li><strong>Not proof that a daemon is running.</strong> It has no clock or process data, by
+design, so it is byte-identical across restarts of the same state. The daemon
+discards the previous receipt as soon as it holds the lock, so a start
+refused at the gate or by the registry leaves none. A start refused before
+the lock (another holder, an incomplete restore) cannot touch the directory,
+and an earlier receipt may remain. Liveness comes from the process and its
+log.</li>
+<li><strong>Not a protocol.</strong> Nothing in the runtime reads it back. Its readers are
+tests and operators.</li>
+</ul>
+<p>It names subjects, public authority keys and device grants. Those are not
+cryptographic secrets, but they are metadata a node has no reason to share, so
+the file is created owner-only (0600) and stays local. The record is created
+the same way. Who can read the store holding the same facts is §11.</p>
+<p>Its JSON fields may change in a later version. A change bumps <code>version</code>. Only
+the format name, the version field and the digest domain are fixed by this ADR.</p>
+<h3 id="11-who-can-read-the-authority-store">11. Who can read the authority store</h3>
+<p><strong>Decision.</strong> <code>store/authority/</code> is owner-only (<code>0700</code>) whatever the process
+umask. This is a deliberate exception: every other store in the data
+directory, and the data directory itself, follow the umask.</p>
+<p>sled creates its files with no explicit mode, so they follow the umask: under
+umask <code>022</code> they are readable by every local account, under <code>000</code> writable
+too. A directory no other account can search keeps them unreachable whatever
+their own modes. So the guarantee is placed on the directory, at the one
+boundary this ADR owns, and not on sled&#39;s files.</p>
+<p>Before the registry opens it, under the data-directory lock:</p>
+<ol>
+<li><strong>Absent:</strong> created with mode <code>0700</code>, not through <code>create_dir_all</code>. Its
+parent <code>store/</code> is created if missing, with the default mode, as any store
+would create it.</li>
+<li><strong>Present:</strong> inspected without following a link. It must be a directory,
+not a link and not any other file, owned by the account the process
+creates files as. Anything else is refused with <code>StoreUnprotected</code>, and
+nothing in it is opened. A link to a valid store is refused too, and its
+target is not changed.</li>
+<li><strong>This account&#39;s directory with another mode</strong>, as a restore or a manual
+copy can leave it: set to exactly <code>0700</code> through a descriptor of the inode
+just checked, synced, and logged as a warning. Nothing inside is touched:
+no fact, instance row or record is removed or regenerated, and the start
+continues by §6.</li>
+</ol>
+<p>The N2-A gate runs before this (§7). It never creates a store, so a new store
+is created owner-only before sled writes anything in it. An existing store is
+different: the gate&#39;s audit opens it first, while it still has the mode it was
+found with, and sled may write files there then. Those files hold what the
+wider directory already exposed. The guarantee below starts once this step has
+run. The gate also refuses a link, and a directory it cannot read, anywhere in
+its discovery walk, so through <code>icnd</code> those reach the operator as gate
+refusals rather than <code>StoreUnprotected</code>.</p>
+<p><strong>What it guarantees.</strong> Once a start has passed this step, no local account
+except the owner and root can list the store or open any file in it by path,
+whatever the umask that created those files.</p>
+<p><strong>What it does not cover:</strong></p>
+<ul>
+<li><strong>Every other store and the data directory itself.</strong> Their confidentiality
+remains the deployment-boundary dependency of ADR-0086: the shipped units
+set <code>UMask=0077</code>, and an <code>icnctl</code> test fails if either stops doing so. The
+data root is not hardened by this ADR.</li>
+<li><strong>The directories above <code>store/authority</code>.</strong> They are assumed writable only
+by the owning account. A daemon started by hand under umask <code>000</code> creates
+<code>store/</code> writable by everyone. Another account could then move
+<code>store/authority</code> aside and put its own directory there. A substitute
+present when the check runs is refused, being another account&#39;s. One
+swapped in between the check and sled&#39;s open is not detected. The next
+start refuses it. Through the same writable <code>store/</code>, a non-directory
+swapped in at the moment of the check could also stall the start rather
+than fail it.</li>
+<li><strong>Exposure before the mode was set.</strong> A file another account opened, copied
+or linked while the directory was wider stays readable to it. Tightening
+prevents new access; it does not withdraw access already taken. This
+includes <strong>facts written later</strong>: sled keeps appending to the same <code>db</code>
+file, so a descriptor another account opened on it while the directory was
+wider keeps reading what is written after the tightening. That outlives
+the daemon: sled reuses the same <code>db</code> file across restarts, so the
+descriptor reads facts written by later runs too. The same holds for a
+handle another account kept on a subdirectory sled creates (<code>blobs/</code>),
+through which it can open files created there later, because the <code>0700</code>
+is checked on <code>store/authority</code> alone. No mode change can revoke an open
+descriptor. Only rebuilding the store into new files and directories
+would, and this decision does not rebuild a store to fix its permissions. A store that was ever readable by
+another account should be treated as exposed to it. Today no runtime
+producer writes facts, so nothing is written after the tightening.</li>
+<li><strong>The N2-A gate&#39;s audit of an existing store.</strong> It runs before this step
+(§7), so for an existing store with a wider mode, sled opens the store, and
+may write files in it, while it is still wide. The audit only reads rows, so
+those files are sled&#39;s own bookkeeping for contents the store already held,
+not new facts. They take the umask, so they can be readable even when the
+older files were not. This adds no new class of exposure beyond the
+previous bullet. It does mean
+that on an existing store the protection is not in place before every sled
+open. Moving the check ahead of the gate would shorten that window by the
+gate&#39;s duration and close no other gap. The previous bullet is the
+material one.</li>
+<li><strong>Copies outside the data directory,</strong> backup archives included. They are
+protected by wherever they are kept.</li>
+<li><strong>Root and the owning account.</strong></li>
+<li><strong>Non-Unix platforms,</strong> where no mode claim is made.</li>
+</ul>
+<p>The tests check the directory&#39;s mode bits and the refusals. They do not show
+another account actually failing to traverse the directory, because the
+development environment has no second account to run as.</p>
+<h3 id="12-manual-recovery">12. Manual recovery</h3>
+<p>Every refusal in §6 needs an operator. Recovery is never automatic. The
+operator procedure is <code>docs/guides/operations/backup-and-recovery.md</code>,
+&quot;Scenario 5&quot;. Its rules:</p>
+<ul>
+<li>Preserve before acting: copy the whole data directory, record and store
+together, before changing anything.</li>
+<li>Restoring the original authority history means restoring the data directory
+from a backup that holds it.</li>
+<li>Deleting the record, or the record and the store, to get past a refusal
+starts a <strong>new</strong> authority history on this node. It is not a repair. It is
+acceptable only where the store provably held no facts, or where the
+maintainer decides to abandon that history.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>A node that loses or swaps its authority store refuses to start instead of
+running without its facts.</li>
+<li>One more refusal class for operators, with a documented procedure.</li>
+<li>Three new files in every data directory.</li>
+<li>The record format and the instance row become compatibility surfaces.</li>
+<li><code>store/authority/</code> is the one store whose directory mode does not follow
+the umask. A tool that recreates the data directory&#39;s layout must keep it
+owner-only, or the next start sets it back and logs a warning.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>No record; treat a missing store as a fresh node</td>
+<td>Silently drops every persisted fact when a store is lost.</td>
+</tr>
+<tr>
+<td>A marker row inside the sled database</td>
+<td>Disappears with the database it is meant to vouch for.</td>
+</tr>
+<tr>
+<td>An instance derived from the node&#39;s key</td>
+<td>Couples store identity to key custody and rotation. A store copied between nodes with the same key would be accepted.</td>
+</tr>
+<tr>
+<td>Close and reopen sled to force an <code>fsync</code></td>
+<td>Lock-release race on first start, and a panic path in sled&#39;s close.</td>
+</tr>
+<tr>
+<td>Put a timestamp or nonce in the receipt</td>
+<td>Breaks byte-identical comparison across restarts, and still would not prove liveness.</td>
+</tr>
+<tr>
+<td>Sign the receipt</td>
+<td>Would make it look like an authority certificate. It is a diagnostic.</td>
+</tr>
+<tr>
+<td>Start empty after a refusal, behind a flag</td>
+<td>A flag that silently drops authority facts is the failure this ADR exists to prevent.</td>
+</tr>
+<tr>
+<td>Rely only on the units&#39; <code>UMask=0077</code> for the authority store</td>
+<td>Leaves the facts readable by other local accounts whenever <code>icnd</code> is started by hand under a lax umask.</td>
+</tr>
+<tr>
+<td>Make the whole data directory owner-only</td>
+<td>A wider change to every store&#39;s convention and to tooling that reads the data directory. This decision is bounded to the store this ADR owns.</td>
+</tr>
+<tr>
+<td>Refuse a store directory with a wider mode instead of setting it</td>
+<td>Turns a restored backup into an outage for something the process can safely fix. Setting the mode keeps every fact, and the warning tells the operator.</td>
+</tr>
+<tr>
+<td>Chmod sled&#39;s files as well as the directory</td>
+<td>sled creates files later (snapshots, blobs) with no mode of its own. The directory covers files created later too.</td>
+</tr>
+</tbody></table>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0088-n1-runtime-authority-store-initialization-and-recovery.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
