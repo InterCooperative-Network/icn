@@ -57,7 +57,8 @@
 //!
 //! sled creates the store's files with no explicit mode, so they follow the process umask. The
 //! store directory does not: it is created `0700` whatever the umask, and an existing one is
-//! checked before sled opens it. A directory of this account with a wider mode, as a restore can
+//! checked before the registry opens it (the N2-A gate's audit has opened it already, with the
+//! mode it was found with). A directory of this account with a wider mode, as a restore can
 //! leave it, is set to `0700` with its contents untouched; a link, a non-directory or another
 //! account's directory is refused. Nothing above `store/authority` is changed: the data directory
 //! and every other store still follow the umask (ADR-0088 §11).
@@ -698,8 +699,9 @@ fn write_record(
 
 // ── the store ───────────────────────────────────────────────────────────────────────────────────
 
-/// Every open of the store goes through [`protect_store_dir`] first, so sled never creates or
-/// reads a file in a directory other local accounts can traverse.
+/// Every open of the store by the registry goes through [`protect_store_dir`] first. A new store
+/// is owner-only before sled creates anything in it. An existing one has already been opened by
+/// the N2-A gate's audit, with whatever mode it had (ADR-0088 §11).
 fn open_store(
     data_dir: &Path,
     store_dir: &Path,
@@ -914,14 +916,11 @@ fn protect_store_dir(data_dir: &Path, store_dir: &Path, exists: bool) -> Result<
 
     let before = std::fs::symlink_metadata(store_dir)
         .map_err(|e| unprotected(format!("cannot inspect it: {e}")))?;
-    let account = if exists {
-        crate::identity_new_files_receive(data_dir)
-            .map_err(|e| unprotected(format!("{e:#}")))?
-            .uid
-    } else {
-        // Just created by this process, so its owner is the account new files receive.
-        before.uid()
-    };
+    // Asked of a probe, not of the directory being judged: a directory swapped in after `mkdir`
+    // must still be compared with this process's account.
+    let account = crate::identity_new_files_receive(data_dir)
+        .map_err(|e| unprotected(format!("{e:#}")))?
+        .uid;
     let verdict = judge_store_dir(
         before.file_type(),
         before.uid(),

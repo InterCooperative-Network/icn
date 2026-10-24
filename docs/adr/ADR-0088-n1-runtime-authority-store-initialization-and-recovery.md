@@ -243,7 +243,7 @@ too. A directory no other account can search keeps them unreachable whatever
 their own modes. So the guarantee is placed on the directory, at the one
 boundary this ADR owns, and not on sled's files.
 
-Before sled opens or creates anything in it, under the data-directory lock:
+Before the registry opens it, under the data-directory lock:
 
 1. **Absent:** created with mode `0700`, not through `create_dir_all`. Its
    parent `store/` is created if missing, with the default mode, as any store
@@ -259,9 +259,14 @@ Before sled opens or creates anything in it, under the data-directory lock:
    no fact, instance row or record is removed or regenerated, and the start
    continues by §6.
 
-The N2-A gate runs before this (§7). It never creates a store, and it already
-refuses a link anywhere in its discovery walk, so the first process to create
-`store/authority` is this step.
+The N2-A gate runs before this (§7). It never creates a store, so a new store
+is created owner-only before sled writes anything in it. An existing store is
+different: the gate's audit opens it first, while it still has the mode it was
+found with, and sled may write files there then. Those files hold what the
+wider directory already exposed. The guarantee below starts once this step has
+run. The gate also refuses a link, and a directory it cannot read, anywhere in
+its discovery walk, so through `icnd` those reach the operator as gate
+refusals rather than `StoreUnprotected`.
 
 **What it guarantees.** Once a start has passed this step, no local account
 except the owner and root can list the store or open any file in it by path,
@@ -279,7 +284,9 @@ whatever the umask that created those files.
   `store/authority` aside and put its own directory there. A substitute
   present when the check runs is refused, being another account's. One
   swapped in between the check and sled's open is not detected. The next
-  start refuses it.
+  start refuses it. Through the same writable `store/`, a non-directory
+  swapped in at the moment of the check could also stall the start rather
+  than fail it.
 - **Exposure before the mode was set.** A file another account opened, copied
   or linked while the directory was wider stays readable to it. Tightening
   prevents new access; it does not withdraw access already taken.
