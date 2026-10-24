@@ -9,7 +9,7 @@ tags: ["identity", "n1", "authority-log", "persistence", "durability", "api-boun
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "implemented; #2800 merged to main as b10f266d9 on 2026-10-23. Daemon integration (N1-R1) is a separate concern; no runtime producer or consumer of facts"
+implementation_status: "implemented; #2800 merged to main as b10f266d9 on 2026-10-23. Daemon integration (N1-R1) is a separate concern; no runtime service produces facts or serves authority decisions"
 references:
   - "icn#2799 (N1-D: local restart durability)"
   - "icn#2800 (the implementing PR)"
@@ -38,8 +38,8 @@ ADR-0018 requires no separate signature.
 Decision status and implementation status are separate axes (ADR-0018). The
 implementation merged with #2800 (squash `b10f266d9`, 2026-10-23). Daemon
 integration is a separate concern that this ADR does not decide: N1-R1 opens
-and rehydrates the store at `icnd` startup, and nothing in the runtime produces
-or consumes facts.
+and rehydrates the store at `icnd` startup, and no runtime service produces
+facts or serves authority decisions.
 
 ## Context
 
@@ -197,9 +197,9 @@ change for implementors and needs this ADR amended.
   `fsync` only from its periodic flusher and on close. So the
   acknowledgment is crash-of-process safe, and only best-effort against power
   loss.
-- No daemon integration. This ADR decides the library boundary only. How
-  `icnd` opens, initializes and rehydrates the store is N1-R1's concern, and
-  nothing in the runtime produces or consumes facts.
+- No decision about the daemon. This ADR decides the library boundary only.
+  How `icnd` opens, initializes and rehydrates the store is N1-R1's concern,
+  and no runtime service produces facts or serves authority decisions.
 
 ## Consequences
 

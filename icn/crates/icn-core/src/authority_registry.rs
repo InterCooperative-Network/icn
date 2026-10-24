@@ -29,16 +29,24 @@
 //! data directory being replaced by an empty one. Nothing inside the data directory can tell that
 //! from a node that never initialized; detecting it needs an anchor retained outside the
 //! directory, which this slice does not have. Nor can it detect individual fact rows vanishing
-//! from an intact store (ADR-0087 §9).
+//! from an intact store (ADR-0087 §9), or the store being rolled back to an earlier copy of
+//! itself, which keeps its instance and has fewer facts.
+//!
+//! The refusals tell an operator to restore from a backup, and `icnctl restore` restores a whole
+//! data directory. On a node whose store has never held a fact — every node today, since nothing
+//! produces facts yet — `RecordMissing` cannot occur and a `StoreReplaced` or `StoreMissing`
+//! refusal loses nothing if the record is removed by hand, after which the next start
+//! re-initializes.
 //!
 //! # The startup receipt
 //!
 //! Each successful [`AuthorityRegistry::open`] writes [`RECEIPT_FILE_NAME`]: counts, and per
 //! subject a summary of what [`derive`] returns over the rehydrated state, with a digest of those
 //! decisions. It is deterministic (no clock, no process data), holds no secret, and is read by
-//! tests and operators; nothing in the runtime reads it back. A stale receipt is removed before
-//! anything is opened, so a refused start never leaves one behind that describes an earlier
-//! state.
+//! tests and operators; nothing in the runtime reads it back. [`AuthorityRegistry::open`] removes
+//! a stale receipt before it opens anything, so a start it refuses leaves none. A start refused
+//! earlier — before the daemon holds the data-directory lock, or by the N2-A gate — never reaches
+//! it, and the previous start's receipt remains: a record of that start, not of this one.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -234,9 +242,10 @@ impl AuthorityRegistry {
     /// Open, initialize or refuse the authority store of `data_dir`, rehydrate it, and write the
     /// startup receipt.
     ///
-    /// `lock` must be this directory's storage lock ([`DataDirLock::acquire`]), still anchored.
-    /// Asking for it in the signature is what keeps the record, the store and the receipt behind
-    /// the exclusion domain and the restore-marker refusal that [`DataDirLock::acquire`] enforces.
+    /// `lock` must be this directory's storage lock, still anchored: asking for it keeps the
+    /// record, the store and the receipt inside the exclusion domain. The restore-marker refusal
+    /// is asked again here rather than assumed from the lock, because not every storage lock is
+    /// taken through [`DataDirLock::acquire`] (`acquire_for_restore_recovery` skips it by design).
     /// The daemon also runs the N2-A startup gate before calling this, so the store is audited
     /// before it is read.
     pub fn open(
@@ -244,6 +253,11 @@ impl AuthorityRegistry {
         lock: &DataDirLock,
     ) -> Result<(Self, AuthorityReceipt), RegistryError> {
         check_lock(data_dir, lock)?;
+        crate::restore_marker::refuse_if_restore_incomplete(data_dir, "the N1 authority registry")
+            .map_err(|e| RegistryError::Lock {
+                data_dir: data_dir.to_path_buf(),
+                reason: format!("{e:#}"),
+            })?;
 
         let store_dir = crate::config::authority_fact_store_path(data_dir);
         let record_path = init_record_path(data_dir);
@@ -299,17 +313,16 @@ impl AuthorityRegistry {
                         facts,
                     });
                 }
-                let instance = match read_instance(&store, &store_dir)? {
-                    Some(instance) => instance,
-                    None => write_new_instance(&store, &store_dir)?,
+                let (store, instance) = match read_instance(&store, &store_dir)? {
+                    Some(instance) => (store, instance),
+                    None => write_new_instance(store, &store_dir)?,
                 };
                 lock_still_held(data_dir, lock)?;
                 write_record(data_dir, &record_path, instance)?;
                 (store, instance, Startup::CompletedInterruptedInitialization)
             }
             (None, false) => {
-                let store = open_store(&store_dir)?;
-                let instance = write_new_instance(&store, &store_dir)?;
+                let (store, instance) = write_new_instance(open_store(&store_dir)?, &store_dir)?;
                 lock_still_held(data_dir, lock)?;
                 write_record(data_dir, &record_path, instance)?;
                 (store, instance, Startup::Initialized)
@@ -665,17 +678,32 @@ fn read_instance(
     }
 }
 
-/// Write a fresh instance row and make it durable before the record that names it exists.
+/// Write a fresh instance row, and get it onto disk before the record that names it exists.
+///
+/// The barrier alone survives a crash of this process but not power loss: sled's flush waits with
+/// `sync_file_range` (ADR-0087 §9), while the record gets a full `fsync`. Power lost between the
+/// two would leave a record naming an instance the store never kept, and the next start would
+/// refuse a node that has nothing to restore. Sled issues a full `fsync` when the database
+/// closes, so the store is closed and reopened here, once per node lifetime, and the row is read
+/// back from the reopened store before the record is written.
 fn write_new_instance(
-    store: &Arc<dyn DurableStore>,
+    store: Arc<dyn DurableStore>,
     store_dir: &Path,
-) -> Result<[u8; INSTANCE_LEN], RegistryError> {
+) -> Result<(Arc<dyn DurableStore>, [u8; INSTANCE_LEN]), RegistryError> {
     let instance: [u8; INSTANCE_LEN] = rand::random();
     store
         .put(INSTANCE_KEY, &instance)
         .and_then(|()| store.sync_durable())
         .map_err(|e| store_error(store_dir, e))?;
-    Ok(instance)
+    drop(store);
+    let store = open_store(store_dir)?;
+    match read_instance(&store, store_dir)? {
+        Some(found) if found == instance => Ok((store, instance)),
+        _ => Err(RegistryError::Store {
+            store: store_dir.to_path_buf(),
+            reason: "the new instance row was not present after reopening the store".into(),
+        }),
+    }
 }
 
 fn store_error(store_dir: &Path, error: anyhow::Error) -> RegistryError {

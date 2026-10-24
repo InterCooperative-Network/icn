@@ -4769,7 +4769,7 @@ category = "architecture"
 status = "living"
 truth_class = "normative"
 title = "ADR-0087: N1 Authority-Fact Persistence Boundary"
-description = "ACCEPTED 2026-10-23. The N1-D persistence boundary between icn-identity and icn-core. Four public items: the AuthorityFactStore trait, the opaque PersistedFact record (key = event_id || signature, value = canonical body bytes), FactStoreError and rehydrate. Duplicate writes are semantically idempotent. put_fact Ok is the durability acknowledgment, behind a required DurableStore::sync_durable barrier: process-crash safe, best-effort against power loss with sled 0.34. put_fact does not validate admission; producers must, and rehydration re-validates every record and fails closed. Implemented by #2800; daemon integration is separate (N1-R1), and no runtime producer or consumer of facts exists."
+description = "ACCEPTED 2026-10-23. The N1-D persistence boundary between icn-identity and icn-core. Four public items: the AuthorityFactStore trait, the opaque PersistedFact record (key = event_id || signature, value = canonical body bytes), FactStoreError and rehydrate. Duplicate writes are semantically idempotent. put_fact Ok is the durability acknowledgment, behind a required DurableStore::sync_durable barrier: process-crash safe, best-effort against power loss with sled 0.34. put_fact does not validate admission; producers must, and rehydration re-validates every record and fails closed. Implemented by #2800; daemon integration is separate (N1-R1), and no runtime service produces facts or serves authority decisions."
 last_updated = "2026-10-24"
 owner = "matt"
 audiences = ["architects", "developers"]

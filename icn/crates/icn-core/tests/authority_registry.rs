@@ -3,7 +3,7 @@
 //! These are the registry's startup and recovery contracts — initialization, refusal, receipt —
 //! exercised in-process against real sled stores and real files. They do not exercise a
 //! production authority transition: nothing in the runtime produces facts yet, so every fact here
-//! is written through [`AuthorityRegistry::ingest`] by the test itself, under the data-directory
+//! is written through [`AuthorityRegistry::ingest`] by the test itself, holding the data-directory
 //! lock. The daemon-level versions of the same claims, against the real `icnd` binary, are in
 //! `bins/icnd/tests/authority_restart_test.rs`.
 
@@ -92,12 +92,15 @@ fn read_receipt(dir: &Path) -> AuthorityReceipt {
     serde_json::from_slice(&std::fs::read(receipt_path(dir)).unwrap()).unwrap()
 }
 
+/// Write the history through the registry, holding the storage lock for the whole write.
 fn seeded(dir: &Path) -> AuthorityReceipt {
-    let (mut registry, _) = open(dir).unwrap();
-    for event in history() {
-        registry.ingest(&event).unwrap();
+    {
+        let lock = lock(dir);
+        let (mut registry, _) = AuthorityRegistry::open(dir, &lock).unwrap();
+        for event in history() {
+            registry.ingest(&event).unwrap();
+        }
     }
-    drop(registry);
     let (_, receipt) = open(dir).unwrap();
     receipt
 }
@@ -356,6 +359,8 @@ fn reopening_reproduces_the_receipt_byte_for_byte() {
     let dir = tempfile::tempdir().unwrap();
     seeded(dir.path());
     let first = std::fs::read(receipt_path(dir.path())).unwrap();
+    // Removed, so the reopen has to write it again rather than leave the first one in place.
+    std::fs::remove_file(receipt_path(dir.path())).unwrap();
     drop(open(dir.path()).unwrap());
     let second = std::fs::read(receipt_path(dir.path())).unwrap();
     assert_eq!(first, second);
@@ -391,16 +396,68 @@ fn a_corrupt_fact_refuses_the_whole_store_and_leaves_no_receipt() {
 #[test]
 fn a_receipt_that_cannot_be_written_refuses_the_start() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir(receipt_path(dir.path())).unwrap();
+    // A directory where the temporary goes: removing a stale receipt succeeds, and the write
+    // itself is what fails.
+    std::fs::create_dir(dir.path().join("n1-authority-receipt.json.tmp")).unwrap();
 
     let error = open(dir.path()).unwrap_err();
     assert!(
         matches!(error, RegistryError::ReceiptUnwritable { .. }),
         "{error}"
     );
+    assert!(error.to_string().contains("create"), "{error}");
+    assert!(!receipt_path(dir.path()).exists());
+}
+
+#[test]
+fn a_refusal_before_the_store_is_opened_still_removes_the_stale_receipt() {
+    // Removing the stale receipt is part of opening: an earlier receipt does not survive a start
+    // the registry refuses, even when the refusal comes before anything is opened.
+    let dir = tempfile::tempdir().unwrap();
+    seeded(dir.path());
+    std::fs::write(init_record_path(dir.path()), b"damaged").unwrap();
+
+    assert!(matches!(
+        open(dir.path()),
+        Err(RegistryError::RecordUnreadable { .. })
+    ));
+    assert!(!receipt_path(dir.path()).exists());
 }
 
 // ── the lock ────────────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn a_lock_that_no_longer_covers_its_path_is_refused_and_nothing_is_written() {
+    // icn#2758: rename the locked root away and put a fresh directory at its path. The lock still
+    // names that path, but it excludes nobody there.
+    let parent = tempfile::tempdir().unwrap();
+    let root = parent.path().join("root");
+    std::fs::create_dir(&root).unwrap();
+    let held = lock(&root);
+    std::fs::rename(&root, parent.path().join("moved")).unwrap();
+    std::fs::create_dir(&root).unwrap();
+
+    let error = AuthorityRegistry::open(&root, &held).unwrap_err();
+    assert!(matches!(error, RegistryError::Lock { .. }), "{error}");
+    assert!(!authority_fact_store_path(&root).exists());
+    assert!(!init_record_path(&root).exists());
+}
+
+#[test]
+fn a_storage_lock_taken_past_the_restore_marker_still_cannot_open_the_store() {
+    // `acquire_for_restore_recovery` is a storage lock that deliberately skips the marker. The
+    // registry asks again instead of trusting the lock to have asked.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(icn_core::restore_marker_path(dir.path()), b"").unwrap();
+    let seen = icn_core::marker_seen(dir.path()).unwrap().unwrap();
+    let recovery =
+        DataDirLock::acquire_for_restore_recovery(dir.path(), "a recovery", &seen).unwrap();
+
+    let error = AuthorityRegistry::open(dir.path(), &recovery).unwrap_err();
+    assert!(error.to_string().contains("did not finish"), "{error}");
+    assert!(!authority_fact_store_path(dir.path()).exists());
+    assert!(!init_record_path(dir.path()).exists());
+}
 
 #[test]
 fn a_lock_on_another_directory_is_refused_and_nothing_is_written() {

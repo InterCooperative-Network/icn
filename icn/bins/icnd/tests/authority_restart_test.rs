@@ -176,6 +176,12 @@ impl Node {
         store.flush().unwrap();
     }
 
+    /// Remove the receipt, so a restart has to write it again from what it rehydrated rather than
+    /// leave the previous start's file in place.
+    fn discard_receipt(&self) {
+        std::fs::remove_file(receipt_path(self.dir())).unwrap();
+    }
+
     fn receipt_bytes(&self) -> Vec<u8> {
         std::fs::read(receipt_path(self.dir())).unwrap()
     }
@@ -239,6 +245,8 @@ fn assert_refused(node: &Node, status: ExitStatus, log: &str, expected: &str) {
         !log.contains("Network actor running"),
         "no service may start after a refusal:\n{log}"
     );
+    // The process has exited, so this cannot catch a listener it had; the log check above does
+    // that. It does catch the port being held by anything a refusal left running.
     assert!(
         !node.gateway_listening(),
         "nothing may listen on the gateway port after a refusal"
@@ -293,6 +301,7 @@ fn a_sigkilled_daemon_restarts_into_identical_authority_decisions() {
     assert_decisions(&node.receipt());
 
     daemon.sigkill();
+    node.discard_receipt();
 
     let _restarted = node.start();
     assert_eq!(
@@ -316,6 +325,7 @@ fn a_gracefully_stopped_daemon_restarts_into_identical_authority_decisions() {
         "a graceful stop exits 0:\n{}",
         daemon.log()
     );
+    node.discard_receipt();
 
     let _restarted = node.start();
     assert_eq!(node.receipt_bytes(), before);
