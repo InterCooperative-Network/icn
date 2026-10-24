@@ -5,20 +5,20 @@ Canonical: no
 Last verified: 2026-10-03
 ---
 
-# Session Handoff — 2026-10-03 — Katie / Home identity integration (N4-A)
+# Session Handoff — 2026-10-03 — Home runtime identity integration (N4-A)
 
 > **Memory status:** historical session evidence only. Reverify every branch, PR, CI, issue, and blocker claim before acting on it.
 
 ## Session scope
 
 **Goal:** reconcile how ICN currently represents human continuity, contextual Subjects, device
-Principals, bounded authority, revocation, recovery and contexts against the Katie forcing use
-case (durable person, replaceable devices: phone, Pi, desktop, VM 802), then land the smallest
+Principals, bounded authority, revocation, recovery and contexts against a home-runtime forcing use
+case (durable person, replaceable devices: phone, single-board computer, desktop, hosted VM), then land the smallest
 upstream slice that moves the fixture scenario *S with devices A and B; A revoked; A refused, B
 accepted, S unchanged* from documentation to a consumable library primitive.
 
-**Boundary:** no production identity for Katie or Matt; no `ContinuityRoot` generated or stored
-anywhere; no change to the network-ops Pi thin-client deployment, which proceeds conventionally;
+**Boundary:** no production identity for any real person; no `ContinuityRoot` generated or stored
+anywhere; no change to any separate thin-client deployment, which proceeds conventionally;
 no Mutualware naming change (public brand stays ICN per #2801/#2802); no new household/personal
 context kind; no gateway route, container, persistence, replication, recovery or production wiring;
 no merge.
@@ -96,7 +96,7 @@ These values are provenance for this handoff, not instructions for the next sess
 
 | Layer | Owns | Must not |
 |---|---|---|
-| **ICN** | identity, authority, delegation, revocation, recovery, proof, canonical encodings and verification | encode Katie-, Pi-, VM- or RDP-specific workflow |
+| **ICN** | identity, authority, delegation, revocation, recovery, proof, canonical encodings and verification | encode person-, device-, VM- or RDP-specific workflow |
 | **Home / Mutualware-facing runtime** | Context experience, endpoint presence, handoff between endpoints, provider resolution, presentation/execution intent | invent subjects, principals, grants, revocation, recovery or a second encoding |
 | **network-ops** | machines, images, deployment, inventory, networking, firewalls, health, rollback | treat an SSH key, OS account, RDP login, VM or Pi as a Subject; hold a `ContinuityRoot`; build a bearer-token "enrollment" and call it N4 |
 
@@ -104,7 +104,7 @@ The invariants the proof pins, in the vocabulary of `IDENTITY_SEMANTICS.md`: no 
 
 ## Decisions and rationale
 
-- **N4-A chosen as the slice, ahead of ladder rungs 3–4.** Rungs 3 (GEN-B recognition) and 4 (domain rail) are institutional and do not gate device evaluation; the Katie scenario needs exactly #2694 §7. No contract was changed.
+- **N4-A chosen as the slice, ahead of ladder rungs 3–4.** Rungs 3 (GEN-B recognition) and 4 (domain rail) are institutional and do not gate device evaluation; the home-runtime scenario needs exactly #2694 §7. No contract was changed.
 - **Prefix evaluation by filtering the body set, not by modifying the fold loop.** Keeps `resolve` the single decision point and makes the equivalence `derive_prefix(≥frontier−1) == derive` trivially true and tested. Rejected: adding a `revoked_at` to `DeviceGrant` (an N1 semantic change) and a "derive-as-of" state snapshot (a second selector).
 - **The act binds the evaluation position but the relying party must match it.** Satisfies N4 invariant 6 while preventing a relying party from re-evaluating an act at a position the signer never saw. Rejected: unbound position (replayable across contexts) and signer-authoritative position (invariant 6 violation).
 - **Relying party supplies the Subject.** An act naming another Subject is refused before any signature work, so authority is evaluated in the relying party's context, never the signer's.
@@ -112,12 +112,12 @@ The invariants the proof pins, in the vocabulary of `IDENTITY_SEMANTICS.md`: no 
 - **Payload opaque, `act_id` witness-independent.** Replay slots belong to action families (#2694 §9); N4-A never parses app bytes.
 - **Module placed outside `authority_log/` with its own clock guard**, mirroring GEN-A's "outer protocol" placement rather than widening the N1 guard.
 - **GEN stance:** personal/household contexts are a new GEN context kind, not a `GovernanceDomainV1` string; a household needs no charter and no founders; nothing to build until #2602 defines the kind.
-- **Custody stance:** the continuity root is client-held by contract (HIA §12.2). A Home process may act only as Katie's own client, which makes that process a custody surface equal to her phone; infrastructure operated for others never qualifies. Not solved by storing anything in network-ops.
+- **Custody stance:** the continuity root is client-held by contract (HIA §12.2). A Home process may act only as the person's own client, which makes that process a custody surface equal to their phone; infrastructure operated for others never qualifies. Not solved by storing anything on operator infrastructure.
 - **External boundary:** a stateless verifier over retained canonical facts; the gateway is at most a hosted relying party, never the owner of the truth.
 
 ## Unsafe assumptions
 
-- `cryptography` 41 in the VM Python is a correct Ed25519 (used only for the audit reference).
+- `cryptography` 41 in the development environment's Python is a correct Ed25519 (used only for the audit reference).
 - The 2026-08-28 agent-context spine is stale for the new module (it predates GEN-A too); regeneration is a separate chore.
 - No other session started N4 work between the live query and the commit.
 

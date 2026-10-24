@@ -81,7 +81,7 @@ SUBJECT = bytes(0x20 + i for i in range(32))         # an opaque 32-byte Subject
 DEVICE_SEED = bytes(0x40 + i for i in range(32))     # the device signing seed
 EVALUATION_POSITION = 3
 CAPABILITY = "Sign"
-PAYLOAD = b"katie:open-workspace"
+PAYLOAD = b"fixture:open-workspace"
 
 
 def canonical_act() -> bytes:

@@ -52,7 +52,7 @@ this layer reads them.
 
 ## 2. What a verified act proves — and what it does not
 
-A successful [`verify_device_act`] proves exactly:
+A successful [`verify_device_act`] returns a `VerifiedDeviceAct` and proves exactly:
 
 > Under the N1 facts this verifier has retained for Subject `S`, folded through position `E`
 > which the verifier itself chose, the chain was live and gap-free through `E`; device Principal
@@ -69,6 +69,21 @@ transport.
 
 **There is no registrar, directory, clock, network lookup or randomness.** Same retained facts,
 same act, same `E` ⇒ same verdict, on every replica.
+
+**Same `E` is not the same facts.** A verdict is relative to the facts retained when it was
+computed. Pinning `E` fixes which positions are read, not which facts exist at them. A fact that
+arrives later at a position at or below `E` can change the verdict for the same act at the same
+`E`: a superseding `recover` there clears every device grant, and a second authorized candidate
+there halts the Subject. An act accepted earlier is then refused. N4-A states no institutional or
+network finality. Whether a decision already taken on an earlier verdict stands is the deciding
+institution's rule, not this primitive's. The tests
+`a_superseding_recovery_inside_the_prefix_withdraws_an_earlier_verdict` and
+`a_competing_candidate_inside_the_prefix_halts_an_earlier_verdict` pin this.
+
+**Only verification yields a verified act.** `evaluate_device_authority` answers the authority
+question for no act in particular and returns bare `DeviceAuthorityEvidence`, which proves no
+signature and names no act. `VerifiedDeviceAct` (the act, its `act_id` and that evidence) has no
+public constructor, so it can only come from `verify_device_act`.
 
 ---
 
@@ -234,7 +249,7 @@ evaluates the authority the verifier knows about. That is the honest semantics o
 
 | Class | How N4-A applies |
 |---|---|
-| **1 — deferred-decision** (votes, nominations, anything tallied at a decision point) | the decision pins `E`; every act in the process is evaluated at that one `E`; a device revoked after `E` still counts, a device revoked at or before `E` never does |
+| **1 — deferred-decision** (votes, nominations, anything tallied at a decision point) | the decision pins `E`; every act in the process is evaluated at that one `E`; a device revoked after `E` still counts, a device revoked at or before `E` never does. The verdict is still relative to the facts retained at `E`: a recovery or fork later found at or below `E` changes it (§2) |
 | **2 — immediately settled** (ledger entries, irreversible effects) | the acceptor evaluates at its own retained `frontier − 1` once, at admission; **no validity bound exists** and R5.1 remains unmet for this class, exactly as HIA states — N4-A does not pretend otherwise |
 | **3 — authority events** | not acts; the log orders them itself |
 
@@ -269,16 +284,16 @@ Inputs, stated in full:
 | device seed | `seed[i] = 0x40 + i` → `4041…5e5f` |
 | `evaluation_position` | `3` |
 | `capability` | `Sign` (`0x01`) |
-| `payload` | ASCII `katie:open-workspace` (20 bytes) |
+| `payload` | ASCII `fixture:open-workspace` (22 bytes) |
 
 Outputs (hex):
 
 | Value | Bytes |
 |---|---|
 | device pubkey | `2543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d` |
-| `device_act_v1` (121 B) | `0000001169636e2e6e342e6465766963652d6163740001202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f012543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d000000000000000301000000146b617469653a6f70656e2d776f726b7370616365` |
-| **`act_id`** | `52df522d5e353e8d2a70f03abd7edb4e8c2770da40b2d395c46d35ff874ef14a` |
-| signature (RFC 8032, deterministic) | `0e12ebbe…fe3306` — verified by the reference, not part of identity |
+| `device_act_v1` (123 B) | `0000001169636e2e6e342e6465766963652d6163740001202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f012543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d00000000000000030100000016666978747572653a6f70656e2d776f726b7370616365` |
+| **`act_id`** | `0bab45ffa00c413d8c566d7d2a77b8ef6990c281c50bcf884ec7238301067e3d` |
+| signature (RFC 8032, deterministic) | `6453bc43…256206` — verified by the reference, not part of identity |
 
 These were produced by an **independent reference written from this document** (Python, sharing
 no code, library or constant with `icn-identity`) and pinned as literals in
@@ -332,7 +347,7 @@ model.
 
 | Input | Source | Mutable? |
 |---|---|---|
-| the Subject's retained N1 facts: canonical bodies + witnesses | the verifier's own admitted store (local, or rehydrated through the N1-D fact store when #2800 lands) | append-only; the verifier admits each fact through `admissible_bytes` itself |
+| the Subject's retained N1 facts: canonical bodies + witnesses | the verifier's own admitted store (local, or rehydrated through the N1-D fact store: merged in #2800, rehydrated by `icnd` at startup since #2843) | append-only; the verifier admits each fact through `admissible_bytes` itself |
 | the act: `device_act_v1` bytes + 64-byte signature | the client | immutable once signed |
 | `(subject, E)` | the relying party's own context | chosen by the relying party, never by the client |
 
@@ -365,11 +380,11 @@ The first consumable surface, in order of smallness, is therefore:
 
 ### 9.3 Downstream contract (what a deployment MAY rely on, MUST NOT reimplement)
 
-A downstream deployment (for example the network-ops Home work) **MAY** rely on:
+A downstream deployment (for example a personal home-runtime deployment) **MAY** rely on:
 
 - the N4-A verdict as the sole answer to "is this device acting for this Subject with this
-  capability at this position"; and on `DeviceAuthorityEvidence` as the thing to log, display or
-  gate on;
+  capability at this position"; and on `VerifiedDeviceAct`, returned only by `verify_device_act`,
+  as the thing to log, display or gate on for an act;
 - `act_id` as a stable, witness-independent identity for an act;
 - the refusal classes in §7 as the complete vocabulary for *why* an act was refused, with no
   payload leakage;
@@ -385,7 +400,13 @@ It **MUST NOT**:
 - hold or derive a `ContinuityRoot` on infrastructure, or mint a Subject on a person's behalf;
 - cache a verdict across positions, choose `E` from the act, or fall back to the frontier when the
   act's `E` is not retained;
-- promote fixture identities, keys or vectors into anything real.
+- promote fixture identities, keys or vectors into anything real;
+- gate an act on bare `DeviceAuthorityEvidence` from `evaluate_device_authority`: it checks no
+  signature and names no act;
+- treat a verdict as final: it is relative to the facts retained when it was computed (§2);
+- reuse one device Principal across a person's separate Subject contexts. N1 `Authorize` facts and
+  signed acts carry the device key, so a reused key links those Subjects for anyone who sees both
+  (`IDENTITY_SEMANTICS.md` §2.1, §5). One device Principal per (device, context).
 
 ### 9.4 What is still open for the boundary
 
@@ -398,7 +419,8 @@ the verifier.
 ## 10. Deliberate scope boundaries
 
 Not in this slice, by design: a transport container; gateway routes; `icnctl` exposure; SDK
-bindings; persistence (N1-D, #2800, is a sibling, not a dependency — the verifier takes an
+bindings; persistence (N1-D, #2800, and its daemon rehydration, #2843, both now merged, are
+siblings, not dependencies — the verifier takes an
 `AuthorityStore` however it was filled); replication; recovery; session or JWT coupling; the N4
 enrollment, rotation, replacement and lost/stolen lifecycle; disposition of legacy
 `multi_device.rs` and the dormant `/v1/devices` route (#2588, #2590); any new context kind for

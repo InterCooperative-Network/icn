@@ -123,7 +123,7 @@ fn verdicts(
         for position in 1..=4 {
             let verdict =
                 verify_device_act(&act(subject, device, position), subject, store, position)
-                    .map(|evidence| evidence.grant.granted_at);
+                    .map(|verified| verified.evidence().grant.granted_at);
             out.push((device, position, verdict));
         }
     }
