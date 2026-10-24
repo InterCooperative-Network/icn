@@ -318,6 +318,8 @@ impl AuthorityRegistry {
                     Some(instance) => instance,
                     None => write_new_instance(&store, &store_dir)?,
                 };
+                // Also when adopting: a process that wrote the row may have died before this.
+                fsync_store(&store_dir).map_err(|e| store_error(&store_dir, e))?;
                 lock_still_held(data_dir, lock)?;
                 write_record(data_dir, &record_path, instance)?;
                 (store, instance, Startup::CompletedInterruptedInitialization)
@@ -325,6 +327,7 @@ impl AuthorityRegistry {
             (None, false) => {
                 let store = open_store(&store_dir)?;
                 let instance = write_new_instance(&store, &store_dir)?;
+                fsync_store(&store_dir).map_err(|e| store_error(&store_dir, e))?;
                 lock_still_held(data_dir, lock)?;
                 write_record(data_dir, &record_path, instance)?;
                 (store, instance, Startup::Initialized)
@@ -680,7 +683,8 @@ fn read_instance(
     }
 }
 
-/// Write a fresh instance row, and get it onto disk before the record that names it exists.
+/// Write a fresh instance row. [`fsync_store`] then gets it onto disk before the record that
+/// names it exists.
 ///
 /// The barrier alone survives a crash of this process but not power loss: sled's flush waits with
 /// `sync_file_range` (ADR-0087 §9), while the record gets a full `fsync`. Power lost between the
@@ -701,7 +705,6 @@ fn write_new_instance(
         .put(INSTANCE_KEY, &instance)
         .and_then(|()| store.sync_durable())
         .map_err(|e| store_error(store_dir, e))?;
-    fsync_store(store_dir).map_err(|e| store_error(store_dir, e))?;
     Ok(instance)
 }
 
