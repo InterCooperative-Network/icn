@@ -1302,6 +1302,50 @@ depends_on = [
   "docs/architecture/IDENTITY_SEMANTICS.md",
 ]
 
+[docs."docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md"]
+category = "architecture"
+status = "living"
+title = "Home runtime identity profile - decision record for the first personal-domain vertical slice"
+description = "PROPOSED decision record and consumption profile, not an identity model: which ICN primitives a person's Home runtime consumes for the human Subject, device Principals, bounded delegation, revocation and recovery, each classified PRODUCTION / LIB-TESTED / FIXTURE-ONLY / EXPERIMENTAL / DOC-ONLY / MISSING against the live checkout with its canonical owner; the external verification boundary status (library + canonical act bytes + vectors exist; the (N1 facts, act) container and stateless icnctl consumer are the named missing pieces); the GEN stance for personal and household contexts (new GEN context kinds proposed and routed to #2602; an Individual-owned InstitutionalDomain is rejected for this use because it extends the person-as-Entity debt and puts a registrar in human genesis); four contradictions settled against cited text (per-context device keys; the ContinuityRoot stays on the person's own client and a VM-hosted Home is a device Principal, never a custodian; N1 DeviceGrant versus ADR-0014 AuthorityGrant are different objects; Mutualware is ICN's public name, not a layer); and an implementable spec for a deployment track with every MISSING step marked and its forbidden substitute named (no bearer-token enrollment, no TLS root as identity, nothing identity-bearing stored on infrastructure). Fixture identities only; no deployment, enrollment ceremony, context kind, container or recovery protocol is claimed."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
+  "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md",
+  "icn/crates/icn-identity/src/device_authority.rs",
+]
+
+[docs."docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md"]
+category = "architecture"
+status = "living"
+title = "N4-A - relying-party evaluation of delegated device authority (derive_prefix, DeviceActV1)"
+description = "NORMATIVE CONTRACT for N4-A (first tranche of icn#2599; rung 5 of the #2694 convergence ladder): how a relying party decides whether one device-signed act is covered by a human Subject's delegation at one relying-party-chosen log position. Specifies derive_prefix - the existing N1 fold applied to the retained prefix through position E, which is what makes 'authorized at E' answerable after a later revoke - the canonical DeviceActV1 bytes under the icn.n4.device-act domain, the fail-closed verifier whose signature check and authority check are two separate steps, the refusal classes, the rule that the evaluation position is supplied by the relying party and merely echoed by the signer, and the mapping onto the act classes of HUMAN_IDENTITY_ARCHITECTURE.md section 9.3. States the external-consumer boundary: a stateless verifier over retained canonical N1 facts plus the act, and what a downstream deployment may rely on versus must not reimplement. Library, spec and tests only: no gateway route, no transport container, no persistence, no replication, no recovery, no session coupling, no attenuation beyond what N1 records, no household or personal context kind, no production wiring, and no claim about Katie's or any real person's identity. Fixture identities only."
+last_updated = "2026-10-03"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-03"
+depends_on = [
+  "icn/crates/icn-identity/src/device_authority.rs",
+  "icn/crates/icn-identity/src/authority_log/derive.rs",
+  "icn/crates/icn-identity/tests/device_authority.rs",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
+]
+
 [docs."docs/architecture/GOVERNANCE_STATE_MACHINE.md"]
 category = "architecture"
 status = "living"

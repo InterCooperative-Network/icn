@@ -227,7 +227,8 @@ pub use construct::{
     authorize_event, revoke_event, sign_body, ConstructError, ContinuityRoot, EstablishmentKind,
 };
 pub use derive::{
-    derive, resolve, supersede, AuthorityState, AuthorityView, DeviceGrant, Resolution,
+    derive, derive_prefix, resolve, supersede, AuthorityState, AuthorityView, DeviceGrant,
+    Resolution,
 };
 pub use encoding::CodecError;
 // The persistence boundary (ADR-0087): the trait a medium implements, the opaque
