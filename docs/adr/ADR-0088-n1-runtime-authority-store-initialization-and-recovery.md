@@ -292,17 +292,23 @@ whatever the umask that created those files.
   prevents new access; it does not withdraw access already taken. This
   includes **facts written later**: sled keeps appending to the same `db`
   file, so a descriptor another account opened on it while the directory was
-  wider keeps reading what is written after the tightening, for as long as
-  that file is in use. No mode change can revoke an open descriptor. Only
-  rebuilding the store into new files would, and this decision does not
-  rebuild a store to fix its permissions. A store that was ever readable by
+  wider keeps reading what is written after the tightening. That outlives
+  the daemon: sled reuses the same `db` file across restarts, so the
+  descriptor reads facts written by later runs too. The same holds for a
+  handle another account kept on a subdirectory sled creates (`blobs/`),
+  through which it can open files created there later, because the `0700`
+  is checked on `store/authority` alone. No mode change can revoke an open
+  descriptor. Only rebuilding the store into new files and directories
+  would, and this decision does not rebuild a store to fix its permissions. A store that was ever readable by
   another account should be treated as exposed to it. Today no runtime
   producer writes facts, so nothing is written after the tightening.
 - **The N2-A gate's audit of an existing store.** It runs before this step
   (§7), so for an existing store with a wider mode, sled opens the store, and
-  may write files in it, while it is still wide. Those files re-encode what
-  the store already held, and any account that could traverse the directory
-  could already read it, so this adds no new class of exposure. It does mean
+  may write files in it, while it is still wide. The audit only reads rows, so
+  those files are sled's own bookkeeping for contents the store already held,
+  not new facts. They take the umask, so they can be readable even when the
+  older files were not. This adds no new class of exposure beyond the
+  previous bullet. It does mean
   that on an existing store the protection is not in place before every sled
   open. Moving the check ahead of the gate would shorten that window by the
   gate's duration and close no other gap. The previous bullet is the
