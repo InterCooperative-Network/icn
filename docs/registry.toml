@@ -4775,12 +4775,14 @@ owner = "matt"
 audiences = ["architects", "developers"]
 
 [docs."docs/adr/ADR-0088-n1-runtime-authority-store-initialization-and-recovery.md"]
-# PROPOSED 2026-10-24 with #2843; not the project's decision until the maintainer accepts it.
+# ACCEPTED 2026-10-24 by the maintainer, with one change to the proposal: store/authority
+# is owner-only (0700) whatever the umask (§11). Decision status and implementation
+# status stay separate axes (ADR-0018 § 3): the implementation is in #2843, not merged.
 category = "architecture"
 status = "living"
-truth_class = "draft"
+truth_class = "normative"
 title = "ADR-0088: N1 Runtime Authority-Store Initialization and Recovery"
-description = "PROPOSED. The runtime boundary on top of ADR-0087: where icnd keeps the N1 authority store, the versioned initialization record and the store's instance row that let a start tell a fresh node from a lost or replaced store, the order and barriers of initialization, the fail-closed states, what cannot be detected (whole data-directory loss, rollback), manual recovery, and the startup receipt as an owner-only local diagnostic rather than an authority certificate."
+description = "ACCEPTED 2026-10-24. The runtime boundary on top of ADR-0087: where icnd keeps the N1 authority store, the versioned initialization record and the store's instance row that let a start tell a fresh node from a lost or replaced store, the order and barriers of initialization, the fail-closed states, what cannot be detected (whole data-directory loss, rollback), manual recovery, the startup receipt as an owner-only local diagnostic rather than an authority certificate, and store/authority as the one store directory kept owner-only (0700) whatever the umask. Implemented in #2843 (not merged)."
 last_updated = "2026-10-24"
 owner = "matt"
 audiences = ["architects", "developers", "operators"]

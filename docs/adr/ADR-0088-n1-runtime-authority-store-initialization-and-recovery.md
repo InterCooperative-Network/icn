@@ -1,17 +1,19 @@
 ---
 id: "0088"
 title: "N1 runtime authority-store initialization and recovery boundary"
-status: "proposed"
+status: "accepted"
 date: "2026-10-24"
+accepted_date: "2026-10-24"
 deciders: ["Matt Faherty"]
 tags: ["identity", "n1", "authority-log", "persistence", "startup", "recovery", "icnd"]
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "implemented in draft PR #2843 (not merged)"
+implementation_status: "implemented in #2843 (not merged)"
 references:
   - "ADR-0087 (the library persistence contract this ADR builds on and does not change)"
   - "ADR-0018 (ADR lifecycle)"
+  - "ADR-0086 (deployment profiles; the units' UMask=0077)"
   - "icn#2843 (N1-R1, the implementing PR)"
   - "icn/crates/icn-core/src/authority_registry.rs"
   - "icn/bins/icnd/src/main.rs (startup ordering)"
@@ -23,11 +25,24 @@ references:
 
 ## Status
 
-**`proposed`.** Drafted with #2843. Not yet the project's decision. The
-implementation exists in that draft PR. Acceptance needs the maintainer's
-decision; the authorization to draft it is not one.
+**`accepted` (2026-10-24).** Drafted with #2843. The maintainer (Matt
+Faherty, the decider) accepted it on 2026-10-24:
 
-Decision status and implementation status are separate axes (ADR-0018).
+- the substantive architecture as proposed: the initialization state machine
+  (§5, §6), the compatibility commitments for the record and the instance row
+  (§3, §4, §8), fail-closed recovery (§6, §7, §12) and the receipt as a
+  diagnostic only (§10);
+- one change to the proposal: `store/authority/` is owner-only (`0700`)
+  whatever the process umask, as a deliberate defense-in-depth exception to
+  the data directory's storage convention (§11). The proposal had left this
+  to the maintainer.
+
+The decision was given as a written instruction in #2843's delivery session.
+ADR-0018 requires no separate signature. The reviews of the implementation
+were by independent review agents; no other human review is claimed.
+
+Decision status and implementation status are separate axes (ADR-0018). The
+implementation is in #2843, not yet merged.
 
 ## Context
 
@@ -51,7 +66,7 @@ ADR-0087's semantics.
 
 | Path, under the data directory | What |
 |---|---|
-| `store/authority/` | the sled database holding ADR-0087's records (`authority/fact/…`) and the instance row |
+| `store/authority/` | the sled database holding ADR-0087's records (`authority/fact/…`) and the instance row; the directory is owner-only (§11) |
 | `n1-authority-initialized.json` | the initialization record |
 | `n1-authority-receipt.json` | the startup receipt (§10), diagnostic only |
 
@@ -135,6 +150,10 @@ first start, and its close path panics on a failed `fsync`.
 | absent | present, with facts | **refuse**: `RecordMissing` |
 | unreadable | any | **refuse**: `RecordUnreadable`; the store is not opened |
 | store cannot be inspected | | **refuse**: only `NotFound` counts as absence |
+| any | a link, not a directory, or another account's directory | **refuse**: `StoreUnprotected`; nothing in it is opened (§11) |
+
+Before any row above that opens the store, its directory is checked and, if
+needed, set owner-only (§11). That never changes which row applies.
 
 A start that fails after the record is committed is not a fresh node next time:
 the record exists, so the next start rehydrates or refuses.
@@ -207,36 +226,73 @@ What it is not:
 It names subjects, public authority keys and device grants. Those are not
 cryptographic secrets, but they are metadata a node has no reason to share, so
 the file is created owner-only (0600) and stays local. The record is created
-the same way.
-
-That protects these two files only. The store's own files, which hold the same
-facts, are created by sled with no explicit mode, as every other store in the
-data directory is, so they follow the process umask. The shipped unit sets
-`UMask=0077`, which makes all of them owner-only. A daemon started by hand with
-a lax umask (022) leaves the data directory and the stores readable by other
-local accounts. Hardening the data directory itself is outside this ADR.
-
-So the confidentiality of the authority facts against other local accounts is a
-**deployment-boundary dependency**, not something this code enforces:
-
-- **Assumption:** the daemon, and any `icnd --init` or `icnctl` run against its
-  data directory, run as the data directory's account with umask `0077`.
-- **Enforcement point:** the shipped units pin `UMask=0077` (ADR-0086), and an
-  `icnctl` test fails if either unit stops pinning it.
-- **Operational check:** `find <data-dir> -perm /077 -not -type l` prints
-  nothing below the data directory.
-- **Not covered:** hand-started processes with a lax umask, and the generic
-  OCI image and development network, which ADR-0086 does not treat as custody
-  profiles.
-
-Creating `store/authority/` with mode 0700 regardless of umask would close
-the gap for this store alone. It is left to the maintainer, because no other
-store does so and it would split the data directory's permission convention.
+the same way. Who can read the store holding the same facts is §11.
 
 Its JSON fields may change in a later version. A change bumps `version`. Only
 the format name, the version field and the digest domain are fixed by this ADR.
 
-### 11. Manual recovery
+### 11. Who can read the authority store
+
+**Decision.** `store/authority/` is owner-only (`0700`) whatever the process
+umask. This is a deliberate exception: every other store in the data
+directory, and the data directory itself, follow the umask.
+
+sled creates its files with no explicit mode, so they follow the umask: under
+umask `022` they are readable by every local account, under `000` writable
+too. A directory no other account can search keeps them unreachable whatever
+their own modes. So the guarantee is placed on the directory, at the one
+boundary this ADR owns, and not on sled's files.
+
+Before sled opens or creates anything in it, under the data-directory lock:
+
+1. **Absent:** created with mode `0700`, not through `create_dir_all`. Its
+   parent `store/` is created if missing, with the default mode, as any store
+   would create it.
+2. **Present:** inspected without following a link. It must be a directory,
+   not a link and not any other file, owned by the account the process
+   creates files as. Anything else is refused with `StoreUnprotected`, and
+   nothing in it is opened. A link to a valid store is refused too, and its
+   target is not changed.
+3. **This account's directory with another mode**, as a restore or a manual
+   copy can leave it: set to exactly `0700` through a descriptor of the inode
+   just checked, synced, and logged as a warning. Nothing inside is touched:
+   no fact, instance row or record is removed or regenerated, and the start
+   continues by §6.
+
+The N2-A gate runs before this (§7). It never creates a store, and it already
+refuses a link anywhere in its discovery walk, so the first process to create
+`store/authority` is this step.
+
+**What it guarantees.** Once a start has passed this step, no local account
+except the owner and root can list the store or open any file in it by path,
+whatever the umask that created those files.
+
+**What it does not cover:**
+
+- **Every other store and the data directory itself.** Their confidentiality
+  remains the deployment-boundary dependency of ADR-0086: the shipped units
+  set `UMask=0077`, and an `icnctl` test fails if either stops doing so. The
+  data root is not hardened by this ADR.
+- **The directories above `store/authority`.** They are assumed writable only
+  by the owning account. A daemon started by hand under umask `000` creates
+  `store/` writable by everyone. Another account could then move
+  `store/authority` aside and put its own directory there. A substitute
+  present when the check runs is refused, being another account's. One
+  swapped in between the check and sled's open is not detected. The next
+  start refuses it.
+- **Exposure before the mode was set.** A file another account opened, copied
+  or linked while the directory was wider stays readable to it. Tightening
+  prevents new access; it does not withdraw access already taken.
+- **Copies outside the data directory,** backup archives included. They are
+  protected by wherever they are kept.
+- **Root and the owning account.**
+- **Non-Unix platforms,** where no mode claim is made.
+
+The tests check the directory's mode bits and the refusals. They do not show
+another account actually failing to traverse the directory, because the
+development environment has no second account to run as.
+
+### 12. Manual recovery
 
 Every refusal in §6 needs an operator. Recovery is never automatic. The
 operator procedure is `docs/guides/operations/backup-and-recovery.md`,
@@ -258,6 +314,9 @@ operator procedure is `docs/guides/operations/backup-and-recovery.md`,
 - One more refusal class for operators, with a documented procedure.
 - Three new files in every data directory.
 - The record format and the instance row become compatibility surfaces.
+- `store/authority/` is the one store whose directory mode does not follow
+  the umask. A tool that recreates the data directory's layout must keep it
+  owner-only, or the next start sets it back and logs a warning.
 
 ## Alternatives considered
 
@@ -270,3 +329,7 @@ operator procedure is `docs/guides/operations/backup-and-recovery.md`,
 | Put a timestamp or nonce in the receipt | Breaks byte-identical comparison across restarts, and still would not prove liveness. |
 | Sign the receipt | Would make it look like an authority certificate. It is a diagnostic. |
 | Start empty after a refusal, behind a flag | A flag that silently drops authority facts is the failure this ADR exists to prevent. |
+| Rely only on the units' `UMask=0077` for the authority store | Leaves the facts readable by other local accounts whenever `icnd` is started by hand under a lax umask. |
+| Make the whole data directory owner-only | A wider change to every store's convention and to tooling that reads the data directory. This decision is bounded to the store this ADR owns. |
+| Refuse a store directory with a wider mode instead of setting it | Turns a restored backup into an outage for something the process can safely fix. Setting the mode keeps every fact, and the warning tells the operator. |
+| Chmod sled's files as well as the directory | sled creates files later (snapshots, blobs) with no mode of its own. The directory covers files created later too. |

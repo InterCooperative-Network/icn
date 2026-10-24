@@ -52,6 +52,15 @@
 //! same once its own checks pass. So a start refused at the gate or here leaves none. A start
 //! refused before the lock (another holder, an incomplete restore) cannot touch the directory,
 //! and an earlier receipt may remain: a record of that start, not of this one.
+//!
+//! # Who can read the store
+//!
+//! sled creates the store's files with no explicit mode, so they follow the process umask. The
+//! store directory does not: it is created `0700` whatever the umask, and an existing one is
+//! checked before sled opens it. A directory of this account with a wider mode, as a restore can
+//! leave it, is set to `0700` with its contents untouched; a link, a non-directory or another
+//! account's directory is refused. Nothing above `store/authority` is changed: the data directory
+//! and every other store still follow the umask (ADR-0088 §11).
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -165,6 +174,19 @@ pub enum RegistryError {
         record: PathBuf,
         /// How many fact rows the store holds.
         facts: usize,
+    },
+
+    /// The store directory cannot be kept owner-only: it is a link or not a directory, belongs to
+    /// another account, or its mode could not be set. Nothing in it was opened.
+    #[error(
+        "refusing to start: the N1 authority store at {store} cannot be kept owner-only: \
+         {reason}. It must be a directory, not a link, owned by the account icnd runs as"
+    )]
+    StoreUnprotected {
+        /// The store directory.
+        store: PathBuf,
+        /// Why.
+        reason: String,
     },
 
     /// The backing database failed to open, read or write.
@@ -287,7 +309,7 @@ impl AuthorityRegistry {
                 });
             }
             (Some(record), true) => {
-                let store = open_store(&store_dir)?;
+                let store = open_store(data_dir, &store_dir, true)?;
                 match read_instance(&store, &store_dir)? {
                     Some(found) if found == record => {}
                     found => {
@@ -302,7 +324,7 @@ impl AuthorityRegistry {
                 (store, record, Startup::Rehydrated)
             }
             (None, true) => {
-                let store = open_store(&store_dir)?;
+                let store = open_store(data_dir, &store_dir, true)?;
                 let facts = store
                     .scan(AUTHORITY_FACT_PREFIX)
                     .map_err(|e| store_error(&store_dir, e))?
@@ -324,7 +346,7 @@ impl AuthorityRegistry {
                 (store, instance, Startup::CompletedInterruptedInitialization)
             }
             (None, false) => {
-                let store = open_store(&store_dir)?;
+                let store = open_store(data_dir, &store_dir, false)?;
                 let instance = initialize(&OnDisk {
                     store: &store,
                     store_dir: &store_dir,
@@ -676,7 +698,14 @@ fn write_record(
 
 // ── the store ───────────────────────────────────────────────────────────────────────────────────
 
-fn open_store(store_dir: &Path) -> Result<Arc<dyn DurableStore>, RegistryError> {
+/// Every open of the store goes through [`protect_store_dir`] first, so sled never creates or
+/// reads a file in a directory other local accounts can traverse.
+fn open_store(
+    data_dir: &Path,
+    store_dir: &Path,
+    exists: bool,
+) -> Result<Arc<dyn DurableStore>, RegistryError> {
+    protect_store_dir(data_dir, store_dir, exists)?;
     let store = SledStore::open(store_dir).map_err(|e| store_error(store_dir, e))?;
     Ok(Arc::new(store))
 }
@@ -804,6 +833,131 @@ fn fsync_store_files(store_dir: &Path) -> anyhow::Result<()> {
     if let Some(parent) = store_dir.parent() {
         crate::restore_marker::sync_directory(parent)?;
     }
+    Ok(())
+}
+
+// ── the store directory's mode ──────────────────────────────────────────────────────────────────
+
+/// The mode of `store/authority`, whatever the process umask (ADR-0088 §11). sled creates its
+/// files with no explicit mode, so they follow the umask; a directory no other account can
+/// traverse keeps them unreachable anyway. Every other store in the data directory still follows
+/// the umask.
+const STORE_DIR_MODE: u32 = 0o700;
+
+/// What an existing store directory needs before sled may open it.
+#[derive(Debug, PartialEq, Eq)]
+enum StoreDirVerdict {
+    /// A directory of this account, already owner-only.
+    Protected,
+    /// A directory of this account with some other mode: set it to [`STORE_DIR_MODE`], keeping
+    /// everything in it.
+    Tighten {
+        /// The mode it had.
+        from: u32,
+    },
+}
+
+/// The policy, as a pure function: an unprivileged test cannot create a directory owned by
+/// another account, but it can drive this with one.
+///
+/// `account` is the owner this process gives a new file. A directory owned by anyone else is
+/// refused, not taken over: changing its mode would not stop its owner from changing it back.
+fn judge_store_dir(
+    file_type: std::fs::FileType,
+    owner: u32,
+    mode: u32,
+    account: u32,
+) -> Result<StoreDirVerdict, String> {
+    if file_type.is_symlink() {
+        return Err("it is a link, not a directory; links are not followed here".into());
+    }
+    if !file_type.is_dir() {
+        return Err("it is not a directory".into());
+    }
+    if owner != account {
+        return Err(format!(
+            "it is owned by uid {owner}, not by uid {account}, the account this process runs as"
+        ));
+    }
+    if mode == STORE_DIR_MODE {
+        Ok(StoreDirVerdict::Protected)
+    } else {
+        Ok(StoreDirVerdict::Tighten { from: mode })
+    }
+}
+
+/// Create `store_dir` owner-only, or check an existing one and set it owner-only. Runs under the
+/// data-directory lock, before sled touches the directory.
+///
+/// Its contents are never touched: a restored store with a wider mode keeps every fact, its
+/// instance row and the record that names it.
+#[cfg(unix)]
+fn protect_store_dir(data_dir: &Path, store_dir: &Path, exists: bool) -> Result<(), RegistryError> {
+    use std::os::unix::fs::{DirBuilderExt as _, MetadataExt as _, PermissionsExt as _};
+
+    let unprotected = |reason: String| RegistryError::StoreUnprotected {
+        store: store_dir.to_path_buf(),
+        reason,
+    };
+    if !exists {
+        if let Some(parent) = store_dir.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| unprotected(format!("cannot create {}: {e}", parent.display())))?;
+        }
+        // Not `create_dir_all`: the directory was just observed absent under the lock, so finding
+        // it now means something else made it.
+        std::fs::DirBuilder::new()
+            .mode(STORE_DIR_MODE)
+            .create(store_dir)
+            .map_err(|e| unprotected(format!("cannot create it: {e}")))?;
+    }
+
+    let before = std::fs::symlink_metadata(store_dir)
+        .map_err(|e| unprotected(format!("cannot inspect it: {e}")))?;
+    let account = if exists {
+        crate::identity_new_files_receive(data_dir)
+            .map_err(|e| unprotected(format!("{e:#}")))?
+            .uid
+    } else {
+        // Just created by this process, so its owner is the account new files receive.
+        before.uid()
+    };
+    let verdict = judge_store_dir(
+        before.file_type(),
+        before.uid(),
+        before.mode() & 0o7777,
+        account,
+    )
+    .map_err(unprotected)?;
+
+    // Act through a descriptor, and only on the inode just judged: a directory swapped in between
+    // is refused rather than chmodded.
+    let dir =
+        std::fs::File::open(store_dir).map_err(|e| unprotected(format!("cannot open it: {e}")))?;
+    let opened = dir
+        .metadata()
+        .map_err(|e| unprotected(format!("cannot inspect it: {e}")))?;
+    if (opened.dev(), opened.ino()) != (before.dev(), before.ino()) {
+        return Err(unprotected("it was replaced while being checked".into()));
+    }
+    if let StoreDirVerdict::Tighten { from } = verdict {
+        dir.set_permissions(std::fs::Permissions::from_mode(STORE_DIR_MODE))
+            .and_then(|()| dir.sync_all())
+            .map_err(|e| unprotected(format!("cannot set mode {STORE_DIR_MODE:o}: {e}")))?;
+        if exists {
+            tracing::warn!(
+                store = %store_dir.display(),
+                from = format_args!("{from:o}"),
+                "N1 authority store: directory mode set to 700"
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Non-Unix makes no mode claim.
+#[cfg(not(unix))]
+fn protect_store_dir(_: &Path, _: &Path, _: bool) -> Result<(), RegistryError> {
     Ok(())
 }
 
@@ -1320,5 +1474,55 @@ mod tests {
             read_record(&init_record_path(dir.path())).unwrap(),
             Some(instance)
         );
+    }
+
+    // ── the store directory's mode ──────────────────────────────────────────────────────────────
+
+    /// The file types `judge_store_dir` is given, read from real inodes: a directory, a link to
+    /// one, and a regular file.
+    #[cfg(unix)]
+    fn kinds(dir: &Path) -> [std::fs::FileType; 3] {
+        let target = dir.join("target");
+        std::fs::create_dir(&target).unwrap();
+        std::os::unix::fs::symlink(&target, dir.join("link")).unwrap();
+        std::fs::write(dir.join("file"), b"").unwrap();
+        ["target", "link", "file"].map(|name| {
+            std::fs::symlink_metadata(dir.join(name))
+                .unwrap()
+                .file_type()
+        })
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_this_accounts_own_directory_is_opened_and_a_wider_mode_is_tightened() {
+        let dir = tempfile::tempdir().unwrap();
+        let [directory, link, file] = kinds(dir.path());
+        let me = 1000;
+
+        assert_eq!(
+            judge_store_dir(directory, me, 0o700, me),
+            Ok(StoreDirVerdict::Protected)
+        );
+        for wider in [0o755, 0o777, 0o750, 0o711, 0o2700, 0o500] {
+            assert_eq!(
+                judge_store_dir(directory, me, wider, me),
+                Ok(StoreDirVerdict::Tighten { from: wider }),
+                "{wider:o}"
+            );
+        }
+
+        let foreign = judge_store_dir(directory, 0, 0o700, me).unwrap_err();
+        assert!(foreign.contains("owned by uid 0"), "{foreign}");
+        let foreign_and_wide = judge_store_dir(directory, me + 1, 0o777, me).unwrap_err();
+        assert!(
+            foreign_and_wide.contains("owned by uid"),
+            "{foreign_and_wide}"
+        );
+
+        let linked = judge_store_dir(link, me, 0o777, me).unwrap_err();
+        assert!(linked.contains("link"), "{linked}");
+        let regular = judge_store_dir(file, me, 0o700, me).unwrap_err();
+        assert!(regular.contains("not a directory"), "{regular}");
     }
 }

@@ -389,7 +389,7 @@ Store recovery instructions separately from backups:
 
 **Situation**: `icnd` exits at startup with a message beginning `refusing to start` that names the N1 authority store (`store/authority`) or its initialization record (`n1-authority-initialized.json`).
 
-`icnd` keeps N1 authority facts in `store/authority/`, and a small record beside the stores says the node created that store. Both carry the same instance ID. The daemon refuses rather than start without its authority state, because a node that silently started empty would lose every authority fact it held. The decision behind this is ADR-0088 (proposed).
+`icnd` keeps N1 authority facts in `store/authority/`, and a small record beside the stores says the node created that store. Both carry the same instance ID. The daemon refuses rather than start without its authority state, because a node that silently started empty would lose every authority fact it held. The decision behind this is ADR-0088 (accepted 2026-10-24).
 
 **Before you change anything**, stop the daemon and copy the whole data directory somewhere safe, as the data directory's account. Keep the record and the store together. Every recovery below starts from that copy:
 
@@ -409,6 +409,7 @@ Find the message in the daemon's log, then match it here:
 | `holds N fact(s) but its initialization record … is missing` | **Missing record** next to a store that holds facts. | Restore the data directory from a backup. Do not write a record by hand: its instance must be the one the store was created with. |
 | `initialization record … is unreadable (cannot read: Permission denied)` or `(cannot inspect: …)` | The daemon's account **cannot read the record**. Nothing is wrong with its contents. | Fix ownership or permissions (`icn`, mode 0600), then start again. Do not restore: an older backup would roll the history back. |
 | `initialization record … is unreadable` (any other reason) | **Unreadable record**: damaged, truncated, a newer format version, or not a regular file. | Look at it. A newer `version` means this binary is older than the one that wrote it: run the newer binary. Otherwise restore from a backup. Do not hand-edit it to match the store; that would hide a replaced store. |
+| `the N1 authority store at … cannot be kept owner-only` | **`store/authority` is not this account's directory.** It is a link, not a directory, or owned by another account, for example after `icnd` ran once as root. Nothing in it was opened. | Do not `chmod` or `chown` a link's target blindly. If it is a link, find the real store, confirm it is this node's own (not one copied from another node), and move it back into place as a directory. If another account owns it, confirm the same, then `chown -R icn:icn` it. Start again; the daemon sets the mode itself. |
 | `the N1 authority store at … failed: …` | **The store could not be opened, read or synced**: a damaged database, a full disk, an I/O error, or permissions. | Read the reason. For permissions or a full disk, fix that and start again. For a damaged database or I/O errors, check the disk, keep the copy, and restore the data directory from a backup. |
 | `a restore of … did not finish` | **Incomplete restore.** | Follow [If a restore does not finish](#if-a-restore-does-not-finish). The authority store is not opened until that is resolved. |
 | `could not write the N1 authority …` | The record or receipt could not be written: permissions, a full disk, or an I/O error. | Fix ownership or permissions (the daemon runs as `icn` with `UMask=0077`) or free space, then start again. For I/O errors, check the disk first. |
@@ -421,13 +422,17 @@ Removing the record, or the record and the store, does not repair anything. The 
 
 Record which one, and keep the copy you made.
 
-**Who can read the authority facts.** The record and the receipt are created owner-only (0600) whatever the umask. The store's own files are not: like every other store in the data directory, they take the daemon's umask. The shipped units (`icnd.service`, `icn-appliance-firstboot.service`) pin `UMask=0077`, so under them every file is owner-only. If you start `icnd`, `icnd --init` or `icnctl` by hand, use the `icn` account with `umask 077`. Otherwise the stores, including `store/authority`, can be readable by other local accounts. Check with:
+**Who can read the authority facts.** The record and the receipt are created owner-only (0600) whatever the umask. The `store/authority` directory is owner-only (0700) whatever the umask: the daemon creates it that way, and every start checks it before opening the store (ADR-0088 §11). The files inside take the daemon's umask, but no other account can reach them through that directory.
+
+If a start finds the directory wider than that, as a restore or a manual copy can leave it, it sets it back to 0700, keeps everything in it, and logs `N1 authority store: directory mode set to 700` with the old mode. No action is needed for the store. While the directory was wider, its files could be read by other local accounts; decide whether that matters on this host.
+
+That protects `store/authority` only. Every other store, and the data directory itself, still take the daemon's umask. The shipped units (`icnd.service`, `icn-appliance-firstboot.service`) pin `UMask=0077`, so under them every file is owner-only. If you start `icnd`, `icnd --init` or `icnctl` by hand, use the `icn` account with `umask 077`. Otherwise the other stores can be readable by other local accounts. Check with:
 
 ```bash
 find '<data-dir>' -perm /077 -not -type l
 ```
 
-It should print only the data directory itself, if anything.
+Under the shipped units it should print only the data directory itself, if anything. After a start by hand under a looser umask it also lists files inside `store/authority`; those are still unreachable through its 0700 directory.
 
 **What the daemon cannot catch for you.** If the whole data directory is lost or replaced, record included, the next start looks like a fresh node and initializes. If the directory is restored from an old backup, the older history is accepted. Keep backups, and know which one you restored.
 

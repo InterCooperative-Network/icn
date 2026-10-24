@@ -425,6 +425,15 @@ fn a_fresh_node_initializes_records_it_and_reopens_as_the_same_instance() {
     assert_eq!(first.startup, Startup::Initialized);
     assert_eq!(first.body_count, 0);
     assert!(node.store().is_dir());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let mode = std::fs::symlink_metadata(node.store())
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o7777, 0o700, "the daemon's store is owner-only");
+    }
     let record: serde_json::Value =
         serde_json::from_slice(&std::fs::read(init_record_path(node.dir())).unwrap()).unwrap();
     assert_eq!(record["instance"], first.instance.as_str());

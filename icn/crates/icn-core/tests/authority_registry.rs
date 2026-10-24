@@ -463,7 +463,7 @@ fn mode(path: &Path) -> u32 {
         & 0o777
 }
 
-/// Set by [`the_record_and_the_receipt_are_owner_only_whatever_the_umask`] for its child.
+/// Set by [`fresh_registry_under_umask`] for its child.
 const UMASK_CHILD_DIR: &str = "ICN_N1R1_UMASK_CHILD_DIR";
 
 /// Not a test on its own: the child half of the next test, and a no-op without its variable.
@@ -478,24 +478,34 @@ fn umask_child_creates_a_probe_then_opens_a_fresh_registry() {
     drop(open(&dir).unwrap());
 }
 
-/// The receipt names subjects, authority keys and device grants: not secrets, but metadata a node
-/// has no reason to show other local accounts. Both files are created owner-only, so a lax umask
-/// cannot widen them (it only ever removes bits).
-///
-/// The mask is set explicitly, to a permissive 022, in a child process, so the result cannot
-/// depend on whatever mask this test inherited. The child's probe shows the mask really applied.
+/// Open a fresh registry in a child process whose umask is `mask`, after a control file the
+/// mask decides. The mask is set in the child, so the result cannot depend on whatever mask this
+/// test inherited, and this process's own mask is never touched.
 #[cfg(unix)]
-#[test]
-fn the_record_and_the_receipt_are_owner_only_whatever_the_umask() {
+fn fresh_registry_under_umask(mask: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let status = std::process::Command::new("/bin/sh")
         .arg("-c")
-        .arg(r#"umask 022 && exec "$0" --exact umask_child_creates_a_probe_then_opens_a_fresh_registry --test-threads=1 -q"#)
+        .arg(format!(
+            r#"umask {mask} && exec "$0" --exact umask_child_creates_a_probe_then_opens_a_fresh_registry --test-threads=1 -q"#
+        ))
         .arg(std::env::current_exe().unwrap())
         .env(UMASK_CHILD_DIR, dir.path())
         .status()
         .unwrap();
     assert!(status.success(), "the child must open the registry");
+    dir
+}
+
+/// The receipt names subjects, authority keys and device grants: not secrets, but metadata a node
+/// has no reason to show other local accounts. Both files are created owner-only, and so is the
+/// store directory, so a lax umask cannot widen them (it only ever removes bits).
+///
+/// The child's probe shows the permissive 022 really applied.
+#[cfg(unix)]
+#[test]
+fn the_record_and_the_receipt_are_owner_only_whatever_the_umask() {
+    let dir = fresh_registry_under_umask("022");
     assert_eq!(
         mode(&dir.path().join("probe")),
         0o644,
@@ -503,6 +513,93 @@ fn the_record_and_the_receipt_are_owner_only_whatever_the_umask() {
     );
     assert_eq!(mode(&init_record_path(dir.path())), 0o600);
     assert_eq!(mode(&receipt_path(dir.path())), 0o600);
+    assert_eq!(mode(&authority_fact_store_path(dir.path())), 0o700);
+}
+
+/// Under a mask that removes nothing, every file sled creates in the store is world-readable. The
+/// directory holding them is still owner-only, so no other account can reach them.
+#[cfg(unix)]
+#[test]
+fn the_store_directory_is_owner_only_even_under_umask_000() {
+    let dir = fresh_registry_under_umask("000");
+    assert_eq!(
+        mode(&dir.path().join("probe")),
+        0o666,
+        "control: the child ran, under umask 000"
+    );
+    assert_eq!(mode(&authority_fact_store_path(dir.path())), 0o700);
+    assert_eq!(mode(&init_record_path(dir.path())), 0o600);
+    assert_eq!(mode(&receipt_path(dir.path())), 0o600);
+}
+
+/// A store directory left wider than owner-only, as a restore from a backup can leave it, is set
+/// to `0700` and opened. Nothing in it is lost or regenerated: same instance, same facts, the same
+/// receipt byte for byte.
+#[cfg(unix)]
+#[test]
+fn a_wider_store_directory_is_made_owner_only_and_keeps_every_fact() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = tempfile::tempdir().unwrap();
+    let seeded = seeded(dir.path());
+    let store = authority_fact_store_path(dir.path());
+    assert_eq!(mode(&store), 0o700, "a restart keeps it owner-only");
+    let record = std::fs::read(init_record_path(dir.path())).unwrap();
+
+    for wider in [0o755, 0o777, 0o2750] {
+        std::fs::set_permissions(&store, std::fs::Permissions::from_mode(wider)).unwrap();
+        let (_, reopened) = open(dir.path()).unwrap();
+        assert_eq!(
+            reopened, seeded,
+            "mode {wider:o}: the same state, rehydrated"
+        );
+        assert_eq!(reopened.startup, Startup::Rehydrated);
+        assert_eq!(
+            std::fs::symlink_metadata(&store)
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o7777,
+            0o700,
+            "mode {wider:o} is set to 700, setgid included"
+        );
+        assert_eq!(std::fs::read(init_record_path(dir.path())).unwrap(), record);
+    }
+}
+
+/// A link at the store's name is refused, not followed, even to a valid store this node's record
+/// names. Its target is neither opened nor re-moded.
+#[cfg(unix)]
+#[test]
+fn a_store_directory_replaced_by_a_link_is_refused_and_its_target_untouched() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = tempfile::tempdir().unwrap();
+    seeded(dir.path());
+    let store = authority_fact_store_path(dir.path());
+    let elsewhere = tempfile::tempdir().unwrap();
+    let target = elsewhere.path().join("authority");
+    std::fs::rename(&store, &target).unwrap();
+    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::os::unix::fs::symlink(&target, &store).unwrap();
+    let listing = |p: &Path| {
+        let mut names: Vec<_> = std::fs::read_dir(p)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        names.sort();
+        names
+    };
+    let before = listing(&target);
+
+    let error = open(dir.path()).unwrap_err();
+    assert!(
+        matches!(&error, RegistryError::StoreUnprotected { reason, .. } if reason.contains("is a link")),
+        "{error}"
+    );
+    assert_eq!(mode(&target), 0o755, "the target is not re-moded");
+    assert_eq!(listing(&target), before, "nothing is created in the target");
+    assert!(!receipt_path(dir.path()).exists());
 }
 
 /// Whoever can place a link at the temporary's name must not be able to direct the write to a
