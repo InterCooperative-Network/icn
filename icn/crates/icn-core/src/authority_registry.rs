@@ -43,10 +43,11 @@
 //! Each successful [`AuthorityRegistry::open`] writes [`RECEIPT_FILE_NAME`]: counts, and per
 //! subject a summary of what [`derive`] returns over the rehydrated state, with a digest of those
 //! decisions. It is deterministic (no clock, no process data), holds no secret, and is read by
-//! tests and operators; nothing in the runtime reads it back. [`AuthorityRegistry::open`] removes
-//! a stale receipt before it opens anything, so a start it refuses leaves none. A start refused
-//! earlier — before the daemon holds the data-directory lock, or by the N2-A gate — never reaches
-//! it, and the previous start's receipt remains: a record of that start, not of this one.
+//! tests and operators; nothing in the runtime reads it back. Once its lock and restore-marker
+//! checks pass, [`AuthorityRegistry::open`] removes a stale receipt before it opens anything, so a
+//! refusal after that point leaves none. A start refused earlier — by those checks, before the
+//! daemon holds the data-directory lock, or by the N2-A gate — writes nothing, and the previous
+//! start's receipt remains: a record of that start, not of this one.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -313,16 +314,17 @@ impl AuthorityRegistry {
                         facts,
                     });
                 }
-                let (store, instance) = match read_instance(&store, &store_dir)? {
-                    Some(instance) => (store, instance),
-                    None => write_new_instance(store, &store_dir)?,
+                let instance = match read_instance(&store, &store_dir)? {
+                    Some(instance) => instance,
+                    None => write_new_instance(&store, &store_dir)?,
                 };
                 lock_still_held(data_dir, lock)?;
                 write_record(data_dir, &record_path, instance)?;
                 (store, instance, Startup::CompletedInterruptedInitialization)
             }
             (None, false) => {
-                let (store, instance) = write_new_instance(open_store(&store_dir)?, &store_dir)?;
+                let store = open_store(&store_dir)?;
+                let instance = write_new_instance(&store, &store_dir)?;
                 lock_still_held(data_dir, lock)?;
                 write_record(data_dir, &record_path, instance)?;
                 (store, instance, Startup::Initialized)
@@ -683,27 +685,47 @@ fn read_instance(
 /// The barrier alone survives a crash of this process but not power loss: sled's flush waits with
 /// `sync_file_range` (ADR-0087 §9), while the record gets a full `fsync`. Power lost between the
 /// two would leave a record naming an instance the store never kept, and the next start would
-/// refuse a node that has nothing to restore. Sled issues a full `fsync` when the database
-/// closes, so the store is closed and reopened here, once per node lifetime, and the row is read
-/// back from the reopened store before the record is written.
+/// refuse a node that has nothing to restore.
+///
+/// So after the barrier, every file of the store and the directories that name it are fsynced
+/// through descriptors of their own: `fsync` acts on the inode, whoever wrote it. Closing and
+/// reopening the database would also fsync, but sled can release its file lock a moment after
+/// the handle drops, so an immediate reopen could refuse a first start, and its close path
+/// unwraps a failed fsync. Once per node lifetime.
 fn write_new_instance(
-    store: Arc<dyn DurableStore>,
+    store: &Arc<dyn DurableStore>,
     store_dir: &Path,
-) -> Result<(Arc<dyn DurableStore>, [u8; INSTANCE_LEN]), RegistryError> {
+) -> Result<[u8; INSTANCE_LEN], RegistryError> {
     let instance: [u8; INSTANCE_LEN] = rand::random();
     store
         .put(INSTANCE_KEY, &instance)
         .and_then(|()| store.sync_durable())
         .map_err(|e| store_error(store_dir, e))?;
-    drop(store);
-    let store = open_store(store_dir)?;
-    match read_instance(&store, store_dir)? {
-        Some(found) if found == instance => Ok((store, instance)),
-        _ => Err(RegistryError::Store {
-            store: store_dir.to_path_buf(),
-            reason: "the new instance row was not present after reopening the store".into(),
-        }),
+    fsync_store(store_dir).map_err(|e| store_error(store_dir, e))?;
+    Ok(instance)
+}
+
+/// `fsync` each regular file directly in `store_dir`, then `store_dir` and its parent.
+fn fsync_store(store_dir: &Path) -> anyhow::Result<()> {
+    use anyhow::Context as _;
+
+    for entry in std::fs::read_dir(store_dir).context("listing the store")? {
+        let entry = entry.context("listing the store")?;
+        if entry
+            .file_type()
+            .context("inspecting a store file")?
+            .is_file()
+        {
+            std::fs::File::open(entry.path())
+                .and_then(|file| file.sync_all())
+                .with_context(|| format!("fsync {}", entry.path().display()))?;
+        }
     }
+    crate::restore_marker::sync_directory(store_dir)?;
+    if let Some(parent) = store_dir.parent() {
+        crate::restore_marker::sync_directory(parent)?;
+    }
+    Ok(())
 }
 
 fn store_error(store_dir: &Path, error: anyhow::Error) -> RegistryError {
