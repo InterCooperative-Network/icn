@@ -184,11 +184,11 @@ above the bound, an oversized payload, or trailing bytes are each errors.
 ### 6.1 Field semantics
 
 - **`subject`** — named, never a signer. A Subject has no key. The relying party supplies the
-  Subject it is evaluating *for*, and refuses an act that names another (§7, step 1).
+  Subject it is evaluating *for*, and refuses an act that names another (§7, step 2).
 - **`device`** — an ordinary Principal. Device-ness is in the grant, not the identifier.
 - **`evaluation_position`** — **advisory until a relying party agrees.** It is bound so that an
   act cannot be re-evaluated at a position its signer never saw, but it confers nothing: the
-  verifier refuses unless it equals the position the relying party supplies (§7, step 2). This is
+  verifier refuses unless it equals the position the relying party supplies (§7, step 3). This is
   how N4 invariant 6, *the evaluation position is not signer-chosen*, is met while still binding
   the position into the signature.
 - **`capability`** — one capability per act. An act that needs two is two acts.
@@ -200,7 +200,7 @@ above the bound, an oversized payload, or trailing bytes are each errors.
 
 `sign_device_act(act, key)` refuses a key whose Principal is not `act.device`. A client cannot
 produce an act it could not use; a hand-assembled envelope with a foreign signature is refused at
-verification instead (§7, step 3).
+verification instead (§7, step 4).
 
 ---
 
@@ -208,11 +208,14 @@ verification instead (§7, step 3).
 
 Given a `SignedDeviceAct`, and independently supplied `(subject, store, E)` from the relying party:
 
-1. Require `act.subject == subject`. *(ActSubjectMismatch)*
-2. Require `act.evaluation_position == E`. *(EvaluationPositionMismatch)*
-3. Verify the signature under `act.device` over `act.canonical_bytes()`, `verify_strict`.
+1. Require the act to be within its bounds, `act.validate()`: `1 ≤ act.evaluation_position ≤
+   MAX_POSITION` and a payload of at most `MAX_DEVICE_ACT_PAYLOAD` bytes. Its fields are public, so
+   an act changed after construction is checked again here. *(MalformedAct)*
+2. Require `act.subject == subject`. *(ActSubjectMismatch)*
+3. Require `act.evaluation_position == E`. *(EvaluationPositionMismatch)*
+4. Verify the signature under `act.device` over `act.canonical_bytes()`, `verify_strict`.
    State-independent, exactly as N1 admission is. *(BadSignature)*
-4. `evaluate_device_authority(subject, store, act.device, act.capability, E)`:
+5. `evaluate_device_authority(subject, store, act.device, act.capability, E)`:
    1. require `1 ≤ E ≤ MAX_POSITION`; *(PositionOutOfRange)*
    2. `derive_prefix(subject, store, E)`; refuse `Unknown` *(SubjectUnknown)* and `Halted`
       *(AuthorityHalted{disputed_at})*;
@@ -226,8 +229,12 @@ Given a `SignedDeviceAct`, and independently supplied `(subject, store, E)` from
 Every failure is a refusal. There is no partial success and no "verified except". Refusal variants
 carry positions and spans only — never payload bytes.
 
-Success returns `DeviceAuthorityEvidence { subject, device, capability, evaluation_position,
-grant, generation }` — **a grant, not a bool** (`IDENTITY_SEMANTICS.md` I5).
+Success returns a `VerifiedDeviceAct`: the act, its `act_id` (computed over the exact bytes whose
+signature verified), and the `DeviceAuthorityEvidence { subject, device, capability,
+evaluation_position, grant, generation }` it was authorized under — **a grant, not a bool**
+(`IDENTITY_SEMANTICS.md` I5). It has no public constructor, so only this procedure produces one.
+Step 5 on its own (`evaluate_device_authority`) returns bare `DeviceAuthorityEvidence`: an
+authority evaluation for no act, never a verification result.
 
 ### 7.1 Choosing `E` — the relying party's rule
 
@@ -359,8 +366,9 @@ Nothing else. No directory, no resolver, no token, no clock.
 service.** A downstream system obtains ICN truth by holding the facts and running this verifier;
 it does not obtain it by asking a gateway "is this device authorized?" and trusting the answer. A
 gateway may *host* a verifier for a client that cannot run one, but the gateway is then a relying
-party making its own evaluation at its own `E`, and the thing it returns is `DeviceAuthorityEvidence`
-plus the facts it evaluated — reproducible, not an oracle verdict. **The gateway is not the owner
+party making its own evaluation at its own `E`, and the thing it returns is the verified act (the act,
+its `act_id` and the evidence it was authorized under) plus the facts it evaluated, never bare
+`DeviceAuthorityEvidence` — reproducible, not an oracle verdict. **The gateway is not the owner
 of this truth.** This keeps the trust surface where it is: exposing the verifier expands no
 authority, because the verifier can only refuse or return a grant that already exists in the log.
 

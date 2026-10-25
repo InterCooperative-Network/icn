@@ -415,7 +415,7 @@ pub enum DeviceActVerifyError {
 /// way to obtain one. That is what makes it usable as an authorization receipt for this act, where
 /// a bare [`DeviceAuthorityEvidence`] is not.
 ///
-/// ```compile_fail
+/// ```compile_fail,E0451
 /// use icn_identity::device_authority::VerifiedDeviceAct;
 /// fn forge(e: icn_identity::device_authority::DeviceAuthorityEvidence,
 ///          a: icn_identity::device_authority::DeviceActV1) -> VerifiedDeviceAct {

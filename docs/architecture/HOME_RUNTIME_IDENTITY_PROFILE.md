@@ -191,7 +191,7 @@ device authority.
 | Stored | Class | Rule |
 |---|---|---|
 | per Subject it serves: the **public** N1 facts — canonical bodies and witnesses — using the N1-D record layout `event_id ‖ signature → canonical body` | record layout on main (#2800); serving MISSING | re-admit every record through `admissible_bytes` on load; storage never selects branches |
-| device acts (`DeviceActV1` bytes + signature) and the `DeviceAuthorityEvidence` the runtime computed for them | LIB-TESTED | evidence is reproducible from facts + act + `E`; it is a log, not an oracle |
+| device acts (`DeviceActV1` bytes + signature) and the `VerifiedDeviceAct` the runtime obtained for each | LIB-TESTED | evidence is reproducible from facts + act + `E`; it is a log, not an oracle |
 | the Home's **own** per-context device keys (the VM-as-device) | — | the VM is a device Principal |
 | **never:** any `ContinuityRoot`, any other device's secret, any human establishment key, any cross-context mapping of one person's Subjects | — | R1.2 [HARD]; IS §5.4; I10 |
 

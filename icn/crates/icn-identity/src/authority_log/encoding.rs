@@ -131,8 +131,9 @@ impl Writer {
 
     /// Write a length-prefixed byte string: `u32be(len) || bytes`.
     pub(crate) fn lp(&mut self, value: &[u8]) {
-        // Domain separators and every other length-prefixed field in this module are short,
-        // fixed, compile-time constants; a `u32` length is more than sufficient.
+        // Domain separators are short compile-time constants. The one variable-length field
+        // framed here, an N4 device act's payload, is bounded far below `u32::MAX` by
+        // `MAX_DEVICE_ACT_PAYLOAD`, which is checked before an act is signed or verified.
         self.u32(value.len() as u32);
         self.buf.extend_from_slice(value);
     }
