@@ -228,7 +228,9 @@ A Home runtime or deployment **MAY** rely on: the N4-A verdict and the `Verified
 `verify_device_act` returns (never bare `DeviceAuthorityEvidence` from `evaluate_device_authority`,
 which checks no signature and names no act); `act_id` as an act's identity; the refusal classes;
 the rule that a revoked device is refused at every `E` at or after the revoke and unaffected before
-it, under the facts retained (N4-A §2); the N1-D record layout (merged, #2800).
+it, under the facts retained (N4-A §2); the N1-D record layout (merged, #2800). No hosted verifier
+and no consumer that enforces an action on an N4-A result exists today. When one is built, it must
+enforce on a `VerifiedDeviceAct`, never on an authority evaluation alone.
 
 It **MUST NOT**: reimplement encodings, the fold, grant semantics or refusal logic in another
 language; treat any account, key, token, VM or machine as the Subject or derive a `SubjectId` from

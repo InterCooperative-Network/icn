@@ -131,10 +131,12 @@ impl Writer {
 
     /// Write a length-prefixed byte string: `u32be(len) || bytes`.
     pub(crate) fn lp(&mut self, value: &[u8]) {
-        // Domain separators are short compile-time constants. Variable-length values (a GEN
-        // context identifier, an N4 device act's payload) are bounded by their callers, not here:
-        // a value of 4 GiB or more would wrap this prefix. The device-act payload is bounded by
-        // `MAX_DEVICE_ACT_PAYLOAD`, checked before an act is signed or verified.
+        // This writer neither bounds nor checks `len`: a value of 4 GiB or more gets a wrapped
+        // prefix. Any bound is the caller's. Callers today: domain separators (short constants);
+        // an N4 device act's payload, which `DeviceActV1::validate` bounds to
+        // `MAX_DEVICE_ACT_PAYLOAD` before signing or verifying, but which `canonical_bytes` and
+        // `act_id` frame unchecked; and a GEN context identifier, which is checked only for being
+        // non-empty and has no upper bound.
         self.u32(value.len() as u32);
         self.buf.extend_from_slice(value);
     }

@@ -379,8 +379,9 @@ The first consumable surface, in order of smallness, is therefore:
    **not yet specified**; `DeviceActV1` already has canonical bytes, the N1-D record layout
    (`event_id || signature → canonical body`) is the natural fact framing, and GEN-A's rule holds:
    serde/JSON bytes are never the cryptographic identity of anything;
-3. an `icnctl` verb that consumes that container and prints the verified act's evidence or the refusal — **not
-   built**; it is the right first non-Rust entry point for network-ops because it is local,
+3. an `icnctl` verb that consumes that container and prints the verified act's evidence or the
+   refusal — **not built**. Like any future consumer that enforces an action, it must rest on
+   `verify_device_act` and its `VerifiedDeviceAct`, never on `evaluate_device_authority` alone; it is the right first non-Rust entry point for network-ops because it is local,
    stateless and needs no running daemon;
 4. only after that, a gateway route — and only as a hosted relying party, never as an authority.
 

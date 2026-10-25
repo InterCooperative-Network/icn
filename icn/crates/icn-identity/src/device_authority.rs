@@ -415,11 +415,26 @@ pub enum DeviceActVerifyError {
 /// way to obtain one. That is what makes it usable as an authorization receipt for this act, where
 /// a bare [`DeviceAuthorityEvidence`] is not.
 ///
+/// Building one outside this module does not compile (the fields are private, E0451):
+///
 /// ```compile_fail,E0451
-/// use icn_identity::device_authority::VerifiedDeviceAct;
-/// fn forge(e: icn_identity::device_authority::DeviceAuthorityEvidence,
-///          a: icn_identity::device_authority::DeviceActV1) -> VerifiedDeviceAct {
+/// use icn_identity::device_authority::{DeviceActV1, DeviceAuthorityEvidence, VerifiedDeviceAct};
+/// fn forge(e: DeviceAuthorityEvidence, a: DeviceActV1) -> VerifiedDeviceAct {
 ///     VerifiedDeviceAct { act_id: a.act_id(), act: a, evidence: e }
+/// }
+/// ```
+///
+/// Stable rustdoc does not check the error code of a `compile_fail` test, so this control compiles
+/// everything the test above uses except the struct literal. If it compiles, the literal is what
+/// fails above.
+///
+/// ```
+/// use icn_identity::device_authority::{DeviceActV1, DeviceAuthorityEvidence, VerifiedDeviceAct};
+/// fn read(v: &VerifiedDeviceAct) -> ([u8; 32], &DeviceActV1, &DeviceAuthorityEvidence) {
+///     (v.act_id(), v.act(), v.evidence())
+/// }
+/// fn parts(e: DeviceAuthorityEvidence, a: DeviceActV1) -> ([u8; 32], DeviceActV1, DeviceAuthorityEvidence) {
+///     (a.act_id(), a, e)
 /// }
 /// ```
 ///
