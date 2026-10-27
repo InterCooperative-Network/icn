@@ -14,8 +14,8 @@ rule this is *not*) · **Code:** `icn/crates/icn-identity/src/device_admission.r
 `tests/device_admission.rs`
 
 > **Truth status.** Normative for the admission rule and the refusal vocabulary; **LIB-TESTED**
-> (8 tests, observed on icn-dev at `21a6cf541`; the module is unchanged since it landed at
-> `18b536ea8`). No runtime, route, transport profile or `icnctl` verb calls it; it is not
+> (9 tests, observed 2026-10-27; since then the act is validated first and success is the
+> `VerifiedDeviceAct`). No runtime, route, transport profile or `icnctl` verb calls it; it is not
 > CLI-reachable and not PRODUCTION. It adds **no kernel primitive** and changes nothing in N1 or
 > N4-A: the commit that introduced it (`18b536ea8`) touched only `device_admission.rs`, its test
 > file and `lib.rs`; `device_authority.rs` and its 25 tests are byte-for-byte what they were. It
@@ -108,6 +108,11 @@ I do hold".
 
 ## 4. What this deliberately does not claim
 
+**An admission is relative to the facts held when it was made** (N4-A §2). A fact that later
+arrives at or below the admission position — a superseding recovery, a competing candidate, a
+revoke — changes the answer for the same act; nothing here re-checks a connection that was already
+admitted, which is the runtime's decision.
+
 **Retained current position is local evidence, not universal finality.** A relying party whose
 facts stop *before* a revocation holds a clean prefix through its old tip and admits there. It is
 not wrong about its facts; it is behind. Test 4 pins this rather than hiding it: obtaining facts
@@ -149,13 +154,12 @@ admitting is its own policy and never an N1 fact.
   bundler's selection (N4-B §3.3 and §7) and is not making a current admission. The `icnctl`
   verb is such a consumer: it takes `--position` from the operator and does **not** compute an
   admission position (N4-B §9).
-- **With N4-D.** A channel binding is a class-2 `Present` act, and N4-D (`verify_channel_binding`)
-  takes `position` from its caller exactly as N4-A does; it does **not** call N4-E. A runtime that
-  wants current admission for a live connection computes `admission_position` from its own store
-  and passes it as N4-D's `position`. A binding bound to any other position is then refused inside
-  N4-D step 3 by N4-A itself (`EvaluationPositionMismatch`), before the channel is compared; the
-  `StaleAct` / `RelyingPartyBehind` vocabulary belongs only to `verify_device_act_at_admission`.
-  Verifying the act and checking the observed channel remain two separate steps (N4-D §4, §7).
+- **With N4-D.** A channel binding is a class-2 `Present` act. Admitting a connection goes
+  through this module: N4-D's `admit_channel_binding` calls `verify_device_act_at_admission`, so a
+  binding is admitted only at the relying party's own retained clean tip, with this module's
+  `StaleAct` / `RelyingPartyBehind` vocabulary. N4-D's `verify_channel_binding_at` keeps the
+  historical question (N4-A at a caller-chosen position) separate, and never admits a connection
+  now. Verifying the act and checking the observed channel remain two separate steps (N4-D §4).
 - **With N4-C.** Enrollment produces the N1 grant; admission reads it. Nothing here approves,
   enrolls or revokes.
 

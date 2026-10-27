@@ -5,12 +5,16 @@ Canonical: no
 Last verified: 2026-10-04
 ---
 
-> **Provenance.** Read-only survey produced by a subagent of the 2026-10-03/04 Katie/Home
+> **Provenance.** Read-only survey produced by a subagent of the 2026-10-03/04 Home
 > identity-integration session, against this worktree at `b098396b5` (before N4-D landed). It
 > modified nothing and ran no cargo. Every `file:line` is evidence to re-verify against the HEAD
 > you are on; line numbers drift. Preserved verbatim here because its conclusions drive the N4-D,
 > admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
 > Title of record: Survey: what a person's durable continuity is in N1 (ContinuityRoot, pre-rotation, Rotate/Recover), loss scenarios, and the exact N7 gaps.
+
+> **Edited 2026-10-27.** Personal names, private machine paths and a private business example
+> were replaced with neutral placeholders, and handoff links point at the renamed handoff. The
+> survey is otherwise as recorded. Branch names are kept as the facts they are.
 
 > **Convergence note (2026-10-04).** Mentions below of `DeviceAuthorityBundleV1`,
 > `icn.n4.device-authority-bundle`, `MAX_BUNDLE_FACTS`, `verify_bundle` / `store_from_bundle`,
@@ -21,7 +25,7 @@ Last verified: 2026-10-04
 
 # Survey — recovery and continuity for a Home runtime under ICN N1 (read-only, 2026-10-03)
 
-Source: `the icn-dev VM:/home/ubuntu/icn-dev/worktrees/icn/katie-home-identity-integration`,
+Source: a local worktree (machine path omitted),
 branch `task/katie-home-identity-integration` @ `b098396b5`. All paths relative to that root.
 No files modified, no cargo run. `gh` is available on the VM (2.99.0); issue #2603 was read with it.
 
@@ -183,7 +187,7 @@ including that protected export and threshold sharing are permitted (§10)"; dow
 / recovery / threshold-share protocol, and the continuity-secret-compromise shortfall"); N4C L125-127
 ("Recovery. Out of scope here (N7, #2603) ... losing the *edge* is an establishment-authority event, handled
 by N1 pre-rotation, not by enrollment"); HRIP §1 row (e) L61 ("LIB-TESTED (establishment transitions); MISSING
-(guardian/threshold protocol, backup)"); handoff `docs/dev/handoff-2026-10-03-katie-home-identity-integration.md`
+(guardian/threshold protocol, backup)"); handoff `docs/dev/handoff-2026-10-03-home-identity-integration.md`
 L218 ("recovery (N7 #2603)" listed under "Not done, named").
 
 **What the guardian/threshold protocol would add.** Under path (b) the pre-committed `A_g` for some generation

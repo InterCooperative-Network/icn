@@ -5,12 +5,16 @@ Canonical: no
 Last verified: 2026-10-04
 ---
 
-> **Provenance.** Read-only survey produced by a subagent of the 2026-10-03/04 Katie/Home
+> **Provenance.** Read-only survey produced by a subagent of the 2026-10-03/04 Home
 > identity-integration session, against this worktree at `b098396b5` (before N4-D landed). It
 > modified nothing and ran no cargo. Every `file:line` is evidence to re-verify against the HEAD
 > you are on; line numbers drift. Preserved verbatim here because its conclusions drive the N4-D,
 > admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
 > Title of record: Survey: where a Home runtime's device roles live relative to N1 device capabilities (icn-authz, kernel Capability, AuthorityGrant/TypedScope, N4 payloads).
+
+> **Edited 2026-10-27.** Personal names, private machine paths and a private business example
+> were replaced with neutral placeholders, and handoff links point at the renamed handoff. The
+> survey is otherwise as recorded. Branch names are kept as the facts they are.
 
 > **Convergence note (2026-10-04).** Mentions below of `DeviceAuthorityBundleV1`,
 > `icn.n4.device-authority-bundle`, `MAX_BUNDLE_FACTS`, `verify_bundle` / `store_from_bundle`,
@@ -21,8 +25,8 @@ Last verified: 2026-10-04
 
 # Survey: a generic, extensible role model for a person's Home runtime
 
-**Read-only survey.** Source: icn-dev VM, worktree
-`/home/ubuntu/icn-dev/worktrees/icn/katie-home-identity-integration`, branch
+**Read-only survey.** Source: the development VM, worktree
+a local worktree (machine path omitted), branch
 `task/katie-home-identity-integration`, HEAD `b098396b5` ("test(identity): the two-device
 acceptance invariant through every boundary"). Paths are relative to that repo root. No files
 were modified; no cargo was run. `gh` is present on the VM; #2599 and #2603 were read directly.
@@ -368,7 +372,7 @@ Composition, type by type:
   `Writer`/`Reader` as a small API change with no semantic content.
 - Placement: a *generic* "labelled act" family could live in `icn-identity` beside N4-D, but
   `role` is app-layer vocabulary (`HIA:1504`) and the handoff boundary says ICN must not "encode
-  Katie-, Pi-, VM- or RDP-specific workflow" (`docs/dev/handoff-2026-10-03-katie-home-identity-integration.md:99`).
+  person-, device-, VM- or RDP-specific workflow" (`docs/dev/handoff-2026-10-03-home-identity-integration.md:99`).
   Keep `HomeRoleV1` in the Home runtime crate.
 
 **Honest limitation.** Without an N1 caveat, a device granted `Sign` can sign a Home act claiming
@@ -402,7 +406,7 @@ relying parties, that is "scope/caveat representation" under #2599 and must be f
    (`N4A:383-384`; `HOME:245-246`).
 10. Do not repurpose node `BindingInfo` for devices (`HOME:224-227`); use the N4-D object once it
     is committed.
-11. Do not put Home/Katie vocabulary into `icn-identity` or `icn-kernel-api` (`handoff:99`;
+11. Do not put Home or person-specific vocabulary into `icn-identity` or `icn-kernel-api` (`handoff:99`;
     `HIA:1500-1504`).
 12. Do not reimplement ICN encodings, the fold, grant semantics or refusal logic outside the Rust
     library (`HOME:242-243`); defining the Home payload's own bytes is not that.

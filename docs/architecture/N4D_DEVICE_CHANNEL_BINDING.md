@@ -13,7 +13,7 @@ Last Reviewed: 2026-10-04
 `tests/device_channel_binding.rs`
 
 > **Truth status.** Normative for the payload bytes and the verification order; **LIB-TESTED**
-> (7 tests, run on icn-dev at `f7151ae37`). No runtime, route or transport profile calls it; it
+> (16 tests, observed 2026-10-27 after admission was routed through N4-E). No runtime, route or transport profile calls it; it
 > is not CLI-reachable and not PRODUCTION. It adds **no kernel primitive**: everything below is a
 > `DeviceActV1` evaluated by N4-A unchanged, plus one equality check. Fixture identities only.
 
@@ -86,18 +86,43 @@ is 2, immediately settled: the relying party evaluates once, at admission, at it
 
 ## 4. Verification, in order, each fail-closed
 
-`verify_channel_binding(signed, subject, store, position, expected_channel)`:
+There are two operations, and they answer different questions:
+
+- **`admit_channel_binding(signed, subject, store, expected_channel)` — admitting a connection
+  now.** This is the operation a live connection is admitted under. The position is not the
+  caller's: it is the relying party's own retained clean tip, through N4-E
+  (`verify_device_act_at_admission`), and the act must bind exactly it.
+- **`verify_channel_binding_at(signed, subject, store, position, expected_channel)` — the
+  historical question:** did this device, authorized at a position the relying party chooses,
+  bind this channel? A valid historical answer never admits a connection now.
+
+Both return the `VerifiedDeviceAct` (the act, its `act_id`, the evidence), never bare evidence,
+and both answer relative to the facts the relying party retains (N4-A §2): neither is finality.
 
 | step | check | refusal |
 |---|---|---|
-| 1 | the act's capability is `Present` | `NotAPresentation` — a `Sign` act carrying binding bytes is a signed act, not a binding; it must not be accepted as one by accident |
-| 2 | the payload decodes as `channel_binding_v1` | `Payload(codec)` — an arbitrary `Present` payload is not automatically a binding |
-| 3 | N4-A `verify_device_act` at the relying party's position: authorship under the device key, then authorization over the retained facts | `Act(…)`: `BadSignature`, `ActSubjectMismatch`, `EvaluationPositionMismatch`, or `Refused(DeviceNotAuthorized | PrefixIncomplete | …)` |
-| 4 | the bound `channel` equals the one this relying party sees | `ChannelMismatch` |
+| 1 | the act is within its bounds (`DeviceActV1::validate`) | `Act(MalformedAct(…))` |
+| 2 | the act's capability is `Present` | `NotAPresentation` — a `Sign` act carrying binding bytes is a signed act, not a binding; it must not be accepted as one by accident |
+| 3 | the payload decodes as `channel_binding_v1` | `Payload(codec)` — an arbitrary `Present` payload is not automatically a binding |
+| 4 (admit) | N4-E current admission: the act binds exactly the relying party's retained clean tip, then N4-A authorship and authorization there | `Admission(…)`: `SubjectUnknown`, `AuthorityHalted`, `NoDelegationYet`, `StaleAct`, `RelyingPartyBehind`, or `Act(BadSignature | ActSubjectMismatch | Refused(…))` |
+| 4 (historical) | N4-A `verify_device_act` at the position the relying party chose | `Act(…)`: `BadSignature`, `ActSubjectMismatch`, `EvaluationPositionMismatch`, or `Refused(DeviceNotAuthorized | PrefixIncomplete | …)` |
+| 5 | the bound `channel` equals the one this relying party sees | `ChannelMismatch` |
 
 Pinned by the tests:
 
-- an authorized device binding the channel it is actually on → evidence (a grant, not a bool);
+- an authorized device binding the channel it is actually on → the verified act;
+- **admission only at the current tip:** a binding at the tip is admitted; the same device's
+  binding at an earlier position is a valid historical answer and is refused for admission
+  (`StaleAct`); one past the tip is `RelyingPartyBehind`;
+- a revoked device's valid historical binding never admits a connection;
+- a later retained fact (a revoke) withdraws an earlier admission;
+- missing facts hold the tip back and never admit past it;
+- a fork in the retained facts admits no connection (`AuthorityHalted`);
+- a binding for one Subject never admits a connection for another, even where the device also
+  holds a grant (`ActSubjectMismatch`);
+- replay is the transport profile's to refuse; the same binding keeps one `act_id`, a fresh nonce
+  gives a new one;
+- an act moved outside its bounds is refused as malformed by both operations;
 - **an authorized device binding another channel → refused** (the man-in-the-middle case: the
   signature is genuine, the grant is in force, and the connection is still refused — a
   transport fact, not an authority fact);

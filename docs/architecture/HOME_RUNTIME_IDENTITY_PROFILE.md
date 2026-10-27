@@ -63,11 +63,11 @@ but unreachable, stubbed or unsafe · **DOC-ONLY** · **MISSING**.
 | (e) recovery | N1 pre-rotation `Rotate`/`Recover` establishment | LIB-TESTED (establishment transitions); MISSING (guardian/threshold protocol, backup) | IS §2.5; N7 #2603 | `construct::establish`; `Recover` clears device grants (`derive.rs:288`) |
 | (e′) legacy recovery | `recovery.rs`, RPC `recovery.*`, SDIS recovery routes | EXPERIMENTAL — **unsafe**: node key signs the trustee attestation; SDIS complete is a stub | HIA F13; #2591, #2448 | `icn-rpc/src/handler/recovery.rs:138`; `api/sdis/recovery.rs:306` |
 | (f) durable local facts | `AuthorityFactStore` + sled adapter (N1-D) | LIB-TESTED; merged in #2800, rehydrated fail-closed at `icnd` startup since #2843 | #2799/#2694; ADR-0087, ADR-0088 | record = `event_id ‖ signature → canonical body`; no runtime producer writes facts |
-| (g) external facts+act container | `EvidenceBundle` (`icn.n4.evidence-bundle`), `verify_evidence_bundle` (N4-B, converged 2026-10-04) | LIB-TESTED (24 tests observed on icn-dev + an independent Python reference) | `N4B_PORTABLE_EVIDENCE_BUNDLE.md` | `evidence_bundle.rs`; fact record = N1-D layout |
+| (g) external facts+act container | `EvidenceBundle` (`icn.n4.evidence-bundle`), `verify_evidence_bundle` (N4-B, converged 2026-10-04) | LIB-TESTED (25 tests observed 2026-10-27 + an independent Python reference) | `N4B_PORTABLE_EVIDENCE_BUNDLE.md` | `evidence_bundle.rs`; fact record = N1-D layout |
 | (h) stateless CLI consumer | `icnctl device-authority verify\|inspect` | CLI-REACHABLE (5 end-to-end tests observed on icn-dev) — a relying party, never an authority; not PRODUCTION: no runtime, route or deployment exercises it | N4-B §4 | `bins/icnctl/src/device_authority.rs` |
-| (h′) enrollment request and attenuated approval | `EnrollmentRequestV1`, `approve_enrollment` (N4-C) | LIB-TESTED (10 tests observed on icn-dev; ceremony end to end in a fixture) | `N4C_DEVICE_ENROLLMENT_REQUEST.md` | `device_enrollment.rs`; transport, UI, delivery not built |
-| (m) device ↔ transport-channel binding | `ChannelBindingV1` as the payload of a `Present` `DeviceActV1` (N4-D) | LIB-TESTED (7 tests observed on icn-dev); no runtime calls it | `N4D_DEVICE_CHANNEL_BINDING.md` | `device_channel_binding.rs`; node `BindingInfo` not reused |
-| (n) current admission position (class 2) | `admission_position`, `verify_device_act_at_admission` (N4-E) | LIB-TESTED (8 tests observed on icn-dev) | `N4E_CURRENT_ADMISSION.md` | `device_admission.rs`; position from the relying party's own facts, never the act |
+| (h′) enrollment request and attenuated approval | `EnrollmentRequestV1`, `approve_enrollment` (N4-C) | LIB-TESTED (11 tests observed 2026-10-27; ceremony end to end in a fixture) | `N4C_DEVICE_ENROLLMENT_REQUEST.md` | `device_enrollment.rs`; transport, UI, delivery not built |
+| (m) device ↔ transport-channel binding | `ChannelBindingV1` as the payload of a `Present` `DeviceActV1` (N4-D) | LIB-TESTED (16 tests observed 2026-10-27; a connection is admitted only through N4-E current admission, `admit_channel_binding`; `verify_channel_binding_at` is the separate historical question); no runtime calls it | `N4D_DEVICE_CHANNEL_BINDING.md` | `device_channel_binding.rs`; node `BindingInfo` not reused |
+| (n) current admission position (class 2) | `admission_position`, `verify_device_act_at_admission` (N4-E) | LIB-TESTED (9 tests observed 2026-10-27) | `N4E_CURRENT_ADMISSION.md` | `device_admission.rs`; position from the relying party's own facts, never the act |
 | (h″) the two-device acceptance invariant through every boundary | `tests/device_lifecycle_acceptance.rs` | LIB-TESTED (2 tests observed on icn-dev) | this document §2 | request → approval → facts → bundle bytes → verdict; A revoked, B accepted, S unchanged; order-independent; stale facts fail closed |
 | (i) context kinds | GEN-A `GovernanceDomainV1` only | LIB-TESTED (one kind); MISSING (personal/household) | GEN doc §5; #2602 | `subject_context.rs:180` |
 | (j) legacy device path | `multi_device.rs`, `/v1/devices/*` | EXPERIMENTAL — unreachable: no DID document is ever created | HIA F8; #2588/#2590; superseded by N4 | `identity_mgr.rs:156` |
@@ -136,6 +136,9 @@ Three routes were weighed:
 | **New GEN context kinds** | **PROPOSED — route to #2602** | The kind tag is inside every GEN preimage, N1 is unchanged, and N4-A evaluates identically whatever the kind. The gap is GEN's alone. |
 
 **Proposed shape, for #2602 to decide (not decided here):**
+
+> **NON-NORMATIVE** until #2602 decides: neither kind exists, nothing may implement or rely on
+> them, and the kind byte would feed the N1 KDF permanently.
 
 - `PersonalContextV1` — one human, no other party. `context_id` is an opaque 32-byte descriptor
   digest the person's own client mints and keeps; it is never published beyond the person's own

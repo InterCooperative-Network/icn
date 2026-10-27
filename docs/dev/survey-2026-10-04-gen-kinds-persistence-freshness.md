@@ -5,12 +5,16 @@ Canonical: no
 Last verified: 2026-10-04
 ---
 
-> **Provenance.** Read-only survey produced by a subagent of the 2026-10-03/04 Katie/Home
+> **Provenance.** Read-only survey produced by a subagent of the 2026-10-03/04 Home
 > identity-integration session, against this worktree at `b098396b5` (before N4-D landed). It
 > modified nothing and ran no cargo. Every `file:line` is evidence to re-verify against the HEAD
 > you are on; line numbers drift. Preserved verbatim here because its conclusions drive the N4-D,
 > admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
 > Title of record: Survey: GEN context kinds for personal/household contexts (#2602), N1-D/N3 persistence and delivery (#2800, #2598), and the class-2 admission position (G1-A).
+
+> **Edited 2026-10-27.** Personal names, private machine paths and a private business example
+> were replaced with neutral placeholders, and handoff links point at the renamed handoff. The
+> survey is otherwise as recorded. Branch names are kept as the facts they are.
 
 > **Convergence note (2026-10-04).** Mentions below of `DeviceAuthorityBundleV1`,
 > `icn.n4.device-authority-bundle`, `MAX_BUNDLE_FACTS`, `verify_bundle` / `store_from_bundle`,
@@ -21,16 +25,16 @@ Last verified: 2026-10-04
 
 # Survey: GEN context kinds, persistence/delivery, evaluation position
 
-Read-only survey of the ICN monorepo on icn-dev, 2026-10-03/04.
+Read-only survey of the ICN monorepo on the development VM, 2026-10-03/04.
 No files modified, no cargo run. Everything below is cited to file:line or doc section.
 
 ## Provenance
 
 | What | Where | State |
 |---|---|---|
-| Survey checkout | `~/icn-dev/worktrees/icn/katie-home-identity-integration`, branch `task/katie-home-identity-integration` | HEAD `b098396b5`, 46 commits ahead of `main` (`5add7a48d`, which is an ancestor) |
-| N1-D (PR #2800) | `~/icn-dev/worktrees/icn/task-2694-n1d` @ `b871dafdc` | PR OPEN; `fact_store.rs` is **not** on `main` and **not** on the katie branch |
-| Uncommitted work on the katie branch | `icn/crates/icn-identity/src/device_channel_binding.rs` (untracked), `tests/device_channel_binding.rs` (untracked), `src/lib.rs` (modified, adds `pub mod device_channel_binding;` L28) | another session's WIP (Home profile §6.5 TLS binding, routed #2599); **not surveyed** |
+| Survey checkout | a local worktree (machine path omitted), branch `task/katie-home-identity-integration` | HEAD `b098396b5`, 46 commits ahead of `main` (`5add7a48d`, which is an ancestor) |
+| N1-D (PR #2800) | a second local worktree (machine path omitted) @ `b871dafdc` | PR OPEN; `fact_store.rs` is **not** on `main` and **not** on the integration branch |
+| Uncommitted work on the integration branch | `icn/crates/icn-identity/src/device_channel_binding.rs` (untracked), `tests/device_channel_binding.rs` (untracked), `src/lib.rs` (modified, adds `pub mod device_channel_binding;` L28) | another session's WIP (Home profile §6.5 TLS binding, routed #2599); **not surveyed** |
 | `gh` on the VM | works for issues #2602, #2598, #2694, #2599 and PR #2800 | live text used |
 
 Paths below are relative to the repo root; Rust under `icn/crates/`.
@@ -49,7 +53,7 @@ Paths below are relative to the repo root; Rust under `icn/crates/`.
 - `docs/adr/ADR-0083-institutional-domain-and-domain-policy-runtime-root.md` L1-140 (status `proposed`, `implementation_status: not-started`)
 - `docs/architecture/IDENTITY_SEMANTICS.md` (IS; canonical) §1.1, §2.2, §2.6, §2.7, §5, §8, §10, §13
 - `docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md` (HIA) §11.1 L1605-1625, R1 L195-210, §12.2
-- issue #2602 (full), #2599 invariants, handoff `docs/dev/handoff-2026-10-03-katie-home-identity-integration.md` (grep)
+- issue #2602 (full), #2599 invariants, handoff `docs/dev/handoff-2026-10-03-home-identity-integration.md` (grep)
 
 ### A.1 What a new kind tag changes mechanically
 
@@ -92,7 +96,7 @@ Caveat: #2602 is labelled `status:needs-design` and its operating rules say "bri
 
 **What GEN-B is today.** `SubjectRecognitionV1` is defined only in #2694 §3 as an *institutional* fact: `domain_id + SubjectId + standing_class + recognition_basis_kind + recognition_basis_hash → recognition_hash`. Grep across `docs/architecture/*.md`: it appears only in GEN §10 (L417, scope exclusion) and Home §4 L143. Nothing in code. The Home profile proposes household membership as "mutual recognition between members' Subjects (the GEN-B recognition shape, bilateral), never an `AuthorityGrant`, never a steward" (§4 L142-144). That bilateral variant (Subject recognizes Subject, no `domain_id`) is **undesigned**; the institutional variant is **unbuilt** (#2694 rung 3).
 
-**Can a Household context exist before recognition exists? Yes.** GEN §2 L36-42: a verified genesis "does not establish ... membership or standing"; "each of those is a separate, later fact". A `HouseholdContextV1` context is a `(kind, context_id)`; each human incepts one Subject into it with their own fresh salt (§5.3 one Subject per context is a client invariant). Two Subjects in one context publish unlinkable nonces (§5.2 argument, kind-independent). Without recognition there is simply no fact that says *S_Katie* and *S_Matt* are co-members, which is exactly the state of two coop members before GEN-B today. The relying parties that matter for the Home slice (the Pi, the hosted workstation) evaluate **device** acts with N4-A over each Subject's own log; co-membership is not an input to that (N4-A §2 L66: recognition "by any institution (GEN-B / N5)" is explicitly not proven and not needed).
+**Can a Household context exist before recognition exists? Yes.** GEN §2 L36-42: a verified genesis "does not establish ... membership or standing"; "each of those is a separate, later fact". A `HouseholdContextV1` context is a `(kind, context_id)`; each human incepts one Subject into it with their own fresh salt (§5.3 one Subject per context is a client invariant). Two Subjects in one context publish unlinkable nonces (§5.2 argument, kind-independent). Without recognition there is simply no fact that says *S_A* and *S_B* are co-members, which is exactly the state of two coop members before GEN-B today. The relying parties that matter for the Home slice (the Pi, the hosted workstation) evaluate **device** acts with N4-A over each Subject's own log; co-membership is not an input to that (N4-A §2 L66: recognition "by any institution (GEN-B / N5)" is explicitly not proven and not needed).
 
 **What is missing for Household specifically:** how two clients agree on one `context_id`. Home §4 L141-142: "the genesis digest of a household descriptor the founding members' clients agree on". No descriptor format and no two-party agreement step exist. For GEN-A's purposes the `context_id` is opaque; the agreement is a ceremony (carrier: the same kind of QR/link/local-network path N4-C step 4 L40 leaves unbuilt). Owner: #2602 (GEN item 4 "recognition" / a child issue), not GEN-A.
 
@@ -102,9 +106,9 @@ Caveat: #2602 is labelled `status:needs-design` and its operating rules say "bri
 |---|---|---|---|---|
 | **Private** (one human) | personal | `PersonalContextV1` | **none.** No ICN object exists for it; the context is a `(kind, context_id)` the person's client minted and keeps (Home §4 L136-139). The only "owner" is the person's client-held `ContinuityRoot` (IS §10; HIA R1.2) | never published beyond the person's own devices; no registrar, founder or charter |
 | **Household** (two humans, no governance object) | interpersonal | `HouseholdContextV1` | **none.** No charter, steward, treasury or `GovernanceDomain` row (Home §4 L141-146; §5 row 3 L165: a household mints no `AuthorityGrant`) | membership = future bilateral recognition (A.3); each human has their own Subject in it; shared decisions are "recognition and app-layer policy, not grants" (L165) |
-| **Pet Care** (one-person business today) | personal **today**, organizational **only after institutional genesis** | `PersonalContextV1` today, as a *second* personal context with its own salt and id, distinct from Private | **none today.** Home §4 L138-139: "*Private* and *a person's own small project* are both this kind; if a project later takes on members it becomes a household or an institution through genesis, not by relabelling" | if it becomes a cooperative: GEN item 2 institutional genesis (#2602) produces a governed domain; Matt incepts a **new** Subject in that `GovernanceDomainV1` context; the Pet Care personal Subject is not promoted; the only link is the `ContinuityRoot` (IS §5 L336-338). No bridge is defined and none is needed now, because no institutional fact exists yet. Any acts recorded in the personal context do not become institutional facts |
+| **Sole Business** (one-person business today) | personal **today**, organizational **only after institutional genesis** | `PersonalContextV1` today, as a *second* personal context with its own salt and id, distinct from Private | **none today.** Home §4 L138-139: "*Private* and *a person's own small project* are both this kind; if a project later takes on members it becomes a household or an institution through genesis, not by relabelling" | if it becomes a cooperative: GEN item 2 institutional genesis (#2602) produces a governed domain; its founder incepts a **new** Subject in that `GovernanceDomainV1` context; the Sole Business personal Subject is not promoted; the only link is the `ContinuityRoot` (IS §5 L336-338). No bridge is defined and none is needed now, because no institutional fact exists yet. Any acts recorded in the personal context do not become institutional facts |
 
-Why Pet Care must not be a `GovernanceDomainV1` from day one: Home §4 L131 ("correct bytes, wrong meaning; nothing could later distinguish a household from a domain"); IS §8 L523-524 ("one human — a person is not a governed collective"); and the Individual-owned `InstitutionalDomain` route is rejected at L130.
+Why Sole Business must not be a `GovernanceDomainV1` from day one: Home §4 L131 ("correct bytes, wrong meaning; nothing could later distinguish a household from a domain"); IS §8 L523-524 ("one human — a person is not a governed collective"); and the Individual-owned `InstitutionalDomain` route is rejected at L130.
 
 ### A.5 One device, three contexts, three Principals, nothing links them
 
@@ -121,6 +125,10 @@ So the device holds three `PrincipalKey`s, sends three `EnrollmentRequestV1`s na
 
 ### A.6 Recommendation for A
 
+> **NON-NORMATIVE.** The `PersonalContextV1` / `HouseholdContextV1` kinds below are a survey
+> recommendation, not a decision. #2602 owns GEN context kinds, and the kind byte feeds the N1
+> KDF permanently, so nothing here may be implemented or relied on until #2602 decides.
+
 **Implement the tags now, on the branch, in one PR that revises the GEN doc first** — with one explicit decision written down before code. The architecture is settled enough for the *tags*: three committed documents (Home profile §4/§7, the handoff L114, N4-A/N4-B/N4-C scope sections) already say "a new GEN kind, never a `GovernanceDomainV1` string", IS delegates kinds to GEN, and the verifier was built with the mismatch check waiting. What is *not* settled is representable without deciding it: make `context_id` for both new kinds an **opaque 32-byte value carried as 64 lowercase hex ASCII bytes** (preimage grammar unchanged, byte-exact comparison unchanged), validated at the constructor, and push "what those 32 bytes digest" to the client. That keeps GEN-A ignorant of descriptor contents, exactly as it is ignorant of what a `GovernanceDomainId` string means.
 
 Smallest sound piece (est. ~150 lines Rust + doc rows + two Python constants):
@@ -130,7 +138,7 @@ Smallest sound piece (est. ~150 lines Rust + doc rows + two Python constants):
 3. `subject_context.rs`: two enum variants and tags (L180-192); `SubjectContextDescriptor::personal_v1(context_id_hex: &str, salt)` and `::household_v1(...)` (beside L293-305) refusing anything but 64 lowercase hex chars; no change to `incept_*` or `verify_*`.
 4. `tests/gen_subject_context.rs`: (a) the kind-mismatch refusal is now reachable — a `GovernanceDomainV1` bundle claimed as `PersonalContextV1` → `ContextKindMismatch`; (b) same `context_id` bytes under two kinds → different nonce, different Subject, different `subject_context_ref` (cross-kind separation); (c) a Household genesis for two Subjects with two salts → unlinkable nonces (reuse of the existing §5.2 test shape); (d) constructor rejects a non-hex / wrong-length id for the new kinds; (e) pinned literals for the two new vectors.
 
-If Matt wants the "brief before coding" rule honoured to the letter, the same content minus steps 3-4 is the #2602 comment, and the code follows on a yes. Either way the Home deployment is not blocked (Home §4 L152-155: the device proof is context-agnostic and runs on a fixture `GovernanceDomainV1`; no production Private/Household context is to be created until the kind exists).
+If the maintainer wants the "brief before coding" rule honoured to the letter, the same content minus steps 3-4 is the #2602 comment, and the code follows on a yes. Either way the Home deployment is not blocked (Home §4 L152-155: the device proof is context-agnostic and runs on a fixture `GovernanceDomainV1`; no production Private/Household context is to be created until the kind exists).
 
 ### A.7 Missing pieces and owners (A)
 
@@ -142,7 +150,7 @@ If Matt wants the "brief before coding" rule honoured to the letter, the same co
 | Bilateral `SubjectRecognitionV1` (household co-membership) | #2602 GEN-B; institutional shape in #2694 §3 (rung 3), bilateral variant undesigned |
 | Per-context device key derivation helper (no `SubjectId` input) | HIA §11.1; route #2599 |
 | Client-side subject index (refuse a second genesis per context, GEN §5.3; retain salts for recovery §5.1) | no issue names it; N7 #2603 for the retained material, otherwise the client app |
-| Pet Care → cooperative: institutional genesis | #2602 GEN item 2; nothing needed now |
+| Sole Business → cooperative: institutional genesis | #2602 GEN item 2; nothing needed now |
 
 ---
 
@@ -179,7 +187,7 @@ The validation gates are equivalent as well: N1-D `into_admitted` (`fact_store.r
 
 Ordering: N4-B requires strictly ascending `(event_id, witness)` (L59). N1-D's `InMemoryAuthorityFactStore` is a `BTreeMap<Vec<u8>, _>` keyed by `event_id || signature` (L199-201), so `load_facts()` already yields N4-B's canonical order; a sled prefix scan is lexicographic by key too. The trait does not promise order (L173-177) and does not need to (`AuthorityBody: Ord` over canonical bytes), but the coincidence means a fact-set container can be emitted straight from `load_facts()` without a sort.
 
-Status: PR #2800 is OPEN; `fact_store.rs` is absent from `main` and from the katie branch (`ls` fails). `icnd::build_services` wiring is explicitly deferred to #2777 ("data-root ownership/exclusion boundary"; PR body "Follow-up"). The Home profile row (f) L63 and §6.3 L204 both say PROPOSED and "once merged".
+Status: PR #2800 is OPEN; `fact_store.rs` is absent from `main` and from the integration branch (`ls` fails). `icnd::build_services` wiring is explicitly deferred to #2777 ("data-root ownership/exclusion boundary"; PR body "Follow-up"). The Home profile row (f) L63 and §6.3 L204 both say PROPOSED and "once merged".
 
 ### B.2 "Delivery to a newly enrolled device" in this model
 
@@ -364,6 +372,6 @@ Tests (fixture from `tests/device_authority.rs`: `S`; `A@1`, `B@2`, `revoke A@3`
 ## Cross-cutting notes
 
 - **One framing, three uses.** The record `event_id ‖ witness ‖ body` is what the daemon persists (N1-D), what a client carries with an act (N4-B), and what a facts-only set should carry (B.6). Keep it one definition.
-- **Fixture-only, still.** Every test identity is fixture material (N4-A/B/C, Home §0). None of A, B, C creates a real Private/Household/Pet Care context; A.6 only makes it *possible* to.
+- **Fixture-only, still.** Every test identity is fixture material (N4-A/B/C, Home §0). None of A, B, C creates a real Private/Household/Sole Business context; A.6 only makes it *possible* to.
 - **ADR-0083 drift (#2806)** is untouched by anything here; nothing in A claims a personal context is an `InstitutionalDomain`.
-- **Untracked WIP** on the katie branch (`device_channel_binding.rs`) should be committed or set aside before any of the above lands on that branch, or the diff will mix two slices.
+- **Untracked WIP** on the integration branch (`device_channel_binding.rs`) should be committed or set aside before any of the above lands on that branch, or the diff will mix two slices.

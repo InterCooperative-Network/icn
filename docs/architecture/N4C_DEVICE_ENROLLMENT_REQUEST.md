@@ -38,12 +38,12 @@ the device and the person's authority edge.
 | 2. derive the **per-context** device Principal for the context it wants to join (HIA §11.1; not from the `SubjectId`) | device | `PrincipalKey` | LIB-TESTED type; derivation DOC-ONLY, client-side |
 | 3. build and self-sign an [`EnrollmentRequestV1`](#3-canonical-request-bytes): the Subject it asks to join, its Principal, the capabilities it asks for, a human label, a nonce | device | `SignedEnrollmentRequest` | **LIB-TESTED** (this slice) |
 | 4. carry the request to the authority edge (QR, link, local network) | carrier | — | transport: not built |
-| 5. `verify_enrollment_request`: the presenter holds the key it names. **Possession, not authority.** | edge | `Ok(())` or `BadSignature` | **LIB-TESTED** |
+| 5. `verify_enrollment_request`: the request is within its bounds (`EnrollmentRequestV1::validate`: label bound, non-empty ask, no `Recover`, re-checked because the fields are public; `sign_enrollment_request` checks it too) and the presenter holds the key it names. **Possession, not authority, and no standing in any institution.** | edge | `Ok(())`, `MalformedRequest(…)` or `BadSignature` | **LIB-TESTED** |
 | 6. show the human: label, device key fingerprint, requested capabilities, the context | edge UI | — | not built |
 | 7. the human approves with an **attenuated** grant (`granted ⊆ requested`, non-empty, never `Recover`), optionally a position span | edge | decision | — |
 | 8. `approve_enrollment`: refuses a request for another Subject, a wider-than-requested grant, an empty grant, `Recover`, or the establishment key as device; otherwise authors the N1 `Authorize` fact with the edge's establishment key at the next log position | edge | `SignedAuthorityEvent` | **LIB-TESTED** |
 | 9. the fact becomes durable at the edge (N1-D store, #2800) and reaches the device and relying parties | transport | facts in stores | N1-D PROPOSED; delivery not built |
-| 10. a relying party evaluates any later act with N4-A over the facts (carried by N4-B) | relying party | `DeviceAuthorityEvidence` or a refusal | LIB-TESTED + `icnctl` |
+| 10. a relying party evaluates any later act with N4-A over the facts (carried by N4-B); the result it relies on is the `VerifiedDeviceAct`, never bare evidence | relying party | `DeviceAuthorityEvidence` or a refusal | LIB-TESTED + `icnctl` |
 | 11. the device is lost or replaced: the edge authors `Revoke`; a fresh install presents a **new** request with a **new** key | edge, device | `SignedAuthorityEvent` | LIB-TESTED (`revoke_event`) |
 
 **Rejection** is silence: no fact is produced, and an unapproved request is never durable.

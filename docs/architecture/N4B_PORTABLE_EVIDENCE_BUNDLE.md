@@ -24,14 +24,14 @@ can state exactly what it has checked at each of the three steps between receivi
 accepting a device-signed act.
 
 > **Truth status.** Normative for the bundle bytes and for the verb's contract. **LIB-TESTED** for
-> the container (24 tests observed on icn-dev, plus an independent Python reference that
+> the container (25 tests observed 2026-10-27, plus an independent Python reference that
 > reproduces the vector and applies its own strict decoder) and **CLI-REACHABLE** for the verb
 > (5 end-to-end tests of the built binary). Not PRODUCTION: no runtime, route, daemon or
 > deployment calls either. The bundle changes nothing in N1 or N4-A. It is not a network protocol,
 > not N3 replication, not a persistence format or durability guarantee, not a session format, not
 > an enrollment or recovery protocol, not a Home or deployment format, and not an `icnd`, gateway
 > or SDK surface. It confers no institutional recognition, membership, standing or session
-> authority. It makes no claim that Katie's Pi or any real device is enrolled. **Fixture identities
+> authority. It makes no claim that any real person's device is enrolled. **Fixture identities
 > only** in every test; no real person's identity, keys or records are involved.
 
 > **One format.** This is the single canonical N4-B container, the result of converging two
@@ -63,7 +63,7 @@ N1 canonical bodies + witnesses
     ↓ EvidenceBundle::admit         -- every (body, witness) through AuthorityStore::ingest (§6)
 AuthorityStore
     ↓ verify_device_act(act, S, store, E)   -- the existing N4-A verifier (§7)
-DeviceAuthorityEvidence | refusal
+VerifiedDeviceAct | refusal
 ```
 
 No step may be skipped or merged. In particular, decoding a bundle **cannot** cause a fact to bypass
