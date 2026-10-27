@@ -1,0 +1,534 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Survey — recovery and continuity for a Home runtime under ICN N1 (read-only, 2026-10-03) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>survey 2026 10 04 continuity and recovery</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>descriptive</span></span></div> <article class="prose" data-astro-cid-uadgga6g><blockquote>
+<p><strong>Provenance.</strong> Read-only survey produced by a subagent of the 2026-10-03/04 Home
+identity-integration session, against this worktree at <code>b098396b5</code> (before N4-D landed). It
+modified nothing and ran no cargo. Every <code>file:line</code> is evidence to re-verify against the HEAD
+you are on; line numbers drift. Preserved verbatim here because its conclusions drive the N4-D,
+admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
+Title of record: Survey: what a person&#39;s durable continuity is in N1 (ContinuityRoot, pre-rotation, Rotate/Recover), loss scenarios, and the exact N7 gaps.</p>
+</blockquote>
+<blockquote>
+<p><strong>Edited 2026-10-27.</strong> Personal names, private machine paths and a private business example
+were replaced with neutral placeholders, and handoff links point at the renamed handoff. The
+survey is otherwise as recorded. Branch names are kept as the facts they are.</p>
+</blockquote>
+<blockquote>
+<p><strong>Convergence note (2026-10-04).</strong> Mentions below of <code>DeviceAuthorityBundleV1</code>,
+<code>icn.n4.device-authority-bundle</code>, <code>MAX_BUNDLE_FACTS</code>, <code>verify_bundle</code> / <code>store_from_bundle</code>,
+<code>device_authority_bundle.rs</code> and its tests describe N4-B as it stood when this record was
+written. N4-B has since been converged on <code>EvidenceBundle</code> (<code>icn.n4.evidence-bundle</code>,
+<code>evidence_bundle.rs</code>; <code>N4B_PORTABLE_EVIDENCE_BUNDLE.md</code> §11). Read those references as
+historical; the text is preserved as written.</p>
+</blockquote>
+<h1 id="survey--recovery-and-continuity-for-a-home-runtime-under-icn-n1-read-only-2026-10-03">Survey — recovery and continuity for a Home runtime under ICN N1 (read-only, 2026-10-03)</h1>
+<p>Source: a local worktree (machine path omitted),
+branch <code>task/katie-home-identity-integration</code> @ <code>b098396b5</code>. All paths relative to that root.
+No files modified, no cargo run. <code>gh</code> is available on the VM (2.99.0); issue #2603 was read with it.</p>
+<p>Abbreviations: IS = <code>docs/architecture/IDENTITY_SEMANTICS.md</code>; HIA = <code>docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md</code>;
+HRIP = <code>docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md</code>; GEN = <code>docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md</code>;
+N4C = <code>docs/architecture/N4C_DEVICE_ENROLLMENT_REQUEST.md</code>; <code>construct.rs</code>/<code>derive.rs</code>/<code>body.rs</code>/<code>mod.rs</code> =
+<code>icn/crates/icn-identity/src/authority_log/&lt;file&gt;</code>; <code>derived.rs</code> = <code>icn/crates/icn-identity/tests/authority_log_derived.rs</code>;
+<code>orders.rs</code> = <code>icn/crates/icn-identity/tests/authority_log_adversarial_orders.rs</code>.</p>
+<hr>
+<h2 id="1-what-object-is-the-durable-human-continuity">1. What object IS the durable human continuity</h2>
+<h3 id="11-the-contract">1.1 The contract</h3>
+<ul>
+<li>IS §2.5 (L207-224): <code>ContinuityRoot</code> is &quot;private secret material from which subject-context authority
+material may be derived, plus the person&#39;s own index of their subjects.&quot; Domain: &quot;opaque client-side secret.
+No public identifier form exists or may be defined&quot; (L212-213). Genesis &quot;client-side at first onboarding;
+phone-only onboarding must produce this by default&quot; (L214-215). It &quot;does not sign protocol acts. It derives
+and recovers Principals that do&quot; (L219-220). Admitted shortfall: &quot;compromise of the continuity secret is a
+takeover and is unrecoverable under the default recovery path. Recorded, not solved&quot; (L221-224).</li>
+<li>IS §10 (L581-628): the root is &quot;private continuity / recovery material&quot;, never in the canonical inception
+body, names nothing, obligation = secrecy (L585-590). &quot;<code>ContinuityRoot</code> must never enter canonical or public
+encoding. Protected local persistence, and future encrypted transfer, recovery or threshold sharing, are
+permitted — N7 (#2603) owns that protocol&quot; (L612-615). The live helper &quot;bundles the secret with the public
+<code>ContextNonce</code>&quot; and that is &quot;implementation debt, not unresolved semantics&quot; (L617-628).</li>
+<li>IS §2.2 (L140-147): the Subject&#39;s lifetime &quot;survives key rotation, device replacement, total device loss and
+algorithm change&quot; architecturally, but &quot;surviving total device loss in practice additionally requires the
+person&#39;s continuity material to be recoverable, and the protected backup / recovery / threshold-share
+protocol that would deliver that is N7 (#2603) — not built&quot;.</li>
+<li>HIA R1.2 [HARD] (L202-203): &quot;No institution, node, gateway or operator holds a key that lets it author acts
+as a human. <em>Custody defines identity.</em>&quot; R1.3 [HARD] (L204-205): loss of any infrastructure must not destroy
+the identity. R2.4 [STRONG] (L221-222): continuity &quot;must not require a permanent master secret whose
+compromise is unrecoverable&quot; — and §12.3 (L1770-1777) states path (a) <strong>does not meet R2.4/R9.5</strong>, trading
+them for R10.2.</li>
+<li>HIA §12.1 (L1677-1696): &quot;Pre-rotation is the recovery mechanism. The inception event commits to a digest of
+the next key set. If that next key set is derived from the continuity root, held in backup and not on any
+device, then total device loss is recovered by restoring the root, deriving the pre-committed keys, and
+rotating.&quot; And: &quot;it does not solve &#39;I lost my devices <em>and</em> my backup.&#39; ... a person who chose path (a) and
+lost both has lost the subject&quot; (L1689-1694).</li>
+<li>HIA §12.2 (L1698-1745): (a) self-recovery commits to &quot;keys derived from the continuity root (recovery
+phrase)&quot;, total-loss = &quot;restore phrase → rotate&quot;, root compromise = &quot;takeover, and unrecoverable&quot;, produced
+offline = yes; (b) guardian-gated commits to &quot;a threshold key set held by M-of-N guardians&quot;, needs an online
+quorum, and FROST-class N7 is &quot;a hard prerequisite&quot; (L1700-1719). &quot;Default is (a), upgradeable to (b) ...
+the <em>operational</em> keys live on the phone; the <em>pre-rotation</em> material is backed up off-device at onboarding&quot;
+(L1741-1745).</li>
+</ul>
+<h3 id="12-the-code-what-the-root-is-and-what-pre-rotation-does">1.2 The code: what the root is and what pre-rotation does</h3>
+<p><code>construct.rs</code>:</p>
+<ul>
+<li>L82-87: <code>pub struct ContinuityRoot { secret: Zeroizing&lt;[u8; 32]&gt;, context_nonce: ContextNonce, plan: Vec&lt;EstablishmentKind&gt; }</code>.
+<code>plan[g - 1]</code> is the kind armed for generation <code>g</code> (L85). No <code>Clone</code>, no <code>serde</code>, no encoder; only a <code>Debug</code>
+impl that never renders the secret (L89-97). There is <strong>no accessor for the secret</strong> at all; only
+<code>context_nonce()</code> (L128-130), <code>horizon()</code> (L123-125) and <code>kind_at(g)</code> (L133-138) are readable.</li>
+<li>L28-34: <code>pub enum EstablishmentKind { Rotate, Recover }</code> — &quot;The kind is inside the commitment, so exactly one
+is armed per generation. Path (a) and path (b) can never both be armed at the same position&quot; (L25-27).</li>
+<li>L101-107: <code>pub fn new(secret: [u8; 32], context_nonce: ContextNonce, horizon: usize) -&gt; Self</code> arms <code>horizon</code>
+generations, <strong>all <code>Rotate</code></strong>. L110-120: <code>pub fn with_plan(secret: [u8; 32], context_nonce: ContextNonce, plan: Vec&lt;EstablishmentKind&gt;) -&gt; Self</code>.</li>
+<li>L153-161 (private <code>authority_seed</code>): <code>seed = SHA-256(LP(KDF_DOMAIN) || b32(context_nonce) || u64be(generation) || b32(root))</code>.
+Inputs are the <strong>pre-subject nonce and the generation, never the SubjectId</strong> (L149-152). <code>KDF_DOMAIN = b&quot;icn.authority-log.kdf&quot;</code> (<code>mod.rs</code> L253).</li>
+<li>L164-166: <code>pub fn authority_signing_key(&amp;self, generation: u64) -&gt; SigningKey</code> — the per-generation Ed25519
+key, exportable as a <code>SigningKey</code> (this is the &quot;operational key&quot; the phone holds).</li>
+<li>L173-176: <code>pub fn authority_set(&amp;self, generation: u64) -&gt; PrincipalSet</code> — exactly one key per generation
+(&quot;preserves the single-writer property&quot;, L170-172).</li>
+<li>L183-203: <code>pub fn commitment(&amp;self, generation: u64) -&gt; Commitment</code> — backward fold from the horizon:
+<code>C_{horizon+1} = TERMINAL</code>, <code>C_g = H(kind_g ‖ PS(A_g) ‖ C_{g+1})</code> (L178-182), using <code>derive::commitment_for</code>
+(<code>derive.rs</code> L120-135: <code>SHA-256(LP(COMMITMENT_DOMAIN) || u8(kind) || PS(authority) || b32(next_commitment))</code>).
+Beyond the horizon the commitment is <code>Commitment::TERMINAL</code> (all-zero, <code>body.rs</code> L68-75), which &quot;authorizes
+nothing&quot; and freezes the authority set &quot;for the remaining life of the subject&quot; (<code>body.rs</code> L72-75).</li>
+<li>L209-223: <code>pub fn incept(&amp;self) -&gt; Result&lt;SignedAuthorityEvent, ConstructError&gt;</code> — inception body =
+<code>{signer: A_0, context_nonce, initial_authority: A_0, next_commitment: C_1}</code>, signed with key 0.
+L226-228: <code>pub fn subject_id(&amp;self) -&gt; Result&lt;SubjectId, ConstructError&gt;</code> = <code>event_id(inception body)</code>.</li>
+<li>L235-273: <code>pub fn establish(&amp;self, generation: u64, subject: SubjectId, position: u64, prev_digest: EventId) -&gt; Result&lt;SignedAuthorityEvent, ConstructError&gt;</code>
+— refuses generation 0 (L242-244) and generations outside the horizon (L245-250); builds
+<code>EstablishmentBody { header{subject, position, prev_digest, signer: A_g}, revealed_authority: A_g, next_commitment: C_{g+1} }</code>
+(L258-267); wraps as <code>Rotate</code> or <code>Recover</code> <strong>per the plan</strong>, not per caller choice (L268-271); signs with
+key <code>g</code> (L272). Deterministic: &quot;no entropy parameter&quot; (L232-234).</li>
+<li>L281-296: <code>pub fn establish_from_state(&amp;self, state: &amp;AuthorityState, subject: SubjectId, position: u64, prev_digest: EventId) -&gt; Result&lt;SignedAuthorityEvent, ConstructError&gt;</code>
+— refuses if <code>state.next_commitment.is_terminal()</code> (<code>ChainExhausted</code>, L288-290); sets
+<code>generation = state.generation + 1</code> (L291); refuses if <code>self.commitment(generation) != state.next_commitment</code>
+(<code>CommitmentMismatch</code>, L292-294); else delegates to <code>establish</code>. &quot;This is the safe entry point&quot; (L278-280).</li>
+<li>L47-76: <code>ConstructError::{GenerationOutOfRange, GenerationZero, CommitmentMismatch, ChainExhausted, Codec}</code>.</li>
+</ul>
+<p><code>derive.rs</code>:</p>
+<ul>
+<li>L49-61: <code>pub struct AuthorityState { pub authority: BTreeSet&lt;PrincipalKey&gt;, pub next_commitment: Commitment, pub generation: u64, pub devices: BTreeMap&lt;PrincipalKey, DeviceGrant&gt; }</code>.</li>
+<li>L161-186 <code>authorized_by_state</code>: <code>Rotate</code>/<code>Recover</code> are authorized <strong>iff</strong> <code>state.next_commitment</code> is not
+terminal (L165-168), the recomputed commitment over <code>(kind, revealed_authority, next_commitment)</code> equals
+<code>state.next_commitment</code> (L169-176), and the signer is the sole revealed principal (L177). <code>Authorize</code>/<code>Revoke</code>
+are authorized iff <code>signer ∈ state.authority</code> and <code>|authority| == 1</code> (L179-184). &quot;No capability, no flag,
+nothing that a compromised current key could use to claim establishment priority&quot; (L155-157).</li>
+<li>L218-227 <code>supersede</code>: establishment events, if any, supersede non-establishment; &quot;never by content&quot;
+(L213-217). L248-259 <code>resolve</code>: <code>0 → Exhausted</code>, <code>1 → Advance</code>, <code>≥2 → Halt</code>.</li>
+<li>L277-309 <code>apply_transition</code>: <strong><code>Rotate</code></strong> (L283-287) sets <code>authority = revealed</code>, <code>next_commitment = body.next_commitment</code>,
+<code>generation += 1</code>, <strong>devices untouched</strong>. <strong><code>Recover</code></strong> (L288-293) does the same <strong>and <code>next.devices.clear()</code></strong> (L292).
+<code>Authorize</code> inserts a <code>DeviceGrant{capabilities, validity, granted_at: position}</code> (L294-303); <code>Revoke</code> removes it (L304-306).
+Doc: &quot;<code>rotate</code> and <code>recover</code> both replace the authority set with the revealed set, so a superseding
+establishment actually removes a compromised key rather than extending around it ... They differ only in their
+effect on device grants: <code>rotate</code> preserves them, <code>recover</code> clears them&quot; (L273-276).</li>
+</ul>
+<p><code>body.rs</code>: <code>EstablishmentBody { header, revealed_authority, next_commitment }</code> (L516-524); <code>AuthorityBody::{Inception, Rotate, Authorize, Revoke, Recover}</code> (L552-563); wire tags <code>ROTATE = 0x02</code>, <code>RECOVER = 0x05</code> (<code>mod.rs</code> L263-269); <code>DeviceCapability::Recover</code> is &quot;an app-layer recovery role. <strong>Inert</strong> with respect to establishment authority&quot; (L351-359).</p>
+<p><code>mod.rs</code> L74-105 states the scheme once: &quot;Commitments are indexed by establishment generation <code>g</code>, not by log
+position&quot;; &quot;<code>Rotate</code> and <code>Recover</code> can never both be armed at the same position&quot;. L121-125 is the event table
+(Rotate: devices preserved; Recover: devices cleared).</p>
+<p><strong>Summary of pre-rotation in this code.</strong> The whole chain is a pure function of <code>(secret, nonce, plan)</code>. The
+secret is the only private input; the nonce is public (it sits in the inception body, <code>body.rs</code> L507, and is
+re-derivable from the GEN descriptor+salt, GEN §6.1 L158-168); the plan is <em>not</em> public but is pinned by
+<code>C_1</code> inside the inception body — a different plan/horizon yields a different <code>SubjectId</code>
+(<code>tests/gen_subject_context.rs</code> L310-324 <code>a_different_plan_horizon_changes_the_subject</code>; GEN §6.2 L182-193;
+<code>src/subject_context.rs</code> L115-128). A <code>Rotate</code> or <code>Recover</code> at generation <code>g</code> reveals <code>A_g</code>, commits <code>C_{g+1}</code>,
+and bumps <code>generation</code>; the old key leaves the authority set; <code>Recover</code> additionally wipes every device grant.</p>
+<h3 id="13-what-the-durable-human-continuity-therefore-is-concretely">1.3 What &quot;the durable human continuity&quot; therefore is, concretely</h3>
+<p>Three distinct things, which must not be conflated:</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Public?</th>
+<th>Where it lives</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SubjectId</code> (per context)</td>
+<td>yes, to the context</td>
+<td>in every relying party&#39;s store</td>
+<td>the durable name; fixed at inception, never changes under rotate/recover (IS §2.2 L130-139; HIA §12.3 L1781-1784)</td>
+</tr>
+<tr>
+<td><code>Bodies(σ)</code> + witnesses (<code>AuthorityStore</code>)</td>
+<td>yes</td>
+<td>any replica; grow-only, join = union (<code>mod.rs</code> L153-162)</td>
+<td>the authoritative <em>state</em> — every honest holder of the same set derives the same <code>AuthorityState</code> (R4.3/R4.5)</td>
+</tr>
+<tr>
+<td><code>(secret, nonce, plan)</code> → <code>ContinuityRoot</code></td>
+<td><strong>no</strong> (secret)</td>
+<td>person&#39;s client + protected backup only</td>
+<td>the only thing that can <em>advance</em> the establishment chain</td>
+</tr>
+</tbody></table>
+<p>The &quot;durable human continuity&quot; the question asks about is the pair: the public <code>SubjectId</code> as the name, and the
+private <code>(secret, plan)</code> (plus the recoverable nonce) as the sole capability to re-establish authority over
+that name. The person&#39;s &quot;index of their subjects&quot; (IS §2.5 L209; GEN §5.1 L116-120: the salt &quot;must be retained
+in the person&#39;s private subject index and protected recovery material&quot;) is the third, unbuilt, component.</p>
+<hr>
+<h2 id="2-issue-2603-n7--what-is-specified-what-is-needs-design">2. Issue #2603 (N7) — what is specified, what is <code>needs-design</code></h2>
+<p><code>gh issue view 2603 --repo InterCooperative-Network/icn</code> (OPEN; labels <code>area:identity, area:security, epic:arch-invariants, security-review, status:needs-design, tier:1-correctness, type:impl</code>).</p>
+<p><strong>Specified (purpose/invariants):</strong> &quot;the threshold/quorum recovery protocol for a human subject&quot;; &quot;a quorum can
+authorize one logical recovery transition without giving every qualifying quorum a subject-wide kill switch&quot;;
+&quot;N7 is therefore a protocol around threshold cryptography, not a synonym for FROST&quot;. Load-bearing invariants
+1-10: one logical transition per position; threshold key = one principal; canonical body before signing; one
+next-authority commitment; no second-quorum fork; no arrival-order selector; recovery is prospective;
+participant anti-equivocation survives restart; &quot;Recovery does not silently preserve compromised device grants.
+N1 <code>Recover</code> semantics clear device grants unless a later explicitly authorized flow re-establishes them&quot;;
+historical signature ≠ surviving authorization.</p>
+<p><strong><code>needs-design</code> (the Scope and Required-artifacts lists, none of which exist in code):</strong> guardian/group
+enrollment and rotation; threshold/group public principal representation; canonical recovery request/context
+(<code>RecoveryIntent</code>/session id); deterministic successor derivation; FROST/signing-session binding; participant
+durable anti-equivocation state; nonce/session lifecycle; offline guardian behaviour; guardian replacement/loss;
+lost-device vs stolen-device paths; compromised-current-authority vs compromised-recovery-group; competing
+attempts; observation via N3; mapping of the threshold result to the N1 <code>Recover</code> body/witness;
+post-recovery device-grant clearing/re-establishment; evidence/receipt shape; migration from legacy trustees.
+Acceptance criteria are all unchecked. Non-goals: guardians never own the subject; no global recovery registry;
+no independent M-of-N as final design; no production cutover. &quot;#2591 is not N7 completion.&quot;</p>
+<p><strong>Docs referencing #2603:</strong> IS L147, L224, L615, L696 (N7 row: N2 establishes &quot;the <code>ContinuityRoot</code> contract,
+including that protected export and threshold sharing are permitted (§10)&quot;; downstream = &quot;the protected backup
+/ recovery / threshold-share protocol, and the continuity-secret-compromise shortfall&quot;); N4C L125-127
+(&quot;Recovery. Out of scope here (N7, #2603) ... losing the <em>edge</em> is an establishment-authority event, handled
+by N1 pre-rotation, not by enrollment&quot;); HRIP §1 row (e) L61 (&quot;LIB-TESTED (establishment transitions); MISSING
+(guardian/threshold protocol, backup)&quot;); handoff <code>docs/dev/handoff-2026-10-03-home-identity-integration.md</code>
+L218 (&quot;recovery (N7 #2603)&quot; listed under &quot;Not done, named&quot;).</p>
+<p><strong>What the guardian/threshold protocol would add.</strong> Under path (b) the pre-committed <code>A_g</code> for some generation
+is a <em>group</em> key (one <code>PrincipalKey</code>, <code>mod.rs</code> L141-143 &quot;A future threshold/group key remains one
+<code>PrincipalKey</code>&quot;), so the reveal at that generation is a FROST-class group signature over the one canonical
+body. N1 already enforces the two rules that make this safe without halting: canonical derivation is <em>checked</em>
+(<code>derive.rs</code> L169-177) and exactly one kind+authority is armed per generation (<code>construct.rs</code> L25-27,
+<code>mod.rs</code> L103-105; HIA §9.2.1 constraint 3 L1183-1213). <code>mod.rs</code> L202-207: &quot;Guardian recovery is <strong>not</strong>
+implemented here. N7 ... is necessary but not sufficient ... the guardian workflow itself is out of scope.&quot;
+What N7 would add is therefore: (i) a way for the root to <em>arm</em> a group principal at a generation instead of a
+root-derived key (today <code>authority_set(g)</code> is always root-derived, <code>construct.rs</code> L173-176 — there is no hook
+for a foreign <code>A_g</code>), (ii) the ceremony that produces one signature over the one canonical body, (iii)
+guardian custody of shares rather than of the secret.</p>
+<p><strong>What &quot;root compromise is unrecoverable under the default path&quot; (IS L221-223) means.</strong> HIA §12.2 L1721-1733:
+an attacker holding the root &quot;derives the pre-committed keys, rotates first, and commits a fresh <code>next</code> digest
+the victim does not hold ... pre-rotation makes root compromise <em>more</em> decisive, not less. It is an excellent
+defence against <em>device</em> compromise and no defence at all against <em>backup</em> compromise.&quot; Note a precision
+against the live code: in <code>construct.rs</code> the next commitment is <strong>not</strong> freely chosen — it is
+<code>self.commitment(generation + 1)</code>, derived from the same root and plan (L266). So an attacker with the secret
+(and the plan, which is pinned by the public <code>C_1</code> and brute-forceable for small horizons) produces the
+<em>byte-identical</em> canonical rotation the victim would, and both parties hold every generation&#39;s key forever.
+The live outcome is a <strong>symmetric, permanent contest</strong>: either side forks any non-establishment position
+(<code>derived.rs</code> L261-305 obligation 11; <code>orders.rs</code> L205-234 case 9) and a superseding establishment never
+excludes the other (both derive <code>A_{g+1}</code>); each round burns one generation until <code>TERMINAL</code>, after which no
+establishment is authorized (<code>derive.rs</code> L165-168) and a fork is a permanent halt. Either reading
+(&quot;lock-out&quot; per the doc, &quot;shared authority to exhaustion&quot; per the code) is unrecoverable; the doc&#39;s sentence
+about a &quot;fresh <code>next</code> digest the victim does not hold&quot; does not describe <code>construct.rs</code>. HIA §9.6 item 7
+(L1545-1547): &quot;its compromise is takeover of every context <em>plus</em> full deanonymization, and under path (a) it
+is unrecoverable.&quot; R9.6&#39;s notice-and-veto window (HIA §12.3 L1757-1769) is the only mitigation and is a
+relying-party wall-clock policy, not code.</p>
+<hr>
+<h2 id="3-where-authoritative-continuity-state-may-live-vs-what-is-a-clientcache">3. Where authoritative continuity state may live vs what is a client/cache</h2>
+<p><strong>Authoritative state = the public body set.</strong> <code>mod.rs</code> L14-17: durable replicated state is &quot;two grow-only
+sets joined by union&quot;; the derived view is &quot;a pure function of the durable body set&quot;. HIA R4.5 (L246-253):
+authority may be evaluated against receiver-local replicated state iff it &quot;is itself authenticated and
+converges deterministically&quot;. So <em>any</em> replica — phone, Home VM, relying party — holding <code>Bodies(σ)</code> is equally
+authoritative about the derived <code>AuthorityState</code>; none is &quot;the&quot; source. The caveat is completeness, not
+authority: HIA §18 O17 (L2140-2141) &quot;A truncated-but-valid prefix verifies perfectly and yields a stale
+authority state&quot;; N4-A therefore fails closed when the retained prefix does not reach <code>E</code>
+(<code>src/device_authority.rs</code> L312-323 <code>PrefixIncomplete</code>; <code>derive.rs</code> L452-454). A Home VM&#39;s store is thus a
+<strong>cache of facts</strong> whose verdicts are exact for the prefix it holds and unknowable beyond it.</p>
+<p><strong>Secret material: client only.</strong> IS §2.5 L212 (&quot;opaque client-side secret&quot;), §5 item 4 (L337-339): &quot;No
+protocol party may hold the linkage; the only linkage that exists lives in the client-held <code>ContinuityRoot</code>&quot;;
+§10 L612-615. HIA R1.2 L202-203; R3.1 L225-226 (&quot;A device holds its own key and never receives another
+principal&#39;s key&quot;); R8.4 L289 (&quot;A relay relays without holding any key of the author&quot;); §11.1 L1609 (node
+operator/gateway &quot;does not learn ... the continuity root&quot;); §8 scenarios 11-13 (L913-917: gateway, personal
+node, malicious host &quot;holds no subject key and cannot author&quot;).</p>
+<p><strong>HRIP §5/§6.3 verified against those contracts.</strong> HRIP §5 L163-164 (continuity root &quot;on the person&#39;s own
+client — the phone is the authority edge — with pre-rotation material backed up off-device at onboarding ...
+A VM-hosted Home runtime holds <em>public</em> N1 facts and the VM&#39;s own device keys; it is a <strong>device Principal</strong>
+... not a custodian ... the default is refuse, and a host operated for someone else never qualifies&quot;) and
+§6.3 L200-207 (stores public facts, device acts + evidence, its own per-context device keys; &quot;never: any
+<code>ContinuityRoot</code>, any other device&#39;s secret, any human establishment key, any cross-context mapping&quot;) are
+consistent with IS §2.7 L238-240 (a device &quot;generates its own key. A device never receives another
+Principal&#39;s key&quot;), IS §2.5, IS §10, HIA R1.2/R3.1/R8.4, and I10 (IS L648). §6.6 L236-249 MUST NOT list
+(&quot;hold or derive a <code>ContinuityRoot</code> on infrastructure; ... build an enrollment, revocation or recovery mechanism
+of its own&quot;) matches IS §13 L707-709 (&quot;Explicitly not smuggled into N2 ... protected continuity backup/recovery&quot;).
+Nothing in the contracts contradicts the profile. One sharpening the code supports: the phone need not hold the
+root after onboarding — <code>authority_signing_key(g)</code> is an exportable <code>SigningKey</code> (<code>construct.rs</code> L164-166) and
+<code>approve_enrollment</code> takes only <code>establishment_key: &amp;SigningKey</code> (<code>src/device_enrollment.rs</code> L279-287), so the
+&quot;operational key on the phone, pre-rotation material off-device&quot; split (HIA L1741-1745) is realisable with
+today&#39;s API: phone = <code>SigningKey</code> for the current generation; backup = <code>(secret, plan)</code>.</p>
+<hr>
+<h2 id="4-loss-scenarios-from-the-codes-semantics">4. Loss scenarios, from the code&#39;s semantics</h2>
+<h3 id="a-loss-of-an-ordinary-enrolled-device--revoke">(a) Loss of an ordinary enrolled device → <code>Revoke</code></h3>
+<p><code>construct.rs</code> L339-356 <code>revoke_event(signer_key: &amp;SigningKey, subject, position, prev_digest, device) -&gt; SignedAuthorityEvent</code>,
+signed by the current establishment key; authorized iff signer ∈ <code>state.authority</code> (<code>derive.rs</code> L182-184);
+effect <code>devices.remove(&amp;device)</code> (L304-306). The Subject is untouched: <code>tests/device_lifecycle_acceptance.rs</code>
+L194-211 pins <code>authority</code>, <code>next_commitment</code> and <code>generation</code> (still 0) identical before and after, and
+<code>tests/device_authority.rs</code> (25 tests) pins refusal at <code>E ≥</code> revoke and acceptance at earlier <code>E</code>. HRIP §6.4
+L209-220; N4C L120-123; IS §2.7 L246 (&quot;Losing a device does not touch the subject&quot;). Replacement = <code>Revoke(old)</code></p>
+<ul>
+<li>a new N4-C request/approval with a new key. No recovery authority is lost because enrollment never grants
+<code>Recover</code> (<code>src/device_enrollment.rs</code> L293-295 <code>RecoverNeverGranted</code>; N4C L125-126).</li>
+</ul>
+<h3 id="b-loss-of-the-phone-authority-edge-with-the-root-material-backed-up">(b) Loss of the phone (authority edge) with the root material backed up</h3>
+<p>A replacement edge rebuilds <code>ContinuityRoot::with_plan(secret, nonce, plan)</code> (<code>construct.rs</code> L110-120) — the
+nonce from the public inception body or from the GEN descriptor+salt — then calls
+<code>establish_from_state(&amp;state, subject, frontier, chosen(frontier−1).event_id())</code> where <code>state</code> is the
+<code>AuthorityView::Live { state, frontier }</code> derived from any complete replica. By construction:</p>
+<ul>
+<li>same <code>SubjectId</code> — the identifier is <code>event_id(inception)</code> and no later event rewrites it (<code>body.rs</code> L593-596; HIA §12.3 L1781-1784);</li>
+<li><code>generation + 1</code>, authority = <code>A_1</code>, <code>next_commitment = C_2</code> (<code>derive.rs</code> L283-287);</li>
+<li>device grants <strong>preserved</strong> if the armed kind is <code>Rotate</code> (<code>derive.rs</code> L283-287; <code>derived.rs</code> L1176-1203
+<code>rotate_preserves_devices_and_recover_clears_them</code> proves a grant at position 1 survives a <code>Rotate</code> at 2 with
+<code>generation == 1</code>), cleared if <code>Recover</code>;</li>
+<li>the old edge key (<code>A_0</code>) is no longer in <code>authority</code>, so its later <code>Authorize</code>/<code>Revoke</code> are unauthorized
+(<code>derived.rs</code> L349-366: &quot;the rotated-out key cannot author again&quot;, proven after a superseding <code>Rotate</code>);</li>
+<li>the new edge authors with <code>authority_signing_key(1)</code> (<code>orders.rs</code> L264-268 <code>authorize_at(&amp;alpha, 1, …)</code> advances the frontier).</li>
+</ul>
+<p>Determinism means a crash-and-retry at the replacement edge re-emits identical bytes (<code>derived.rs</code> L786-803
+obligation 15, including &quot;A freshly rebuilt root with the same secret and nonce reproduces the same bytes&quot;
+L804-810). <strong>Gap:</strong> no existing test exercises the <em>positive</em> <code>establish_from_state</code> path — its only call
+site in tests is the negative <code>CommitmentMismatch</code> check (<code>derived.rs</code> L820-830); every positive establishment
+in the suite goes through <code>establish(generation, …)</code> with a caller-supplied generation. No test composes
+&quot;rebuild root from the triple → <code>establish_from_state</code> at the frontier → grants intact → old key refused →
+new key approves an N4-C enrollment → N4-B relying party reports <code>evidence.generation == 1</code>&quot;.</p>
+<p>Constraint: the <em>kind</em> is fixed by the plan at genesis. With <code>ContinuityRoot::new</code> every generation is <code>Rotate</code>
+(<code>construct.rs</code> L105); a Home that ever wants a grant-clearing <code>Recover</code> must arm it via <code>with_plan</code> <strong>before
+inception</strong>, because changing the plan changes <code>C_1</code> and therefore the Subject (GEN §6.2 L191-193).</p>
+<h3 id="c-compromise-of-the-current-establishment-key-not-the-root">(c) Compromise of the current establishment key (not the root)</h3>
+<p>What the compromised key can do: fork any non-establishment position (<code>derived.rs</code> L261-283 obligation 11;
+<code>orders.rs</code> L205-234 case 9: &quot;current-key compromise is an instant DoS; the model converges ON A HALTED
+SUBJECT&quot;); it <strong>cannot</strong> rotate because it holds no pre-committed material (<code>derived.rs</code> L286-305; HIA §9.2
+L993-995; §8 scenario 1 L905). A <code>Recover</code> <em>capability</em> on a device grants nothing (<code>derived.rs</code> L688-740).</p>
+<p>What the root holder does: author the next armed establishment <strong>at the disputed position</strong> (<code>derived.rs</code>
+L328-334 &quot;Recovery must rotate AT the disputed position, not the next one&quot;). Proven: it supersedes both
+non-establishment candidates, the frontier advances (L336-341), the victim&#39;s own event at that position is
+also discarded (&quot;a real cost of recovery&quot;, L343-347), the compromised key leaves the authority set and its
+replay at the next position is refused (L349-366); every delivery order converges (<code>orders.rs</code> L237-268
+case 10; L270-331 mixed scenario). A fork behind the frontier orphans the whole suffix including honest
+grants, which remain durable facts but lose authorization (<code>derived.rs</code> L914-996 obligation 17; O-N9).</p>
+<p>Whether it is a <code>Rotate</code> or a <code>Recover</code> is decided by the plan, not at the moment of compromise. The
+distinction matters for a <em>stealthy</em> attacker who appends <code>Authorize(attacker_device)</code> in-chain at the frontier
+without forking: a <code>Rotate</code> keeps that grant (the new edge must then <code>Revoke</code> it with key <code>g+1</code>), a <code>Recover</code>
+clears it with every other grant (<code>derive.rs</code> L288-293; proven generically by <code>derived.rs</code> L1176-1203). Issue
+#2603 invariant 9 restates this. N1&#39;s own limit: &quot;O16/O16′ (a single compromised current key halts a subject
+unilaterally; that is reproduced as a test, not prevented)&quot; (<code>mod.rs</code> L180-181).</p>
+<h3 id="d-loss-of-every-device-including-the-edge-and-the-backup">(d) Loss of every device including the edge AND the backup</h3>
+<p>Nothing in the code can advance the chain: <code>establish</code>/<code>establish_from_state</code> need the secret; there is no
+other constructor of an authorized establishment body (<code>derive.rs</code> L169-177 requires the exact pre-image).
+What survives: the <code>SubjectId</code> and its public history (R2.3 for pre-fork positions); the frozen
+<code>AuthorityState</code> at the frontier with <code>A_g</code> in <code>authority</code> and every device grant still in force — a grant
+with <code>validity: None</code> is in force at every later position (<code>derive.rs</code> L36-44), and since positions only
+advance when the authority key signs, position-denominated spans never lapse either. So enrolled devices keep
+acting within their grants indefinitely and nobody can <code>Revoke</code> them (HIA §9.3 L1364-1372 for class 2 is the
+same shape). The Subject is <strong>orphaned, not halted</strong>: <code>AuthorityView::Live</code> forever at the same frontier. HIA
+§12.1 L1689-1694 (&quot;has lost the subject&quot;); §8 scenario 8 L917 (&quot;R9.1 [HARD] is not fully met&quot;); §9.6 item 8
+L1548-1550; §18 O14 row L2136 (&quot;the custody question remains&quot;). Starting over means a new genesis per context,
+which GEN §5.3 L149-154 says a client MUST refuse &quot;unless a separately specified recovery or migration flow
+authorizes it&quot; — that flow does not exist, and institutional re-recognition is FACT B / GEN (#2602), not N1.</p>
+<hr>
+<h2 id="5-the-exact-missing-pieces-for-a-home">5. The exact missing pieces for a Home</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>State in code</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ContinuityRoot</code> persistence/export format</td>
+<td><strong>None.</strong> No <code>Clone</code>, no <code>serde</code>, no canonical encoder (<code>encoding.rs</code> has no mention of the root); the secret is <code>Zeroizing</code> and has no accessor (<code>construct.rs</code> L82-87, L89-97). What <em>can</em> be exported is the caller&#39;s own copy of the inputs <code>(secret: [u8;32], plan: Vec&lt;EstablishmentKind&gt;)</code> captured before construction, plus the public nonce (inception body / GEN salt). <code>horizon()</code> and <code>kind_at(g)</code> let a holder of the live root read the plan back; the secret cannot be read back. Any bundle format, encryption, and I4a enforcement on the real codec are N2-F′ (IS §14 L747) and N7</td>
+<td>N7 #2603 (format/protection); N2-F′ (codec boundary)</td>
+</tr>
+<tr>
+<td>Backup of pre-rotation material &quot;off-device at onboarding&quot; (HIA L1741-1745)</td>
+<td>DOC-ONLY. No onboarding flow, no backup object, no phone client. The <em>shape</em> is realisable: phone keeps <code>authority_signing_key(g)</code>, backup keeps <code>(secret, plan, nonce-or-salt)</code></td>
+<td>N7 #2603; &quot;Slice C (mobile genesis) ... must now also produce ... off-device pre-rotation backup&quot; (HIA §18 L2143)</td>
+</tr>
+<tr>
+<td>Per-context subject index (which contexts, which salt, which plan)</td>
+<td>MISSING (GEN §5.1 L116-120; IS §2.5 L209)</td>
+<td>GEN #2602 / N7</td>
+</tr>
+<tr>
+<td>Guardian threshold shares, group principal, ceremony</td>
+<td>MISSING entirely; no hook to arm a non-root-derived <code>A_g</code> (<code>construct.rs</code> L173-176)</td>
+<td>N7 #2603 (<code>needs-design</code>)</td>
+</tr>
+<tr>
+<td>Re-establishment of a replacement edge</td>
+<td>LIB-TESTED mechanism (<code>with_plan</code> + <code>establish_from_state</code>), <strong>untested as a composed scenario</strong>; the positive <code>establish_from_state</code> path has zero test coverage (<code>derived.rs</code> L820-830 is the only call, negative)</td>
+<td>this session can add a fixture test; the ceremony/transport is N4/N3</td>
+</tr>
+<tr>
+<td>Delivery of the rotation fact to the Home and relying parties</td>
+<td>MISSING (HRIP §6.2 L195-196; N1-D #2800; N3 #2598)</td>
+<td>#2800, #2598</td>
+</tr>
+<tr>
+<td>Contest window (R9.6 notice-and-veto)</td>
+<td>DOC-ONLY policy, wall-clock, relying-party side (HIA §12.3 L1757-1769); no issue found that owns it</td>
+<td>none found</td>
+</tr>
+<tr>
+<td>&quot;Lost everything&quot; re-genesis / migration flow and institutional re-recognition</td>
+<td>MISSING (GEN §5.3 L149-154)</td>
+<td>GEN #2602 (FACT B)</td>
+</tr>
+<tr>
+<td>Historical authorization evidence after superseding recovery (O-N9)</td>
+<td>OPEN; no evidence format (<code>mod.rs</code> L196-200)</td>
+<td>no issue number cited in IS §13; O-N7 is #2606</td>
+</tr>
+</tbody></table>
+<p>Tests that exist for <code>establish_from_state</code>: exactly one, negative — <code>derived.rs</code> L820-830 (a root applied to a
+stranger&#39;s state returns <code>Err</code>). Tests for the pieces it composes: <code>establish</code> determinism L786-840; generation
+skip/replay L518-548; superseding at a disputed position L308-367, L914-996; <code>rotate_preserves_devices_and_recover_clears_them</code> L1176-1203; wrong-plan ⇒ different Subject <code>tests/gen_subject_context.rs</code> L310-324.</p>
+<hr>
+<h2 id="6-recommendation--the-narrowest-executable-piece-and-what-is-missing">6. Recommendation — the narrowest executable piece, and what is missing</h2>
+<h3 id="61-recommended-one-fixture-test-testsedge_replacement_acceptancers-or-appended-to-device_lifecycle_acceptancers">6.1 Recommended: one fixture test, <code>tests/edge_replacement_acceptance.rs</code> (or appended to <code>device_lifecycle_acceptance.rs</code>)</h3>
+<p>&quot;<strong>Phone lost; a replacement edge rebuilt from the backed-up <code>(secret, plan)</code> and the public nonce rotates to
+generation 1 with the same <code>SubjectId</code> and intact device grants; the old edge key can no longer author; the
+new edge approves a new device through N4-C; an N4-B relying party accepts it with <code>evidence.generation == 1</code>;
+verdicts are order-independent.</strong>&quot; Everything it needs exists and is <code>pub</code>; it invents no custody, transport,
+backup format or recovery protocol, and it is the first positive exercise of <code>establish_from_state</code>.</p>
+<p>Steps and the exact functions:</p>
+<ol>
+<li>Genesis as today: <code>authority_log_support::subject_with_plan(seed, vec![EstablishmentKind::Rotate; 4])</code>
+(support L36-49) — keep the raw <code>[seed;32]</code> secret and the plan <em>outside</em> the root as the &quot;backup&quot;.</li>
+<li>Edge key 0 = <code>root.authority_signing_key(0)</code>; enrol A and B exactly as <code>device_lifecycle_acceptance.rs</code>
+L45-61 does (<code>sign_enrollment_request</code> → <code>verify_enrollment_request</code> →
+<code>approve_enrollment(&amp;signed, &amp;edge0, subject, position, prev, grant, None)</code>).</li>
+<li>Simulate loss: drop <code>root</code> and <code>edge0</code>. Rebuild
+<code>ContinuityRoot::with_plan(secret: [u8; 32], context_nonce: ContextNonce, plan: Vec&lt;EstablishmentKind&gt;) -&gt; Self</code>
+with <code>context_nonce</code> read from the inception body (<code>InceptionBody.context_nonce</code>, <code>body.rs</code> L507) rather than
+from the dropped root, to prove the nonce is recoverable from public facts.</li>
+<li>Derive the live state: <code>derive(subject, &amp;store) -&gt; AuthorityView</code>; take <code>Live { state, frontier }</code>.</li>
+<li><code>rebuilt.establish_from_state(&amp;state, subject, frontier, chosen_prev) -&gt; Result&lt;SignedAuthorityEvent, ConstructError&gt;</code>
+where <code>chosen_prev</code> is the <code>event_id</code> of the last chosen body (the B grant). Assert <code>Ok</code>, body is <code>Rotate</code>.</li>
+<li>Ingest; re-derive; assert <code>state.generation == 1</code>, <code>state.authority == rebuilt.authority_set(1).members()</code>,
+<code>state.next_commitment == rebuilt.commitment(2)</code>, <code>devices</code> contains A and B with their original <code>granted_at</code>,
+<code>inception.body.subject() == subject</code> unchanged.</li>
+<li>Old key: <code>authorize_event(&amp;edge0, subject, frontier+1, rotation_id, device, caps, None)</code> ingests (admissible)
+but the frontier does not move — pins &quot;the old edge key can no longer author&quot;.</li>
+<li>New edge: <code>approve_enrollment(&amp;rebuilt.authority_signing_key(1), …)</code> enrols C at <code>frontier+1</code>; a relying
+party via <code>DeviceAuthorityBundleV1::new(facts, act).canonical_bytes()</code> + <code>verify_bundle_bytes(&amp;bytes, subject, E)</code>
+returns evidence with <code>generation == 1</code> for C, and still accepts B at the same <code>E</code>.</li>
+<li>Negative sibling (cheap, high value): a backup with the <em>wrong plan</em> (<code>vec![Rotate; 5]</code>) rebuilt against the
+same state returns <code>Err(ConstructError::CommitmentMismatch { generation: 1 })</code> — pins &quot;the plan is part of
+the identity and must be in the backup&quot; on the <em>establishment</em> path (today pinned only on the genesis path,
+<code>gen_subject_context.rs</code> L310-324).</li>
+<li><code>for order in permutations(&amp;all)</code> as in <code>device_lifecycle_acceptance.rs</code> L213-.</li>
+</ol>
+<p>Classification to record: LIB-TESTED fixture; <strong>not</strong> N7; backup is a test-local <code>[u8;32]</code> + <code>Vec</code>, not a
+format. The test should say so in its header exactly as <code>device_lifecycle_acceptance.rs</code> L1-21 does.</p>
+<h3 id="62-missing-protocolstate-transitions-with-owners">6.2 Missing protocol/state transitions, with owners</h3>
+<ul>
+<li>Protected backup/export of <code>(secret, plan[, salt])</code>, its format, encryption, and the onboarding step that
+produces it — <strong>N7 #2603</strong> (IS §10 L612-615; HIA §12.2 L1741-1745; HIA §18 Slice C L2143).</li>
+<li>Guardian path (b): group principal armed at a generation, FROST-class one-message signing, shares, anti-equivocation
+state — <strong>N7 #2603</strong> (<code>needs-design</code>); requires a construction hook that does not exist (<code>construct.rs</code> L173-176).</li>
+<li>Carriage of the rotation fact and of enrollment requests/approvals — <strong>N1-D #2800, N3 #2598, N4 #2599</strong>.</li>
+<li>Per-context subject index and the client rule against a second genesis — <strong>GEN #2602</strong> (§5.1, §5.3).</li>
+<li>R9.6 contest window at relying parties — policy only, no owning issue found.</li>
+<li>Historical authorization evidence after supersession (O-N9) — open, no owning issue cited in IS §13.</li>
+<li>The IS §2.5 shortfall itself (root compromise) — recorded, not solvable in N1; <strong>N7 #2603</strong>.</li>
+</ul>
+<h3 id="63-flag-for-the-docs-not-for-this-session-to-fix">6.3 Flag for the docs (not for this session to fix)</h3>
+<p>HIA §12.2 L1724-1726 (&quot;commits a fresh <code>next</code> digest the victim does not hold&quot;) describes a non-deterministic
+rotation; <code>construct.rs</code> L266 derives <code>next_commitment</code> from the root, so under the live code root compromise is
+symmetric shared authority until <code>TERMINAL</code>, not a one-sided lock-out. Same verdict (unrecoverable), different
+mechanism; worth a one-line amendment when N7 is designed.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/survey-2026-10-04-continuity-and-recovery.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

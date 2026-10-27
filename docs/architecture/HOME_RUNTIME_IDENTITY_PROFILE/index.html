@@ -72,7 +72,7 @@ downstream document that frames a Home runtime as a <em>contract layer</em> shou
 consumption profile of ICN identity</strong> — this document — and nothing more.</p>
 <hr>
 <h2 id="1-primitive-map-acceptance-item-1">1. Primitive map (acceptance item 1)</h2>
-<p>Classes: <strong>PRODUCTION</strong> reachable from a shipped binary/route · <strong>LIB-TESTED</strong> implemented and
+<p>Classes: <strong>PRODUCTION</strong> exercised by a running node, route or deployment (operationally wired; ADR-0032/0033 maturity claims need that evidence) · <strong>CLI-REACHABLE</strong> executable by an operator from a workspace binary, with end-to-end tests, but wired into no runtime, route, deployment or profile · <strong>LIB-TESTED</strong> implemented and
 tested, no runtime caller · <strong>FIXTURE-ONLY</strong> exists only inside tests · <strong>EXPERIMENTAL</strong> present
 but unreachable, stubbed or unsafe · <strong>DOC-ONLY</strong> · <strong>MISSING</strong>.</p>
 <table>
@@ -157,17 +157,45 @@ but unreachable, stubbed or unsafe · <strong>DOC-ONLY</strong> · <strong>MISSI
 </tr>
 <tr>
 <td>(g) external facts+act container</td>
-<td>—</td>
-<td><strong>MISSING</strong></td>
-<td>N4-A doc §9.2 item 2</td>
-<td>nothing carries N1 facts across a process boundary</td>
+<td><code>EvidenceBundle</code> (<code>icn.n4.evidence-bundle</code>), <code>verify_evidence_bundle</code> (N4-B, converged 2026-10-04)</td>
+<td>LIB-TESTED (25 tests observed 2026-10-27 + an independent Python reference)</td>
+<td><code>N4B_PORTABLE_EVIDENCE_BUNDLE.md</code></td>
+<td><code>evidence_bundle.rs</code>; fact record = N1-D layout</td>
 </tr>
 <tr>
 <td>(h) stateless CLI consumer</td>
-<td>—</td>
-<td><strong>MISSING</strong></td>
-<td>N4-A doc §9.2 item 3</td>
-<td><code>icnctl</code> has <code>id</code>/<code>device</code>/<code>recovery</code> verbs over legacy objects only</td>
+<td><code>icnctl device-authority verify|inspect</code></td>
+<td>CLI-REACHABLE (5 end-to-end tests observed on icn-dev) — a relying party, never an authority; not PRODUCTION: no runtime, route or deployment exercises it</td>
+<td>N4-B §9</td>
+<td><code>bins/icnctl/src/device_authority.rs</code></td>
+</tr>
+<tr>
+<td>(h′) enrollment request and attenuated approval</td>
+<td><code>EnrollmentRequestV1</code>, <code>approve_enrollment</code> (N4-C)</td>
+<td>LIB-TESTED (11 tests observed 2026-10-27; ceremony end to end in a fixture)</td>
+<td><code>N4C_DEVICE_ENROLLMENT_REQUEST.md</code></td>
+<td><code>device_enrollment.rs</code>; transport, UI, delivery not built</td>
+</tr>
+<tr>
+<td>(m) device ↔ transport-channel binding</td>
+<td><code>ChannelBindingV1</code> as the payload of a <code>Present</code> <code>DeviceActV1</code> (N4-D)</td>
+<td>LIB-TESTED (16 tests observed 2026-10-27; a connection is admitted only through N4-E current admission, <code>admit_channel_binding</code>; <code>verify_channel_binding_at</code> is the separate historical question); no runtime calls it</td>
+<td><code>N4D_DEVICE_CHANNEL_BINDING.md</code></td>
+<td><code>device_channel_binding.rs</code>; node <code>BindingInfo</code> not reused</td>
+</tr>
+<tr>
+<td>(n) current admission position (class 2)</td>
+<td><code>admission_position</code>, <code>verify_device_act_at_admission</code> (N4-E)</td>
+<td>LIB-TESTED (9 tests observed 2026-10-27)</td>
+<td><code>N4E_CURRENT_ADMISSION.md</code></td>
+<td><code>device_admission.rs</code>; position from the relying party&#39;s own facts, never the act</td>
+</tr>
+<tr>
+<td>(h″) the two-device acceptance invariant through every boundary</td>
+<td><code>tests/device_lifecycle_acceptance.rs</code></td>
+<td>LIB-TESTED (2 tests observed on icn-dev)</td>
+<td>this document §2</td>
+<td>request → approval → facts → bundle bytes → verdict; A revoked, B accepted, S unchanged; order-independent; stale facts fail closed</td>
 </tr>
 <tr>
 <td>(i) context kinds</td>
@@ -198,8 +226,9 @@ but unreachable, stubbed or unsafe · <strong>DOC-ONLY</strong> · <strong>MISSI
 <td><code>bundle.rs:181</code>; <code>handlers/hello.rs</code></td>
 </tr>
 </tbody></table>
-<p><strong>What a Home runtime consumes today, truthfully:</strong> rows (a), (b), (c), (c′), (d) as a Rust
-library. Nothing else. Rows (g)–(i) are the seam it is waiting on.</p>
+<p><strong>What a Home runtime consumes today, truthfully:</strong> rows (a), (b), (c), (c′), (d), (g) and (h′)
+as a Rust library, and row (h) as a stateless <code>icnctl</code> verb. Row (i) (context kinds) and the
+transport/delivery around (h′) are the seam it is still waiting on.</p>
 <hr>
 <h2 id="2-the-fixture-test-acceptance-item-2--done">2. The fixture test (acceptance item 2) — done</h2>
 <p><code>icn/crates/icn-identity/tests/device_authority.rs</code> (PR #2807): Subject <code>S</code>; <code>A</code> authorized at 1,
@@ -207,6 +236,14 @@ library. Nothing else. Rows (g)–(i) are the seam it is waiting on.</p>
 evidence <code>{granted_at: 2, generation: 0}</code>; <code>S</code>&#39;s identifier, authority set, generation and next
 commitment identical before and after; <code>A ∉ devices</code>, <code>B ∈ devices</code>, <code>B ∉ authority</code>; device bytes ≠
 Subject bytes. <code>A</code>&#39;s act at <code>E = 2</code> still verifies. 25 tests; independent reference 4/4.</p>
+<p><strong>Extended through every boundary (2026-10-04):</strong> <code>tests/device_lifecycle_acceptance.rs</code> enrols <code>A</code>
+and <code>B</code> through N4-C requests and attenuated approvals, carries the facts and each act as N4-B
+bytes to an independent relying party, revokes <code>A</code>, and pins: <code>A</code> refused and <code>B</code> accepted at the
+current position; <code>S</code>&#39;s identifier, authority set, generation (still 0: nothing rotates) and
+pre-rotation commitment unchanged; the same verdicts for every arrival order of the facts; and a
+relying party that evaluates at a position it does not hold failing closed (<code>PrefixIncomplete</code>).
+A relying party whose facts stop before the revocation still accepts <code>A</code> at its own older tip:
+it is behind, not deceived (N4-E §4). 2 tests observed 2026-10-27.</p>
 <hr>
 <h2 id="3-the-external-verification-boundary-acceptance-item-3">3. The external verification boundary (acceptance item 3)</h2>
 <table>
@@ -226,11 +263,11 @@ Subject bytes. <code>A</code>&#39;s act at <code>E = 2</code> still verifies. 25
 </tr>
 <tr>
 <td>deterministic container for <strong>(N1 facts, act)</strong> that a non-Rust client can carry</td>
-<td><strong>MISSING — the exact missing piece</strong></td>
+<td><strong>built — N4-B</strong> (<code>EvidenceBundle</code>, <code>icn.n4.evidence-bundle</code>; 25 tests; independent Python reference)</td>
 </tr>
 <tr>
 <td>stateless <code>icnctl</code> verb consuming that container, no <code>icnd</code></td>
-<td>MISSING (follows the container)</td>
+<td><strong>built — <code>icnctl device-authority verify|inspect</code></strong> (exit 0/1/2 = authorized/refused/malformed; 5 end-to-end tests)</td>
 </tr>
 <tr>
 <td>gateway route</td>
@@ -238,9 +275,10 @@ Subject bytes. <code>A</code>&#39;s act at <code>E = 2</code> still verifies. 25
 </tr>
 </tbody></table>
 <p>The container&#39;s record layout should align with #2800&#39;s <code>event_id ‖ signature → canonical body</code>
-so that &quot;what the daemon persists&quot; and &quot;what a client carries&quot; are one framing. Until it lands,
-<em>external systems consume ICN truth</em> stops at the Rust API, and the Home runtime has no
-identity-bearing thing to build.</p>
+so that &quot;what the daemon persists&quot; and &quot;what a client carries&quot; are one framing. With N4-B landed,
+<em>external systems consume ICN truth</em> reaches a stateless CLI relying party; what the Home runtime
+still lacks is the ceremony transport (N4-C defines the request and approval, not their carriage)
+and a context kind for personal/household contexts (#2602).</p>
 <hr>
 <h2 id="4-gen-stance-for-private--household--a-persons-own-project-acceptance-item-4">4. GEN stance for Private / Household / a person&#39;s own project (acceptance item 4)</h2>
 <p><strong>Can a personal or household context exist today without a <code>GovernanceDomain</code>?</strong></p>
@@ -276,6 +314,10 @@ defines&quot;).</p>
 </tr>
 </tbody></table>
 <p><strong>Proposed shape, for #2602 to decide (not decided here):</strong></p>
+<blockquote>
+<p><strong>NON-NORMATIVE</strong> until #2602 decides: neither kind exists, nothing may implement or rely on
+them, and the kind byte would feed the N1 KDF permanently.</p>
+</blockquote>
 <ul>
 <li><code>PersonalContextV1</code> — one human, no other party. <code>context_id</code> is an opaque 32-byte descriptor
 digest the person&#39;s own client mints and keeps; it is never published beyond the person&#39;s own
@@ -356,10 +398,10 @@ pretends to be the ICN one.</p>
 <td>no <code>SubjectId</code> in the derivation</td>
 </tr>
 <tr>
-<td><strong>present</strong> to the authority edge: the per-context device public key, spelled <code>did:icn:&lt;multibase&gt;</code> or raw 32 bytes, plus a human-readable device label</td>
-<td>an enrollment <em>request</em> — not an ICN object yet</td>
-<td><strong>MISSING</strong> (N4 request shape)</td>
-<td>the request carries <strong>no</strong> certificate, no Subject, no claim of authority</td>
+<td><strong>present</strong> to the authority edge a self-signed <code>EnrollmentRequestV1</code>: the Subject it asks to join, its per-context Principal, the capabilities it asks for (never <code>Recover</code>), a label, a nonce</td>
+<td><code>SignedEnrollmentRequest</code></td>
+<td><strong>LIB-TESTED</strong> (N4-C)</td>
+<td>possession of the key, never authority; carriage of the bytes is MISSING</td>
 </tr>
 </tbody></table>
 <p>The device presents a <em>key</em>, nothing more. Possession of the device proves nothing about the human.</p>
@@ -383,13 +425,19 @@ pretends to be the ICN one.</p>
 <td>it authors an N1 <strong><code>Authorize</code></strong> event: <code>subject</code>, <code>position</code>, <code>prev_digest</code>, <code>device</code>, <code>capabilities ⊆ {Sign, Present, Encrypt}</code>, <code>validity: Option&lt;ValiditySpan&gt;</code></td>
 <td><code>SignedAuthorityEvent</code></td>
 <td>LIB-TESTED (<code>construct::authorize_event</code>)</td>
-<td><code>Recover</code> is never granted to a device (<strong>DOC-ONLY</strong>: a proposed rule; N1 admits and N4-A evaluates a <code>Recover</code> grant like any other capability, so nothing enforces it yet, routed to #2599); the establishment key is never the device (enforced: <code>DeviceIsEstablishmentAuthority</code>)</td>
+<td><code>Recover</code> is never granted to a device: <strong>enforced at N4-C approval</strong> (<code>approve_enrollment</code> refuses it), but N1 admission and N4-A evaluation do not enforce it, so a <code>Recover</code> grant authored outside the approval path is still honoured (routed to #2599); the establishment key is never the device (enforced: <code>DeviceIsEstablishmentAuthority</code>)</td>
+</tr>
+<tr>
+<td>the edge turns the request into the fact: <code>approve_enrollment</code> (attenuated; refuses another Subject, a wider grant, an empty grant, <code>Recover</code>, the establishment key)</td>
+<td><code>SignedAuthorityEvent</code></td>
+<td><strong>LIB-TESTED</strong> (N4-C)</td>
+<td>the human decides; the function only refuses what the contract forbids</td>
 </tr>
 <tr>
 <td>the event reaches the device and every relying party</td>
 <td>facts in their stores</td>
-<td><strong>MISSING</strong> — the N4 ceremony/transport</td>
-<td>until it exists the only path is in-process construction with the root present, i.e. fixture-only</td>
+<td><strong>MISSING</strong> — delivery/transport</td>
+<td>in-process construction is no longer the only path to the <em>fact</em>; carrying it still is fixture-only</td>
 </tr>
 </tbody></table>
 <p><strong>Forbidden substitute:</strong> a bearer token, invite code, OS account, SSH key, RDP login or TLS client
@@ -446,9 +494,10 @@ humans or devices. Therefore:</p>
 <ul>
 <li>the thin-client transport (remote desktop to a hosted workstation) keeps its <strong>conventional</strong>
 PKI, owned and operated by the deployment track; it is a transport fact, not an identity fact;</li>
-<li>a future Home transport that wants &quot;this connection is device Principal <code>K</code>&quot; needs a device
-binding object designed under N4, with the same three-fact shape (key signs the cert digest;
-current cert matches) — <strong>MISSING</strong>, routed with #2599;</li>
+<li>a Home transport that wants &quot;this connection is device Principal <code>K</code>&quot; uses the N4-D binding:
+a <code>Present</code> act whose payload is <code>(channel digest, nonce)</code>, verified by N4-A over retained facts
+and then one equality against the channel the relying party sees — <strong>LIB-TESTED</strong>
+(<code>N4D_DEVICE_CHANNEL_BINDING.md</code>); what <code>channel</code> digests is the transport profile&#39;s to state;</li>
 <li>nothing about a TLS root ever identifies the human.</li>
 </ul>
 <h3 id="66-the-may--must-not-list">6.6 The MAY / MUST NOT list</h3>
@@ -459,7 +508,8 @@ the rule that a revoked device is refused at every <code>E</code> at or after th
 it, under the facts retained (N4-A §2); the N1-D record layout (merged, #2800). No hosted verifier
 and no consumer that enforces an action on an N4-A result exists today. When one is built, it must
 enforce on a <code>VerifiedDeviceAct</code>, never on an authority evaluation alone.</p>
-<p>It <strong>MUST NOT</strong>: reimplement encodings, the fold, grant semantics or refusal logic in another
+<p>It <strong>MUST NOT</strong>: use a node&#39;s transport or network key as a device Principal (a public node key
+would make the device a correlation handle for the person, IS §2.4); reimplement encodings, the fold, grant semantics or refusal logic in another
 language; treat any account, key, token, VM or machine as the Subject or derive a <code>SubjectId</code> from
 one; hold or derive a <code>ContinuityRoot</code> on infrastructure; mint a Subject or a context on a
 person&#39;s behalf; choose <code>E</code> from the act or fall back to the frontier when the act&#39;s <code>E</code> is not
@@ -484,7 +534,7 @@ identities into anything real.</p>
 </tr>
 <tr>
 <td>3. external verification boundary</td>
-<td><strong>library + canonical bytes + vectors done; the (facts, act) container is the named missing piece</strong></td>
+<td><strong>done to a CLI relying party</strong>: N4-B container (LIB-TESTED, vectors) + <code>icnctl device-authority</code> (CLI-REACHABLE). Open: a hosted relying party, deliberately not built</td>
 </tr>
 <tr>
 <td>4. GEN stance</td>
@@ -492,7 +542,7 @@ identities into anything real.</p>
 </tr>
 <tr>
 <td>5. implementable spec</td>
-<td><strong>§6</strong> — with every MISSING step marked and its forbidden substitute named</td>
+<td><strong>§6</strong>, now with the request and approval objects real (N4-C §6 restates the contract per phase: first boot, enrollment, runtime, revocation, recovery, contexts, trust)</td>
 </tr>
 </tbody></table>
 <h2 id="8-routing">8. Routing</h2>

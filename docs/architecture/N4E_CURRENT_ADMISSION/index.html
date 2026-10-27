@@ -1,0 +1,313 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="NORMATIVE CONTRACT for N4-E (icn#2599): the current-admission rule for class-2 device acts, as implemented in device_admission.rs. Distinguishes the historical N4-A question (is this act authorized at an explicitly chosen position E) from current admission (is this act acceptable against the position this relying party itself currently holds a clean authority prefix through): admission_position = frontier - 1 of the relying party's own retained facts, never read from the act, and the act must bind exactly it (StaleAct below, RelyingPartyBehind above) before N4-A runs unchanged. Refusal vocabulary (SubjectUnknown, AuthorityHalted, NoDelegationYet, StaleAct, RelyingPartyBehind, Act); what it deliberately does not claim (retained position is local evidence, not universal finality; a relying party behind a revocation admits at its old tip; no clock, no lease, no freshness guarantee; class-1 acts pin their own E); the eight pinned behaviours; composition with N4-B (a stateless bundle consumer makes no current admission; the icnctl verb takes --position from the operator) and N4-D (admit_channel_binding admits a live connection through this module; the historical question stays separate). Success is the VerifiedDeviceAct. Library and tests only (9 tests observed 2026-10-27): no runtime, route, transport profile or CLI calls it. Documents existing behaviour; introduces no semantics. Fixture identities only."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N4-E — current admission: the relying party&#39;s position, from its own retained facts | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>N4E CURRENT ADMISSION</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-10-04</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="n4-e--current-admission-the-relying-partys-position-from-its-own-retained-facts">N4-E — current admission: the relying party&#39;s position, from its own retained facts</h1>
+<p><strong>Companion to:</strong> <code>N4A_DEVICE_AUTHORITY_EVALUATION.md</code> (the historical verifier, §7.1 and §7.2),
+<code>N4B_PORTABLE_EVIDENCE_BUNDLE.md</code> (carrying facts), <code>N4D_DEVICE_CHANNEL_BINDING.md</code> §7 (the
+class-2 act that needs this), <code>HUMAN_IDENTITY_ARCHITECTURE.md</code> §9.3 (act classes),
+<code>HOME_RUNTIME_IDENTITY_PROFILE.md</code> row (n) · <strong>Issues:</strong> #2599 (N4), #2694 §6 (G1-A, the class-1
+rule this is <em>not</em>) · <strong>Code:</strong> <code>icn/crates/icn-identity/src/device_admission.rs</code>,
+<code>tests/device_admission.rs</code></p>
+<blockquote>
+<p><strong>Truth status.</strong> Normative for the admission rule and the refusal vocabulary; <strong>LIB-TESTED</strong>
+(9 tests, observed 2026-10-27; since then the act is validated first and success is the
+<code>VerifiedDeviceAct</code>). No runtime, route, transport profile or <code>icnctl</code> verb calls it; it is not
+CLI-reachable and not PRODUCTION. It adds <strong>no kernel primitive</strong> and changes nothing in N1 or
+N4-A: the commit that introduced it (<code>18b536ea8</code>) touched only <code>device_admission.rs</code>, its test
+file and <code>lib.rs</code>; <code>device_authority.rs</code> and its 25 tests are byte-for-byte what they were. It
+computes one position from a store and then calls <code>verify_device_act</code> unchanged. This document
+describes the implementation as it exists; it introduces no semantics the code does not already
+have. Fixture identities only.</p>
+</blockquote>
+<hr>
+<h2 id="1-two-questions-that-must-not-be-confused">1. Two questions that must not be confused</h2>
+<p>N4-A answers a <strong>historical</strong> question for a position the relying party supplies:</p>
+<blockquote>
+<p><em>Was device <code>K</code> covered by Subject <code>S</code> with capability <code>C</code> at position <code>E</code>?</em></p>
+</blockquote>
+<p>That must stay answerable for any <code>E</code> the relying party retains, because a decision pinned at
+<code>E</code> (class 1) must evaluate every act at that <code>E</code> forever, and because a later revocation must
+not rewrite what was true before it (N4 invariant 4). N4-A deliberately leaves the <em>choice</em> of
+<code>E</code> to the relying party (N4-A §7.1).</p>
+<p>For an act that is settled <strong>at admission</strong> — a connection binding, a request to open a session,
+anything with an immediate effect (class 2, HIA §9.3) — that choice is not free. If the device
+could name any <code>E</code> at which it was once authorized, a device revoked at 3 would keep signing acts
+bound to 2 forever, and every relying party would honestly confirm that history. N4-E answers
+the second question:</p>
+<blockquote>
+<p><em>Is this act valid against the position this relying party itself currently holds a clean
+authority prefix through?</em></p>
+</blockquote>
+<p>The two questions have the same verifier underneath and different inputs: N4-A takes <code>E</code> as a
+parameter; N4-E computes <code>E</code> from the relying party&#39;s own store and refuses an act that binds any
+other position. N4-E is therefore a <em>caller</em> of N4-A, never a replacement for it: historical
+verification at an explicitly chosen <code>E</code> remains available and unchanged for every act, including
+one N4-E has refused.</p>
+<h2 id="2-the-rule">2. The rule</h2>
+<p>For Subject <code>S</code> and the relying party&#39;s retained store <code>σ</code>:</p>
+<pre><code class="language-text">admission_position(S, σ) :=
+    match derive(S, σ) {
+        Unknown                     → refuse SubjectUnknown
+        Halted { disputed_at, .. }  → refuse AuthorityHalted { disputed_at }
+        Live { frontier, .. }       → if frontier &lt; 2 then refuse NoDelegationYet
+                                      else frontier − 1
+    }
+
+verify_device_act_at_admission(act, S, σ) :=
+    let A = admission_position(S, σ)?
+    if act.evaluation_position &lt; A  → refuse StaleAct { act, admission: A }
+    if act.evaluation_position &gt; A  → refuse RelyingPartyBehind { act, admission: A }
+    verify_device_act(act, S, σ, A)          -- N4-A, unchanged
+</code></pre>
+<p>This is N4-A §7.1 row 2 (&quot;a verifier holding a store whose <code>derive</code> reports <code>Live { frontier }</code>:
+<code>frontier − 1</code>&quot;) and §7.2 class 2 (&quot;the acceptor evaluates at its own retained <code>frontier − 1</code>
+once, at admission&quot;), executed rather than left to the caller. Properties that hold by
+construction, each pinned by a test (§5):</p>
+<ul>
+<li><strong>The position comes from the store, never from the act.</strong> The act must bind exactly the
+admission position. Below it is <code>StaleAct</code>: the device is behind, or is replaying a position it
+was still authorized at. Above it is <code>RelyingPartyBehind</code>: <em>this relying party</em> is behind and
+must obtain facts; it never guesses, fetches or falls back.</li>
+<li><strong>No clock, no network, no registrar, no randomness</strong> enter the decision. The source guard
+test forbids every such symbol in the module.</li>
+<li><strong>Unknown, halted and inception-only Subjects admit nothing.</strong> No inception retained:
+<code>SubjectUnknown</code>. A fork in the retained prefix: <code>AuthorityHalted</code> — current authority is
+disputed, so there is no current admission, while history <em>below</em> the fork stays answerable
+through N4-A at an explicit <code>E</code>. Inception only (<code>frontier &lt; 2</code>): <code>NoDelegationYet</code> — position
+0 is the inception and is never an evaluation position.</li>
+<li><strong>N4-A runs unchanged</strong> once the position is fixed. Authorship under the device key and
+authorization over the retained facts remain its two separate checks; every N4-A refusal
+surfaces as <code>Act(…)</code> verbatim.</li>
+<li><strong>Arrival order is irrelevant.</strong> The admission position is a function of the fact set.</li>
+</ul>
+<h2 id="3-refusals">3. Refusals</h2>
+<table>
+<thead>
+<tr>
+<th>Refusal</th>
+<th>Meaning</th>
+<th>Who should act</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SubjectUnknown</code></td>
+<td>no inception body for <code>S</code> is retained</td>
+<td>the relying party needs facts</td>
+</tr>
+<tr>
+<td><code>AuthorityHalted { disputed_at }</code></td>
+<td>the retained prefix forks at <code>disputed_at</code>; current authority is disputed</td>
+<td>nobody is admitted now; N1 fork handling (O-N7)</td>
+</tr>
+<tr>
+<td><code>NoDelegationYet</code></td>
+<td>only the inception is retained; no grant exists yet</td>
+<td>the relying party needs facts</td>
+</tr>
+<tr>
+<td><code>StaleAct { act, admission }</code></td>
+<td>the act binds a position below the admission position</td>
+<td>the device must re-sign at the current position</td>
+</tr>
+<tr>
+<td><code>RelyingPartyBehind { act, admission }</code></td>
+<td>the act binds a position above the admission position</td>
+<td>the relying party must obtain facts (N3), never guess</td>
+</tr>
+<tr>
+<td><code>Act(DeviceActVerifyError)</code></td>
+<td>evaluated at the admission position and N4-A refused</td>
+<td>as N4-A §7: unauthorized, revoked, wrong capability, bad signature, …</td>
+</tr>
+</tbody></table>
+<p>Every variant is a refusal. There is no partial admission and no &quot;admit at the nearest position
+I do hold&quot;.</p>
+<h2 id="4-what-this-deliberately-does-not-claim">4. What this deliberately does not claim</h2>
+<p><strong>An admission is relative to the facts held when it was made</strong> (N4-A §2). A fact that later
+arrives at or below the admission position — a superseding recovery, a competing candidate, a
+revoke — changes the answer for the same act; nothing here re-checks a connection that was already
+admitted, which is the runtime&#39;s decision.</p>
+<p><strong>Retained current position is local evidence, not universal finality.</strong> A relying party whose
+facts stop <em>before</em> a revocation holds a clean prefix through its old tip and admits there. It is
+not wrong about its facts; it is behind. Test 4 pins this rather than hiding it: obtaining facts
+is the only cure, and the module offers no other. This is exactly HIA §9.3&#39;s statement that R5.1
+(a bounded validity window) is <strong>not met for class 2</strong>; N4-E narrows the exposure to &quot;the
+relying party&#39;s own tip&quot; instead of &quot;any position the device likes&quot;, and claims nothing more.</p>
+<p><strong>Class-1 acts do not use this.</strong> A deferred decision pins its own <code>E</code> (G1-A, #2694 §6) and
+evaluates every ballot at that one position; evaluating each at a receiver-local tip would
+reintroduce arrival-order divergence. N4-E is for acts settled at admission.</p>
+<p><strong>No freshness, liveness or revocation-propagation guarantee</strong> is made: no clock, no lease, no
+&quot;latest globally&quot;. Whether facts reach a relying party in time is N3&#39;s question (#2598).</p>
+<p><strong>No session is created.</strong> Admission is one decision about one act; what a runtime does after
+admitting is its own policy and never an N1 fact.</p>
+<h2 id="5-behaviour-pinned-by-the-tests">5. Behaviour pinned by the tests</h2>
+<p><code>tests/device_admission.rs</code>, fixture: <code>S</code> incepted; <code>A</code> authorized at 1; <code>B</code> authorized at 2;
+<code>A</code> revoked at 3.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Test</th>
+<th>Pins</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>an up-to-date relying party admits at its clean tip</td>
+<td>store holds 0..3 → admission 3; <code>B</code> bound to 3 → evidence <code>{ granted_at 2, generation 0 }</code>; <code>A</code> bound to 3 → <code>Act(Refused(DeviceNotAuthorized))</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>a revoked device replaying an older position is refused for current admission</td>
+<td><code>A</code> bound to 2 verifies historically at 2 (N4-A) and is <code>StaleAct { act: 2, admission: 3 }</code> for admission</td>
+</tr>
+<tr>
+<td>3</td>
+<td>an act bound beyond the relying party&#39;s facts means it is behind</td>
+<td>store holds 0..2 → admission 2; <code>B</code> bound to 3 → <code>RelyingPartyBehind { act: 3, admission: 2 }</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>a relying party that has not received the revocation admits at its old tip and says so</td>
+<td>store holds 0..2; <code>A</code> bound to 2 → admitted at 2 (the honest class-2 limit)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>two simultaneously valid devices bind the same current position</td>
+<td>before the revoke, <code>A</code> and <code>B</code> both admitted at 2</td>
+</tr>
+<tr>
+<td>6</td>
+<td>unknown, halted and inception-only Subjects have no admission position</td>
+<td>empty store → <code>SubjectUnknown</code>; inception only → <code>NoDelegationYet</code>; two authorized grants at 1 → <code>AuthorityHalted { disputed_at: 1 }</code>, and an act at 1 is refused the same way</td>
+</tr>
+<tr>
+<td>7</td>
+<td>admission is a function of the facts, not their arrival order</td>
+<td>all 4! ingest orders give admission 3, admit <code>B</code>, refuse <code>A</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>admission reads no wall clock and no environment</td>
+<td>the module source contains none of <code>SystemTime</code>, <code>Instant::now</code>, <code>std::env</code>, <code>std::fs</code>, <code>std::net</code>, <code>rand::</code>, <code>OsRng</code>, <code>thread_rng</code></td>
+</tr>
+</tbody></table>
+<h2 id="6-composition-with-the-other-n4-pieces">6. Composition with the other N4 pieces</h2>
+<ul>
+<li><strong>With N4-B.</strong> A relying party that holds its own store computes <code>admission_position</code> from it
+and evaluates there. A <em>stateless</em> consumer of an <code>EvidenceBundle</code> has no store of its own: its
+position is the one the act binds and the bundler assembled for, so it is relying on the
+bundler&#39;s selection (N4-B §3.3 and §7) and is not making a current admission. The <code>icnctl</code>
+verb is such a consumer: it takes <code>--position</code> from the operator and does <strong>not</strong> compute an
+admission position (N4-B §9).</li>
+<li><strong>With N4-D.</strong> A channel binding is a class-2 <code>Present</code> act. Admitting a connection goes
+through this module: N4-D&#39;s <code>admit_channel_binding</code> calls <code>verify_device_act_at_admission</code>, so a
+binding is admitted only at the relying party&#39;s own retained clean tip, with this module&#39;s
+<code>StaleAct</code> / <code>RelyingPartyBehind</code> vocabulary. N4-D&#39;s <code>verify_channel_binding_at</code> keeps the
+historical question (N4-A at a caller-chosen position) separate, and never admits a connection
+now. Verifying the act and checking the observed channel remain two separate steps (N4-D §4).</li>
+<li><strong>With N4-C.</strong> Enrollment produces the N1 grant; admission reads it. Nothing here approves,
+enrolls or revokes.</li>
+</ul>
+<h2 id="7-scope-boundaries">7. Scope boundaries</h2>
+<p>Not defined here: how facts reach the relying party (N3, #2598); any validity window or lease
+for class-2 acts (R5.1, open by HIA&#39;s own statement); the class-1 pinned position (G1-A); session
+state after admission; a runtime, route or verb that calls this (none exists); fork resolution
+(N1 O-N7). <code>device_admission.rs</code> has no serde impl, no wire encoding and no persistent state.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/N4E_CURRENT_ADMISSION.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

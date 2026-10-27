@@ -1,0 +1,810 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="NORMATIVE CONTRACT for N4-B, the one canonical container for carrying the N1 evidence needed to evaluate one SignedDeviceAct at position E (N4A_DEVICE_AUTHORITY_EVALUATION.md section 9.2 items 2 and 3). A strict, deterministic, externally transportable byte container under the icn.n4.evidence-bundle domain carrying every retained N1 body for one Subject at or below the act's evaluation position E, every witness over each, and one canonical DeviceActV1 plus signature. States the scope rule and why it is exactly the derive_prefix input set; the fact layout as the N1-D record (event_id || signature -> canonical body) grouped by body with the digest stated explicitly; ordering by digest that carries no authority meaning; no bound beyond N1's and N4-A's own; the fail-closed decode table; re-admission of every pair through AuthorityStore::ingest; the three separate claims (decode, admit, verify) and what each proves; the thin verify_evidence_bundle composition that decides nothing of its own; summarize for inspection; the stateless icnctl device-authority verify|inspect verb (exit 0/1/2, refusal classes, what it must never do); an independently reproduced cross-implementation vector; and the 2026-10-04 convergence record that retired DeviceAuthorityBundleV1, its domain and MAX_BUNDLE_FACTS with no compatibility decoder. The container transports evidence and does not interpret authority. Every verification path returns a VerifiedDeviceAct, never bare evidence. Library (25 tests observed 2026-10-27), CLI-reachable (5 end-to-end tests), spec and reference only: no network protocol, no N3 replication, no persistence guarantee, no session format, no enrollment or recovery, no icnd, gateway or SDK surface, no institutional recognition, no claim about any real person's device. Fixture identities only."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N4-B — the portable evidence bundle, and the stateless `icnctl` relying party | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>N4B PORTABLE EVIDENCE BUNDLE</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-10-04</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="n4-b--the-portable-evidence-bundle-and-the-stateless-icnctl-relying-party">N4-B — the portable evidence bundle, and the stateless <code>icnctl</code> relying party</h1>
+<p><strong>Implements:</strong> <code>N4A_DEVICE_AUTHORITY_EVALUATION.md</code> §9.2 items 2 and 3 — the container for
+<em>(facts, act)</em> and the verb that consumes it ·
+<strong>Parent ladder:</strong> <a href="https://github.com/InterCooperative-Network/icn/issues/2694" target="_blank" rel="noopener">icn#2694</a> §7 ·
+<a href="https://github.com/InterCooperative-Network/icn/issues/2599" target="_blank" rel="noopener">icn#2599</a> (N4) ·
+<strong>Companion to:</strong> <code>IDENTITY_SEMANTICS.md</code> (the canonical contract), <code>HOME_RUNTIME_IDENTITY_PROFILE.md</code>
+(who consumes this and why), <code>N4C_DEVICE_ENROLLMENT_REQUEST.md</code> (how a device comes to hold facts) ·
+<strong>Code:</strong> <code>icn/crates/icn-identity/src/evidence_bundle.rs</code>, <code>icn/bins/icnctl/src/device_authority.rs</code> ·
+<strong>Tests:</strong> <code>icn/crates/icn-identity/tests/evidence_bundle.rs</code>,
+<code>icn/bins/icnctl/tests/device_authority_bundle_test.rs</code> ·
+<strong>Reference:</strong> <code>icn/crates/icn-identity/tests/reference/evidence_bundle_reference.py</code></p>
+<p>This document is the <strong>contract</strong> for the N4-B portable evidence bundle. It is written so that an
+implementation in another language can reproduce the canonical bytes in §8 from this text, the N1
+canonical-encoding contract it cites, and the N4-A act contract — and so that a stateless consumer
+can state exactly what it has checked at each of the three steps between receiving bytes and
+accepting a device-signed act.</p>
+<blockquote>
+<p><strong>Truth status.</strong> Normative for the bundle bytes and for the verb&#39;s contract. <strong>LIB-TESTED</strong> for
+the container (25 tests observed 2026-10-27, plus an independent Python reference that
+reproduces the vector and applies its own strict decoder) and <strong>CLI-REACHABLE</strong> for the verb
+(5 end-to-end tests of the built binary). Not PRODUCTION: no runtime, route, daemon or
+deployment calls either. The bundle changes nothing in N1 or N4-A. It is not a network protocol,
+not N3 replication, not a persistence format or durability guarantee, not a session format, not
+an enrollment or recovery protocol, not a Home or deployment format, and not an <code>icnd</code>, gateway
+or SDK surface. It confers no institutional recognition, membership, standing or session
+authority. It makes no claim that any real person&#39;s device is enrolled. <strong>Fixture identities
+only</strong> in every test; no real person&#39;s identity, keys or records are involved.</p>
+</blockquote>
+<blockquote>
+<p><strong>One format.</strong> This is the single canonical N4-B container, the result of converging two
+independently developed implementations of the same boundary on 2026-10-04 (§11). The superseded
+<code>DeviceAuthorityBundleV1</code> (<code>icn.n4.device-authority-bundle</code>) no longer exists in the tree and has
+no compatibility decoder.</p>
+</blockquote>
+<hr>
+<h2 id="1-the-question-this-answers">1. The question this answers</h2>
+<blockquote>
+<p>How does a holder of N1 facts hand a <strong>stateless</strong> verifier exactly the evidence that the existing
+N1 + N4-A semantics need to evaluate one signed device act, so that the verifier rebuilds the same
+<code>AuthorityStore</code> and reaches the same verdict — without <code>icnd</code>, a network, a directory or a clock?</p>
+</blockquote>
+<p>The answer is a strict, deterministic byte container. It is <strong>framing over canonical facts</strong>. It
+adds no fact kind, no selector, no ordering rule the fold could read, and no verdict.</p>
+<h3 id="11-the-architectural-invariant">1.1 The architectural invariant</h3>
+<p><strong>The container transports evidence. It does not interpret authority.</strong> The canonical N1 admission
+path (<code>admissible</code>) and derivation path (<code>derive_prefix</code>, consumed by <code>verify_device_act</code>) remain
+the only authority semantics. The flow is, and may only be:</p>
+<pre><code class="language-text">portable bytes
+    ↓ EvidenceBundle::decode        -- strict, fail-closed, structural (§5)
+N1 canonical bodies + witnesses
+    ↓ EvidenceBundle::admit         -- every (body, witness) through AuthorityStore::ingest (§6)
+AuthorityStore
+    ↓ verify_device_act(act, S, store, E)   -- the existing N4-A verifier (§7)
+VerifiedDeviceAct | refusal
+</code></pre>
+<p>No step may be skipped or merged. In particular, decoding a bundle <strong>cannot</strong> cause a fact to bypass
+canonical admission: <code>AuthorityStore</code> has no ingest path other than <code>ingest</code>, which calls
+<code>admissible</code>, and the bundle type has no method that builds a store any other way.</p>
+<hr>
+<h2 id="2-three-claims-kept-separate">2. Three claims, kept separate</h2>
+<p>A consumer that accepts an act after processing a bundle has made <strong>three</strong> independent checks. They
+prove different things and none implies the next.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Succeeds when</th>
+<th>Proves</th>
+<th>Does <strong>not</strong> prove</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>decode</strong> (§5)</td>
+<td>the bytes are one canonical bundle</td>
+<td>the framing is well-formed; each carried body is a strict canonical N1 body; each stated <code>event_id</code> is that body&#39;s digest; each body belongs to the bundle&#39;s Subject at position <code>≤ E</code>; each body has <code>≥ 1</code> witness; the act is a strict canonical device act naming the bundle&#39;s Subject and <code>E</code></td>
+<td>that any witness signature verifies; that any fact was ever authorized; that the prefix is complete or unforked</td>
+</tr>
+<tr>
+<td><strong>admit</strong> (§6)</td>
+<td>every <code>(body, witness)</code> passes N1 admission</td>
+<td><em>some key signed each body</em> — the inline signer — exactly as a live replica would conclude</td>
+<td>that the signer had authority; that the set is complete; anything about the act</td>
+</tr>
+<tr>
+<td><strong>verify</strong> (§7)</td>
+<td>the existing N4-A verifier returns evidence</td>
+<td>under <strong>the facts the bundler supplied</strong>, folded through <code>E</code>, the chain was live and gap-free through <code>E</code>, the device held a covering grant, was not the establishment authority, and signed this exact act</td>
+<td>that the bundler supplied <em>all</em> facts that exist for <code>S</code> through <code>E</code> (see §3.3); that the device is authorized <em>now</em> (that is N4-E, <code>N4E_CURRENT_ADMISSION.md</code>); anything N4-A §2 lists as outside its claim</td>
+</tr>
+</tbody></table>
+<p>A bundle that decodes and admits but whose act is <strong>refused</strong> is a correct bundle. Refusal is a
+verdict, and transporting the evidence for a refusal is the container doing its job.</p>
+<hr>
+<h2 id="3-scope-which-facts-a-bundle-carries">3. Scope: which facts a bundle carries</h2>
+<p>A bundle is scoped to one Subject <code>S</code> and one evaluation position <code>E</code>, both named by the enclosed act
+(N4-A §6.1: the act binds the position its signer claims; the relying party must agree, §7).</p>
+<h3 id="31-the-rule">3.1 The rule</h3>
+<blockquote>
+<p>A bundle for <code>(S, E)</code> carries <strong>every retained N1 body <code>b</code> with <code>subject(b) = S</code> and
+<code>position(b) ≤ E</code></strong>, together with <strong>every retained witness <code>(event_id(b), σ)</code> over each such
+body</strong>, and nothing else.</p>
+</blockquote>
+<h3 id="32-why-exactly-that-set">3.2 Why exactly that set</h3>
+<p>This is not a heuristic. N4-A §5 defines</p>
+<pre><code class="language-text">derive_prefix(S, store, E) := derive(S, { b ∈ Bodies_store(S) : position(b) ≤ E })
+</code></pre>
+<p>so the fold&#39;s <strong>only</strong> input is that body set. A verifier that admits exactly these facts folds
+exactly what the bundler would have folded. Each consequence below was checked against N1&#39;s actual
+candidate rule (<code>candidate_is_authorized</code>: subject, position, <code>prev_digest</code>, authorization by the
+state as of the parent) rather than assumed:</p>
+<ul>
+<li><strong>Facts above <code>E</code> are never required</strong> to prove authority at <code>E</code>. The fold filters them out before
+it runs, the candidate set at position <code>p</code> is drawn only from bodies at exactly <code>p</code>, and no body
+above <code>E</code> can change what is concluded at or below it. A later revocation therefore need not — and
+(§3.4) <em>cannot</em> — be carried into a historical proof. This is N4-A&#39;s non-retroactive-revocation
+invariant, honoured by construction.</li>
+<li><strong>Facts at or below <code>E</code> that the fold would never select are carried.</strong> Unauthorized spam,
+orphaned branches and superseded candidates are all in <code>Bodies(S)</code>. Deciding that one of them is
+unselectable would require the bundler to run the fold, which is interpretation. So the bundler
+does not decide; it carries.</li>
+<li><strong>A fork at or below <code>E</code> is carried as a fork.</strong> Both candidates satisfy the rule; neither is
+chosen. The verifier reports <code>AuthorityHalted { disputed_at }</code> exactly as it would on the original
+store.</li>
+<li><strong>A gap at or below <code>E</code> is carried as a gap.</strong> There is nothing to carry at the missing position;
+bodies above it that name an unretained parent are carried (they are <code>≤ E</code>) and remain
+unselectable; the verifier reports <code>PrefixIncomplete { frontier, required: E }</code>.</li>
+<li><strong>An unknown Subject is carried as an empty fact list.</strong> A bundler holding no inception for <code>S</code>
+produces a bundle with zero facts. It decodes, admits to an empty store, and the <strong>verifier</strong>
+refuses <code>SubjectUnknown</code>. The decoder does not convert that into an error of its own.</li>
+<li><strong>Every witness over a carried body is carried.</strong> Several witnesses over one body are a re-signing,
+not duplicity (N1 §9.2.1); dropping to one would mean <em>choosing</em> a signature.</li>
+</ul>
+<p><strong>What a bundle discloses.</strong> Every retained body for <code>S</code> through <code>E</code> goes to the relying party,
+including the grants to the Subject&#39;s other devices in this context. It stays within one context
+(one <code>SubjectId</code>), but a consumer that hands bundles around should know it reveals the Subject&#39;s
+device set up to <code>E</code>, not only the one device that acted.</p>
+<h3 id="33-what-the-bundlers-selection-does-and-does-not-prove">3.3 What the bundler&#39;s selection does and does not prove</h3>
+<p>A bundle proves what the verifier&#39;s third claim says: a verdict <strong>under the facts supplied</strong>. It
+does not prove the bundler supplied every fact that exists. A bundler can omit a fact at or below
+<code>E</code> (for example one candidate of a fork, or the revocation at <code>E</code> itself) and the verifier cannot
+detect the omission from the bundle alone. Withholding the only fact at <code>E</code> leaves the prefix
+incomplete and the verifier fails closed (<code>PrefixIncomplete</code>). Withholding one candidate of a fork
+<strong>at or below</strong> <code>E</code> is <strong>not</strong> detectable: the remaining chain is clean, and the verifier returns a
+verdict where the full fact set would have halted the Subject. A bundle therefore proves a verdict under the facts it
+carries, never that no conflicting fact exists. That is N1&#39;s O-N7 (late fork discovery) and
+the N3 replication question (#2598), neither of which a transport format can close. What the
+container <strong>does</strong> guarantee is that the bundler cannot <em>add</em> a fact outside scope (§3.4), cannot
+substitute a body for the one its witnesses are over (§5), and cannot make the verifier evaluate at
+a position other than the one the act binds (§5, act agreement).</p>
+<h3 id="34-strictness-at-the-boundary">3.4 Strictness at the boundary</h3>
+<p>The decoder <strong>refuses</strong> a body whose subject is not <code>S</code> (<code>FactSubjectMismatch</code>) or whose position is
+above <code>E</code> (<code>FactOutsideScope</code>). A bundle that carries one is not a prefix bundle for <code>(S, E)</code>. This
+is what makes &quot;the same semantic evidence yields the same bytes&quot; a property of the format rather
+than a convention of the encoder, and it is what prevents a revocation after <code>E</code> from being smuggled
+into a proof about <code>E</code> in either direction.</p>
+<hr>
+<h2 id="4-canonical-bytes">4. Canonical bytes</h2>
+<h3 id="41-primitives">4.1 Primitives</h3>
+<p>Reused from N1 (<code>authority_log/encoding.rs</code>), not redefined:</p>
+<pre><code class="language-text">LP(x)  := u32be(len(x)) || x          -- length-prefixed byte string
+b32(x) := 32 raw bytes, no prefix
+b64(x) := 64 raw bytes, no prefix
+u8 / u16be / u32be / u64be            -- big-endian, fixed width
+H(x)   := SHA-256(x)
+</code></pre>
+<h3 id="42-constants-frozen-for-v1">4.2 Constants (frozen for v1)</h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>BUNDLE_DOMAIN</code></td>
+<td>ASCII <code>icn.n4.evidence-bundle</code> (22 bytes)</td>
+</tr>
+<tr>
+<td><code>BUNDLE_VERSION</code></td>
+<td><code>1</code> (<code>u16be</code>)</td>
+</tr>
+<tr>
+<td>position bound</td>
+<td><code>1 ..= MAX_POSITION</code> (N1&#39;s <code>1_048_576</code>), applied to <code>E</code></td>
+</tr>
+</tbody></table>
+<p><code>BUNDLE_DOMAIN</code> is length-prefixed and pairwise distinct from every N1 separator
+(<code>icn.authority-log</code>, <code>.sig</code>, <code>.commit</code>, <code>.kdf</code>), the N4-A act separator (<code>icn.n4.device-act</code>), the
+N4-C request separator (<code>icn.n4.enrollment-request</code>), the N4-D binding separator
+(<code>icn.n4.channel-binding</code>) and every GEN separator. Bundle bytes can never be presented as, or
+mistaken for, any of those, and none of those can be presented as a bundle.</p>
+<h3 id="43-layout">4.3 Layout</h3>
+<pre><code class="language-text">evidence_bundle_v1 :=
+      LP(BUNDLE_DOMAIN)
+   || u16be(BUNDLE_VERSION)
+   || b32(subject)                        -- S; MUST equal act.subject
+   || u64be(evaluation_position)          -- E; MUST equal act.evaluation_position
+   || u32be(fact_count)                   -- may be 0
+   || fact * fact_count                   -- strictly ascending by event_id
+   || LP(device_act_v1)                   -- the act&#39;s canonical bytes, verbatim (N4-A §6)
+   || b64(act_signature)                  -- Ed25519 over device_act_v1, verbatim
+
+fact :=
+      b32(event_id)                       -- H(canonical_body), stated, not inferred
+   || LP(canonical_body)                  -- the N1 canonical body bytes, verbatim (N1 §1)
+   || u32be(witness_count)                -- MUST be ≥ 1
+   || b64(signature) * witness_count      -- strictly ascending bytewise; no duplicates
+
+bundle_id := H(evidence_bundle_v1)
+</code></pre>
+<h3 id="44-relationship-to-the-n1-d-durable-record">4.4 Relationship to the N1-D durable record</h3>
+<p>N1-D (#2800) persists one durable fact as <code>key = event_id (32) || signature (64)</code>,
+<code>value = canonical_bytes(body)</code>. A <code>fact</code> above is that record <strong>grouped by body</strong>: one body, its
+stated digest, and every signature over it. The grouping is the only difference, and it exists so
+that one body has one encoding in the container (a flat record per witness would repeat the body
+bytes and open the question of what to do if two records for one <code>event_id</code> carried different body
+bytes). The digest is carried explicitly for the same reason N1-D carries it in the key: a
+substituted or corrupted body is caught as a <strong>disagreement</strong> between what is stated and what is
+carried, rather than silently re-identified.</p>
+<p>Nothing of a storage backend is serialized. The record layout is a <em>concept</em> shared with N1-D; the
+bundle is transport framing over canonical facts and would be unchanged if N1-D never existed.</p>
+<h3 id="45-ordering-and-why-it-carries-no-meaning">4.5 Ordering, and why it carries no meaning</h3>
+<p>Facts are ordered by <code>event_id</code>; witnesses by signature bytes. These are the only canonical
+identifiers the durable layer has, and both are digests or signatures — values that bear no relation
+to log position, arrival order or preference. In the §8 vector the inception body (position 0) sorts
+<strong>third</strong>. A decoder rebuilds set-valued state (<code>BTreeMap&lt;EventId, _&gt;</code>, <code>BTreeSet&lt;WitnessSignature&gt;</code>);
+the fold orders bodies by position itself. <strong>Container order is never authority order.</strong> Ingest
+order, backend iteration order, map iteration order, filesystem order and process restarts cannot
+change the bytes, because the bytes are a function of the fact <em>set</em> only.</p>
+<p>No clock, no randomness, no &quot;latest&quot;, no lexical branch selection, no repair-on-read.</p>
+<h3 id="46-bounds">4.6 Bounds</h3>
+<p><strong>No new limit is introduced.</strong> Every count and length is bounded by the input itself through N1&#39;s
+<code>Reader</code>: a declared element count that the remaining bytes could not hold is refused
+(<code>CountOverflow</code>) before any allocation, and a declared length that overruns the input is refused
+(<code>UnexpectedEnd</code>). The act payload is bounded by N4-A&#39;s <code>MAX_DEVICE_ACT_PAYLOAD</code> (65 536 bytes) inside
+<code>DeviceActV1::decode</code>, and <code>E</code> by N1&#39;s <code>MAX_POSITION</code>. Memory consumed by a decode is therefore
+proportional to the bytes the caller chose to read. The number of facts a legitimate Subject can
+have through <code>E</code> is bounded by the chain, but N1 deliberately leaves adversarial storage pressure
+open (O-N8); a cap invented here would be a storage-policy decision this layer does not own. (The
+superseded implementation carried such a cap, <code>MAX_BUNDLE_FACTS</code>; §11 records why it was removed.)</p>
+<hr>
+<h2 id="5-strict-decode--evidencebundledecode">5. Strict decode — <code>EvidenceBundle::decode</code></h2>
+<p>Fail-closed on every defect. In order of detection:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Check</th>
+<th>Refusal</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>LP(BUNDLE_DOMAIN)</code> present and exact</td>
+<td><code>Framing(BadDomain)</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>version <code>= BUNDLE_VERSION</code></td>
+<td><code>Framing(UnsupportedVersion)</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>1 ≤ E ≤ MAX_POSITION</code></td>
+<td><code>PositionOutOfRange(E)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>fact_count</code> fits the remaining input</td>
+<td><code>Framing(CountOverflow)</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>each fact: stated <code>event_id</code> strictly greater than the previous</td>
+<td><code>FactOrder</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>each fact: <code>LP(canonical_body)</code> fits; body is a strict N1 body (N1&#39;s own decoder, including its trailing-byte check)</td>
+<td><code>Framing(UnexpectedEnd)</code> · <code>Body { source: CodecError }</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>each fact: <code>H(canonical_body) = event_id</code></td>
+<td><code>EventIdMismatch { stated, computed }</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>each fact: <code>subject(body) = S</code></td>
+<td><code>FactSubjectMismatch</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>each fact: <code>position(body) ≤ E</code></td>
+<td><code>FactOutsideScope { position, through: E }</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>each fact: <code>witness_count ≥ 1</code> and fits the input</td>
+<td><code>NoWitness</code> · <code>Framing(CountOverflow)</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>each witness strictly greater than the previous</td>
+<td><code>WitnessOrder</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>LP(device_act_v1)</code> fits; act is a strict N4-A act (N4-A&#39;s own decoder: domain, version, principal tag, position bound, payload bound, trailing bytes)</td>
+<td><code>Act(DeviceActError)</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>64 signature bytes present; <strong>input fully consumed</strong></td>
+<td><code>Framing(UnexpectedEnd)</code> · <code>Framing(TrailingBytes)</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>act.subject = S</code></td>
+<td><code>ActSubjectMismatch</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>act.evaluation_position = E</code></td>
+<td><code>ActPositionMismatch { act, bundle }</code></td>
+</tr>
+</tbody></table>
+<p>Any ambiguity that would give one logical bundle two byte identities — a reordered fact, a duplicate
+fact, a reordered or duplicate witness, trailing bytes — is a refusal, not a normalization. Every
+32-byte and 64-byte field is typed by position in the layout and, for principals inside bodies and
+the act, by N1&#39;s principal tag; no blob is accepted &quot;because it is the right length&quot;.</p>
+<p>Decode performs <strong>no</strong> signature verification and <strong>no</strong> derivation.</p>
+<h3 id="51-inspection--evidencebundlesummarize">5.1 Inspection — <code>EvidenceBundle::summarize</code></h3>
+<p>A decoded bundle can be <em>described</em>: for each carried fact in canonical order, its index, N1 kind
+tag, Subject, position, stated <code>event_id</code> and witness count. <code>summarize</code> admits nothing and
+evaluates nothing. A bundle whose act would be refused summarizes exactly as one whose act would be
+accepted. It exists for the <code>inspect</code> verb (§9) and for logging; its output is never a verdict.</p>
+<hr>
+<h2 id="6-re-admission--evidencebundleadmit">6. Re-admission — <code>EvidenceBundle::admit</code></h2>
+<p>For every carried fact and every witness over it, in canonical order:</p>
+<pre><code class="language-text">AuthorityStore::ingest(SignedAuthorityEvent { body, signature })
+</code></pre>
+<p>This is N1&#39;s gate, unchanged: <code>admissible(body, signature)</code> — canonical round-trip, position bound,
+<code>verify_strict</code> under the body&#39;s inline signer over <code>LP(SIGNATURE_DOMAIN) || canonical_body</code>. A
+witness that does not verify is refused as <code>Inadmissible { event_id, source: AdmissionError }</code>.</p>
+<p><code>admit</code> <strong>fails closed on the first refusal</strong>. A partially admitted store is a different Subject
+history than the one bundled, and returning one would let a single bad witness silently change a
+derived authority state. There is no &quot;skip the bad one&quot; path.</p>
+<p>Because <code>AuthorityBody</code>&#39;s equality, ordering and hashing are defined over <code>canonical_bytes()</code>, the
+store rebuilt by <code>admit</code> is <strong>equal</strong> to the store the bundle was assembled from, restricted to the
+scope — not merely equivalent. The tests assert <code>==</code>.</p>
+<hr>
+<h2 id="7-verification">7. Verification</h2>
+<p>Not defined here. The consumer calls the existing N4-A verifier:</p>
+<pre><code class="language-text">verify_device_act(bundle.act(), subject, &amp;bundle.admit()?, position)
+</code></pre>
+<p>where <code>subject</code> and <code>position</code> are <strong>the relying party&#39;s own</strong>. Every rule of N4-A §7 applies
+unchanged, including that <code>E</code> is the position the relying party evaluates at. The bundle&#39;s header
+<code>(S, E)</code> was required to agree with the act at decode (§5, rows 14–15); the relying party&#39;s <code>(S, E)</code>
+is then checked by N4-A itself: a disagreement is <code>ActSubjectMismatch</code> or
+<code>EvaluationPositionMismatch</code>, a refusal and never a fallback. For a stateless consumer that chooses
+to rely on the bundler&#39;s selection (§3.3), its own <code>(S, E)</code> <strong>is</strong> the bundle&#39;s. A consumer that
+holds its own facts should ingest the bundle&#39;s facts into its own store (the join is set union;
+order is irrelevant) and evaluate at its own <code>E</code> — and if the question is &quot;is this act valid
+<em>now</em>?&quot;, that <code>E</code> is the one N4-E computes from its own retained clean tip (<code>N4E_CURRENT_ADMISSION.md</code>),
+never one the device chose.</p>
+<h3 id="71-the-thin-composition--verify_evidence_bundle">7.1 The thin composition — <code>verify_evidence_bundle</code></h3>
+<pre><code class="language-text">verify_evidence_bundle(bundle, subject, position)
+    := verify_device_act(bundle.act(), subject, &amp;bundle.admit()?, position)
+
+verify_evidence_bundle_bytes(bytes, subject, position)
+    := verify_evidence_bundle(&amp;EvidenceBundle::decode(bytes)?, subject, position)
+</code></pre>
+<p>These are API convenience and nothing more. They make <strong>no</strong> decision of their own: no scope check
+beyond what decode already enforced, no selection, no fallback, no position taken from the bytes.
+<code>EvidenceVerifyError</code> keeps the two sources apart — <code>Bundle(BundleError)</code> for a decode or admission
+refusal, <code>Act(DeviceActVerifyError)</code> for the N4-A verdict — so a consumer can say which of the
+three claims in §2 failed. The tests pin that the wrapper&#39;s result equals the direct call&#39;s, verdict
+for verdict.</p>
+<hr>
+<h2 id="8-test-vector">8. Test vector</h2>
+<p>Inputs, stated in full. These are the <code>authority_log_support::subject(0x31, 4)</code> fixture and two
+stranger device keys, written out as raw data so no test helper is needed to reproduce them.</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Subject root secret</td>
+<td><code>[0x31; 32]</code></td>
+</tr>
+<tr>
+<td>Subject context nonce</td>
+<td><code>[0x94; 32]</code> (<code>0x31 ^ 0xa5</code>)</td>
+</tr>
+<tr>
+<td>establishment plan</td>
+<td>4 generations, all <code>Rotate</code></td>
+</tr>
+<tr>
+<td>device A seed</td>
+<td><code>[0x41; 32]</code></td>
+</tr>
+<tr>
+<td>device B seed</td>
+<td><code>[0x42; 32]</code></td>
+</tr>
+<tr>
+<td>facts</td>
+<td>inception @0; <code>Authorize(A, {Sign}, no span)</code> @1 by <code>A_0</code>; <code>Authorize(B, {Sign}, no span)</code> @2; <code>Revoke(A)</code> @3 — each with the one RFC 8032 witness by <code>A_0</code></td>
+</tr>
+<tr>
+<td>act</td>
+<td><code>DeviceActV1 { subject: S, device: B, capability: Sign, evaluation_position: 3, payload: ASCII &quot;fixture:open-workspace&quot; }</code>, signed by B</td>
+</tr>
+</tbody></table>
+<p>Derived (hex):</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Bytes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>A_0</code> public key</td>
+<td><code>216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a</code></td>
+</tr>
+<tr>
+<td>device A public key</td>
+<td><code>db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d</code></td>
+</tr>
+<tr>
+<td>device B public key</td>
+<td><code>2152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12</code></td>
+</tr>
+<tr>
+<td><strong><code>SubjectId</code></strong> <code>= H(inception)</code></td>
+<td><code>a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d</code></td>
+</tr>
+<tr>
+<td>fact order (ascending <code>event_id</code>)</td>
+<td><code>1bd0cea4…</code> (authorize A, pos 1) · <code>9791575d…</code> (authorize B, pos 2) · <code>a0068f2e…</code> (<strong>inception, pos 0</strong>) · <code>b22bf1bc…</code> (revoke A, pos 3)</td>
+</tr>
+<tr>
+<td><code>device_act_v1</code> (123 B)</td>
+<td><code>0000001169636e2e6e342e6465766963652d6163740001a0068f2e…db12 0000000000000003 01 00000016 666978747572653a6f70656e2d776f726b7370616365</code></td>
+</tr>
+<tr>
+<td><code>evidence_bundle_v1</code></td>
+<td>1 335 bytes; pinned in full as <code>EXPECT_BUNDLE_BYTES_HEX</code> in <code>tests/evidence_bundle.rs</code></td>
+</tr>
+<tr>
+<td><strong><code>bundle_id</code></strong></td>
+<td><code>009fb4ce160121684041689c82bc4d01563dc6e852d5c9390c8aaa31a658deaf</code></td>
+</tr>
+</tbody></table>
+<p>Every one of these values is reproduced by an <strong>independent reference written from this document,
+the N1 contract and the N4-A contract</strong> (Python, sharing no code, library or constant with
+<code>icn-identity</code>), which derives the N1 bodies, the witnesses, the act, the container and its id from
+the seeds above, applies its own strict decoder to its own bytes, and then reads the <code>EXPECT_*</code>
+literals out of the Rust test purely as a comparison target:</p>
+<pre><code class="language-bash">python3 icn/crates/icn-identity/tests/reference/evidence_bundle_reference.py
+</code></pre>
+<p>It exits non-zero on any disagreement, and additionally demonstrates from the prose that a trailing
+byte, a truncation, a reordered fact, a stated digest that is not the body&#39;s, a fact above <code>E</code> and
+an act whose position disagrees with the bundle are each refused.</p>
+<h3 id="81-behaviour-pinned-by-the-test-suite">8.1 Behaviour pinned by the test suite</h3>
+<ul>
+<li>byte-exact round trip; <code>decode(encode(b)) == b</code>; <code>admit</code> rebuilds a store <strong>equal</strong> to the source;</li>
+<li>identical bytes and <code>bundle_id</code> under all <code>4!</code> ingest orders of the four facts and under every
+split-and-join of each order;</li>
+<li>two valid witnesses over one body survive as two witnesses of one body; the rebuilt store has
+4 bodies and 5 witnesses; witness arrival order does not change the bytes; the verifier is unmoved;</li>
+<li>a stated <code>event_id</code> that is not the body digest, a body swapped under another fact&#39;s digest, and a
+body with one flipped nonce byte are each refused <code>EventIdMismatch</code>;</li>
+<li>a body with a wrong version, an unknown kind, an internal trailing byte, or act bytes in a body
+slot is refused with N1&#39;s own <code>CodecError</code>;</li>
+<li>an N1 body in the act slot, an act at position 0, a <code>SubjectId</code> in the act&#39;s device slot and a
+truncated act are refused with N4-A&#39;s own <code>DeviceActError</code>;</li>
+<li>every strict prefix of the bytes is refused; one trailing byte is <code>TrailingBytes(1)</code>;</li>
+<li>a <code>u32::MAX</code> fact count, a <code>u32::MAX</code> witness count and an overrunning body length are refused
+before allocation; <code>E = 0</code> and <code>E = MAX_POSITION + 1</code> are refused; a 65 537-byte act payload is
+refused by N4-A&#39;s bound;</li>
+<li>reordered facts, a duplicate fact, descending witnesses, a duplicate witness and an empty witness
+list are each refused;</li>
+<li>a fact for another Subject, a header Subject disagreeing with the act, and a header position
+disagreeing with the act are each refused;</li>
+<li>a flipped witness bit and a stranger&#39;s signature over the right body decode cleanly and are refused
+at <strong>admission</strong> with <code>AdmissionError::SignatureInvalid</code>;</li>
+<li>the verifier reaches the <strong>same</strong> result after transport as on the original store for: B accepted
+at 3; A refused <code>DeviceNotAuthorized</code> at 3; an unknown Subject refused <code>SubjectUnknown</code>; a fork at 2
+refused <code>AuthorityHalted { disputed_at: 2 }</code> with both candidates carried; a gap at 2 refused
+<code>PrefixIncomplete { frontier: 2, required: 3 }</code> with the orphan carried;</li>
+<li>A at <code>E = 2</code> verifies from a 3-fact bundle that does not contain the position-3 revoke; splicing the
+revoke in is refused <code>FactOutsideScope</code>; A at <code>E = 3</code> is refused because that bundle carries it;</li>
+<li>for every byte index and two bit masks, the mutated bytes have a different <code>bundle_id</code> and either
+fail to decode, fail to admit, or are refused by the verifier — <strong>no single-byte mutation yields
+evidence</strong>;</li>
+<li>bundle bytes are not an N1 body and not an act, and neither is a bundle; the six domain separators
+are pairwise distinct;</li>
+<li><code>evidence_bundle.rs</code> references no clock, no randomness, no hash map, and calls none of
+<code>supersede</code>, <code>resolve</code>, <code>derive</code>, <code>derive_prefix</code>.</li>
+</ul>
+<h3 id="82-behaviour-ported-from-the-superseded-suite">8.2 Behaviour ported from the superseded suite</h3>
+<p>Pinned by <code>DeviceAuthorityBundleV1</code>&#39;s tests and not by the donor&#39;s; restated over this container:</p>
+<ul>
+<li>a bundler that drops the revoke at <code>E = 3</code> and still claims <code>E = 3</code> yields
+<code>PrefixIncomplete { frontier: 3, required: 3 }</code>, never a still-authorized A (withholding cannot
+extend authority);</li>
+<li><code>verify_evidence_bundle</code> and <code>verify_evidence_bundle_bytes</code> return exactly the direct verifier&#39;s
+evidence or refusal, and surface an inadmissible witness as <code>Bundle(Inadmissible)</code> before any
+verdict;</li>
+<li>a relying party that supplies another Subject or another position is refused by N4-A
+(<code>ActSubjectMismatch</code>, <code>EvaluationPositionMismatch</code>), not by the container and not by a fallback;</li>
+<li><code>BUNDLE_DOMAIN</code> is distinct from the N4-C, N4-D and GEN separators;</li>
+<li><code>summarize</code> lists the four facts in canonical order with the right kinds, positions and witness
+counts for a bundle whose act would be refused.</li>
+</ul>
+<hr>
+<h2 id="9-icnctl-device-authority">9. <code>icnctl device-authority</code></h2>
+<p>Stateless. Reads the bundle file and nothing else: no data directory is opened, no daemon or
+network is contacted, no N2-A gate applies (nothing persistent is touched). stdout is one JSON
+document; the exit code is the verdict class. The verb is a mechanical consumer of §5–§7:</p>
+<pre><code class="language-text">bytes -&gt; EvidenceBundle::decode -&gt; admit (every pair through AuthorityStore::ingest)
+      -&gt; verify_device_act at the --subject and --position the caller states
+      -&gt; one JSON document; exit code = verdict class
+</code></pre>
+<pre><code class="language-text">icnctl device-authority verify  --bundle FILE --subject HEX64 --position N
+icnctl device-authority inspect --bundle FILE
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>exit</th>
+<th><code>verdict</code></th>
+<th>when</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td><code>authorized</code></td>
+<td>the act is covered; the document carries the N4-A evidence</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>refused</code></td>
+<td>all facts admissible and N4-A refused (<code>class</code> = one of the N4-A refusal names: <code>MalformedAct</code>, <code>ActSubjectMismatch</code>, <code>EvaluationPositionMismatch</code>, <code>BadSignature</code>, <code>PositionOutOfRange</code>, <code>SubjectUnknown</code>, <code>AuthorityHalted</code>, <code>PrefixIncomplete</code>, <code>DeviceIsEstablishmentAuthority</code>, <code>DeviceNotAuthorized</code>, <code>GrantNotInForce</code>, <code>CapabilityNotGranted</code>), <strong>or</strong> one fact was inadmissible (<code>class</code> = <code>InadmissibleFact</code>, with the fact&#39;s <code>event_id</code>)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>malformed</code></td>
+<td>not a strict canonical bundle, unreadable file, or an unusable <code>--subject</code></td>
+</tr>
+</tbody></table>
+<p><code>authorized</code> document:</p>
+<pre><code class="language-json">{
+  &quot;verdict&quot;: &quot;authorized&quot;,
+  &quot;subject&quot;: &quot;&lt;hex32&gt;&quot;, &quot;device&quot;: &quot;&lt;hex32&gt;&quot;, &quot;device_did&quot;: &quot;did:icn:…&quot;,
+  &quot;capability&quot;: &quot;Sign&quot;, &quot;evaluation_position&quot;: 3,
+  &quot;grant&quot;: { &quot;capabilities&quot;: [&quot;Sign&quot;, &quot;Present&quot;], &quot;validity&quot;: null, &quot;granted_at&quot;: 2 },
+  &quot;generation&quot;: 0,
+  &quot;act_id&quot;: &quot;&lt;hex32&gt;&quot;, &quot;bundle_id&quot;: &quot;&lt;hex32&gt;&quot;, &quot;fact_count&quot;: 4
+}
+</code></pre>
+<p>Every field comes from the <code>VerifiedDeviceAct</code> that <code>verify_evidence_bundle</code> returned; <code>act_id</code>
+is that verified act&#39;s own id, over the exact bytes whose signature verified, not an id computed
+apart from verification. <code>authorized</code> means &quot;authorized under the facts this bundle carries, at
+the position the relying party named&quot;: it is not current authorization, completeness of the
+Subject&#39;s history, or finality (N4-A §2; §3.3 above). The verb is CLI-REACHABLE library code;
+nothing in production calls it. <code>device_did</code> is the key-derived spelling of the device Principal
+(IS §3): it names a device, never a Subject or a member, and MUST NOT be fed into a legacy
+<code>did:icn:</code> member or Subject path.</p>
+<p><code>inspect</code> prints the bundle&#39;s own scope (<code>subject</code>, <code>evaluation_position</code>), each fact (<code>index</code>,
+<code>kind_tag</code>, <code>subject</code>, <code>position</code>, <code>event_id</code>, <code>witness_count</code>) and the act (<code>subject</code>, <code>device</code>,
+<code>device_did</code>, <code>capability</code>, <code>evaluation_position</code>, <code>payload_len</code>, <code>act_id</code>) and <strong>decides
+nothing</strong>: a bundle whose act would be refused inspects with exit 0.</p>
+<p>The verb MUST NOT, and does not: choose <code>E</code>; fetch missing facts; query <code>icnd</code>; repair malformed
+evidence; normalize a fork; invent freshness or currentness; fall back on any failure.
+<code>--subject</code> and <code>--position</code> are mandatory and are never read from the bundle. A caller that takes
+them from the bundle has made itself the signer&#39;s relying party, which is the one thing N4
+invariant 6 forbids. (A caller that wants &quot;valid <em>now</em>&quot; computes its position with N4-E over its own
+facts and passes that.)</p>
+<hr>
+<h2 id="10-what-a-downstream-consumer-may-rely-on--must-not-do">10. What a downstream consumer MAY rely on / MUST NOT do</h2>
+<p>Everything in <code>N4A_DEVICE_AUTHORITY_EVALUATION.md</code> §9.3, plus:</p>
+<p><strong>MAY:</strong> carry a bundle over any transport; store a bundle as the record of what was evaluated,
+where the consumer has its own basis to retain it — a valid bundle is not permission to keep it,
+and retention is a separate decision (see the PROPOSED ADR-0089);
+treat <code>bundle_id</code> as the identity of <em>what was carried</em> (it is witness-dependent, unlike <code>act_id</code>);
+run <code>icnctl device-authority verify</code> as its relying party and gate on exit code and <code>class</code>;
+re-verify at a later <code>position</code> once it has retained more facts, by assembling a new bundle.</p>
+<p><strong>MUST NOT:</strong> take <code>subject</code> or <code>position</code> from the bundle; cache a verdict across positions;
+treat <code>inspect</code> output as a verdict; treat exit 1 with <code>InadmissibleFact</code> as &quot;some facts were
+fine&quot;; reimplement the framing, the admission rules or the fold in another language (the Python
+file is an <em>audit</em>, not a client); put anything in a bundle that is not an N1 fact or the act;
+reintroduce a second container format or a compatibility decoder for the superseded one.</p>
+<hr>
+<h2 id="11-convergence-record-2026-10-04">11. Convergence record (2026-10-04)</h2>
+<p>Two implementations of this boundary were developed independently from the same base
+(<code>eee1dca63</code>): <code>DeviceAuthorityBundleV1</code> (<code>icn.n4.device-authority-bundle</code>, this branch at
+<code>b5df9d93b</code>, with the <code>icnctl</code> verb) and <code>EvidenceBundle</code> (<code>icn.n4.evidence-bundle</code>,
+<code>task/n4a-portable-evidence-bundle</code> at <code>8962f17a5</code>/<code>ae0a0e1ee</code>, with the independent reference).
+The requirement was one canonical byte representation. They were compared directly against
+<code>IDENTITY_SEMANTICS.md</code>, N4-A, the N1 encoding/admission/store/fold and #2599/#2694, and
+<code>EvidenceBundle</code> was selected. The differences, and why each resolved the way it did:</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th><code>DeviceAuthorityBundleV1</code> (removed)</th>
+<th><code>EvidenceBundle</code> (canonical)</th>
+<th>Why it mattered</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Evidence scope</td>
+<td>any <code>(body, witness)</code> pair for any Subject at any position; pruning left to the verifier</td>
+<td>exactly <code>{ b ∈ Bodies(S) : position(b) ≤ E }</code> with every witness; <code>FactSubjectMismatch</code> / <code>FactOutsideScope</code> at decode</td>
+<td>§3.2: the scope is the <code>derive_prefix</code> input set; enforcing it makes &quot;same evidence, same bytes&quot; a property of the format and keeps a fact above <code>E</code> out of a proof about <code>E</code></td>
+</tr>
+<tr>
+<td>Header</td>
+<td>none</td>
+<td><code>b32(S) ‖ u64be(E)</code>, agreeing with the act</td>
+<td>the bundle names what it is evidence <em>for</em>; a consumer can state its scope before admitting anything</td>
+</tr>
+<tr>
+<td>Body/witness representation</td>
+<td>flat record per witness: <code>event_id ‖ σ ‖ LP(body)</code>; a re-signed body repeated its bytes</td>
+<td>one body once with all its witnesses, <code>≥ 1</code></td>
+<td>§4.4: one encoding per body; no two records for one digest carrying different bytes</td>
+</tr>
+<tr>
+<td>Ordering / duplicates</td>
+<td>strict by <code>(event_id, σ)</code>; duplicates refused</td>
+<td>strict by <code>event_id</code>, witnesses strict bytewise; duplicates refused</td>
+<td>equivalent strictness; the grouped form is the one the header and scope rule need</td>
+</tr>
+<tr>
+<td><code>event_id</code> stated and checked</td>
+<td>yes</td>
+<td>yes</td>
+<td>equivalent</td>
+</tr>
+<tr>
+<td>Bound</td>
+<td><code>MAX_BUNDLE_FACTS = 2^16</code>, invented</td>
+<td>none beyond <code>Reader::count</code>, N4-A&#39;s payload bound and N1&#39;s <code>MAX_POSITION</code></td>
+<td>§4.6: traces to no governing contract; a cap is a storage-policy decision this layer does not own</td>
+</tr>
+<tr>
+<td>Verification wrapper</td>
+<td><code>verify_bundle</code> = <code>store_from_bundle</code> → <code>verify_device_act</code></td>
+<td><code>verify_evidence_bundle</code> = <code>admit</code> → <code>verify_device_act</code> (ported)</td>
+<td>pure composition in both; kept as a thin API, documented as such, not as a layer</td>
+</tr>
+<tr>
+<td>Reference</td>
+<td>zero-fact framing vector + the act vector</td>
+<td>full 4-fact vector derived from seeds, plus an independent strict decoder</td>
+<td>the stronger cross-implementation evidence</td>
+</tr>
+<tr>
+<td>CLI</td>
+<td>`icnctl device-authority verify</td>
+<td>inspect`</td>
+<td>none</td>
+</tr>
+</tbody></table>
+<p>Disposition: <code>device_authority_bundle.rs</code>, its test file, its Python reference, the domain
+<code>icn.n4.device-authority-bundle</code>, <code>MAX_BUNDLE_FACTS</code>, <code>store_from_bundle</code>, <code>verify_bundle</code> and
+<code>BundleVerifyError</code> are removed. <code>verify_bundle</code>&#39;s composition survives as <code>verify_evidence_bundle</code>;
+its <code>summarize</code> survives on <code>EvidenceBundle</code>; its tests that the donor suite did not already cover
+are ported (§8.2); its <code>icnctl</code> verb is retargeted. N4-C, the two-device lifecycle acceptance and
+N4-D assemble their bundles from a store instead of from a fact list; nothing they assert changed.
+N4-E never depended on the container. No compatibility decoding was added: neither format had
+deployed or persisted bytes. The standalone portable-evidence branch is superseded by this one.</p>
+<hr>
+<h2 id="12-what-changed-in-n1-and-n4-a">12. What changed in N1 and N4-A</h2>
+<p><strong>Nothing semantic.</strong> The only edit outside the module is two <code>pub(crate)</code> helpers, <code>Writer::b64</code>
+and <code>Reader::b64</code>, in <code>authority_log/encoding.rs</code> (identical on both branches), so a 64-byte
+signature is framed with N1&#39;s own reader and writer rather than a second implementation of
+fixed-width reads. No wire format, no constant, no admission rule, no fold rule and no verifier
+rule changed. <code>DeviceActV1</code> still has no serde and no wire encoding beyond its canonical bytes; the
+bundle carries those bytes verbatim.</p>
+<hr>
+<h2 id="13-what-remains-open">13. What remains open</h2>
+<ul>
+<li><strong>Where a client gets the facts.</strong> This document assumes the bundler holds them. The N1-D fact
+store (#2800) is how a replica persists them; replication between replicas is N3 (#2598); how a
+<em>device</em> first receives its Subject&#39;s facts is part of the N4 enrollment ceremony (#2599,
+<code>N4C_DEVICE_ENROLLMENT_REQUEST.md</code> step 4, unbuilt).</li>
+<li><strong>Which position a relying party should pin</strong> for a deferred (class 1) decision: G1-A, #2694 §6.
+For a class-2 act admitted now, N4-E computes it from the relying party&#39;s own facts.</li>
+<li><strong>Late fork discovery and omitted facts</strong> (§3.3): O-N7 and N3, not this container.</li>
+<li>A gateway route as a hosted relying party (N4-A §9.2 item 4) — deliberately unbuilt.</li>
+</ul>
+<hr>
+<h2 id="14-deliberate-scope-boundaries">14. Deliberate scope boundaries</h2>
+<p>Not in this slice, by design: <code>icnd</code> wiring; a gateway route; SDK bindings; persistence or any
+coupling to N1-D&#39;s trait (N1-D is a sibling whose record <em>concept</em> is shared, §4.4); N3 replication;
+recovery; rotation or replacement lifecycle; GEN subject-context work; Home enrollment transport; Pi
+or network-ops changes; governance voting; institution or member recognition; any real identity
+material.</p>
+<p>The format has one version. A future version is a new <code>BUNDLE_VERSION</code> with its own decoder branch;
+v1 bytes never change meaning.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

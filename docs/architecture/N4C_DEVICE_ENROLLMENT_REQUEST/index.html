@@ -1,0 +1,307 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="NORMATIVE CONTRACT for N4-C (third tranche of icn#2599): the self-signed EnrollmentRequestV1 a new device presents before it holds any authority - the Subject it asks to join, its per-context Principal, the capabilities it asks for (never Recover), a human label and a nonce - which proves possession of the device key and nothing more; the approve_enrollment step on the person's authority edge that turns it into the N1 Authorize fact, refusing a request for another Subject, a grant wider than asked, an empty grant, Recover, or the establishment key as device; rejection as silence and expiry as the edge's policy; the eleven-step ceremony with each step's class; the contradictions it settles (per-context device keys; attenuation structural; recovery never delegated); and the per-phase contract a Home runtime may build to (first boot, enrollment, runtime, revocation, recovery, contexts, trust/transport). Library, spec and tests only: no transport, approval UI, pending-request persistence, fact delivery, rotation, replacement, recovery, context kind, or icnctl verb. Fixture identities only."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N4-C — the enrollment request, the approval step, and the ceremony a client can implement | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>N4C DEVICE ENROLLMENT REQUEST</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-10-04</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="n4-c--the-enrollment-request-the-approval-step-and-the-ceremony-a-client-can-implement">N4-C — the enrollment request, the approval step, and the ceremony a client can implement</h1>
+<p><strong>Companion to:</strong> <code>N4A_DEVICE_AUTHORITY_EVALUATION.md</code> (evaluation), <code>N4B_PORTABLE_EVIDENCE_BUNDLE.md</code>
+(carrying facts), <code>IDENTITY_SEMANTICS.md</code> §2.7 (the Device Principal contract),
+<code>HUMAN_IDENTITY_ARCHITECTURE.md</code> §11–§12 (per-context device keys; custody of the root),
+<code>HOME_RUNTIME_IDENTITY_PROFILE.md</code> (who consumes this) · <strong>Issue:</strong> #2599 (N4) ·
+<strong>Code:</strong> <code>icn/crates/icn-identity/src/device_enrollment.rs</code>, <code>tests/device_enrollment.rs</code></p>
+<blockquote>
+<p><strong>Truth status.</strong> Normative for the request bytes and the approval rules; <strong>LIB-TESTED</strong> (11
+tests, observed 2026-10-27, including the ceremony end to end in a fixture: request → possession check → attenuated
+approval → act accepted inside the grant, refused outside it → revoke → refused; Subject
+unchanged). Transport, approval UI, persistence of pending requests, delivery of the resulting
+fact, rotation, replacement and recovery are <strong>not</strong> built. Fixture identities only.</p>
+</blockquote>
+<hr>
+<h2 id="1-what-was-missing">1. What was missing</h2>
+<p>N1 defines the fact that authorizes a device (<code>Authorize</code>, <code>construct::authorize_event</code>); N4-A
+decides whether an act is covered by it; N4-B carries facts to a relying party. Nothing defined
+the one object a device presents <strong>before it holds any authority</strong>: the request. Without it, a
+client could only be enrolled by a process that already held the person&#39;s establishment key and
+constructed the <code>Authorize</code> fact itself — i.e. only inside the person&#39;s own client. This document
+defines the request and the approval step, so the ceremony is a protocol between two parties:
+the device and the person&#39;s authority edge.</p>
+<h2 id="2-the-ceremony">2. The ceremony</h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Party</th>
+<th>Produces</th>
+<th>Class</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. generate a device secret locally (hardware-backed where available)</td>
+<td>device</td>
+<td>nothing ICN-visible</td>
+<td>— (device&#39;s own)</td>
+</tr>
+<tr>
+<td>2. derive the <strong>per-context</strong> device Principal for the context it wants to join (HIA §11.1; not from the <code>SubjectId</code>)</td>
+<td>device</td>
+<td><code>PrincipalKey</code></td>
+<td>LIB-TESTED type; derivation DOC-ONLY, client-side</td>
+</tr>
+<tr>
+<td>3. build and self-sign an <a href="#3-canonical-request-bytes">`EnrollmentRequestV1`</a>: the Subject it asks to join, its Principal, the capabilities it asks for, a human label, a nonce</td>
+<td>device</td>
+<td><code>SignedEnrollmentRequest</code></td>
+<td><strong>LIB-TESTED</strong> (this slice)</td>
+</tr>
+<tr>
+<td>4. carry the request to the authority edge (QR, link, local network)</td>
+<td>carrier</td>
+<td>—</td>
+<td>transport: not built</td>
+</tr>
+<tr>
+<td>5. <code>verify_enrollment_request</code>: the request is within its bounds (<code>EnrollmentRequestV1::validate</code>: label bound, non-empty ask, no <code>Recover</code>, re-checked because the fields are public; <code>sign_enrollment_request</code> checks it too) and the presenter holds the key it names. <strong>Possession, not authority, and no standing in any institution.</strong></td>
+<td>edge</td>
+<td><code>Ok(())</code>, <code>MalformedRequest(…)</code> or <code>BadSignature</code></td>
+<td><strong>LIB-TESTED</strong></td>
+</tr>
+<tr>
+<td>6. show the human: label, device key fingerprint, requested capabilities, the context</td>
+<td>edge UI</td>
+<td>—</td>
+<td>not built</td>
+</tr>
+<tr>
+<td>7. the human approves with an <strong>attenuated</strong> grant (<code>granted ⊆ requested</code>, non-empty, never <code>Recover</code>), optionally a position span</td>
+<td>edge</td>
+<td>decision</td>
+<td>—</td>
+</tr>
+<tr>
+<td>8. <code>approve_enrollment</code>: refuses a request for another Subject, a wider-than-requested grant, an empty grant, <code>Recover</code>, or the establishment key as device; otherwise authors the N1 <code>Authorize</code> fact with the edge&#39;s establishment key at the next log position</td>
+<td>edge</td>
+<td><code>SignedAuthorityEvent</code></td>
+<td><strong>LIB-TESTED</strong></td>
+</tr>
+<tr>
+<td>9. the fact becomes durable at the edge (N1-D store, #2800) and reaches the device and relying parties</td>
+<td>transport</td>
+<td>facts in stores</td>
+<td>N1-D merged (#2800, ADR-0087), rehydrated at <code>icnd</code> startup (#2843); delivery not built</td>
+</tr>
+<tr>
+<td>10. a relying party evaluates any later act with N4-A over the facts (carried by N4-B); the result it relies on is the <code>VerifiedDeviceAct</code>, never bare evidence</td>
+<td>relying party</td>
+<td><code>VerifiedDeviceAct</code> or a refusal</td>
+<td>LIB-TESTED + <code>icnctl</code></td>
+</tr>
+<tr>
+<td>11. the device is lost or replaced: the edge authors <code>Revoke</code>; a fresh install presents a <strong>new</strong> request with a <strong>new</strong> key</td>
+<td>edge, device</td>
+<td><code>SignedAuthorityEvent</code></td>
+<td>LIB-TESTED (<code>revoke_event</code>)</td>
+</tr>
+</tbody></table>
+<p><strong>Rejection</strong> is silence: no fact is produced, and an unapproved request is never durable.
+<strong>Expiry</strong> is the edge&#39;s policy: N1 has no clock, so the request carries a nonce, not a deadline;
+an edge that wants requests to lapse enforces that where the request is shown, and a device whose
+request lapsed builds a new one. Both are pinned in the module&#39;s contract.</p>
+<h2 id="3-canonical-request-bytes">3. Canonical request bytes</h2>
+<p>N1 framing, reused: principals and capability sets are encoded exactly as in an N1 body.</p>
+<pre><code class="language-text">enrollment_request_v1 :=
+      LP(&quot;icn.n4.enrollment-request&quot;)
+   || u16be(1)
+   || b32(subject)                         -- the Subject the device ASKS to join
+   || u8(0x01) || b32(device_key)          -- the device&#39;s per-context Principal
+   || u32be(n) || n × u8(capability_tag)   -- requested, strictly ascending; never 0x04 (Recover)
+   || LP(label)                            -- UTF-8, ≤ 64 bytes, for the approving human only
+   || b32(nonce)                           -- device-chosen
+
+request_id := SHA-256(enrollment_request_v1)
+signature  := Ed25519(device_key, enrollment_request_v1)
+</code></pre>
+<p>Strict decoding refuses: wrong domain/version, a non-principal in the device slot, unordered or
+unknown capability tags, <code>Recover</code>, an empty ask, an over-long or non-UTF-8 label, trailing bytes.
+The domain is distinct from every N1, GEN, N4-A and N4-B separator (pinned).</p>
+<h2 id="4-what-the-request-is-not">4. What the request is not</h2>
+<ul>
+<li><strong>Not a certificate.</strong> It binds no name to no key with no authority. It is an <em>ask</em>.</li>
+<li><strong>Not a claim about the human.</strong> It names a <code>SubjectId</code> because the edge must know which log
+to append to; naming it proves nothing, and the edge refuses a request for a Subject it does
+not act for.</li>
+<li><strong>Not reusable across contexts.</strong> The Principal is per-context; a request for another context
+is another request with another key. A device that presented one key in two contexts would
+link the person&#39;s Subjects to any observer that saw both (IS §2.1); the request shape does
+not prevent a misbehaving device from doing that, and nothing can — it makes the correct
+behaviour the natural one.</li>
+<li><strong>Not an invitation, token or code.</strong> Possession of request bytes confers nothing; only the
+edge&#39;s <code>Authorize</code> fact does, and only a relying party that holds it concludes anything.</li>
+<li><strong>Not a node key.</strong> A device Principal MUST NOT reuse a node&#39;s transport or network key: a node
+key is publicly observable, so the device would become a correlation handle for the person
+(IS §2.4). A runtime hosted on a node still holds its own per-context device keys.</li>
+</ul>
+<h2 id="5-contradictions-settled-by-the-executable-ceremony">5. Contradictions settled by the executable ceremony</h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Answer, as pinned by tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>one key per endpoint vs per-context device keys</td>
+<td>the request carries one per-context Principal; a device joining three contexts presents three requests with three keys. The earlier &quot;one operational key per endpoint&quot; assumption is withdrawn.</td>
+</tr>
+<tr>
+<td>can an approver grant more than was asked?</td>
+<td>no: <code>GrantExceedsRequest</code>. Attenuation is structural, not advisory.</td>
+</tr>
+<tr>
+<td>can enrollment ever confer recovery?</td>
+<td>no: <code>RecoverRequested</code> at construction, <code>RecoverNeverGranted</code> at approval. Recovery stays with the person&#39;s establishment authority (N7).</td>
+</tr>
+<tr>
+<td>can the phone enroll its own establishment key as a device?</td>
+<td>no: <code>DeviceIsEstablishmentAuthority</code>. The edge&#39;s key authors facts; it is never a bounded device.</td>
+</tr>
+<tr>
+<td>does a verified request grant anything?</td>
+<td>no: a stranger with a valid request is refused by N4-A (<code>DeviceNotAuthorized</code> / <code>PrefixIncomplete</code>) until a fact exists.</td>
+</tr>
+<tr>
+<td>does revoking a device touch the human?</td>
+<td>no: identifier, authority set and generation are identical before and after (pinned).</td>
+</tr>
+</tbody></table>
+<h2 id="6-the-contract-a-home-runtime-or-deployment-may-build-to">6. The contract a Home runtime or deployment may build to</h2>
+<p>In the vocabulary of <code>HOME_RUNTIME_IDENTITY_PROFILE.md</code> §6, with the objects that now exist:</p>
+<p><strong>First boot.</strong> The device generates a device secret; derives one Principal per context it will
+join; builds, for each, an <code>EnrollmentRequestV1</code> and signs it. It presents <strong>only</strong> the signed
+request bytes and a human-readable label. What survives reinstall: nothing — a reinstalled device
+is a new Principal and presents a new request; the person&#39;s identity and facts are untouched.</p>
+<p><strong>Enrollment.</strong> The edge runs <code>verify_enrollment_request</code>, shows the human the label,
+fingerprint and ask, and on approval runs <code>approve_enrollment</code> with the attenuated grant. The
+relationship is the resulting N1 <code>Authorize</code> fact and nothing else. The bounded authority is the
+grant&#39;s capability set and optional span.</p>
+<p><strong>Runtime.</strong> The Home runtime (a device Principal itself) stores public N1 facts in the N1-D
+layout and its own device keys; it asks &quot;is this act covered?&quot; with the matching operation: <strong>current admission</strong> (N4-E,
+<code>verify_device_act_at_admission</code>, or <code>admit_channel_binding</code> for a connection) for anything
+settled now, and the historical N4-A verifier (<code>icnctl device-authority verify</code>, or the library)
+only for &quot;was it covered at a position I choose&quot;. A historical answer never admits anything now. The device itself
+needs locally: its secret, its per-context Principals, and the facts it has received.</p>
+<p><strong>Revocation.</strong> Lost, stolen or reflashed: the edge authors <code>Revoke</code>; every relying party that
+retains it refuses the device at every position from the revoke on. A reflashed device holds a
+new secret and is a new Principal; the old one stays revoked. Effectiveness is per relying party,
+as far as its facts go (N3 owns propagation).</p>
+<p><strong>Recovery.</strong> Out of scope here (N7, #2603). The request path never grants <code>Recover</code>, so losing
+every device that was enrolled through it loses no recovery authority; losing the <em>edge</em> is an
+establishment-authority event, handled by N1 pre-rotation, not by enrollment.</p>
+<p><strong>Contexts.</strong> One request per <code>(device, context)</code>; each context&#39;s Subject is a different
+<code>SubjectId</code> the device learns from the edge for that context; the device&#39;s Principals differ per
+context. Nothing links them except the person&#39;s own <code>ContinuityRoot</code>, which never appears in
+any request, fact or bundle.</p>
+<p><strong>Trust / transport.</strong> TLS, pairing codes, QR scanning and local networks carry request and
+fact bytes; none of them is identity or authority. A connection that &quot;is device <code>K</code>&quot; needs a
+device binding object under N4 (<code>HOME_RUNTIME_IDENTITY_PROFILE.md</code> §6.5), not built here.</p>
+<h2 id="7-scope-boundaries">7. Scope boundaries</h2>
+<p>Not in this slice: request transport and display; persistence of pending requests; delivery of
+the <code>Authorize</code> fact to the device and to relying parties; rotation and replacement flows beyond
+<code>Revoke</code> + new request; recovery; a device-binding object for transports; any new capability
+beyond N1&#39;s four; any new context kind (GEN, #2602); an <code>icnctl</code> verb for requests or approvals
+(an approval needs the establishment key, which belongs on the person&#39;s client, not in a server
+CLI). <code>EnrollmentRequestV1</code> has <strong>no serde impl and no wire encoding beyond its canonical bytes</strong>.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/N4C_DEVICE_ENROLLMENT_REQUEST.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

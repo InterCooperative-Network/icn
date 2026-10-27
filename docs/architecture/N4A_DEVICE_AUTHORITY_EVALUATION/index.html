@@ -474,16 +474,20 @@ authority, because the verifier can only refuse or return a grant that already e
 <ol>
 <li><strong>this library API</strong> (<code>icn_identity::device_authority</code>) — exists;</li>
 <li>a strict, deterministic <strong>container</strong> for <em>(facts, act)</em> so a non-Rust client can carry them —
-<strong>not yet specified</strong>; <code>DeviceActV1</code> already has canonical bytes, the N1-D record layout
-(<code>event_id || signature → canonical body</code>) is the natural fact framing, and GEN-A&#39;s rule holds:
-serde/JSON bytes are never the cryptographic identity of anything;</li>
+<strong>built: N4-B</strong>, <code>N4B_PORTABLE_EVIDENCE_BUNDLE.md</code> (<code>evidence_bundle.rs</code>,
+<code>icn.n4.evidence-bundle</code>): every retained body for <code>S</code> at <code>≤ E</code> with every witness, grouped by
+body in the N1-D record layout (<code>event_id || signature → canonical body</code>), re-admitted through
+<code>AuthorityStore::ingest</code>; GEN-A&#39;s rule holds: serde/JSON bytes are never the cryptographic
+identity of anything;</li>
 <li>an <code>icnctl</code> verb that consumes that container and prints the verified act&#39;s evidence or the
-refusal — <strong>not built</strong>. Like any future consumer that enforces an action, it must rest on
-<code>verify_device_act</code> and its <code>VerifiedDeviceAct</code>, never on <code>evaluate_device_authority</code> alone; it is the right first non-Rust entry point for network-ops because it is local,
-stateless and needs no running daemon;</li>
+refusal — <strong>built: <code>icnctl device-authority verify|inspect</code></strong> (N4-B §9); local, stateless, no
+daemon. Like any future consumer that enforces an action, it rests on <code>verify_device_act</code> and
+its <code>VerifiedDeviceAct</code>, never on <code>evaluate_device_authority</code> alone;</li>
 <li>only after that, a gateway route — and only as a hosted relying party, never as an authority.</li>
 </ol>
-<p><strong>The one missing boundary to build next is item 2.</strong> Items 3 and 4 follow from it mechanically.</p>
+<p>Items 2 and 3 landed as N4-B (converged on one canonical container on 2026-10-04; N4-B §11).
+Item 4 remains deliberately unbuilt. The ceremony that puts facts
+in a device&#39;s hands in the first place is N4-C (<code>N4C_DEVICE_ENROLLMENT_REQUEST.md</code>).</p>
 <h3 id="93-downstream-contract-what-a-deployment-may-rely-on-must-not-reimplement">9.3 Downstream contract (what a deployment MAY rely on, MUST NOT reimplement)</h3>
 <p>A downstream deployment (for example a personal home-runtime deployment) <strong>MAY</strong> rely on:</p>
 <ul>
@@ -514,9 +518,8 @@ signed acts carry the device key, so a reused key links those Subjects for anyon
 (<code>IDENTITY_SEMANTICS.md</code> §2.1, §5). One device Principal per (device, context).</li>
 </ul>
 <h3 id="94-what-is-still-open-for-the-boundary">9.4 What is still open for the boundary</h3>
-<p>The container (§9.2 item 2); how a relying party learns <em>which</em> position a process pinned
-(G1-A, #2694 §6); and replication of facts between replicas (N3, #2598). None of these changes
-the verifier.</p>
+<p>How a relying party learns <em>which</em> position a process pinned (G1-A, #2694 §6); and
+replication of facts between replicas (N3, #2598). None of these changes the verifier.</p>
 <hr>
 <h2 id="10-deliberate-scope-boundaries">10. Deliberate scope boundaries</h2>
 <p>Not in this slice, by design: a transport container; gateway routes; <code>icnctl</code> exposure; SDK

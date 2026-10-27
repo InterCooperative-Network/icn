@@ -1,0 +1,561 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Survey: a generic, extensible role model for a person&#39;s Home runtime | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>survey 2026 10 04 home role capability layering</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>descriptive</span></span></div> <article class="prose" data-astro-cid-uadgga6g><blockquote>
+<p><strong>Provenance.</strong> Read-only survey produced by a subagent of the 2026-10-03/04 Home
+identity-integration session, against this worktree at <code>b098396b5</code> (before N4-D landed). It
+modified nothing and ran no cargo. Every <code>file:line</code> is evidence to re-verify against the HEAD
+you are on; line numbers drift. Preserved verbatim here because its conclusions drive the N4-D,
+admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
+Title of record: Survey: where a Home runtime&#39;s device roles live relative to N1 device capabilities (icn-authz, kernel Capability, AuthorityGrant/TypedScope, N4 payloads).</p>
+</blockquote>
+<blockquote>
+<p><strong>Edited 2026-10-27.</strong> Personal names, private machine paths and a private business example
+were replaced with neutral placeholders, and handoff links point at the renamed handoff. The
+survey is otherwise as recorded. Branch names are kept as the facts they are.</p>
+</blockquote>
+<blockquote>
+<p><strong>Convergence note (2026-10-04).</strong> Mentions below of <code>DeviceAuthorityBundleV1</code>,
+<code>icn.n4.device-authority-bundle</code>, <code>MAX_BUNDLE_FACTS</code>, <code>verify_bundle</code> / <code>store_from_bundle</code>,
+<code>device_authority_bundle.rs</code> and its tests describe N4-B as it stood when this record was
+written. N4-B has since been converged on <code>EvidenceBundle</code> (<code>icn.n4.evidence-bundle</code>,
+<code>evidence_bundle.rs</code>; <code>N4B_PORTABLE_EVIDENCE_BUNDLE.md</code> §11). Read those references as
+historical; the text is preserved as written.</p>
+</blockquote>
+<h1 id="survey-a-generic-extensible-role-model-for-a-persons-home-runtime">Survey: a generic, extensible role model for a person&#39;s Home runtime</h1>
+<p><strong>Read-only survey.</strong> Source: the development VM, worktree
+a local worktree (machine path omitted), branch
+<code>task/katie-home-identity-integration</code>, HEAD <code>b098396b5</code> (&quot;test(identity): the two-device
+acceptance invariant through every boundary&quot;). Paths are relative to that repo root. No files
+were modified; no cargo was run. <code>gh</code> is present on the VM; #2599 and #2603 were read directly.</p>
+<p>Two provenance caveats that matter for the recommendation:</p>
+<ul>
+<li><code>icn/crates/icn-identity/src/device_channel_binding.rs</code> and its test are <strong>untracked</strong>
+(<code>git status --short</code> prints <code>??</code> for both; no commit touches the file). It is cited below as a
+precedent-in-progress, not as a landed contract. <code>lib.rs:28</code> already declares
+<code>pub mod device_channel_binding;</code>.</li>
+<li><code>icn/crates/icn-identity/src/authority_log/mod.rs:216</code> declares <code>pub(crate) mod encoding;</code> and
+<code>encoding.rs:103</code> / <code>:150</code> declare <code>pub(crate) struct Writer</code> / <code>pub(crate) struct Reader</code>. Only
+<code>CodecError</code> is re-exported (<code>mod.rs:232</code>). An app-layer crate outside <code>icn-identity</code> cannot reuse
+ICN&#39;s canonical length-prefix writer today.</li>
+</ul>
+<hr>
+<h2 id="0-the-constraint-restated">0. The constraint, restated</h2>
+<p>N1&#39;s device capability set is <code>{Sign=0x01, Encrypt=0x02, Present=0x03, Recover=0x04}</code>
+(<code>icn/crates/icn-identity/src/authority_log/body.rs:351-380</code>). It is a wire format: <code>tag()</code> is
+documented &quot;The wire tag. Never renumber these.&quot; (<code>body.rs:363</code>) and <code>from_tag</code> returns
+<code>CodecError::UnknownCapability(other)</code> for anything else (<code>body.rs:379</code>), so a new tag makes every
+existing decoder refuse the body. The enum is also documented as <strong>app-layer labels the kernel
+never interprets</strong>, with the rule that <strong>no capability value confers log-writing or establishment
+authority</strong> (<code>body.rs:342-349</code>); <code>Recover</code> is &quot;An app-layer recovery role. <strong>Inert</strong> with respect to
+establishment authority.&quot; (<code>body.rs:358</code>).</p>
+<p>A grant is <code>AuthorizeBody { header, device: PrincipalKey, capabilities: CapabilitySet, validity: Option&lt;ValiditySpan&gt; }</code> (<code>body.rs:527-536</code>); revocation is <code>RevokeBody { header, device }</code>
+(<code>body.rs:540-545</code>). The derived view is <code>devices: BTreeMap&lt;PrincipalKey, DeviceGrant&gt;</code>
+(<code>authority_log/derive.rs:60</code>), where <code>DeviceGrant { capabilities, validity, granted_at }</code> is
+inserted by <code>Authorize</code> (<code>derive.rs:294-302</code>), removed by <code>Revoke</code> (<code>derive.rs:303-305</code>), and
+cleared wholesale by the establishment-level <code>AuthorityBody::Recover</code> (<code>derive.rs:288-293</code>).
+There is no caveat, resource, amount, or label field anywhere in the N1 body.</p>
+<p>The question is therefore where &quot;presentation endpoint / execution provider / storage provider /
+administrative device / approval edge / recovery participant / context participant&quot; can live
+without touching those bytes.</p>
+<hr>
+<h2 id="1-icn-authz--the-capability-graph-crate">1. <code>icn-authz</code> — the capability graph crate</h2>
+<p><strong>What it models.</strong> <code>lib.rs:1-15</code>: &quot;Canonical capability graph model for unifying ICN&#39;s
+authorization systems&quot;; &quot;This is an <strong>app-layer</strong> crate ... The kernel sees only hashes produced by
+this crate, never the capability model itself.&quot; The model is:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Definition</th>
+<th>Cite</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>CapabilitySubjectId(String)</code></td>
+<td>a validated <code>did:</code>-prefixed string; explicitly <strong>not</strong> <code>authority_log::SubjectId</code></td>
+<td><code>model/ids.rs:14-25</code></td>
+</tr>
+<tr>
+<td><code>Action(String)</code></td>
+<td><code>domain:verb[:subverb...]</code>, ASCII alnum/colon/hyphen, lowercased, &gt;=2 segments</td>
+<td><code>ids.rs:47-86</code></td>
+</tr>
+<tr>
+<td><code>ResourceKind</code></td>
+<td>frozen <code>{Entity, Scope, Asset, Contract, System}</code>, tags 0x01-0x05</td>
+<td><code>ids.rs:111-127</code>, <code>hash.rs:28-32</code></td>
+</tr>
+<tr>
+<td><code>ResourceId { kind, id: String }</code></td>
+<td></td>
+<td><code>ids.rs:133-138</code></td>
+</tr>
+<tr>
+<td><code>Constraint</code></td>
+<td>frozen <code>{RateLimit, CreditMultiplier, MaxTopics, TimeLock, RequiresQuorum, Tag(String)}</code></td>
+<td><code>ids.rs:154-173</code>, <code>hash.rs:38-43</code></td>
+</tr>
+<tr>
+<td><code>EdgeSource</code></td>
+<td>frozen <code>{CclContract, TrustScore, GovernanceVote, Static}</code></td>
+<td><code>ids.rs:179-193</code>, <code>hash.rs:49-52</code></td>
+</tr>
+<tr>
+<td><code>CapabilityEdge { subject, action, resource, constraints, source, valid_at: Option&lt;BlockHeight&gt; }</code></td>
+<td>constraints sorted+deduped</td>
+<td><code>model/edge.rs:18-52</code></td>
+</tr>
+<tr>
+<td><code>CapabilityGraph::query(subject, action, resource) -&gt; Decision { allowed, matching_edges }</code></td>
+<td><strong>exact equality</strong> on subject/action/resource; &quot;B0 minimal&quot;</td>
+<td><code>edge.rs:99-123</code></td>
+</tr>
+<tr>
+<td>frozen BLAKE3 type tags 0x10-0x16</td>
+<td></td>
+<td><code>hash.rs:16-22</code></td>
+</tr>
+</tbody></table>
+<p><strong>Resource/action scoping.</strong> Yes, as data: an edge carries an <code>Action</code> and a <code>ResourceId</code>.
+<strong>Caveats.</strong> Only as <code>Constraint</code> values (including an opaque <code>Tag(String)</code>); the query at
+<code>edge.rs:103-123</code> does not evaluate constraints at all, it returns the matching edges.
+<strong>Attenuation / delegation chains.</strong> Not present in the model read in full (<code>ids.rs</code>, <code>edge.rs</code>,
+<code>graph/builder.rs:1-77</code>): <code>EdgeSource</code> has no delegated variant and there is no narrowing or
+chain-walk operation. The task premise (&quot;attenuation, delegation chains&quot;) is not borne out by the
+crate.</p>
+<p><strong>Runtime callers.</strong> None. Only <code>icn/Cargo.toml:38</code> (workspace member) and <code>icn/Cargo.toml:165</code>
+(path dep declaration) mention it; no other <code>Cargo.toml</code> depends on it and <code>grep -rn icn_authz</code>
+outside the crate returns nothing. <code>src/adapters/mod.rs:1</code> is the single line
+&quot;Domain-specific adapters (CCL, Trust, JWT) -- implemented in Phase B1&quot;, and <code>graph/builder.rs:4-5, 16-17</code> say the same. It is a B0 type model with mock-source tests
+(<code>tests/capability_graph_integration.rs</code>).</p>
+<p><strong>Could it carry Home roles as namespaced actions?</strong> Syntactically yes (<code>home:present</code>,
+<code>home:execute</code>, <code>home:store</code> all satisfy <code>Action::new</code>), and the <code>domain:verb</code> grammar is a good
+naming convention to borrow. As a mechanism, no: its subject is a <code>did:</code> string rather than
+<code>SubjectId</code>/<code>PrincipalKey</code>; <code>valid_at</code> is a <code>BlockHeight</code> (<code>ids.rs:199-203</code>), not an authority-log
+position; it has no signer, no witness, no canonical bytes bound under a signature; and nothing
+evaluates it. Using it would be inventing a second authority system beside N1/N4.</p>
+<hr>
+<h2 id="2-icn-kernel-api--authzrs-and-scopers">2. <code>icn-kernel-api</code> — <code>authz.rs</code> and <code>scope.rs</code></h2>
+<p><strong>Bearer token.</strong> <code>Capability { id, resource: String, action: String, constraints: Constraints, holder: Option&lt;Did&gt;, issuer: Did, expiration: LogicalTimestamp, signature: Vec&lt;u8&gt; }</code>
+(<code>src/authz.rs:800-818</code>); <code>Constraints { max_amount, max_uses, allowed_targets, custom }</code>
+(<code>:819-830</code>). The header states non-goals: &quot;Role hierarchies (use capabilities instead)&quot; and
+&quot;Predefined capability taxonomies (apps define their own)&quot; (<code>:32-37</code>).</p>
+<p><strong><code>ActionKind::Custom(String)</code> is an extension point by design</strong> (<code>:459-480</code>, with
+<code>ActionKind::custom()</code> at <code>:477-479</code>). It is used today for <code>&quot;network_message&quot;</code>
+(<code>icn-core/src/supervisor/network_policy.rs:297</code>, <code>lifecycle.rs:1893</code>, <code>icn-net/src/rate_limit.rs:1162</code>),
+<code>&quot;network_access&quot;</code> (<code>icn-gateway/src/rate_limit.rs:561</code>) and <code>&quot;connect&quot;</code>
+(<code>icn-gateway/src/trust_mgr.rs:1632</code>). But <code>ActionKind</code> lives in <code>PolicyRequestCore { actor: Did, action, domain }</code> (<code>:487-495</code>) and is routed to a <code>PolicyOracle</code> (<code>:645-723</code>) whose job is to turn
+app semantics into a kernel-enforced <code>ConstraintSet</code> (<code>:212-235</code>). It is a per-request policy
+question keyed by a <code>Did</code>, not a durable, signed, position-bound delegation. It also has no
+position semantics and no witness.</p>
+<p><strong>Who issues <code>Capability</code>?</strong> Nobody in production. <code>CapabilityEngine</code> (<code>:867-904</code>) has <strong>no
+implementor</strong> (<code>grep -rn &quot;impl CapabilityEngine&quot;</code> returns nothing). The only construction found is
+<code>icn-core/src/apps/runtime.rs:730-740</code> <code>root_capability_set()</code>: <code>resource: &quot;*&quot;, action: &quot;*&quot;, issuer: &quot;did:icn:root&quot;, expiration: u64::MAX, signature: vec![]</code> — an unsigned wildcard root token.
+HOME profile <code>§6.2</code> lists a bearer token among the forbidden substitutes for an <code>Authorize</code> fact
+(<code>docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md:196-198</code>).</p>
+<p><strong><code>ScopeLevel</code></strong> is <code>{Local=0, Cell=1, Org=2, Federation=3, Commons=4}</code> (<code>src/scope.rs:41-60</code>), a
+network-reach ordering (&quot;The kernel knows that <code>Federation</code> is &#39;wider&#39; than <code>Org</code>, but it does NOT
+know what an organization is&quot;, <code>scope.rs:8-10</code>), consumed by placement/durability code
+(<code>state.rs:687-703</code>, <code>receipts.rs</code>, <code>icnd/src/compute_wiring.rs:178,291</code>). It is not an authority
+scope and has no personal/household level.</p>
+<hr>
+<h2 id="3-icn-governancesrcauthorityrs-and-adr-0014--adr-0019">3. <code>icn-governance/src/authority.rs</code> and ADR-0014 / ADR-0019</h2>
+<p><strong>Model.</strong> <code>AuthorityClass</code> is a <strong>closed</strong> enum <code>{Representation, Execution, Attestation}</code>
+(<code>authority.rs:52-73</code>). <code>AuthorityGrant { id, class, grantor_entity: GrantorEntityId, grantee: Grantee, scope: TypedScope, granted_by: Option&lt;DecisionProvenance&gt;, valid_from, valid_until, revoked_at }</code> (<code>:257-297</code>), all <strong>wall-clock</strong> <code>Timestamp</code>s with <code>is_active_at(now)</code> (<code>:300-325</code>).
+<code>Grantee</code> is <code>{Did, Entity}</code> (<code>:221-227</code>).</p>
+<p><strong>The grantor rule is the disqualifier.</strong> &quot;A valid grantor is a <strong>cooperative, community, or
+federation</strong> acting under its own charter&#39;s process. The ICN runtime, daemon, gateway, or any
+non-entity platform component is <strong>never</strong> a valid grantor.&quot; (<code>:190-201</code>; ADR-0014 <code>:190-197</code> and
+non-goal 11 at <code>docs/adr/ADR-0014-constitutional-object-model.md:588-593</code>). A person is not a
+grantor entity; a household &quot;mints no <code>AuthorityGrant</code>; its members delegate to their own devices in
+their own logs&quot; (<code>HOME_RUNTIME_IDENTITY_PROFILE.md:165</code>; also <code>:141-146</code> &quot;never an <code>AuthorityGrant</code>,
+never a steward&quot;).</p>
+<p><strong><code>TypedScope</code></strong> is <code>{ domain: Option&lt;GovernanceDomainId&gt;, proposal_class: Vec&lt;String&gt;, action_kind: Vec&lt;String&gt;, amount_ceiling: Option&lt;AmountCeiling&gt;, time_window: Option&lt;TimeWindow&gt; }</code>
+(<code>authority.rs:135-158</code>). &quot;The semantic categories are frozen by ADR-0014; exact encoding may
+refine&quot; (<code>:131-134</code>; ADR-0014 <code>:224-256</code>). It is a conjunction of governance-flavoured axes and
+<code>is_empty()</code> is malformed (<code>:160-172</code>). The string bridge <code>parse_authority_scope_strings</code> accepts
+only <code>domain:</code>, <code>proposal_class:</code>, <code>action_kind:</code>, <code>amount_ceiling:</code> (<code>:336-407</code>). So: extensible
+only by ADR, and along institutional axes. ADR-0014 also says what <code>AuthorityClass</code> &quot;explicitly
+does <strong>not</strong> cover: general-purpose ACL/RBAC roles, kernel-level capability bearer semantics ...
+or ordinary membership status&quot; (<code>ADR-0014:178-182</code>).</p>
+<p><strong>Runtime status.</strong> Grants are minted only for steward appointment/reconfirmation (Attestation
+class) at the accepted-decision seam (<code>docs/adr/ADR-0019-...md:39-47, 56-68</code>), persisted in
+<code>icn-gateway/src/receipt_store.rs:1015-1726</code>; &quot;Kernel dispatch gated by mandates: NOT
+IMPLEMENTED&quot;; &quot;Kernel capability minting from <code>AuthorityGrant</code>: NOT IMPLEMENTED&quot; (<code>ADR-0019:60-68</code>).
+<code>icn-gateway/src/token_authority.rs:91</code> lists <code>AuthorityGrant</code> as a <em>future</em> issuance basis
+(<code>:80-82</code>: production source &quot;allows nothing&quot;). The types &quot;must never be imported by kernel crates&quot;
+(<code>authority.rs:23-27</code>; ADR-0014 <code>:488-497</code>).</p>
+<hr>
+<h2 id="4-identity_semantics-27-and-n4-2599">4. IDENTITY_SEMANTICS §2.7 and N4 (#2599)</h2>
+<p><code>docs/architecture/IDENTITY_SEMANTICS.md:233-247</code> (Device Principal): &quot;Not a subject, and not a
+Principal class of its own&quot;; &quot;<strong>Device-ness is not in the identifier — it is the grant.</strong>&quot;;
+&quot;Authority — an <code>authorize</code> event in the subject&#39;s log naming this Principal, with capabilities
+and a validity span. <strong>Attenuation is mandatory</strong>: issued ⊆ issuer ∩ flow ∩ requested.&quot;; &quot;A device
+signature alone never establishes subject authorship.&quot; Invariant <strong>I5</strong> (<code>:638</code>): &quot;Device
+authorization requires explicit subject delegation evidence — never inferred from a valid
+signature | Verification returns a <strong>grant</strong>, not a bool.&quot; Routing table (<code>:691</code>): #2599 owns
+&quot;Device authorization/rotation/revocation mechanics&quot;.</p>
+<p><strong>#2599 (read via <code>gh issue view 2599</code>).</strong> Core model requires N4 to define &quot;capability
+attenuation; scope/caveat representation; authorization validity relative to subject
+authority-log position&quot;. Load-bearing invariants: 2 (attenuation), 3 (&quot;Every security-relevant
+authorization field is cryptographically bound&quot;), 6 (evaluation position not signer-chosen),
+<strong>7 (&quot;Recovery capability is not establishment authority. A device capability named <code>Recover</code> must
+not become a branch-selection or log-writing privilege&quot;)</strong>, 9 (authorship vs authorization
+distinct). Required outputs include &quot;capability/scope model and attenuation rule&quot;. Non-goals:
+&quot;N7 guardian threshold recovery itself&quot;.</p>
+<p><strong>Is adding capability tags a contract change?</strong> Yes, by three independent statements:
+N4-A <code>§7.3</code> &quot;N1 records a capability set and an optional position span; it has no caveat, amount or
+resource field. N4-A checks exactly what N1 recorded. <strong>Richer scope is a contract change for
+#2599, not something to improvise here.</strong>&quot; (<code>docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md:243-247</code>);
+N4-C <code>§7</code> scope boundary &quot;any new capability beyond N1&#39;s four&quot; (<code>N4C_DEVICE_ENROLLMENT_REQUEST.md:140-143</code>;
+<code>device_enrollment.rs:39</code>); HOME profile row (c) &quot;No caveat/resource field: richer scope is #2599&quot;
+(<code>HOME_RUNTIME_IDENTITY_PROFILE.md:58</code>). And mechanically: <code>from_tag</code> refuses unknown tags
+(<code>body.rs:379</code>) and GEN-A genesis verification requires the initial grant to equal exactly the
+Alpha set (<code>subject_context.rs:634</code>, <code>:690</code>), so widening the set breaks existing verifiers.</p>
+<hr>
+<h2 id="5-n4-a-72-act-classes-and-hia-93">5. N4-A §7.2 act classes and HIA §9.3</h2>
+<p><code>N4A:233-239</code>: class 1 deferred-decision (the decision pins <code>E</code>; a device revoked after <code>E</code> still
+counts), class 2 immediately settled (&quot;the acceptor evaluates at its own retained <code>frontier − 1</code>
+once, at admission; <strong>no validity bound exists</strong> and R5.1 remains unmet&quot;), class 3 authority
+events (&quot;not acts; the log orders them itself&quot;). HIA <code>§9.3</code> table at
+<code>docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md:1318-1322</code>, and the honest statement at
+<code>:1356-1362</code>: for class 2 &quot;the only real controls are <strong>scope limits</strong> (a device may not settle
+above some bound) and a relying party&#39;s own freshness bar&quot;.</p>
+<p>Note what the mapping is <strong>not</strong>: it maps <em>acts</em> to evaluation rules, not device <em>capabilities</em> to
+classes. The only capability-to-act coupling in code is one capability per act
+(<code>N4A:178-179</code>; <code>DeviceActV1.capability</code>, <code>device_authority.rs:120-121</code>) and
+<code>CapabilityNotGranted</code> when the act&#39;s capability is outside the grant (<code>N4A:210</code>;
+<code>device_authority.rs:275-277</code>). Which capability an action family uses is the family&#39;s choice.</p>
+<p>Two HIA requirements frame the role question directly: <strong>R3.5 [STRONG]</strong> &quot;Device classes differ by
+scope and custody strength, never by principal class&quot; (<code>HIA:234-235</code>), and the Meaning Firewall
+table at <code>HIA:1500-1504</code>: kernel/identity layers hold &quot;a generic <strong>attenuating delegation</strong> between
+principals&quot; and never &quot;any notion of person, member, <strong>device-class</strong> or coop&quot;; the <strong>app</strong> layer
+holds &quot;<code>Person</code>, <code>member</code>, <strong><code>role</code></strong>, standing, recovery policy, act-class rules&quot;.</p>
+<hr>
+<h2 id="6-gen-a-alpha_initial_device_capabilities">6. GEN-A <code>alpha_initial_device_capabilities()</code></h2>
+<p><code>icn/crates/icn-identity/src/subject_context.rs:364-371</code>: &quot;Exactly <code>{Sign, Present}</code>. <code>Encrypt</code> is
+not granted because nothing in this profile addresses content to the Subject yet, and <code>Recover</code> is
+not granted because an app-layer label named <code>Recover</code> must never be mistaken for N1 establishment
+authority.&quot; Genesis verification pins equality with this set (<code>:634</code>, <code>:690</code>), and the initial
+device must not be the establishment authority (<code>SubjectContextError::InitialDeviceIsAuthority</code>,
+<code>:385-387</code>). N4-C enrollment never requests or grants <code>Recover</code> (<code>device_enrollment.rs:110, 134-135, 293-294</code>); HOME <code>§6.2</code> says approvals use <code>capabilities ⊆ {Sign, Present, Encrypt}</code>
+(<code>HOME:192</code>).</p>
+<hr>
+<h2 id="7-the-precedent-n4-d-device_channel_bindingrs-untracked">7. The precedent: N4-D <code>device_channel_binding.rs</code> (untracked)</h2>
+<p>The pattern the Home slice needs already has a worked example in the worktree, uncommitted:</p>
+<ul>
+<li>&quot;This module adds <strong>no kernel primitive</strong>. A channel binding is a [<code>DeviceActV1</code>] with capability
+[<code>DeviceCapability::Present</code>] whose payload is a domain-separated [<code>ChannelBindingV1</code>]&quot;
+(<code>device_channel_binding.rs:9-11</code>).</li>
+<li>Own domain and version: <code>CHANNEL_BINDING_DOMAIN = b&quot;icn.n4.channel-binding&quot;</code>, version 1
+(<code>:52-55</code>); payload struct <code>ChannelBindingV1 { channel: [u8;32], nonce: [u8;32] }</code> (<code>:59-63</code>)
+with strict <code>canonical_bytes</code>/<code>decode</code> (<code>:74-96</code>).</li>
+<li><code>bind_channel</code> builds <code>DeviceActV1::new(subject, device, DeviceCapability::Present, position, payload)</code> and signs it (<code>:116-132</code>); <code>verify_channel_binding</code> refuses a non-<code>Present</code> act
+(<code>:145</code>, <code>NotAPresentation</code>), then runs N4-A unchanged, then one equality check.</li>
+<li>The layering table (<code>:17-24</code>) separates transport / binding / N4-A / the human.</li>
+</ul>
+<p>This is exactly &quot;an action family that signs through this envelope places its own
+domain-separated canonical bytes here; N4-A never parses them&quot; (<code>N4A:180-182</code>;
+<code>device_authority.rs:67-68</code>). The Home role object should follow the same shape — but at the
+<strong>app layer</strong>, see §9.</p>
+<hr>
+<h2 id="8-answers">8. Answers</h2>
+<h3 id="a-where-should-home-roles-live">(a) Where should Home roles live?</h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Verdict</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>New kernel-level <code>DeviceCapability</code> variants</td>
+<td><strong>No</strong></td>
+<td>wire change (<code>body.rs:363, 379</code>); breaks GEN-A verify (<code>subject_context.rs:634, 690</code>); &quot;contract change for #2599&quot; (<code>N4A:246-247</code>); role is app-layer meaning (<code>HIA:1500-1504</code>, R3.5 <code>HIA:234-235</code>)</td>
+</tr>
+<tr>
+<td>Namespaced app capability / role object carried in <code>DeviceActV1.payload</code></td>
+<td><strong>Yes — the answer</strong></td>
+<td>payload is opaque by contract (<code>N4A:180-182</code>); precedent N4-D (<code>device_channel_binding.rs:9-11</code>); evaluated by N4-A as the N1 capability the role requires; zero contract change</td>
+</tr>
+<tr>
+<td><code>icn-authz</code> resources/actions</td>
+<td><strong>Borrow the <code>domain:verb</code> grammar only</strong> (<code>ids.rs:47-56</code>)</td>
+<td>no callers, no adapters (<code>adapters/mod.rs:1</code>), <code>did:</code> string subjects (<code>ids.rs:14-25</code>), <code>BlockHeight</code> not log position (<code>ids.rs:199-203</code>), exact-match query (<code>edge.rs:103-123</code>), no attenuation</td>
+</tr>
+<tr>
+<td><code>TypedScope</code> / <code>AuthorityGrant</code></td>
+<td><strong>No</strong></td>
+<td>grantor must be a chartered entity (<code>authority.rs:190-201</code>); wall-clock validity (<code>:286-296</code>); institutional axes frozen by ADR (<code>:131-134</code>); explicitly excludes RBAC roles (<code>ADR-0014:178-182</code>); HOME <code>:165</code></td>
+</tr>
+<tr>
+<td>kernel <code>Capability</code> bearer / <code>ActionKind::Custom</code></td>
+<td><strong>No</strong></td>
+<td>no <code>CapabilityEngine</code> impl; only an unsigned wildcard root (<code>runtime.rs:730-740</code>); per-request policy keyed by <code>Did</code> (<code>authz.rs:487-495</code>); forbidden substitute (<code>HOME:196-198</code>)</td>
+</tr>
+<tr>
+<td>Attenuation caveat on N1 <code>Authorize</code> under #2599</td>
+<td><strong>Not for this slice; file it if needed later</strong></td>
+<td>it is the legitimate path for <em>verifier-enforced</em> role attenuation across relying parties, but it changes N1 canonical bytes, the GEN-A preimage and the N4-B record layout; the Home slice does not need it because the Home runtime is its own relying party</td>
+</tr>
+</tbody></table>
+<p>Composition, not enumeration: each Home role <strong>reduces to one of the three grantable N1
+capabilities plus app data</strong>, and the roles that do not reduce are not device roles at all:</p>
+<table>
+<thead>
+<tr>
+<th>Home role</th>
+<th>Reduces to</th>
+<th>Cite</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>presentation endpoint</td>
+<td><code>Present</code> act with Home payload; the channel it is on via N4-D</td>
+<td><code>body.rs:357</code>; <code>device_channel_binding.rs:9-11</code></td>
+</tr>
+<tr>
+<td>execution provider (hosted VM, PC)</td>
+<td><code>Sign</code> act with Home payload; the VM is a device Principal</td>
+<td><code>body.rs:353</code>; <code>HOME:164, 206</code></td>
+</tr>
+<tr>
+<td>storage provider</td>
+<td><code>Encrypt</code> if it must decrypt content addressed to the Subject; <strong>no capability at all</strong> if it only stores public N1 facts</td>
+<td><code>body.rs:355</code>; <code>HOME:204</code></td>
+</tr>
+<tr>
+<td>administrative / management device</td>
+<td>a <code>Sign</code> device whose Home act family is &quot;admin&quot;; it can never author N1 facts</td>
+<td><code>body.rs:345-349</code></td>
+</tr>
+<tr>
+<td>approval / authority edge</td>
+<td><strong>not a device role</strong> — it is the Subject&#39;s establishment authority; refused as a device</td>
+<td><code>N4A:251-259</code> (§7.4); <code>subject_context.rs:385-387</code>; <code>N4C:98</code></td>
+</tr>
+<tr>
+<td>recovery participant</td>
+<td><strong>not a device role</strong> — see (b); N7 object, MISSING</td>
+<td><code>HOME:61</code>; #2603</td>
+</tr>
+<tr>
+<td>context participant</td>
+<td><strong>not a device role</strong> — a Subject per context (GEN) with per-context device keys; household membership is mutual recognition</td>
+<td><code>HOME:141-150, 163</code>; <code>N4C:131-134</code></td>
+</tr>
+</tbody></table>
+<h3 id="b-recover-vs-participates-in-a-recovery-scheme">(b) <code>Recover</code> vs &quot;participates in a recovery scheme&quot;</h3>
+<p>They are <strong>not the same thing</strong>, and nothing in the current contracts links them.</p>
+<ul>
+<li><code>DeviceCapability::Recover</code> is a bit in a <em>device&#39;s</em> grant inside the Subject&#39;s log. It is
+documented inert (<code>body.rs:345-349, 358</code>), never requested or granted by enrollment
+(<code>device_enrollment.rs:134-135, 293-294</code>), never granted by Alpha genesis
+(<code>subject_context.rs:366-368</code>), and #2599 invariant 7 forbids it ever becoming a log-writing or
+branch-selection privilege. No code path reads it: <code>grep -n &quot;DeviceCapability::Recover&quot;</code> in
+<code>derive.rs</code>/<code>device_authority.rs</code> finds only the refusals above. It is a reserved tag with no
+consumer.</li>
+<li>Recovery participation (N7, #2603) is establishment-level. A guardian group is &quot;a <strong>threshold</strong>
+key set held by M-of-N guardians&quot; (<code>HIA:1700-1703</code>) whose aggregate is <strong>one</strong> <code>PrincipalKey</code> in
+the pre-committed authority set (#2603 invariant 2: &quot;Threshold key = one principal. Individual
+guardian keys are custody shares/participants; the N1 establishment authority sees one logical
+group principal&quot;). It lands in the log as <code>AuthorityBody::Recover(EstablishmentBody)</code>
+(<code>body.rs:515-523, 562</code>) and <strong>clears every device grant</strong> (<code>derive.rs:288-293</code>; #2603
+invariant 9). The guardian descriptor, commitment and signing session are #2603 &quot;Required
+protocol artifacts&quot; and are <strong>MISSING</strong> (<code>HOME:61</code>).</li>
+<li>So a &quot;recovery participant&quot; is a participant in a <em>different</em> object (an N7 group behind an
+establishment principal), typically another human&#39;s principal (<code>HIA:1612</code>), and must never be
+represented as a device grant carrying <code>Recover</code>. The Home runtime may display &quot;intended
+guardian&quot; as its own UI state; that confers nothing and must say so.</li>
+</ul>
+<h3 id="c-the-smallest-primitive">(c) The smallest primitive</h3>
+<p><strong><code>HomeRoleV1</code>: an app-layer, domain-separated payload object carried in <code>DeviceActV1.payload</code>,
+signed by the device, verified by N4-A exactly as any act, and interpreted by the Home runtime as
+data.</strong> No kernel or N1 change.</p>
+<p>Shape (illustrative; the bytes are the Home layer&#39;s own, which <code>N4A:180-182</code> permits):</p>
+<pre><code class="language-text">home_role_v1 := LP(&quot;home.role&quot;) || u16be(1)
+             || LP(role)            -- ASCII &quot;domain:verb&quot; label, e.g. &quot;home:present&quot; | &quot;home:execute&quot; | &quot;home:store&quot; | &quot;home:admin&quot;
+             || b32(service)        -- digest of the Home service/context descriptor this act is for
+             || b32(nonce)          -- relying-party challenge or device-chosen bytes; replay is the family&#39;s business
+             || LP(intent)          -- opaque Home bytes (what the device wants to do in that role)
+</code></pre>
+<p>Composition, type by type:</p>
+<ol>
+<li><code>DeviceActV1 { subject, device, capability, evaluation_position, payload }</code>
+(<code>device_authority.rs:115-128</code>) with <code>capability = required_capability(role)</code>:
+<code>home:present → Present</code>, <code>home:execute | home:admin → Sign</code>, <code>home:store → Encrypt</code>.
+<code>sign_device_act</code> (<code>:220</code>) refuses a key that is not <code>act.device</code>.</li>
+<li>The Home runtime (relying party) chooses <code>E</code> per <code>N4A:217-231</code>, supplies the Subject, and runs
+<code>verify_device_act</code> (<code>:384</code>) → <code>DeviceAuthorityEvidence { subject, device, capability, evaluation_position, grant, generation }</code> (<code>:281-296</code>) or a refusal.</li>
+<li><strong>Role ⊆ grant</strong>: the runtime checks <code>evidence.capability == required_capability(role)</code> and
+decodes the payload strictly (wrong domain/version/trailing bytes → refuse), mirroring
+<code>verify_channel_binding</code>&#39;s <code>NotAPresentation</code> check (<code>device_channel_binding.rs:145</code>). A role
+can never widen a grant because the verifier only ever confirms a capability N1 recorded
+(<code>N4A:210</code>, <code>CapabilityNotGranted</code>).</li>
+<li>The runtime stores <code>(act bytes, signature, evidence)</code> as HOME <code>§6.3</code> already prescribes
+(<code>HOME:205</code>): &quot;evidence is reproducible from facts + act + <code>E</code>; it is a log, not an oracle&quot;.</li>
+<li>Durable <em>assignment</em> (&quot;device B is the desk&#39;s presentation endpoint&quot;) is Home-runtime policy. If
+the person wants it signed, it is another Home act family (<code>home:admin</code>, payload names the
+assignee and role) by one of their own <code>Sign</code> devices, verified the same way. It is never an N1
+fact.</li>
+<li>Carriage to a relying party reuses N4-B <code>DeviceAuthorityBundleV1</code> unchanged (<code>HOME:64</code>); the
+<code>icnctl device-authority verify|inspect</code> verb already answers authorized/refused/malformed for
+any payload (<code>HOME:65</code>).</li>
+</ol>
+<p><strong>What changes.</strong> No contract. Kernel: nothing. N1 bytes: nothing. N4-A/B/C: nothing. GEN: nothing
+(the role object is context-agnostic; the production Private/Household context kind remains
+#2602&#39;s, <code>HOME:132-146</code>). Two <em>optional</em> non-contract items:</p>
+<ul>
+<li>Visibility: <code>pub(crate) mod encoding</code> (<code>authority_log/mod.rs:216</code>) means a Home crate cannot reuse
+<code>Writer</code>/<code>Reader</code>. Either the Home crate writes its own 30-line length-prefix encoder for its
+own payload (allowed: the payload is opaque to ICN and the MUST NOT at <code>HOME:242-243</code> is about
+reimplementing <em>ICN&#39;s</em> encodings, fold and grant semantics), or <code>icn-identity</code> re-exports
+<code>Writer</code>/<code>Reader</code> as a small API change with no semantic content.</li>
+<li>Placement: a <em>generic</em> &quot;labelled act&quot; family could live in <code>icn-identity</code> beside N4-D, but
+<code>role</code> is app-layer vocabulary (<code>HIA:1504</code>) and the handoff boundary says ICN must not &quot;encode
+person-, device-, VM- or RDP-specific workflow&quot; (<code>docs/dev/handoff-2026-10-03-home-identity-integration.md:99</code>).
+Keep <code>HomeRoleV1</code> in the Home runtime crate.</li>
+</ul>
+<p><strong>Honest limitation.</strong> Without an N1 caveat, a device granted <code>Sign</code> can sign a Home act claiming
+any <code>Sign</code>-class role; role attenuation is enforced by the Home runtime&#39;s policy, not by the
+verifier, and does not travel to other relying parties. For a personal Home whose runtime is the
+only relying party that is acceptable and matches <code>HIA:1356-1362</code> (class-2 controls are scope
+limits and the acceptor&#39;s own rule). If role-level attenuation must be verifier-enforced across
+relying parties, that is &quot;scope/caveat representation&quot; under #2599 and must be filed there.</p>
+<h3 id="d-what-must-not-be-done">(d) What must NOT be done</h3>
+<ol>
+<li>Do not add, rename or renumber <code>DeviceCapability</code> variants (<code>body.rs:363, 379</code>;
+<code>N4C:140-143</code>; <code>N4A:246-247</code>).</li>
+<li>Do not make <code>Recover</code> mean recovery participation, and never request or grant it to a device
+(<code>body.rs:345-349, 358</code>; <code>device_enrollment.rs:134-135, 293-294</code>; #2599 inv. 7).</li>
+<li>Do not reuse <code>AuthorityGrant</code> / <code>TypedScope</code> / <code>Mandate</code> for personal or household roles
+(<code>authority.rs:190-201</code>; <code>ADR-0014:178-182, 588-593</code>; <code>HOME:141-146, 165</code>).</li>
+<li>Do not use kernel <code>Capability</code> bearer tokens, JWT sessions, <code>ActionKind::Custom</code> policy
+requests, SSH keys, OS accounts, RDP logins or TLS client certs as device roles
+(<code>HOME:196-198</code>; <code>N4A:380-385</code>; <code>authz.rs:730-740</code> root token has no signature).</li>
+<li>Do not use <code>icn-authz</code> as a runtime authority source; borrow its <code>domain:verb</code> grammar at most
+(<code>adapters/mod.rs:1</code>; <code>ids.rs:14-25</code>).</li>
+<li>Do not model the approval/authority edge as a device role; the establishment key is refused as
+a device (<code>N4A:251-259</code>; <code>N4C:98</code>).</li>
+<li>Do not model &quot;context participant&quot; as a device role; it is a per-context Subject and
+per-context device key (GEN, <code>HOME:148-150, 163</code>; <code>N4C:131-134</code>), and a household is mutual
+recognition, not a grant (<code>HOME:141-146</code>).</li>
+<li>Do not let a role widen a grant: role ⊆ grant, always checked against
+<code>DeviceAuthorityEvidence.capability</code>.</li>
+<li>Do not choose <code>E</code> from the act, cache verdicts across positions, or fall back to the frontier
+(<code>N4A:383-384</code>; <code>HOME:245-246</code>).</li>
+<li>Do not repurpose node <code>BindingInfo</code> for devices (<code>HOME:224-227</code>); use the N4-D object once it
+is committed.</li>
+<li>Do not put Home or person-specific vocabulary into <code>icn-identity</code> or <code>icn-kernel-api</code> (<code>handoff:99</code>;
+<code>HIA:1500-1504</code>).</li>
+<li>Do not reimplement ICN encodings, the fold, grant semantics or refusal logic outside the Rust
+library (<code>HOME:242-243</code>); defining the Home payload&#39;s own bytes is not that.</li>
+<li>Do not derive device keys from <code>SubjectId</code> or reuse one device key across contexts
+(<code>HIA:1614-1620</code>; <code>HOME:163</code>).</li>
+<li>Do not represent personal roles with <code>ScopeLevel</code> or a <code>GovernanceDomainV1</code> context
+(<code>scope.rs:8-10</code>; <code>HOME:131</code>).</li>
+</ol>
+<hr>
+<h2 id="9-checks-that-ran">9. Checks that ran</h2>
+<p>Read-only <code>grep</code>/<code>sed</code>/<code>cat</code> over the worktree at <code>b098396b5</code>; <code>git status --short</code> and <code>git log</code>
+for the channel-binding files; <code>gh issue view 2599</code> and <code>2603</code>. No cargo, no edits. Line numbers
+are from that checkout and will drift.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/survey-2026-10-04-home-role-capability-layering.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

@@ -1,0 +1,567 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Survey: GEN context kinds, persistence/delivery, evaluation position | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>survey 2026 10 04 gen kinds persistence freshness</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>descriptive</span></span></div> <article class="prose" data-astro-cid-uadgga6g><blockquote>
+<p><strong>Provenance.</strong> Read-only survey produced by a subagent of the 2026-10-03/04 Home
+identity-integration session, against this worktree at <code>b098396b5</code> (before N4-D landed). It
+modified nothing and ran no cargo. Every <code>file:line</code> is evidence to re-verify against the HEAD
+you are on; line numbers drift. Preserved verbatim here because its conclusions drive the N4-D,
+admission, fact-set, capability-layering, GEN-kind and N7 slices that follow it on this branch.
+Title of record: Survey: GEN context kinds for personal/household contexts (#2602), N1-D/N3 persistence and delivery (#2800, #2598), and the class-2 admission position (G1-A).</p>
+</blockquote>
+<blockquote>
+<p><strong>Edited 2026-10-27.</strong> Personal names, private machine paths and a private business example
+were replaced with neutral placeholders, and handoff links point at the renamed handoff. The
+survey is otherwise as recorded. Branch names are kept as the facts they are.</p>
+</blockquote>
+<blockquote>
+<p><strong>Convergence note (2026-10-04).</strong> Mentions below of <code>DeviceAuthorityBundleV1</code>,
+<code>icn.n4.device-authority-bundle</code>, <code>MAX_BUNDLE_FACTS</code>, <code>verify_bundle</code> / <code>store_from_bundle</code>,
+<code>device_authority_bundle.rs</code> and its tests describe N4-B as it stood when this record was
+written. N4-B has since been converged on <code>EvidenceBundle</code> (<code>icn.n4.evidence-bundle</code>,
+<code>evidence_bundle.rs</code>; <code>N4B_PORTABLE_EVIDENCE_BUNDLE.md</code> §11). Read those references as
+historical; the text is preserved as written.</p>
+</blockquote>
+<h1 id="survey-gen-context-kinds-persistencedelivery-evaluation-position">Survey: GEN context kinds, persistence/delivery, evaluation position</h1>
+<p>Read-only survey of the ICN monorepo on the development VM, 2026-10-03/04.
+No files modified, no cargo run. Everything below is cited to file:line or doc section.</p>
+<h2 id="provenance">Provenance</h2>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Where</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Survey checkout</td>
+<td>a local worktree (machine path omitted), branch <code>task/katie-home-identity-integration</code></td>
+<td>HEAD <code>b098396b5</code>, 46 commits ahead of <code>main</code> (<code>5add7a48d</code>, which is an ancestor)</td>
+</tr>
+<tr>
+<td>N1-D (PR #2800)</td>
+<td>a second local worktree (machine path omitted) @ <code>b871dafdc</code></td>
+<td>PR OPEN; <code>fact_store.rs</code> is <strong>not</strong> on <code>main</code> and <strong>not</strong> on the integration branch</td>
+</tr>
+<tr>
+<td>Uncommitted work on the integration branch</td>
+<td><code>icn/crates/icn-identity/src/device_channel_binding.rs</code> (untracked), <code>tests/device_channel_binding.rs</code> (untracked), <code>src/lib.rs</code> (modified, adds <code>pub mod device_channel_binding;</code> L28)</td>
+<td>another session&#39;s WIP (Home profile §6.5 TLS binding, routed #2599); <strong>not surveyed</strong></td>
+</tr>
+<tr>
+<td><code>gh</code> on the VM</td>
+<td>works for issues #2602, #2598, #2694, #2599 and PR #2800</td>
+<td>live text used</td>
+</tr>
+</tbody></table>
+<p>Paths below are relative to the repo root; Rust under <code>icn/crates/</code>.</p>
+<hr>
+<h2 id="a-context-kinds-gen-2602">A. Context kinds (GEN, #2602)</h2>
+<blockquote>
+<p><strong>NON-NORMATIVE.</strong> The <code>PersonalContextV1</code> / <code>HouseholdContextV1</code> kinds throughout section A (tables included) are a
+survey recommendation, not a decision. #2602 owns GEN context kinds, and the kind byte feeds the N1
+KDF permanently, so nothing here may be implemented or relied on until #2602 decides.</p>
+</blockquote>
+<h3 id="a0-sources-read">A.0 Sources read</h3>
+<ul>
+<li><code>docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md</code> (427 lines, all of it; status <code>normative</code>, canonical <code>no</code>)</li>
+<li><code>icn/crates/icn-identity/src/subject_context.rs</code> (724 lines, all of it)</li>
+<li><code>icn/crates/icn-identity/tests/gen_subject_context.rs</code> (test names + the shape/relabel tests)</li>
+<li><code>icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py</code> (kind constant L71, use at L90, L123)</li>
+<li><code>docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md</code> (264 lines, all; status <code>proposed</code>)</li>
+<li><code>docs/adr/ADR-0083-institutional-domain-and-domain-policy-runtime-root.md</code> L1-140 (status <code>proposed</code>, <code>implementation_status: not-started</code>)</li>
+<li><code>docs/architecture/IDENTITY_SEMANTICS.md</code> (IS; canonical) §1.1, §2.2, §2.6, §2.7, §5, §8, §10, §13</li>
+<li><code>docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md</code> (HIA) §11.1 L1605-1625, R1 L195-210, §12.2</li>
+<li>issue #2602 (full), #2599 invariants, handoff <code>docs/dev/handoff-2026-10-03-home-identity-integration.md</code> (grep)</li>
+</ul>
+<h3 id="a1-what-a-new-kind-tag-changes-mechanically">A.1 What a new kind tag changes mechanically</h3>
+<p>The kind tag enters exactly two GEN preimages and, through one of them, a third reference:</p>
+<table>
+<thead>
+<tr>
+<th>Preimage</th>
+<th>Code</th>
+<th>Contains <code>u8(kind.tag())</code>?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>context_preimage</code> → <code>context_nonce</code></td>
+<td><code>subject_context.rs:323-336</code> (<code>w.u8(self.kind.tag())</code> at L327)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>subject_context_ref_preimage</code></td>
+<td><code>subject_context.rs:339-348</code> (L343)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>initial_device_binding_ref_preimage</code></td>
+<td><code>subject_context.rs:352-362</code></td>
+<td>not directly; it commits <code>subject_context_ref</code> (L359), which does</td>
+</tr>
+</tbody></table>
+<p>The verifier reconstructs the descriptor from <code>bundle.context_kind</code> by struct literal (<code>subject_context.rs:592-596</code>, module-private field access), so verification already works for any variant the enum has. The kind-mismatch check at <code>subject_context.rs:581-583</code> exists today and is <strong>unreachable with one variant</strong>; the comment at L577-580 says it was &quot;kept rather than deferred so that adding a v2 context kind cannot silently let a bundle of one kind satisfy a claim about another&quot;. The code was written to be extended here.</p>
+<p><strong>N1 is unaffected.</strong> The only thing N1 receives is the 32-byte <code>ContextNonce</code> (<code>authority_log/body.rs:105</code>, written at L641, read at L700). IS §2.6: the nonce is &quot;not an identifier of anything&quot;; IS §10: &quot;public protocol data&quot;, N1 does not interpret it. GEN doc §1 L24-27: &quot;No N1 wire format, canonical body, signature preimage or digest rule is altered or extended.&quot; A second kind changes which 32 bytes go in; the inception body&#39;s shape, admission (<code>admissible_bytes</code>), <code>derive</code>, <code>derive_prefix</code> and <code>MAX_POSITION</code> never see a kind.</p>
+<p><strong>N4-A is unaffected.</strong> <code>verify_device_act(signed, subject, store, position)</code> (<code>device_authority.rs:384-406</code>) and <code>evaluate_device_authority</code> (L302-348) take no context input at all. N4-A doc §10 L398-405 lists &quot;any new context kind for personal or household use (GEN, #2602)&quot; as out of scope precisely because nothing in it depends on the kind; Home profile §4 L132: &quot;N4-A evaluates identically whatever the kind.&quot; Likewise N4-B (bundle carries N1 facts only; §8 L182-184 excludes &quot;any new context kind&quot;) and N4-C (request names a <code>SubjectId</code> only; §7 L143).</p>
+<p><strong>Two mechanical consequences that are not free:</strong></p>
+<ol>
+<li><strong><code>context_id</code> is a <code>String</code></strong> (<code>subject_context.rs:283</code>) and the preimage grammar is <code>LP(context_id_utf8)</code> (GEN §6.1 L165). The Home profile proposes that for <code>PersonalContextV1</code> and <code>HouseholdContextV1</code> the context id is &quot;an opaque 32-byte descriptor digest&quot; (§4 L136-137, L141-142). Raw 32 bytes are not valid UTF-8 in general. Either (a) encode the digest as lowercase hex (64 ASCII bytes) and validate the form in the kind&#39;s constructor, leaving the preimage grammar and the <code>String</code> field untouched; or (b) change the field to bytes with per-kind validation, which touches the v1 vector and the Python reference&#39;s <code>lp(context_id.encode())</code> assumption. (a) is the zero-grammar-change option. This is a decision #2602 has to state in the doc; it is not in the Home profile.</li>
+<li><strong>Vectors and the reference.</strong> GEN §8 L346-357: the pinned literals &quot;were produced by an independent reference implementation written from this document&quot; and the reference is self-checking. Adding a kind means a new §8 vector row per kind and a new constant in <code>gen_subject_context_reference.py</code> (it currently hardcodes <code>KIND_GOVERNANCE_DOMAIN_V1 = 0x01</code> at L71). The discipline is doc → reference → Rust literal, in that order.</li>
+</ol>
+<p><strong>Versioning.</strong> GEN §5 L104-106: &quot;The kind tag is inside every preimage, so a later GEN <em>version</em> may define further kinds without disturbing this one.&quot; The §4 table labels the constants &quot;frozen for v1&quot;. Mechanically no version bump is needed: <code>GEN_CONTEXT_VERSION = 1</code> stays in the preimage, <code>0x01</code> bundles are byte-identical, and a <code>0x02</code> bundle is a different preimage. The verifier&#39;s <code>version == 1</code> check (L574-576) would have to grow to accept a <code>2</code> if the doc chose to bump. Recommend: keep v1, state in §5 that v1 defines three kinds, and record that decision explicitly; the doc&#39;s wording currently leaves it ambiguous.</p>
+<h3 id="a2-contract-change-needing-an-adr-or-an-anticipated-extension">A.2 Contract change needing an ADR, or an anticipated extension?</h3>
+<p>Evidence:</p>
+<ul>
+<li><strong>No ADR exists for GEN-A or N4-A.</strong> <code>grep -li &quot;GEN-A|subject_context|SubjectContextGenesis|N4-A|device_authority&quot; docs/adr/*.md</code> returns nothing. Both landed as normative architecture docs plus an issue (#2695, #2599) and a PR with an independent reference. That is the established form for identity-layer contracts.</li>
+<li><strong>The canonical document already delegates kinds to GEN.</strong> IS §2.2 L125-132: &quot;a context may later be bilateral, informal, community-level, federation-level, or another relationship GEN (#2602) defines. What is normative here is that a human Subject is scoped to one context and is never global — not what kinds of context may exist.&quot; IS §13 L699: #2602 owns &quot;the genesis/context-establishment protocol&quot;. So adding kinds changes <strong>no canonical contract</strong>; IS does not need editing.</li>
+<li><strong>The GEN doc anticipates it</strong> (§5 L104-106, quoted above) and the verifier was built for it (<code>subject_context.rs:577-583</code>).</li>
+<li><strong>ADR-0083 is not in the path.</strong> It admits <code>Individual</code> as an owning entity class for <code>InstitutionalDomain</code> (L88-92). Home profile §4 L130 rejects that route for personal/household use (makes a person an owning entity class, extends the person-as-Entity debt IS §8 L538-544, puts a <code>governance:write</code> bearer in the genesis path against HIA R1.1 [HARD] L201). ADR-0083 lives in the governance app layer (L81-83); GEN kinds live in the kernel crate. They do not collide so long as nothing claims a Personal context <em>is</em> an <code>InstitutionalDomain</code>. #2806 tracks ADR-0083&#39;s status drift separately.</li>
+<li><strong>IS §13 L710-711</strong> forbids &quot;any generalization of N1&#39;s machinery beyond human subjects&quot;. A Household kind does not do that: a household never gets a Subject; each human incepts their own Subject <em>into</em> the household context (Home §4 L148-150). That is the line to hold in the doc text.</li>
+</ul>
+<p>Verdict: <strong>an extension the GEN doc&#39;s own text anticipates, under #2602&#39;s ownership, in the form the project already uses (doc revision + vectors + code + issue routing). No ADR by precedent.</strong> What <em>is</em> a design decision rather than mechanics: the byte form and meaning of <code>context_id</code> per kind (A.1 item 1), whether v1 stays v1, and the Household agreement ceremony (A.3). Those must be written into GEN §5 before the reference is extended.</p>
+<p>Caveat: #2602 is labelled <code>status:needs-design</code> and its operating rules say &quot;brief before coding&quot;. The Home profile is <code>Status: proposed</code> and says of its own shape &quot;for #2602 to decide (not decided here)&quot; (L134). The handoff (L114) and the Home profile (§7 row 4) both already committed to &quot;new GEN kinds, not a <code>GovernanceDomainV1</code> string&quot;. The <em>direction</em> is settled; the <em>bytes</em> are not written down yet.</p>
+<h3 id="a3-household-membership-gen-b-and-whether-the-kind-can-exist-first">A.3 Household membership (GEN-B) and whether the kind can exist first</h3>
+<p><strong>What GEN-B is today.</strong> <code>SubjectRecognitionV1</code> is defined only in #2694 §3 as an <em>institutional</em> fact: <code>domain_id + SubjectId + standing_class + recognition_basis_kind + recognition_basis_hash → recognition_hash</code>. Grep across <code>docs/architecture/*.md</code>: it appears only in GEN §10 (L417, scope exclusion) and Home §4 L143. Nothing in code. The Home profile proposes household membership as &quot;mutual recognition between members&#39; Subjects (the GEN-B recognition shape, bilateral), never an <code>AuthorityGrant</code>, never a steward&quot; (§4 L142-144). That bilateral variant (Subject recognizes Subject, no <code>domain_id</code>) is <strong>undesigned</strong>; the institutional variant is <strong>unbuilt</strong> (#2694 rung 3).</p>
+<p><strong>Can a Household context exist before recognition exists? Yes.</strong> GEN §2 L36-42: a verified genesis &quot;does not establish ... membership or standing&quot;; &quot;each of those is a separate, later fact&quot;. A <code>HouseholdContextV1</code> context is a <code>(kind, context_id)</code>; each human incepts one Subject into it with their own fresh salt (§5.3 one Subject per context is a client invariant). Two Subjects in one context publish unlinkable nonces (§5.2 argument, kind-independent). Without recognition there is simply no fact that says <em>S_A</em> and <em>S_B</em> are co-members, which is exactly the state of two coop members before GEN-B today. The relying parties that matter for the Home slice (the Pi, the hosted workstation) evaluate <strong>device</strong> acts with N4-A over each Subject&#39;s own log; co-membership is not an input to that (N4-A §2 L66: recognition &quot;by any institution (GEN-B / N5)&quot; is explicitly not proven and not needed).</p>
+<p><strong>What is missing for Household specifically:</strong> how two clients agree on one <code>context_id</code>. Home §4 L141-142: &quot;the genesis digest of a household descriptor the founding members&#39; clients agree on&quot;. No descriptor format and no two-party agreement step exist. For GEN-A&#39;s purposes the <code>context_id</code> is opaque; the agreement is a ceremony (carrier: the same kind of QR/link/local-network path N4-C step 4 L40 leaves unbuilt). Owner: #2602 (GEN item 4 &quot;recognition&quot; / a child issue), not GEN-A.</p>
+<h3 id="a4-classification-of-the-three-fixture-contexts">A.4 Classification of the three fixture contexts</h3>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Class</th>
+<th>Kind</th>
+<th>Which ICN object owns it</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Private</strong> (one human)</td>
+<td>personal</td>
+<td><code>PersonalContextV1</code></td>
+<td><strong>none.</strong> No ICN object exists for it; the context is a <code>(kind, context_id)</code> the person&#39;s client minted and keeps (Home §4 L136-139). The only &quot;owner&quot; is the person&#39;s client-held <code>ContinuityRoot</code> (IS §10; HIA R1.2)</td>
+<td>never published beyond the person&#39;s own devices; no registrar, founder or charter</td>
+</tr>
+<tr>
+<td><strong>Household</strong> (two humans, no governance object)</td>
+<td>interpersonal</td>
+<td><code>HouseholdContextV1</code></td>
+<td><strong>none.</strong> No charter, steward, treasury or <code>GovernanceDomain</code> row (Home §4 L141-146; §5 row 3 L165: a household mints no <code>AuthorityGrant</code>)</td>
+<td>membership = future bilateral recognition (A.3); each human has their own Subject in it; shared decisions are &quot;recognition and app-layer policy, not grants&quot; (L165)</td>
+</tr>
+<tr>
+<td><strong>Sole Business</strong> (one-person business today)</td>
+<td>personal <strong>today</strong>, organizational <strong>only after institutional genesis</strong></td>
+<td><code>PersonalContextV1</code> today, as a <em>second</em> personal context with its own salt and id, distinct from Private</td>
+<td><strong>none today.</strong> Home §4 L138-139: &quot;<em>Private</em> and <em>a person&#39;s own small project</em> are both this kind; if a project later takes on members it becomes a household or an institution through genesis, not by relabelling&quot;</td>
+<td>if it becomes a cooperative: GEN item 2 institutional genesis (#2602) produces a governed domain; its founder incepts a <strong>new</strong> Subject in that <code>GovernanceDomainV1</code> context; the Sole Business personal Subject is not promoted; the only link is the <code>ContinuityRoot</code> (IS §5 L336-338). No bridge is defined and none is needed now, because no institutional fact exists yet. Any acts recorded in the personal context do not become institutional facts</td>
+</tr>
+</tbody></table>
+<p>Why Sole Business must not be a <code>GovernanceDomainV1</code> from day one: Home §4 L131 (&quot;correct bytes, wrong meaning; nothing could later distinguish a household from a domain&quot;); IS §8 L523-524 (&quot;one human — a person is not a governed collective&quot;); and the Individual-owned <code>InstitutionalDomain</code> route is rejected at L130.</p>
+<h3 id="a5-one-device-three-contexts-three-principals-nothing-links-them">A.5 One device, three contexts, three Principals, nothing links them</h3>
+<p>Confirmed from four independent places:</p>
+<ul>
+<li>HIA §11.1 L1612-1614: &quot;Device keys must be per-context too. If one device key appears in two contexts, the identifier separation is defeated. Per-context device keys are a deterministic derivation from the device&#39;s own secret.&quot;</li>
+<li>Home profile §5 row 1 L163: &quot;The Pi, with three contexts, holds three device Principals derived from one local device secret. The derivation is client-side and must not take <code>SubjectId</code> as input.&quot; §6.1 L182.</li>
+<li>N4-C §5 L94: &quot;a device joining three contexts presents three requests with three keys&quot;; §6 L129-132: &quot;Nothing links them except the person&#39;s own <code>ContinuityRoot</code>, which never appears in any request, fact or bundle.&quot;</li>
+<li>GEN: the three preimages (A.1 table) contain only <code>(kind, context_id, salt, inception_event_id)</code>; no cross-context field exists. §9.2 L398-400: holding one bundle &quot;does not help recognize or link a Subject in another context.&quot;</li>
+</ul>
+<p>So the device holds three <code>PrincipalKey</code>s, sends three <code>EnrollmentRequestV1</code>s naming three different <code>SubjectId</code>s, and receives three <code>Authorize</code> facts in three logs. GEN, N1, N4-A/B/C contain no object that relates them.</p>
+<p><strong>What is missing here:</strong> the per-context device key derivation helper is DOC-ONLY (Home row b′ L57: &quot;no derivation helper exists in code&quot;); N4-C §2 row 2 L38: &quot;derivation DOC-ONLY, client-side&quot;; N4-C §4 L84-86 admits the request shape &quot;does not prevent a misbehaving device&quot; from reusing one key. Rule it must obey: HIA L1616-1618 (no <code>SubjectId</code> input). No issue owns it by name; it belongs with the device lifecycle (#2599).</p>
+<h3 id="a6-recommendation-for-a">A.6 Recommendation for A</h3>
+<p><strong>Implement the tags now, on the branch, in one PR that revises the GEN doc first</strong> — with one explicit decision written down before code. The architecture is settled enough for the <em>tags</em>: three committed documents (Home profile §4/§7, the handoff L114, N4-A/N4-B/N4-C scope sections) already say &quot;a new GEN kind, never a <code>GovernanceDomainV1</code> string&quot;, IS delegates kinds to GEN, and the verifier was built with the mismatch check waiting. What is <em>not</em> settled is representable without deciding it: make <code>context_id</code> for both new kinds an <strong>opaque 32-byte value carried as 64 lowercase hex ASCII bytes</strong> (preimage grammar unchanged, byte-exact comparison unchanged), validated at the constructor, and push &quot;what those 32 bytes digest&quot; to the client. That keeps GEN-A ignorant of descriptor contents, exactly as it is ignorant of what a <code>GovernanceDomainId</code> string means.</p>
+<p>Smallest sound piece (est. ~150 lines Rust + doc rows + two Python constants):</p>
+<ol>
+<li>GEN doc §5: add <code>0x02 = PersonalContextV1</code>, <code>0x03 = HouseholdContextV1</code>; the <code>context_id</code> form for each (hex32); the sentence that a household never has a Subject of its own; the statement that v1 stays v1; §8: one vector row per new kind, produced by the reference first.</li>
+<li><code>gen_subject_context_reference.py</code>: <code>KIND_PERSONAL_V1 = 0x02</code>, <code>KIND_HOUSEHOLD_V1 = 0x03</code>, two more derivations.</li>
+<li><code>subject_context.rs</code>: two enum variants and tags (L180-192); <code>SubjectContextDescriptor::personal_v1(context_id_hex: &amp;str, salt)</code> and <code>::household_v1(...)</code> (beside L293-305) refusing anything but 64 lowercase hex chars; no change to <code>incept_*</code> or <code>verify_*</code>.</li>
+<li><code>tests/gen_subject_context.rs</code>: (a) the kind-mismatch refusal is now reachable — a <code>GovernanceDomainV1</code> bundle claimed as <code>PersonalContextV1</code> → <code>ContextKindMismatch</code>; (b) same <code>context_id</code> bytes under two kinds → different nonce, different Subject, different <code>subject_context_ref</code> (cross-kind separation); (c) a Household genesis for two Subjects with two salts → unlinkable nonces (reuse of the existing §5.2 test shape); (d) constructor rejects a non-hex / wrong-length id for the new kinds; (e) pinned literals for the two new vectors.</li>
+</ol>
+<p>If the maintainer wants the &quot;brief before coding&quot; rule honoured to the letter, the same content minus steps 3-4 is the #2602 comment, and the code follows on a yes. Either way the Home deployment is not blocked (Home §4 L152-155: the device proof is context-agnostic and runs on a fixture <code>GovernanceDomainV1</code>; no production Private/Household context is to be created until the kind exists).</p>
+<h3 id="a7-missing-pieces-and-owners-a">A.7 Missing pieces and owners (A)</h3>
+<table>
+<thead>
+<tr>
+<th>Missing</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PersonalContextV1</code> / <code>HouseholdContextV1</code> tags, constructors, vectors, reference, doc §5/§8</td>
+<td>#2602 (GEN-A extension)</td>
+</tr>
+<tr>
+<td><code>context_id</code> byte form for non-domain kinds (hex32 recommended) and the v1-stays-v1 decision</td>
+<td>#2602 (doc decision)</td>
+</tr>
+<tr>
+<td>Household descriptor agreement (two clients, one <code>context_id</code>) ceremony</td>
+<td>#2602 (GEN item 4 / child); carrier is the same unbuilt N4-C step 4 transport</td>
+</tr>
+<tr>
+<td>Bilateral <code>SubjectRecognitionV1</code> (household co-membership)</td>
+<td>#2602 GEN-B; institutional shape in #2694 §3 (rung 3), bilateral variant undesigned</td>
+</tr>
+<tr>
+<td>Per-context device key derivation helper (no <code>SubjectId</code> input)</td>
+<td>HIA §11.1; route #2599</td>
+</tr>
+<tr>
+<td>Client-side subject index (refuse a second genesis per context, GEN §5.3; retain salts for recovery §5.1)</td>
+<td>no issue names it; N7 #2603 for the retained material, otherwise the client app</td>
+</tr>
+<tr>
+<td>Sole Business → cooperative: institutional genesis</td>
+<td>#2602 GEN item 2; nothing needed now</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="b-persistence-and-delivery-n1-d-2800-n3-2598">B. Persistence and delivery (N1-D #2800, N3 #2598)</h2>
+<h3 id="b0-sources-read">B.0 Sources read</h3>
+<ul>
+<li>PR #2800 description (full, via <code>gh</code>), file list, and the code in worktree <code>task-2694-n1d</code>: <code>icn/crates/icn-identity/src/authority_log/fact_store.rs</code> (243 lines, all), <code>icn/crates/icn-core/src/authority_facts.rs</code> L1-70, <code>authority_log/mod.rs</code> exports L213, L233-234</li>
+<li><code>icn/crates/icn-identity/src/authority_log/store.rs</code> L21-160; <code>derive.rs</code> L425-520; <code>mod.rs</code> L1-60, L260</li>
+<li><code>icn/crates/icn-identity/src/device_authority_bundle.rs</code> (header, record, <code>decode</code>, <code>store_from_bundle</code>, <code>verify_bundle</code>, <code>verify_bundle_bytes</code> L291-327)</li>
+<li><code>docs/architecture/N4B_DEVICE_AUTHORITY_BUNDLE.md</code> (all), <code>N4C_DEVICE_ENROLLMENT_REQUEST.md</code> (all), <code>N4A_DEVICE_AUTHORITY_EVALUATION.md</code> §2, §5, §7, §9, §10</li>
+<li>HIA §9.2.1 L1006-1110 (the &quot;filter commutes with union&quot; text is HIA L1075-1077, not IS; IS has no §9.2.1 — IS §9 is &quot;Node semantics&quot;)</li>
+<li><code>tests/device_lifecycle_acceptance.rs</code> L1-45, L160-260</li>
+<li>issue #2598 (full)</li>
+</ul>
+<h3 id="b1-record-layout-and-whether-n4-bs-equals-it">B.1 Record layout, and whether N4-B&#39;s equals it</h3>
+<p>N1-D (<code>fact_store.rs:26-29</code>, <code>PersistedFact::key</code> L118-123, <code>::value</code> L125-128):</p>
+<pre><code class="language-text">key   = event_id (32) || signature (64)       -- this IS the N1 `Witness` (store.rs:39)
+value = canonical_bytes(body)
+</code></pre>
+<p>N4-B (<code>N4B §2 L54-57</code>; <code>device_authority_bundle.rs:51-54</code>, emitted at L209-211):</p>
+<pre><code class="language-text">fact := b32(event_id) || b64(witness_signature) || LP(canonical_body)
+</code></pre>
+<p><strong>They are the same record; the only difference is stream framing.</strong> <code>N4B_fact == N1D_key || LP(N1D_value)</code>. The 96-byte prefix is byte-identical; N4-B adds <code>u32be(len)</code> because it is a byte stream, whereas a kv store delimits rows itself. N4-B §2 L74-76 and N4-A §9.2 L165-167 call this &quot;one framing&quot;; precisely, it is one record with two framings, and the mapping <code>PersistedFact::from_key_value(&amp;fact[..96], body)</code> / <code>key() || LP(value())</code> is a bijection.</p>
+<p>The validation gates are equivalent as well: N1-D <code>into_admitted</code> (<code>fact_store.rs:155-161</code>) runs <code>admissible_bytes</code> then checks <code>body.event_id() == key.event_id</code> (<code>KeyDisagreesWithValue</code>); N4-B <code>decode</code> checks <code>event_id == SHA-256(body)</code> (L243) and canonical re-encode (<code>BundleError</code> L113), then <code>store_from_bundle</code> (L291-304) runs <code>AuthorityStore::ingest</code> → <code>admissible</code>. Neither has a privileged path; both fail closed (N1-D <code>rehydrate</code> L185-192 on the first bad record; N4-B on the first inadmissible fact, naming its index).</p>
+<p>Ordering: N4-B requires strictly ascending <code>(event_id, witness)</code> (L59). N1-D&#39;s <code>InMemoryAuthorityFactStore</code> is a <code>BTreeMap&lt;Vec&lt;u8&gt;, _&gt;</code> keyed by <code>event_id || signature</code> (L199-201), so <code>load_facts()</code> already yields N4-B&#39;s canonical order; a sled prefix scan is lexicographic by key too. The trait does not promise order (L173-177) and does not need to (<code>AuthorityBody: Ord</code> over canonical bytes), but the coincidence means a fact-set container can be emitted straight from <code>load_facts()</code> without a sort.</p>
+<p>Status: PR #2800 is OPEN; <code>fact_store.rs</code> is absent from <code>main</code> and from the integration branch (<code>ls</code> fails). <code>icnd::build_services</code> wiring is explicitly deferred to #2777 (&quot;data-root ownership/exclusion boundary&quot;; PR body &quot;Follow-up&quot;). The Home profile row (f) L63 and §6.3 L204 both say PROPOSED and &quot;once merged&quot;.</p>
+<h3 id="b2-delivery-to-a-newly-enrolled-device-in-this-model">B.2 &quot;Delivery to a newly enrolled device&quot; in this model</h3>
+<p>What the device needs, from N4-C §6 L118: &quot;its secret, its per-context Principals, and the facts it has received.&quot; Why it needs the facts and not only its own <code>Authorize</code>:</p>
+<ul>
+<li>To <strong>act</strong>, it must bind an <code>evaluation_position</code> the relying party will hold (<code>device_authority.rs:394-399</code> requires <code>act.E == relying party&#39;s E</code>; see C). It cannot know a sound E without the prefix.</li>
+<li>To <strong>check its own grant is live</strong> (<code>derive</code> needs the inception and every position up to its grant: <code>derive_indexed</code> L476-520 walks from position 1).</li>
+<li>In the Home topology the hosted workstation / Pi is itself a <strong>relying party</strong> for the other devices&#39; acts (N4-C §6 L115-118: &quot;the Home runtime ... stores public N1 facts in the N1-D layout ... builds an N4-B bundle and runs the N4-A verifier&quot;), so it needs every fact for every Subject it serves (Home §6.3 L204).</li>
+</ul>
+<p>Who sends: the <strong>authority edge</strong> (the phone) authors the <code>Authorize</code> (N4-C §2 step 8 L44) and is the only party that has it first. Step 9 L45: &quot;the fact becomes durable at the edge (N1-D store, #2800) and reaches the device and relying parties — transport — N1-D PROPOSED; delivery not built.&quot; N4-C §7 L140-141 and <code>device_enrollment.rs:37-38</code> exclude &quot;delivery of the resulting fact back to the device or to relying parties (N3/N4 transport)&quot;. Home §6.2 L194: &quot;MISSING — delivery/transport&quot;.</p>
+<p>Push/pull primitive: <strong>none.</strong> N3a (#2598) owns &quot;dissemination of canonical N1 bodies and retained witnesses; ... gap detection and missing-fact requests&quot; and is <code>needs-design</code> with nothing in code. The only existing cross-process carrier is the N4-B bundle read from a <strong>file</strong> by <code>icnctl device-authority verify</code> (N4B §4 L107). The legacy <code>sync.rs</code> (<code>IdentityUpdateMessage</code>, <code>IDENTITY_UPDATES_TOPIC</code>, <code>lib.rs:98</code>) is DID-document gossip for the superseded path (Home row (j) EXPERIMENTAL, HIA F8) and must not be repurposed for N1 facts.</p>
+<p><strong>The bundle is the carrier, but it cannot carry facts alone.</strong> <code>DeviceAuthorityBundleV1::decode</code> requires an act (<code>device_authority_bundle.rs:255-256</code>: <code>DeviceActV1::decode(r.lp(&quot;act&quot;)?)</code>, then <code>act_signature</code>), and <code>new(facts, act)</code> takes one (L178-188). Delivering facts to a device that has no grant yet would mean fabricating an act, which is a signed statement by a device and so a semantic lie. Hence a facts-only container is genuinely the missing object, not a convenience.</p>
+<h3 id="b3-how-revocations-propagate">B.3 How revocations propagate</h3>
+<p>Mechanically: <code>Revoke</code> is one more N1 body. <code>AuthorityStore::join</code> (<code>store.rs:116-127</code>) is componentwise set union, &quot;associative, commutative, idempotent and monotone&quot; (L113-115; HIA §9.2.1 L1053-1056). Admission is state-independent so filtering commutes with union (HIA L1075-1077). <code>derive</code> removes the grant when it folds the <code>Revoke</code> (N4-A §5.1 L125: &quot;N1&#39;s <code>Revoke</code> removes the grant from the derived state; there is no <code>revoked_at</code>&quot;). The lifecycle test pins: after <code>revoke_event(..., 3, ..., a)</code> (L167) every permutation of the four facts gives <code>A</code> refused / <code>B</code> accepted at <code>E = 3</code> (L214-232).</p>
+<p>Therefore: <strong>any transport that carries facts converges</strong>, because ingesting carried facts is <code>join(local, carried)</code>. Whether the carrier is a fact-set, an N4-B bundle, kv rows, or a future N3 message makes no difference to the result; the contract already says so (N4B §6 L158: &quot;carry a bundle over any transport&quot;).</p>
+<p>What is missing is exactly what the task suspected:</p>
+<ol>
+<li><strong>Transport</strong> — no process-to-process primitive exists for N1 facts (B.2).</li>
+<li><strong>Trigger</strong> — nothing decides <em>when</em> and <em>to whom</em> the edge sends a new fact. Home §6.4 L211-216: the edge authors <code>Revoke</code>; &quot;effectiveness is per relying party, exactly as far as its retained facts go. There is no global instant revocation&quot; (#2599 invariant 5). L219-220: a Home runtime that loses contact with the edge &quot;cannot revoke anything; it can only stop relaying&quot;.</li>
+<li><strong>Gap detection / request</strong> — N3a (#2598 &quot;gap detection and missing-fact requests&quot;).</li>
+</ol>
+<p>A relying party that never receives the <code>Revoke</code> keeps evaluating correctly at positions it holds; it is only wrong about <em>now</em>, which the contract already admits is unprovable (N3 invariant 6, no negative-universe proof). The class-2 hole (a compromised device keeps binding an old E, HIA §9.3 L1346-1352) is a C question.</p>
+<h3 id="b4-how-a-relying-party-learns-which-prefix--frontier-it-holds">B.4 How a relying party learns which prefix / frontier it holds</h3>
+<ul>
+<li><code>derive(subject, store) → AuthorityView::Live { state, frontier }</code> (<code>derive.rs:74-82</code>, returned at L492-495): <code>frontier</code> = &quot;the first position with no authorized candidate&quot; (comment L77). The relying party holds a clean prefix through <code>frontier − 1</code>.</li>
+<li><code>derive_prefix(subject, store, E)</code> (L458-465) → <code>Live { frontier = E + 1 }</code> iff clean through <code>E</code>; <code>Live { frontier ≤ E }</code> is a gap; <code>Halted { disputed_at }</code> is a fork (N4-A §5.2 table L137-146).</li>
+<li>GEN gives the same number for a genesis: <code>VerifiedSubjectContext.frontier</code> (<code>subject_context.rs:497</code>), always <code>2</code>.</li>
+<li>Gaps stop the frontier at the missing position (<code>derive.rs:737-755</code> test &quot;frontier stops at the missing position&quot;); unauthorized spam never advances it (<code>mod.rs:18-20</code>).</li>
+</ul>
+<p>What does <strong>not</strong> exist: a wire shape to <em>tell another party</em> your frontier (&quot;digest/range/frontier summary shape&quot; is an N3 required wire question in #2598), and any observation receipt (&quot;observer O observed σ through K&quot;, N3b). Two parties can only compare frontiers by exchanging the facts themselves, which with the join is harmless but is not a summary.</p>
+<h3 id="b5-fail-closed-on-a-missing-revocation-already-proven">B.5 Fail-closed on a missing revocation: already proven</h3>
+<ul>
+<li><code>evaluate_device_authority</code> (<code>device_authority.rs:312-324</code>): <code>frontier &lt;= position → PrefixIncomplete { frontier, required }</code>.</li>
+<li><code>tests/device_lifecycle_acceptance.rs:233-249</code>: <code>stale = &amp;all[..3]</code>; <code>A</code>&#39;s act at <code>E = 3</code> → <code>PrefixIncomplete { frontier: 3, required: 3 }</code>; at <code>E = 2</code> → <code>Ok</code> (L251-257; history is not rewritten).</li>
+<li>N4-B §3 L96-99 &quot;Withholding shrinks, never extends&quot;, pinned by a test; N4-A §8.1 L115-116.</li>
+</ul>
+<p>What remains is choosing <code>E</code> — and the honest corollary the lifecycle test also pins: a stale relying party <em>does</em> accept a revoked device&#39;s act at an <code>E</code> it legitimately holds (L251-257). That is correct as history and is the class-2 limit as a current decision. Section C.</p>
+<h3 id="b6-recommendation-for-b">B.6 Recommendation for B</h3>
+<p><strong>A <code>FactDelivery</code> service is not needed and would be the wrong layer</strong> (it would be a transport with a trigger, which is N3). <strong>What is needed is a facts-only container</strong>, because the only carrier that exists demands an act (B.2). Smallest sound piece:</p>
+<p><code>authority_log::AuthorityFactSetV1</code> (kernel crate, <code>std</code> only, placed under <code>authority_log/</code> so the no-clock test covers it):</p>
+<pre><code class="language-text">fact_set_v1 :=
+      LP(&quot;icn.n1.authority-fact-set&quot;)       -- distinct from every N1/GEN/N4 separator; pin it
+   || u16be(1)
+   || u32be(fact_count)                      -- ≤ MAX_BUNDLE_FACTS, bounded before allocation
+   || fact_count × (b32(event_id) || b64(witness) || LP(canonical_body))   -- the N1-D/N4-B record, unchanged
+</code></pre>
+<p>API: <code>new(facts)</code> (sort + dedup by <code>(event_id, witness)</code>), <code>canonical_bytes()</code>, strict <code>decode()</code> (same rules as N4-B §2 table), <code>into_store() -&gt; Result&lt;AuthorityStore, _&gt;</code> (fail-closed ingest, naming the index, like <code>store_from_bundle</code>), and <code>for_subject(store, subject)</code> (export side; today there is no <code>AuthorityStore</code> method that yields <code>SignedAuthorityEvent</code>s for a subject — <code>bodies_for</code> L139 and <code>witnesses_for</code> L148 exist separately, so this is a ten-line join of the two). When #2800 merges, <code>from_persisted(&amp;[PersistedFact])</code> / <code>to_persisted()</code> are one-liners because the record is the same bytes.</p>
+<p>Do <strong>not</strong> change <code>DeviceAuthorityBundleV1</code>&#39;s bytes (its domain and vectors are pinned); note in its doc that it is &quot;fact set + act&quot; by construction.</p>
+<p>Tests: fact-set round trip reproduces <code>Bodies</code> and <code>Witnesses</code> exactly; <code>verify_device_act</code> over <code>into_store()</code> equals <code>verify_bundle</code> over the same facts; a set missing the <code>Revoke</code> yields <code>PrefixIncomplete</code> at the revoke position; <code>into_store(a ∪ b) == join(into_store(a), into_store(b))</code> (the N3 join property through the container); arrival-order independence; every N4-B malformed case (reordered, duplicated, wrong <code>event_id</code>, non-canonical body, impossible count) refused.</p>
+<p>This is the &quot;transport container for facts ... (next slice)&quot; the Home profile §0 L36 names. Owner: #2694 (container as the shared missing boundary; N4-A §9.2 item 2) for the object; <strong>N4-C step 9 / #2599 for the device-delivery use; N3 #2598 for replica-to-replica</strong>. The trigger (&quot;edge pushes after approval and after revoke to every party it knows&quot;) stays with #2599/#2598 and is the next slice after the container.</p>
+<h3 id="b7-missing-pieces-and-owners-b">B.7 Missing pieces and owners (B)</h3>
+<table>
+<thead>
+<tr>
+<th>Missing</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Facts-only container (<code>AuthorityFactSetV1</code>) and a per-subject export from <code>AuthorityStore</code></td>
+<td>#2694 container boundary; consumed by #2599 (device delivery) and #2598 (replication)</td>
+</tr>
+<tr>
+<td>N1-D merge + <code>icnd</code> wiring</td>
+<td>#2800 (open) → #2777 (data-root exclusion)</td>
+</tr>
+<tr>
+<td>Transport for request/fact bytes (QR, link, local network)</td>
+<td>#2599 (N4-C step 4, step 9)</td>
+</tr>
+<tr>
+<td>Trigger / fan-out: edge pushes new <code>Authorize</code>/<code>Revoke</code> to device and relying parties</td>
+<td>#2599 (ceremony), #2598 (N3a dissemination)</td>
+</tr>
+<tr>
+<td>Gap detection, missing-fact request, frontier/digest summary</td>
+<td>#2598 (N3a)</td>
+</tr>
+<tr>
+<td>Scoped observation evidence (&quot;observed through K&quot;)</td>
+<td>#2598 (N3b)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="c-evaluation-position--freshness-g1-a-2694-6">C. Evaluation position / freshness (G1-A, #2694 §6)</h2>
+<h3 id="c0-sources-read">C.0 Sources read</h3>
+<ul>
+<li>issue #2694 §6 (<code>VotingProcessSnapshotV1</code>), §7 (N4-alpha prefix evaluation), §8 (<code>MemberVoteActionV1</code>), and the three comments (rung 5 landed; &quot;the act binds the position but the relying party must supply an equal one — the signer never selects the window&quot;)</li>
+<li>N4-A doc §2 L53-72, §5 L107-146, §7 L192-260 (esp. §7.1 L217-231, §7.2 L233-239), §9.3-9.4 L366-396</li>
+<li>HIA §9.3 L1314-1408, §17 rows O-N1 L2093, O-N6 L2098; N3 #2598 invariants 5-7 and vocabulary</li>
+<li><code>device_authority.rs</code> L1-60, L295-410; <code>derive.rs</code> L437-465</li>
+<li><code>grep -rn &quot;position oracle|O-N1|O-N6|G1-A&quot; docs/architecture docs/adr</code>: <strong>&quot;position oracle&quot; occurs nowhere.</strong> The nearest concepts are N3&#39;s &quot;no hidden time oracle&quot; (invariant 7) and &quot;metaphysical finality oracle&quot; (#2598 purpose), and N4-B §1 L38 &quot;it is a relying party, not an oracle.&quot; G1-A appears only in N4-A §9.4 L393 and N4-B §7 L175, both as &quot;which position a relying party should pin (G1-A, #2694 §6)&quot;.</li>
+</ul>
+<h3 id="c1-what-the-contract-says-about-choosing-e">C.1 What the contract says about choosing E</h3>
+<p>N4-A §7.1 L219-231 is the rule, verbatim in substance:</p>
+<blockquote>
+<p><code>E</code> is <strong>the last position the relying party relies on</strong>: the position of the last authority fact it has itself observed, retained and admitted for this Subject. It is a position, never a timestamp, and it is never read from the act.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th><code>E</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>a governance process that pinned a prefix when it froze its electorate (#2694 §6)</td>
+<td>the pinned position, same for every ballot</td>
+</tr>
+<tr>
+<td>a verifier whose <code>derive</code> reports <code>Live { frontier }</code></td>
+<td><code>frontier − 1</code></td>
+</tr>
+<tr>
+<td>a verifier that has not retained the position the act names</td>
+<td><strong>refuse</strong>; &quot;do not fetch, guess or fall back to the frontier&quot;</td>
+</tr>
+</tbody></table>
+<p>§7.1 L228-230: <code>frontier − 1</code> on a store that has not seen a revoke is &quot;<strong>prospective only</strong>: it evaluates the authority the verifier knows about. That is the honest semantics of class-2 acts.&quot; §7.2 L233-239: class 1 (deferred-decision) — &quot;the decision pins <code>E</code>&quot;; class 2 (immediately settled) — &quot;the acceptor evaluates at its own retained <code>frontier − 1</code> once, at admission; <strong>no validity bound exists</strong> and R5.1 remains unmet for this class.&quot;</p>
+<p>#2694 §7: &quot;<code>E</code> is chosen by the relying governance process, not by the signer ... No new branch selector. No wall clock. No ambient network lookup.&quot; &quot;#2694 §6&quot; is <code>VotingProcessSnapshotV1</code>, the frozen process fact that would carry the pinned position for class 1; it is <strong>rung 6 (G1-A), unbuilt</strong>, and it depends on O-N6 (deterministic proposal closure; HIA L2098: &quot;a governance problem, not an identity one&quot;).</p>
+<p>HIA §9.3 L1339-1368 is the reasoning: a window checked against the signer&#39;s own position bounds nothing (&quot;a compromised device simply keeps referencing <code>N</code>&quot;); it binds only against &quot;an evaluation position the signer does not control&quot;, which exists for class 1 (the decision) and for class 2 only as &quot;the acceptor&#39;s own current frontier — receiver-local, therefore divergent (R4.2/R4.3)&quot;. L1363-1368: for class 2 &quot;the only real controls are scope limits and a relying party&#39;s own freshness bar, which is the acceptor&#39;s risk decision under Rivest Proposition 1 and does not converge between acceptors.&quot;</p>
+<h3 id="c2-is-evaluate-at-frontier1-of-the-facts-you-hold-sanctioned">C.2 Is &quot;evaluate at frontier−1 of the facts you hold&quot; sanctioned?</h3>
+<p><strong>Yes for class 2, with the stated caveat; no for class 1.</strong> For class 1 a relying party that used its own <code>frontier − 1</code> per ballot would reintroduce the arrival-order divergence HIA L1399-1401 rejects; the process must pin one <code>E</code> (G1-A).</p>
+<p>The load-bearing detail from code: the relying party does not pick <code>E</code> <em>per act</em> in any free sense. <code>verify_device_act</code> (<code>device_authority.rs:394-399</code>) refuses unless <code>act.evaluation_position == position</code>. So the operational question is never &quot;at what E shall I judge this device&quot; but &quot;<strong>is the E this act binds the E I would have pinned?</strong>&quot; For class 2 at admission that is: accept iff <code>act.E == frontier(my store) − 1</code>.</p>
+<ul>
+<li><code>act.E &lt; frontier − 1</code>: the act is <strong>stale</strong> (or a compromised device replaying an old position, HIA L1346-1352). Refusing it is what closes that hole from the acceptor&#39;s side. It is still a correct <em>historical</em> statement, which is why the library lets a caller evaluate there (lifecycle test L251-257), but it is not a current admission.</li>
+<li><code>act.E ≥ frontier</code>: the relying party is <strong>behind</strong>; it must obtain facts, not guess (§7.1 row 3; Home §6.6 L245-246 MUST NOT &quot;fall back to the frontier when the act&#39;s <code>E</code> is not retained&quot;).</li>
+</ul>
+<p>A consequence worth stating for the Home slice: every time the edge appends a fact (any <code>Authorize</code>/<code>Revoke</code>), the frontier advances, and every device that has not yet received that fact will bind a now-stale <code>E</code> and be refused by an up-to-date relying party until it catches up. HIA L1378: &quot;a subject who advances too aggressively can strand an offline device&quot; (O-N1). This makes <strong>fact delivery to devices (B.6) load-bearing for liveness</strong>, not merely for relying parties.</p>
+<h3 id="c3-when-the-relying-party-cannot-establish-a-current-frontier">C.3 When the relying party cannot establish a current frontier</h3>
+<p>It <strong>never can</strong>, by design, and the contract does not pretend otherwise (N3 invariant 6 &quot;no negative-universe proof&quot;; N4-A §2 L62-64: a verified act does not prove &quot;that any other replica would reach <code>E</code>&quot;). It has a frontier of what it holds:</p>
+<table>
+<thead>
+<tr>
+<th><code>derive</code> says</th>
+<th>Meaning</th>
+<th>Current-admission answer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Unknown</code></td>
+<td>no inception retained</td>
+<td>refuse (<code>SubjectUnknown</code>)</td>
+</tr>
+<tr>
+<td><code>Halted { disputed_at }</code></td>
+<td>fork in the retained prefix</td>
+<td>refuse for any <code>E ≥ disputed_at</code>; the current authority is disputed, so no current admission (historical evaluation below the fork remains valid, N4-A §8.1 L117)</td>
+</tr>
+<tr>
+<td><code>Live { frontier: 1 }</code></td>
+<td>inception only</td>
+<td>no delegation exists yet; <code>E = 0</code> is <code>PositionOutOfRange</code> (L310-311)</td>
+</tr>
+<tr>
+<td><code>Live { frontier ≥ 2 }</code></td>
+<td>clean prefix through <code>frontier − 1</code></td>
+<td>admit at <code>frontier − 1</code>; the claim is scoped to &quot;under the facts I hold&quot; (N3b vocabulary: <em>Observed</em>, <em>Valid-at-frontier</em>, <em>Policy-actionable</em>, never <em>globally irreversible</em>)</td>
+</tr>
+</tbody></table>
+<p>A gap looks like a short frontier; nothing distinguishes &quot;I am behind&quot; from &quot;nothing more has happened&quot; except receiving facts. That is N3a&#39;s problem (#2598), not the verifier&#39;s.</p>
+<h3 id="c4-wall-clock-dependence">C.4 Wall-clock dependence</h3>
+<p>Forbidden at every layer, and pinned: <code>authority_log_no_clock.rs::module_reads_no_wall_clock</code> (PR #2800 body cites it as the constraint the fact store sits under); <code>derive.rs:456-457</code> &quot;The bound is a <strong>position</strong>, never a timestamp&quot;; N4-A §2 L71 &quot;no registrar, directory, clock, network lookup or randomness&quot;; N4-A §8.1 L129-130 &quot;the module reads no clock&quot;; N3 invariant 7 &quot;no hidden time oracle&quot;; IS §2.2 &quot;never a clock&quot;; HIA §9.3 L1341-1344 &quot;No clock is read anywhere, which is the property worth keeping (R4.1)&quot;. N4-C L50-51: &quot;N1 has no clock, so the request carries a nonce, not a deadline&quot; and expiry is enforced at the edge&#39;s UI, outside the protocol. A hosting operator may use time to decide to <em>stop relaying</em> (Home §6.4 L219-220) — that is a hosting decision that &quot;confers no authority&quot; and is not an evaluation input.</p>
+<h3 id="c5-smallest-executable-piece-for-c">C.5 Smallest executable piece for C</h3>
+<p>In <code>device_authority.rs</code> (no doc contract change; it executes N4-A §7.1 row 2):</p>
+<pre><code class="language-rust">/// The class-2 admission position: the last position this relying party holds a clean
+/// prefix through. Never read from an act; never a timestamp; never fetched.
+pub fn admission_position(subject: SubjectId, store: &amp;AuthorityStore)
+    -&gt; Result&lt;u64, AdmissionPositionRefusal&gt;;
+// Unknown            -&gt; SubjectUnknown
+// Halted{disputed_at}-&gt; AuthorityHalted{disputed_at}
+// Live{frontier&lt;2}   -&gt; NoDelegationYet
+// Live{frontier}     -&gt; Ok(frontier - 1)
+
+/// `verify_device_act` at `admission_position`. An act binding any other position is refused
+/// by the existing `EvaluationPositionMismatch { act, relying }`; `act &lt; relying` is a stale act,
+/// `act &gt; relying` means this relying party is behind and must obtain facts.
+pub fn verify_device_act_at_admission(signed: &amp;SignedDeviceAct, subject: SubjectId, store: &amp;AuthorityStore)
+    -&gt; Result&lt;DeviceAuthorityEvidence, DeviceActVerifyError&gt;;
+</code></pre>
+<p>This does <strong>not</strong> choose <code>E</code> from the act (Home §6.6 / N4-A §9.3 MUST NOT): it computes <code>E</code> from the store and compares. Document it as class 2 only, with the §7.1 L228-230 &quot;prospective only&quot; caveat copied in, and that class 1 uses the process pin (G1-A) instead.</p>
+<p>Tests (fixture from <code>tests/device_authority.rs</code>: <code>S</code>; <code>A@1</code>, <code>B@2</code>, <code>revoke A@3</code>):</p>
+<ol>
+<li>Full relying party (frontier 4): <code>admission_position == 3</code>; <code>A</code>&#39;s act bound to 3 → <code>DeviceNotAuthorized</code>; <code>B</code>&#39;s → evidence <code>{granted_at: 2, generation: 0}</code>.</li>
+<li><strong>Revoked device replays an old position</strong>: <code>A</code> signs a new act binding <code>E = 2</code> (where it was authorized). Full relying party → <code>EvaluationPositionMismatch { act: 2, relying: 3 }</code>. This is the requested test: the act binds <code>E</code>, the relying party cannot judge the device at an <code>E</code> other than the act&#39;s, and it refuses an <code>E</code> older than its own admission position.</li>
+<li><strong>Stale relying party</strong> (holds through 2, frontier 3): <code>admission_position == 2</code>; <code>A</code>&#39;s act bound to 3 → <code>EvaluationPositionMismatch { act: 3, relying: 2 }</code> (behind; never accepted, never fetched); <code>A</code>&#39;s act bound to 2 → <strong>accepted</strong>, pinned deliberately as the class-2 limit (it does not hold the revoke; HIA §9.3 R5.1 not met for class 2). Honesty here matters more than a green test that hides it.</li>
+<li><code>Halted</code> → refused; <code>Unknown</code> → refused; inception-only → <code>NoDelegationYet</code>.</li>
+<li>Verdicts identical over all permutations of the facts; module still reads no clock/randomness (extend the existing source-inspection pin).</li>
+</ol>
+<h3 id="c6-missing-pieces-and-owners-c">C.6 Missing pieces and owners (C)</h3>
+<table>
+<thead>
+<tr>
+<th>Missing</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>admission_position</code> / <code>verify_device_act_at_admission</code> (class-2 rule made executable)</td>
+<td>#2599 (the acceptor&#39;s freshness bar)</td>
+</tr>
+<tr>
+<td><code>VotingProcessSnapshotV1</code> pinning <code>E</code> for class 1 (G1-A)</td>
+<td>#2694 rung 6; depends on #2600 (G1)</td>
+</tr>
+<tr>
+<td>O-N6 deterministic proposal closure</td>
+<td>#2600 (HIA L2098: governance, not identity)</td>
+</tr>
+<tr>
+<td>O-N1 validity span <code>k</code> and re-authorization cadence</td>
+<td>HIA §17 open; no issue number; empirical UX input (L2093)</td>
+</tr>
+<tr>
+<td>N3b scoped observation evidence; frontier summary wire shape</td>
+<td>#2598</td>
+</tr>
+<tr>
+<td>Fact delivery to devices so they can bind a current <code>E</code> (liveness)</td>
+<td>B.6 container + #2599 trigger</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="cross-cutting-notes">Cross-cutting notes</h2>
+<ul>
+<li><strong>One framing, three uses.</strong> The record <code>event_id ‖ witness ‖ body</code> is what the daemon persists (N1-D), what a client carries with an act (N4-B), and what a facts-only set should carry (B.6). Keep it one definition.</li>
+<li><strong>Fixture-only, still.</strong> Every test identity is fixture material (N4-A/B/C, Home §0). None of A, B, C creates a real Private/Household/Sole Business context; A.6 only makes it <em>possible</em> to.</li>
+<li><strong>ADR-0083 drift (#2806)</strong> is untouched by anything here; nothing in A claims a personal context is an <code>InstitutionalDomain</code>.</li>
+<li><strong>Untracked WIP</strong> on the integration branch (<code>device_channel_binding.rs</code>) should be committed or set aside before any of the above lands on that branch, or the diff will mix two slices.</li>
+</ul>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/survey-2026-10-04-gen-kinds-persistence-freshness.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
