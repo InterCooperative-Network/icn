@@ -292,6 +292,12 @@ const NOT_REGISTERED: &[(&str, &str, &str)] = &[
         CANONICAL_FIXTURE,
     ),
     ("icn:test:ordered:v1", CANONICAL_RS, CANONICAL_FIXTURE),
+    (
+        "icn.n4.channel-binding",
+        "icn/crates/icn-identity/src/device_channel_binding.rs",
+        "never leads a preimage: the binding is the LP-framed payload of an `icn.n4.device-act` \
+         act, so it is hashed and signed only after that act's own domain (N4-D)",
+    ),
 ];
 
 const CANONICAL_RS: &str = "icn/crates/icn-kernel-api/src/canonical.rs";
@@ -394,6 +400,11 @@ const REGISTRY: &[Domain] = &[
     // One preimage, two uses: `act_id` hashes it and the device key signs it (N4-A §6, §6.2).
     d(b"icn.n4.device-act", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/device_authority.rs", "icn/crates/icn-identity/tests/reference/device_act_reference.py"]),
     d(b"icn.n4.device-act", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-identity/src/device_authority.rs"]),
+    // Same shape as the act: `request_id` hashes the request and the new device key signs it (N4-C).
+    d(b"icn.n4.enrollment-request", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/device_enrollment.rs"]),
+    d(b"icn.n4.enrollment-request", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-identity/src/device_enrollment.rs"]),
+    // `bundle_id` hashes the container; nothing signs it (N4-B).
+    d(b"icn.n4.evidence-bundle", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/evidence_bundle.rs", "icn/crates/icn-identity/tests/reference/evidence_bundle_reference.py"]),
     d(b"icn:anti-entropy-probe:v1", Blake3, Raw, Production, &["icn/crates/icn-kernel-api/src/proofs.rs"]),
     d(b"icn:artifact-receipt:v1", Blake3, Raw, Production, &["icn/crates/icn-kernel-api/src/proofs.rs", "icn/crates/icn-kernel-api/src/canonical.rs"]),
     d(b"icn:baseline:agreement_ctx:fixture", Blake3, Whole, TestOnly, &["icn/crates/icn-baseline-lock/src/projector.rs"]),

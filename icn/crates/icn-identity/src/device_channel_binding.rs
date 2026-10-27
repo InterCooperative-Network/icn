@@ -23,6 +23,19 @@
 //! | N4-A over retained facts | "is that device authorized for `Present` by `S` at `E`?" | whether the human approved anything today |
 //! | the human, at the edge | approvals (N4-C) | — |
 //!
+//! # Two operations, kept apart
+//!
+//! - [`admit_channel_binding`] — **admitting a connection now.** The position is the relying
+//!   party's own retained clean tip (N4-E, [`verify_device_act_at_admission`]); the act must bind
+//!   exactly it. A device revoked in the facts the relying party holds is refused, and so is a
+//!   binding that names an older position. This is the operation a connection is admitted under.
+//! - [`verify_channel_binding_at`] — **the historical question**: did this device, authorized at
+//!   a position the relying party chooses, bind this channel? N4-A at that position. A valid
+//!   historical answer never admits a connection now.
+//!
+//! Both return the [`VerifiedDeviceAct`], never bare evidence, and both are relative to the facts
+//! the relying party retains: neither is network finality.
+//!
 //! A binding whose channel digest differs from what the relying party sees is refused **even if
 //! the device is fully authorized**: that is the man-in-the-middle case, and it is a transport
 //! fact, not an authority fact. A binding by an unauthorized or revoked device is refused by N4-A
@@ -43,9 +56,10 @@ use thiserror::Error;
 
 use crate::authority_log::encoding::{Reader, Writer};
 use crate::authority_log::{AuthorityStore, CodecError, DeviceCapability, PrincipalKey, SubjectId};
+use crate::device_admission::{verify_device_act_at_admission, AdmissionRefusal};
 use crate::device_authority::{
     sign_device_act, verify_device_act, DeviceActError, DeviceActV1, DeviceActVerifyError,
-    DeviceAuthorityEvidence, SignedDeviceAct,
+    SignedDeviceAct, VerifiedDeviceAct,
 };
 
 /// Domain separator that opens every canonical channel binding. Length-prefixed in the encoding.
@@ -104,9 +118,14 @@ pub enum ChannelBindingError {
     /// The act's payload is not a canonical channel binding.
     #[error("act payload is not a channel binding: {0}")]
     Payload(#[from] CodecError),
-    /// N4-A refused the act: bad authorship, or no covering authority at the position.
+    /// N4-A refused the act: malformed, bad authorship, or no covering authority at the
+    /// position (historical verification).
     #[error("{0}")]
     Act(#[from] DeviceActVerifyError),
+    /// Current admission refused the act: no clean retained tip, a stale or ahead-of-tip
+    /// position, or N4-A's refusal at the tip.
+    #[error("{0}")]
+    Admission(#[from] AdmissionRefusal),
     /// The device bound a channel other than the one this relying party sees.
     #[error("the bound channel is not the channel this relying party sees")]
     ChannelMismatch,
@@ -131,24 +150,57 @@ pub fn bind_channel(
     sign_device_act(&act, device_key)
 }
 
-/// Verify that `signed` binds `expected_channel` to a device authorized by `subject` at
-/// `position`. Order, each fail-closed: the act is a presentation; its payload is a channel
-/// binding; N4-A accepts the act (authorship, then authorization over `store`); the bound
-/// channel equals the one the relying party sees.
-pub fn verify_channel_binding(
+/// Admit a connection now: `signed` must bind `expected_channel` to a device authorized by
+/// `subject` at the relying party's own retained clean tip (N4-E).
+///
+/// Order, each fail-closed: the act is within its bounds; it is a presentation; its payload is a
+/// channel binding; current admission accepts it ([`verify_device_act_at_admission`]: the act
+/// binds exactly the tip, then N4-A's authorship and authorization there); the bound channel
+/// equals the one the relying party sees.
+pub fn admit_channel_binding(
+    signed: &SignedDeviceAct,
+    subject: SubjectId,
+    store: &AuthorityStore,
+    expected_channel: &[u8; 32],
+) -> Result<VerifiedDeviceAct, ChannelBindingError> {
+    let binding = binding_of(signed)?;
+    let verified = verify_device_act_at_admission(signed, subject, store)?;
+    if binding.channel != *expected_channel {
+        return Err(ChannelBindingError::ChannelMismatch);
+    }
+    Ok(verified)
+}
+
+/// The historical question: did `signed` bind `expected_channel` for a device authorized by
+/// `subject` at `position`, a position the relying party chooses? Never admits a connection now;
+/// use [`admit_channel_binding`] for that.
+///
+/// Order, each fail-closed: the act is within its bounds; it is a presentation; its payload is a
+/// channel binding; N4-A accepts it at `position`; the bound channel equals the one the relying
+/// party names.
+pub fn verify_channel_binding_at(
     signed: &SignedDeviceAct,
     subject: SubjectId,
     store: &AuthorityStore,
     position: u64,
     expected_channel: &[u8; 32],
-) -> Result<DeviceAuthorityEvidence, ChannelBindingError> {
-    if signed.act.capability != DeviceCapability::Present {
-        return Err(ChannelBindingError::NotAPresentation);
-    }
-    let binding = ChannelBindingV1::decode(&signed.act.payload)?;
-    let evidence = verify_device_act(signed, subject, store, position)?;
+) -> Result<VerifiedDeviceAct, ChannelBindingError> {
+    let binding = binding_of(signed)?;
+    let verified = verify_device_act(signed, subject, store, position)?;
     if binding.channel != *expected_channel {
         return Err(ChannelBindingError::ChannelMismatch);
     }
-    Ok(evidence)
+    Ok(verified)
+}
+
+/// The checks both operations share, before any authority is consulted.
+fn binding_of(signed: &SignedDeviceAct) -> Result<ChannelBindingV1, ChannelBindingError> {
+    signed
+        .act
+        .validate()
+        .map_err(|e| ChannelBindingError::Act(DeviceActVerifyError::MalformedAct(e)))?;
+    if signed.act.capability != DeviceCapability::Present {
+        return Err(ChannelBindingError::NotAPresentation);
+    }
+    Ok(ChannelBindingV1::decode(&signed.act.payload)?)
 }

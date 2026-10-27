@@ -25,7 +25,7 @@
 //!     ↓ EvidenceBundle::admit           -- every pair through AuthorityStore::ingest
 //! AuthorityStore
 //!     ↓ verify_device_act(.., E)        -- the existing N4-A verifier, derive_prefix inside
-//! DeviceAuthorityEvidence | refusal
+//! VerifiedDeviceAct | refusal
 //! ```
 //!
 //! [`AuthorityStore`] has no ingest path other than [`AuthorityStore::ingest`], which calls
@@ -122,7 +122,7 @@ use crate::authority_log::{
 };
 use crate::device_authority::{
     verify_device_act, DeviceActError, DeviceActSignature, DeviceActV1, DeviceActVerifyError,
-    DeviceAuthorityEvidence, SignedDeviceAct,
+    SignedDeviceAct, VerifiedDeviceAct,
 };
 
 /// Domain separator that opens every canonical bundle. Length-prefixed in the encoding.
@@ -288,6 +288,9 @@ impl EvidenceBundle {
         let subject = signed.act.subject;
         let through = signed.act.evaluation_position;
         check_position(through)?;
+        // The act's public fields may have changed since construction: never assemble bytes that
+        // `decode` would refuse.
+        signed.act.validate()?;
 
         let mut facts = BTreeMap::new();
         for body in store.bodies_for(subject) {
@@ -574,7 +577,7 @@ pub fn verify_evidence_bundle(
     bundle: &EvidenceBundle,
     subject: SubjectId,
     position: u64,
-) -> Result<DeviceAuthorityEvidence, EvidenceVerifyError> {
+) -> Result<VerifiedDeviceAct, EvidenceVerifyError> {
     let store = bundle.admit()?;
     verify_device_act(bundle.act(), subject, &store, position).map_err(EvidenceVerifyError::Act)
 }
@@ -584,7 +587,7 @@ pub fn verify_evidence_bundle_bytes(
     bytes: &[u8],
     subject: SubjectId,
     position: u64,
-) -> Result<DeviceAuthorityEvidence, EvidenceVerifyError> {
+) -> Result<VerifiedDeviceAct, EvidenceVerifyError> {
     let bundle = EvidenceBundle::decode(bytes)?;
     verify_evidence_bundle(&bundle, subject, position)
 }

@@ -61,7 +61,7 @@ fn the_ceremony_end_to_end_request_approve_act_revoke() {
     // The new device: generates its own per-context key; presents a self-signed request.
     let (pi_key, pi) = stranger(PI_SEED);
     let request =
-        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "Katie desk Pi", NONCE).unwrap();
+        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "office desktop", NONCE).unwrap();
     let signed = sign_enrollment_request(&request, &pi_key).unwrap();
 
     // The edge: checks possession, then attenuates — only Present is granted.
@@ -86,7 +86,8 @@ fn the_ceremony_end_to_end_request_approve_act_revoke() {
         &sign_device_act(&present, &pi_key).unwrap(),
     )
     .unwrap();
-    let evidence = verify_evidence_bundle(&bundle, s.subject, 1).expect("Present was granted");
+    let verified = verify_evidence_bundle(&bundle, s.subject, 1).expect("Present was granted");
+    let evidence = verified.evidence();
     assert_eq!(evidence.grant.granted_at, 1);
     assert_eq!(
         evidence.grant.capabilities,
@@ -140,7 +141,7 @@ fn a_verified_request_that_was_never_approved_buys_nothing() {
     let s = subject(0x01, 4);
     let (pi_key, pi) = stranger(PI_SEED);
     let request =
-        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "Katie desk Pi", NONCE).unwrap();
+        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "office desktop", NONCE).unwrap();
     let signed = sign_enrollment_request(&request, &pi_key).unwrap();
     verify_enrollment_request(&signed).unwrap();
 
@@ -177,7 +178,7 @@ fn approval_cannot_widen_what_was_requested() {
         s.subject,
         pi,
         CapabilitySet::new([DeviceCapability::Present]),
-        "Katie desk Pi",
+        "office desktop",
         NONCE,
     )
     .unwrap();
@@ -211,7 +212,7 @@ fn recover_is_never_requested_and_never_granted() {
         EnrollmentRequestError::RecoverRequested
     );
     let request =
-        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "Katie desk Pi", NONCE).unwrap();
+        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "office desktop", NONCE).unwrap();
     let signed = sign_enrollment_request(&request, &pi_key).unwrap();
     let recover = CapabilitySet::new([DeviceCapability::Recover]);
     assert_eq!(
@@ -222,9 +223,9 @@ fn recover_is_never_requested_and_never_granted() {
 
 #[test]
 fn a_request_for_another_subject_is_refused_at_approval() {
-    let katie = subject(0x01, 4);
+    let person = subject(0x01, 4);
     let someone_else = subject(0x02, 4);
-    let edge = katie.root.authority_signing_key(0);
+    let edge = person.root.authority_signing_key(0);
     let (pi_key, pi) = stranger(PI_SEED);
     let request =
         EnrollmentRequestV1::new(someone_else.subject, pi, sign_present(), "Pi", NONCE).unwrap();
@@ -233,9 +234,9 @@ fn a_request_for_another_subject_is_refused_at_approval() {
         approve_enrollment(
             &signed,
             &edge,
-            katie.subject,
+            person.subject,
             1,
-            katie.genesis(),
+            person.genesis(),
             sign_present(),
             None
         )
@@ -250,9 +251,9 @@ fn a_tampered_request_fails_its_own_signature_and_is_not_approved() {
     let edge = s.root.authority_signing_key(0);
     let (pi_key, pi) = stranger(PI_SEED);
     let request =
-        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "Katie desk Pi", NONCE).unwrap();
+        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "office desktop", NONCE).unwrap();
     let mut signed = sign_enrollment_request(&request, &pi_key).unwrap();
-    signed.request.label = "Matt desk Pi".to_owned();
+    signed.request.label = "relabelled desktop".to_owned();
     assert_eq!(
         verify_enrollment_request(&signed).unwrap_err(),
         EnrollmentVerifyError::BadSignature
@@ -313,7 +314,7 @@ fn request_bytes_are_strict_and_round_trip() {
     let s = subject(0x01, 4);
     let (_, pi) = stranger(PI_SEED);
     let request =
-        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "Katie desk Pi", NONCE).unwrap();
+        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "office desktop", NONCE).unwrap();
     let bytes = request.canonical_bytes();
     let decoded = EnrollmentRequestV1::decode(&bytes).unwrap();
     assert_eq!(decoded, request);
@@ -380,4 +381,62 @@ fn request_domain_is_distinct_from_every_other_domain() {
     ] {
         assert_ne!(ENROLLMENT_REQUEST_DOMAIN, other);
     }
+}
+
+/// A request whose public fields were moved outside the bounds after construction is never signed,
+/// never verified even with a raw signature over its bytes, and never approved. A label exactly at
+/// the bound still signs, verifies and round-trips.
+#[test]
+fn a_request_moved_outside_its_bounds_is_neither_signed_verified_nor_approved() {
+    let s = subject(0x01, 4);
+    let (pi_key, pi) = stranger(PI_SEED);
+    let edge = s.root.authority_signing_key(0);
+    let valid =
+        EnrollmentRequestV1::new(s.subject, pi, sign_present(), "office desktop", NONCE).unwrap();
+
+    let mut long_label = valid.clone();
+    long_label.label = "x".repeat(MAX_ENROLLMENT_LABEL + 1);
+    let mut empty_ask = valid.clone();
+    empty_ask.requested = CapabilitySet::new(Vec::<DeviceCapability>::new());
+    let mut asks_recover = valid.clone();
+    asks_recover.requested =
+        CapabilitySet::new([DeviceCapability::Sign, DeviceCapability::Recover]);
+
+    for (bad, why) in [
+        (
+            &long_label,
+            EnrollmentRequestError::LabelTooLong(MAX_ENROLLMENT_LABEL + 1),
+        ),
+        (&empty_ask, EnrollmentRequestError::EmptyRequest),
+        (&asks_recover, EnrollmentRequestError::RecoverRequested),
+    ] {
+        assert_eq!(bad.validate(), Err(why.clone()));
+        assert_eq!(sign_enrollment_request(bad, &pi_key), Err(why.clone()));
+        let raw = SignedEnrollmentRequest {
+            request: bad.clone(),
+            signature: EnrollmentRequestSignature::from_bytes(
+                ed25519_dalek::Signer::sign(&pi_key, &bad.canonical_bytes()).to_bytes(),
+            ),
+        };
+        assert_eq!(
+            verify_enrollment_request(&raw),
+            Err(EnrollmentVerifyError::MalformedRequest(why.clone()))
+        );
+        assert_eq!(
+            approve_enrollment(&raw, &edge, s.subject, 1, s.genesis(), sign_present(), None),
+            Err(EnrollmentApprovalError::Possession(
+                EnrollmentVerifyError::MalformedRequest(why)
+            ))
+        );
+    }
+
+    let mut at_bound = valid;
+    at_bound.label = "y".repeat(MAX_ENROLLMENT_LABEL);
+    assert_eq!(at_bound.validate(), Ok(()));
+    let signed = sign_enrollment_request(&at_bound, &pi_key).unwrap();
+    assert_eq!(verify_enrollment_request(&signed), Ok(()));
+    assert_eq!(
+        EnrollmentRequestV1::decode(&at_bound.canonical_bytes()),
+        Ok(at_bound)
+    );
 }

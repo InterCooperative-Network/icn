@@ -88,7 +88,7 @@ fn signed(f: &Fixture, device: PrincipalKey, key: &SigningKey, position: u64) ->
         device,
         DeviceCapability::Sign,
         position,
-        b"katie:open-workspace".to_vec(),
+        b"fixture:open-workspace".to_vec(),
     )
     .unwrap();
     sign_device_act(&act, key).unwrap()
@@ -156,7 +156,9 @@ fn verify_accepts_the_sibling_device_and_prints_the_grant_as_evidence() {
     );
     assert_eq!(doc["generation"], 0);
     assert_eq!(doc["fact_count"], 4);
-    assert_eq!(doc["act_id"].as_str().unwrap().len(), 64);
+    // The act_id printed is the verified act's own id, not one computed apart from verification.
+    let expected_act_id = hex::encode(signed(&f, f.b, &f.b_key, 3).act.act_id());
+    assert_eq!(doc["act_id"].as_str().unwrap(), expected_act_id);
     assert!(doc["device_did"].as_str().unwrap().starts_with("did:icn:"));
 }
 

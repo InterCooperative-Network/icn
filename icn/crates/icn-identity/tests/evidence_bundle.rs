@@ -106,7 +106,7 @@ fn verify_bytes(bytes: &[u8]) -> Result<DeviceAuthorityRefusalOrEvidence, Bundle
 }
 
 type DeviceAuthorityRefusalOrEvidence =
-    Result<icn_identity::device_authority::DeviceAuthorityEvidence, DeviceActVerifyError>;
+    Result<icn_identity::device_authority::VerifiedDeviceAct, DeviceActVerifyError>;
 
 // Minimal raw framing helpers for building hostile bytes by hand. These deliberately do not call
 // any encoder in `icn-identity`; the point is to construct bytes the encoder would never emit.
@@ -304,8 +304,8 @@ fn several_witnesses_over_one_body_survive_transport() {
     );
 
     // And the verifier is unmoved: one body, two witnesses, no dispute.
-    let ev = verify_device_act(&act, f.s.subject, &rebuilt, 3).unwrap();
-    assert_eq!(ev.grant.granted_at, 2);
+    let verified = verify_device_act(&act, f.s.subject, &rebuilt, 3).unwrap();
+    assert_eq!(verified.evidence().grant.granted_at, 2);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -801,7 +801,8 @@ fn the_verifier_reaches_the_same_verdict_after_transport() {
         .canonical_bytes();
     let transported = verify_bytes(&bytes).unwrap();
     assert_eq!(transported, direct);
-    let ev = transported.unwrap();
+    let verified = transported.unwrap();
+    let ev = verified.evidence();
     assert_eq!(ev.device, f.b);
     assert_eq!(ev.grant.granted_at, 2);
     assert_eq!(ev.generation, 0);
@@ -1134,8 +1135,9 @@ fn canonical_bundle_vector_matches_the_independent_reference() {
     let decoded = EvidenceBundle::decode(&hex::decode(EXPECT_BUNDLE_BYTES_HEX).unwrap()).unwrap();
     assert_eq!(decoded, bundle);
     assert_eq!(decoded.admit().unwrap(), store);
-    let ev =
+    let verified =
         verify_device_act(decoded.act(), s.subject, &store, VECTOR_EVALUATION_POSITION).unwrap();
+    let ev = verified.evidence();
     assert_eq!(ev.device, b);
     assert_eq!(ev.grant.granted_at, 2);
 }
@@ -1268,4 +1270,30 @@ fn summarize_describes_the_facts_in_canonical_order_and_decides_nothing() {
     let mut positions: Vec<u64> = summary.iter().map(|s| s.position).collect();
     positions.sort_unstable();
     assert_eq!(positions, vec![0, 1, 2, 3]);
+}
+
+/// `assemble` never emits bytes `decode` would refuse: an act whose payload was enlarged after
+/// construction is refused before anything is framed.
+#[test]
+fn assemble_refuses_an_act_moved_outside_its_bounds() {
+    let f = fixture();
+    let mut act = sign_device_act(
+        &DeviceActV1::new(
+            f.s.subject,
+            f.b,
+            icn_identity::authority_log::DeviceCapability::Sign,
+            3,
+            b"fixture:open-workspace".to_vec(),
+        )
+        .unwrap(),
+        &f.b_key,
+    )
+    .unwrap();
+    act.act.payload = vec![0; MAX_DEVICE_ACT_PAYLOAD + 1];
+    assert_eq!(
+        EvidenceBundle::assemble(&f.store, &act),
+        Err(BundleError::Act(DeviceActError::PayloadTooLarge(
+            MAX_DEVICE_ACT_PAYLOAD + 1
+        )))
+    );
 }

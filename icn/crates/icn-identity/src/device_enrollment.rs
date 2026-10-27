@@ -100,7 +100,9 @@ pub enum EnrollmentRequestError {
 
 /// What a new device presents to the person's authority edge. Public protocol data, all of it
 /// bound under the device's own signature. Construct through [`EnrollmentRequestV1::new`] or
-/// [`EnrollmentRequestV1::decode`].
+/// [`EnrollmentRequestV1::decode`]. The fields are public, so [`sign_enrollment_request`] and
+/// [`verify_enrollment_request`] check [`EnrollmentRequestV1::validate`] again: a request moved
+/// outside its bounds after construction is never signed and never verified.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnrollmentRequestV1 {
     /// The Subject the device asks to be authorized under. Asked, not asserted.
@@ -109,7 +111,7 @@ pub struct EnrollmentRequestV1 {
     pub device: PrincipalKey,
     /// The capabilities the device asks for. Never contains `Recover`.
     pub requested: CapabilitySet,
-    /// A label for the approving human ("Katie desk Pi"). Interpreted by nobody else.
+    /// A label for the approving human ("office desktop"). Interpreted by nobody else.
     pub label: String,
     /// Device-chosen bytes that make two otherwise identical requests distinct. Freshness
     /// policy belongs to the approver.
@@ -125,22 +127,30 @@ impl EnrollmentRequestV1 {
         label: &str,
         nonce: [u8; 32],
     ) -> Result<Self, EnrollmentRequestError> {
-        if label.len() > MAX_ENROLLMENT_LABEL {
-            return Err(EnrollmentRequestError::LabelTooLong(label.len()));
-        }
-        if requested.members().is_empty() {
-            return Err(EnrollmentRequestError::EmptyRequest);
-        }
-        if requested.contains(DeviceCapability::Recover) {
-            return Err(EnrollmentRequestError::RecoverRequested);
-        }
-        Ok(EnrollmentRequestV1 {
+        let request = EnrollmentRequestV1 {
             subject,
             device,
             requested,
             label: label.to_owned(),
             nonce,
-        })
+        };
+        request.validate()?;
+        Ok(request)
+    }
+
+    /// Check the label bound, a non-empty ask and no `Recover`. Construction checks them once;
+    /// this checks them again for a request whose public fields may have changed since.
+    pub fn validate(&self) -> Result<(), EnrollmentRequestError> {
+        if self.label.len() > MAX_ENROLLMENT_LABEL {
+            return Err(EnrollmentRequestError::LabelTooLong(self.label.len()));
+        }
+        if self.requested.members().is_empty() {
+            return Err(EnrollmentRequestError::EmptyRequest);
+        }
+        if self.requested.contains(DeviceCapability::Recover) {
+            return Err(EnrollmentRequestError::RecoverRequested);
+        }
+        Ok(())
     }
 
     /// The canonical byte encoding — the exact bytes that are signed and hashed.
@@ -213,6 +223,7 @@ pub fn sign_enrollment_request(
     request: &EnrollmentRequestV1,
     device_key: &SigningKey,
 ) -> Result<SignedEnrollmentRequest, EnrollmentRequestError> {
+    request.validate()?;
     if PrincipalKey::from_signing_key(device_key) != request.device {
         return Err(EnrollmentRequestError::SignerIsNotDevice);
     }
@@ -226,17 +237,26 @@ pub fn sign_enrollment_request(
 /// Why a signed request is not even a valid *claim of possession*.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum EnrollmentVerifyError {
+    /// The request is outside its bounds (its public fields changed after construction), so its
+    /// bytes are not a canonical request.
+    #[error("request is not a canonical enrollment request: {0}")]
+    MalformedRequest(#[source] EnrollmentRequestError),
     /// The signature does not verify under the device key the request names.
     #[error("request signature does not verify under the named device principal")]
     BadSignature,
 }
 
-/// Check that the presenter holds the device key the request names. **This is not
-/// authorization**: a device whose request verifies holds no authority until an approver
-/// records an `Authorize` fact, and N4-A refuses it until then.
+/// Check that the request is within its bounds and that the presenter holds the device key it
+/// names. **This is not authorization**, and it confers no standing in any institution: a device
+/// whose request verifies holds no authority until an approver records an `Authorize` fact, and
+/// N4-A refuses it until then.
 pub fn verify_enrollment_request(
     signed: &SignedEnrollmentRequest,
 ) -> Result<(), EnrollmentVerifyError> {
+    signed
+        .request
+        .validate()
+        .map_err(EnrollmentVerifyError::MalformedRequest)?;
     let signature = Signature::from_bytes(signed.signature.as_bytes());
     signed
         .request

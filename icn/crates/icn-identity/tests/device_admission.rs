@@ -83,6 +83,7 @@ fn an_up_to_date_relying_party_admits_at_its_clean_tip() {
     let ev =
         verify_device_act_at_admission(&signed(f.s.subject, f.b, &f.b_key, 3), f.s.subject, &store)
             .expect("B is authorized at the admission position");
+    let ev = ev.evidence();
     assert_eq!(
         (ev.evaluation_position, ev.grant.granted_at, ev.generation),
         (3, 2, 0)
@@ -150,7 +151,7 @@ fn a_relying_party_that_has_not_received_the_revocation_admits_at_its_old_tip_an
         &behind,
     )
     .expect("admitted under the facts it holds");
-    assert_eq!(ev.evaluation_position, 2);
+    assert_eq!(ev.evidence().evaluation_position, 2);
 }
 
 #[test]
@@ -243,4 +244,20 @@ fn admission_reads_no_wall_clock_and_no_environment() {
             "device_admission.rs must not use {forbidden}"
         );
     }
+}
+
+/// A malformed act is refused as malformed before any position is compared: an act moved to
+/// position 0 after construction is not reported as stale, and is never admitted.
+#[test]
+fn a_malformed_act_is_refused_as_malformed_before_any_position_check() {
+    let f = fixture();
+    let store = store_of(&f.facts);
+    let mut moved = signed(f.s.subject, f.b, &f.b_key, 3);
+    moved.act.evaluation_position = 0;
+    assert_eq!(
+        verify_device_act_at_admission(&moved, f.s.subject, &store),
+        Err(AdmissionRefusal::Act(DeviceActVerifyError::MalformedAct(
+            icn_identity::device_authority::DeviceActError::PositionOutOfRange(0)
+        )))
+    );
 }

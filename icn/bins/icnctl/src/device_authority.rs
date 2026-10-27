@@ -26,7 +26,7 @@ use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use icn_identity::authority_log::{SubjectId, ValiditySpan};
 use icn_identity::device_authority::{
-    DeviceActVerifyError, DeviceAuthorityEvidence, DeviceAuthorityRefusal,
+    DeviceActVerifyError, DeviceAuthorityRefusal, VerifiedDeviceAct,
 };
 use icn_identity::evidence_bundle::{
     verify_evidence_bundle, BundleError, EvidenceBundle, EvidenceVerifyError,
@@ -84,7 +84,7 @@ fn verify(path: &Path, subject_hex: &str, position: u64) -> Result<()> {
         Err(reason) => return finish(malformed(&reason), EXIT_MALFORMED),
     };
     match verify_evidence_bundle(&bundle, subject, position) {
-        Ok(evidence) => finish(authorized(&bundle, &evidence), 0),
+        Ok(verified) => finish(authorized(&bundle, &verified), 0),
         Err(EvidenceVerifyError::Bundle(BundleError::Inadmissible { event_id, source })) => finish(
             json!({
                 "verdict": "refused",
@@ -166,7 +166,10 @@ fn parse_subject(hex_str: &str) -> std::result::Result<SubjectId, String> {
     Ok(SubjectId::from_bytes(array))
 }
 
-fn authorized(bundle: &EvidenceBundle, evidence: &DeviceAuthorityEvidence) -> Value {
+/// The document for an act that passed verification. Everything comes from the
+/// [`VerifiedDeviceAct`], including the `act_id` of the exact bytes whose signature verified.
+fn authorized(bundle: &EvidenceBundle, verified: &VerifiedDeviceAct) -> Value {
+    let evidence = verified.evidence();
     let capabilities: Vec<String> = evidence
         .grant
         .capabilities
@@ -187,7 +190,7 @@ fn authorized(bundle: &EvidenceBundle, evidence: &DeviceAuthorityEvidence) -> Va
             "granted_at": evidence.grant.granted_at,
         },
         "generation": evidence.generation,
-        "act_id": hex::encode(bundle.act().act.act_id()),
+        "act_id": hex::encode(verified.act_id()),
         "bundle_id": hex::encode(bundle.bundle_id()),
         "fact_count": bundle.facts().len(),
     })
@@ -204,6 +207,7 @@ fn malformed(reason: &str) -> Value {
 /// The stable class name of a refusal: the N4-A vocabulary, never a payload byte.
 fn refusal_class(err: &DeviceActVerifyError) -> &'static str {
     match err {
+        DeviceActVerifyError::MalformedAct(_) => "MalformedAct",
         DeviceActVerifyError::ActSubjectMismatch => "ActSubjectMismatch",
         DeviceActVerifyError::EvaluationPositionMismatch { .. } => "EvaluationPositionMismatch",
         DeviceActVerifyError::BadSignature => "BadSignature",

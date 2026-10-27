@@ -39,7 +39,7 @@ use thiserror::Error;
 
 use crate::authority_log::{derive, AuthorityStore, AuthorityView, SubjectId};
 use crate::device_authority::{
-    verify_device_act, DeviceActVerifyError, DeviceAuthorityEvidence, SignedDeviceAct,
+    verify_device_act, DeviceActVerifyError, SignedDeviceAct, VerifiedDeviceAct,
 };
 
 /// Why no current admission is possible, or why this act is not admitted now.
@@ -99,13 +99,20 @@ pub fn admission_position(
     }
 }
 
-/// Admit `signed` now: compute the admission position from `store`, require the act to bind
-/// exactly it, then run N4-A unchanged at that position.
+/// Admit `signed` now: check the act is within its bounds, compute the admission position from
+/// `store`, require the act to bind exactly it, then run N4-A unchanged at that position.
+///
+/// Success is the [`VerifiedDeviceAct`] N4-A returned: authorship and authority at the relying
+/// party's own retained tip. It is current only relative to the facts `store` holds.
 pub fn verify_device_act_at_admission(
     signed: &SignedDeviceAct,
     subject: SubjectId,
     store: &AuthorityStore,
-) -> Result<DeviceAuthorityEvidence, AdmissionRefusal> {
+) -> Result<VerifiedDeviceAct, AdmissionRefusal> {
+    signed
+        .act
+        .validate()
+        .map_err(|e| AdmissionRefusal::Act(DeviceActVerifyError::MalformedAct(e)))?;
     let admission = admission_position(subject, store)?;
     let act = signed.act.evaluation_position;
     if act < admission {

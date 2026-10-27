@@ -30,8 +30,8 @@ use icn_identity::authority_log::{
     DeviceCapability, EventId, PrincipalKey, SignedAuthorityEvent, SubjectId,
 };
 use icn_identity::device_authority::{
-    sign_device_act, DeviceActV1, DeviceActVerifyError, DeviceAuthorityEvidence,
-    DeviceAuthorityRefusal, SignedDeviceAct,
+    sign_device_act, DeviceActV1, DeviceActVerifyError, DeviceAuthorityRefusal, SignedDeviceAct,
+    VerifiedDeviceAct,
 };
 use icn_identity::device_enrollment::{
     approve_enrollment, sign_enrollment_request, verify_enrollment_request, EnrollmentRequestV1,
@@ -67,8 +67,14 @@ fn act(
     capability: DeviceCapability,
     position: u64,
 ) -> SignedDeviceAct {
-    let act =
-        DeviceActV1::new(subject, device, capability, position, b"katie:act".to_vec()).unwrap();
+    let act = DeviceActV1::new(
+        subject,
+        device,
+        capability,
+        position,
+        b"fixture:act".to_vec(),
+    )
+    .unwrap();
     sign_device_act(&act, key).unwrap()
 }
 
@@ -79,15 +85,13 @@ fn relying_party(
     act: SignedDeviceAct,
     subject: SubjectId,
     position: u64,
-) -> Result<DeviceAuthorityEvidence, EvidenceVerifyError> {
+) -> Result<VerifiedDeviceAct, EvidenceVerifyError> {
     let bundle =
         EvidenceBundle::assemble(&store_of(facts), &act).map_err(EvidenceVerifyError::Bundle)?;
     verify_evidence_bundle_bytes(&bundle.canonical_bytes(), subject, position)
 }
 
-fn refused_as(
-    result: Result<DeviceAuthorityEvidence, EvidenceVerifyError>,
-) -> DeviceAuthorityRefusal {
+fn refused_as(result: Result<VerifiedDeviceAct, EvidenceVerifyError>) -> DeviceAuthorityRefusal {
     match result {
         Err(EvidenceVerifyError::Act(DeviceActVerifyError::Refused(refusal))) => refusal,
         other => panic!("expected an N4-A refusal, got {other:?}"),
@@ -112,7 +116,7 @@ fn the_backbone_two_devices_one_revoked_the_other_and_the_subject_unharmed() {
         &s,
         &edge,
         0x11,
-        "Katie desk Pi",
+        "office desktop",
         CapabilitySet::new([DeviceCapability::Sign, DeviceCapability::Present]),
         CapabilitySet::new([DeviceCapability::Sign, DeviceCapability::Present]),
         1,
@@ -122,7 +126,7 @@ fn the_backbone_two_devices_one_revoked_the_other_and_the_subject_unharmed() {
         &s,
         &edge,
         0x22,
-        "Katie phone",
+        "mobile phone",
         CapabilitySet::new([DeviceCapability::Sign, DeviceCapability::Present]),
         CapabilitySet::new([DeviceCapability::Present]), // attenuated: asked for Sign too
         2,
@@ -143,7 +147,10 @@ fn the_backbone_two_devices_one_revoked_the_other_and_the_subject_unharmed() {
         2,
     )
     .expect("A may Sign");
-    assert_eq!((ok_a.device, ok_a.grant.granted_at), (a, 1));
+    assert_eq!(
+        (ok_a.evidence().device, ok_a.evidence().grant.granted_at),
+        (a, 1)
+    );
     let ok_b = relying_party(
         &enrolled,
         act(s.subject, b, &b_key, DeviceCapability::Present, 2),
@@ -151,7 +158,10 @@ fn the_backbone_two_devices_one_revoked_the_other_and_the_subject_unharmed() {
         2,
     )
     .expect("B may Present");
-    assert_eq!((ok_b.device, ok_b.grant.granted_at), (b, 2));
+    assert_eq!(
+        (ok_b.evidence().device, ok_b.evidence().grant.granted_at),
+        (b, 2)
+    );
     // Bounded: B asked for Sign and was not given it.
     assert_eq!(
         refused_as(relying_party(
@@ -185,6 +195,7 @@ fn the_backbone_two_devices_one_revoked_the_other_and_the_subject_unharmed() {
         3,
     )
     .expect("B is unaffected by A's revocation");
+    let still_b = still_b.evidence();
     assert_eq!(
         (still_b.device, still_b.grant.granted_at, still_b.generation),
         (b, 2, 0)
@@ -266,7 +277,7 @@ fn a_device_cannot_be_enrolled_twice_into_a_wider_grant_by_resubmitting_its_requ
         &s,
         &edge,
         0x11,
-        "Katie desk Pi",
+        "office desktop",
         CapabilitySet::new([DeviceCapability::Present]),
         CapabilitySet::new([DeviceCapability::Present]),
         1,
