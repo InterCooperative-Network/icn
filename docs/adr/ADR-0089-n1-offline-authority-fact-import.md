@@ -227,12 +227,11 @@ resumable**:
    loss (ADR-0087 §4, §9). Closing the store is **not** that step: ADR-0088 §5 already rejects
    closing sled to force a sync (its close is a `Drop` that returns nothing, skips I/O after an
    earlier error, panics on a failed `fsync`, and runs only when the last handle drops). Instead,
-   after every handle to the authority store has been dropped, the tool walks `store/authority`
-   recursively (including `blobs/`), opens every file and every directory with its own descriptors
-   using `O_NOFOLLOW`, `fsync`s each, and proceeds only if every one succeeds. Any failure, including
-   a panic in sled's own drop, leaves the marker in place (an implementation must not catch that
-   panic and continue to the sync step), so the node stays fail closed and `--resume` repeats the sync. Only then remove the marker
-   and `fsync` the data directory. Otherwise a power loss could keep the
+   after every handle to the authority store has been dropped, the tool runs the **durability walk**
+   below over `store/authority` and proceeds only if it succeeds. Any failure, including a panic in
+   sled's own drop, leaves the marker in place (an implementation must not catch that panic and
+   continue to the sync step), so the node stays fail closed and `--resume` repeats the walk. Only
+   then remove the marker and `fsync` the data directory. Otherwise a power loss could keep the
    marker's removal while losing trailing facts, such as a `revoke`, and the daemon would start on
    exactly the partial state the marker exists to expose. Only after the marker is gone remove the
    staged copy. A stop between the two leaves an orphan staged copy and no marker, which is harmless
@@ -275,7 +274,33 @@ failed `fsync`), between them and the marker's removal, and between the marker's
 removal and the staged copy's removal. In every case the daemon must refuse while the marker exists,
 `--resume` must complete, the final store must equal a clean import's, and no case may leave the node
 permanently refused. The suite also covers a withdrawal and a lowered bound made while the marker
-exists, and a resume near the per-Subject bound.
+exists, and a resume near the per-Subject bound. A store damaged in a way the durability walk
+refuses (a planted symlink, an unexpected file type) is outside this obligation: the node stays
+refused until the operator repairs the store, and the refusal names the entry.
+
+**The durability walk.** `O_NOFOLLOW` guards only the last component of a path, so the walk never
+opens a path that contains a directory it has not itself opened:
+
+- It opens `store/authority` relative to a descriptor for the data directory, with
+  `O_NOFOLLOW | O_DIRECTORY`, and checks with `fstat` that the result is a directory owned by the
+  effective uid (§5).
+- It descends only through descriptors: each entry is opened with `openat` relative to its parent
+  directory's descriptor, with `O_NOFOLLOW`, plus `O_DIRECTORY` for directories, and `O_NONBLOCK`
+  for regular files. Every opened descriptor is checked with `fstat` against the entry's type before
+  it is used. No full path below `store/authority` is ever opened.
+- It refuses, and does not open, any entry that is a symlink, FIFO, socket, block or character
+  device, or any type other than a regular file or a directory. A FIFO is never opened, so the walk
+  cannot block on one.
+- It `fsync`s every regular file and every directory it opened, including `store/authority` itself
+  and every subdirectory such as `blobs/`, and succeeds only if every `openat`, `fstat` and `fsync`
+  succeeded.
+- On any refusal or failure the marker stays in place and nothing further is removed.
+
+A refusal for a planted symlink or an unexpected file type is **expected fail-closed behaviour**,
+not a "never wedged" violation: only the account that owns the store (or root) can plant one there
+(§5). Resume repeats the walk and refuses again until the operator repairs the store, for example by
+removing the planted entry, so `--resume` can complete. The same rule already applies to the N2-A
+gate's discovery of sled roots, which refuses any symlink.
 
 ### 7. Reconciliation with daemon startup: what changes
 
@@ -476,10 +501,19 @@ ADR-0087 is unchanged.
   top-level regular files in the data directory.
 - Logs carry digests, counts and the `SubjectId` only. Never fact bodies, keys or payloads.
 - No network, IPC or credential dependency. No real identity material in tests.
+- Acceptance tests for the durability walk: a symlinked intermediate directory under
+  `store/authority` (for example `blobs/` replaced by a symlink to a directory outside the store); a
+  symlinked file; a FIFO, a socket and (where the test can create one) a device node at a file
+  position; and an injected `fsync` failure on a file and on a directory. In each case the import or
+  resume refuses, names the entry, opens nothing outside the store, never blocks, and leaves the
+  marker in place; after the operator repairs the store, `--resume` completes.
 - Mutation tests that remove the marker write, skip whole-segment admission, publish before the
   barrier, filter by verdict, write a startup receipt from the offline path, let `open` ignore the
-  marker, remove the marker after a failed or skipped store `fsync`, accept a non-`fixture:` basis, skip the ownership check, check the size after reading, or
-  resume without comparing the segment id, must each be caught.
+  marker, remove the marker after a failed or skipped store `fsync`, accept a non-`fixture:` basis,
+  skip the ownership check, check the size after reading, resume without comparing the segment id,
+  open a child by full path instead of relative to its parent's descriptor, drop `O_NOFOLLOW`,
+  follow a symlinked directory, open a FIFO or other non-regular, non-directory entry, or skip the
+  `fsync` of a directory, must each be caught.
 
 ## Consequences
 
