@@ -22,10 +22,14 @@
 //! ```text
 //! segment bytes
 //!     ↓ AuthorityHistorySegment::decode   -- strict, fail-closed, structural (§3 rules 1-6)
-//! N1 canonical bodies + witnesses
+//! AuthorityHistorySegment                 -- canonical and bounded; no witness checked yet
 //!     ↓ AuthorityHistorySegment::admit    -- every pair through AuthorityStore::ingest (rule 7)
-//! AuthorityStore
+//! AdmittedAuthorityHistorySegment         -- every pair admitted; still not authority
 //! ```
+//!
+//! The two stages are two types. [`AuthorityHistorySegment::admit`] is the only way to obtain an
+//! [`AdmittedAuthorityHistorySegment`], so code that takes one cannot be handed a segment whose
+//! witnesses were never checked.
 //!
 //! [`AuthorityStore`] has no ingest path other than [`AuthorityStore::ingest`], which calls
 //! [`crate::authority_log::admissible`]. This module therefore adds no second validator of
@@ -484,13 +488,15 @@ impl AuthorityHistorySegment {
     }
 
     /// Admit every carried `(body, witness)` pair through canonical N1 admission into an empty
-    /// in-memory store, and return it (rule 7).
+    /// in-memory store (rule 7), and return the segment together with that store.
     ///
     /// Every pair goes through [`AuthorityStore::ingest`] — every witness, not one per fact.
-    /// Fails closed on the first refusal: a partially admitted store is a different history than
-    /// the one carried. The store is in memory only; nothing is persisted, and no fact is
-    /// filtered by what the N1 fold would conclude from it.
-    pub fn admit(&self) -> Result<AuthorityStore, SegmentError> {
+    /// Fails closed on the first refusal and returns no segment: a partially admitted store is a
+    /// different history than the one carried, so it is dropped. The store is in memory only;
+    /// nothing is persisted, and no fact is filtered by what the N1 fold would conclude from it.
+    ///
+    /// Consumes the segment, so admission moves it rather than copying it.
+    pub fn admit(self) -> Result<AdmittedAuthorityHistorySegment, SegmentError> {
         let mut store = AuthorityStore::new();
         for (event_id, fact) in &self.facts {
             for witness in &fact.witnesses {
@@ -503,7 +509,87 @@ impl AuthorityHistorySegment {
                     })?;
             }
         }
-        Ok(store)
+        Ok(AdmittedAuthorityHistorySegment {
+            segment: self,
+            store,
+        })
+    }
+}
+
+/// A history segment whose every carried `(body, witness)` pair passed N1 admission (rule 7).
+///
+/// The fields are private and there is no public constructor: [`AuthorityHistorySegment::admit`]
+/// is the only way to obtain one, and it returns one only when every pair was admitted. A
+/// consumer that must not act on unchecked witnesses — the future importer — takes this type, and
+/// a structurally decoded [`AuthorityHistorySegment`] is not accepted in its place.
+///
+/// Building one outside this module does not compile (the fields are private, E0451):
+///
+/// ```compile_fail,E0451
+/// use icn_identity::authority_log::AuthorityStore;
+/// use icn_identity::history_segment::{AdmittedAuthorityHistorySegment, AuthorityHistorySegment};
+/// fn forge(segment: AuthorityHistorySegment, store: AuthorityStore) -> AdmittedAuthorityHistorySegment {
+///     AdmittedAuthorityHistorySegment { segment, store }
+/// }
+/// ```
+///
+/// Nor does passing a decoded segment where an admitted one is required (E0308):
+///
+/// ```compile_fail,E0308
+/// use icn_identity::history_segment::{AdmittedAuthorityHistorySegment, AuthorityHistorySegment};
+/// fn import(_: &AdmittedAuthorityHistorySegment) {}
+/// fn skip_admission(decoded: &AuthorityHistorySegment) {
+///     import(decoded)
+/// }
+/// ```
+///
+/// Stable rustdoc does not check the error code of a `compile_fail` test, so this control compiles
+/// everything the tests above use except the struct literal and the substitution. If it compiles,
+/// those are what fail above.
+///
+/// ```
+/// use icn_identity::authority_log::AuthorityStore;
+/// use icn_identity::history_segment::{
+///     AdmittedAuthorityHistorySegment, AuthorityHistorySegment, SegmentError,
+/// };
+/// fn import(_: &AdmittedAuthorityHistorySegment) {}
+/// fn admit_then_import(decoded: AuthorityHistorySegment) -> Result<(), SegmentError> {
+///     import(&decoded.admit()?);
+///     Ok(())
+/// }
+/// fn read(a: &AdmittedAuthorityHistorySegment) -> (&AuthorityHistorySegment, &AuthorityStore) {
+///     (a.segment(), a.store())
+/// }
+/// fn parts(segment: AuthorityHistorySegment, store: AuthorityStore) -> (AuthorityHistorySegment, AuthorityStore) {
+///     (segment, store)
+/// }
+/// ```
+///
+/// # What admission does not establish
+///
+/// Admissible is not authorized. A fact signed by a key that held no authority, and both
+/// candidates of a fork, are admitted and kept here; whether any key had authority is what
+/// [`crate::authority_log::derive()`] concludes over [`AdmittedAuthorityHistorySegment::store`], and
+/// nothing in this type records or caches that conclusion. Admission is also not persistence, not
+/// retention permission, not import-time anchoring against retained facts, and not completeness
+/// or freshness (see the module docs).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmittedAuthorityHistorySegment {
+    segment: AuthorityHistorySegment,
+    store: AuthorityStore,
+}
+
+impl AdmittedAuthorityHistorySegment {
+    /// The admitted segment, unchanged: the same facts, witnesses, range and canonical bytes it
+    /// had before admission.
+    pub fn segment(&self) -> &AuthorityHistorySegment {
+        &self.segment
+    }
+
+    /// The in-memory store built by ingesting every carried pair, and nothing else: its bodies
+    /// are exactly the segment's bodies and its witnesses exactly the segment's witnesses.
+    pub fn store(&self) -> &AuthorityStore {
+        &self.store
     }
 }
 

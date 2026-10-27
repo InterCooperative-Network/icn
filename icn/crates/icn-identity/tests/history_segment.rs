@@ -26,18 +26,18 @@ mod authority_log_support;
 use std::collections::{BTreeMap, BTreeSet};
 
 use authority_log_support::{authorize_at, revoke_at, store_of, stranger, subject, Subject};
-use ed25519_dalek::SigningKey;
+use ed25519_dalek::{Signer, SigningKey};
 use icn_identity::authority_log::{
-    authorize_event, derive, AdmissionError, AuthorityBody, AuthorityBody as Body, AuthorityView,
-    CapabilitySet, CodecError, DeviceCapability, EventId, SignedAuthorityEvent, SubjectId,
-    ValiditySpan, WitnessSignature, COMMITMENT_DOMAIN, DOMAIN, KDF_DOMAIN, MAX_POSITION,
-    SIGNATURE_DOMAIN,
+    authorize_event, derive, AdmissionError, AuthorityBody, AuthorityBody as Body, AuthorityStore,
+    AuthorityView, CapabilitySet, CodecError, DeviceCapability, EventId, SignedAuthorityEvent,
+    SubjectId, ValiditySpan, Witness, WitnessSignature, COMMITMENT_DOMAIN, DOMAIN, KDF_DOMAIN,
+    MAX_POSITION, SIGNATURE_DOMAIN,
 };
 use icn_identity::device_authority::DEVICE_ACT_DOMAIN;
 use icn_identity::evidence_bundle::{BundledFact, BUNDLE_DOMAIN};
 use icn_identity::history_segment::{
-    AuthorityHistorySegment, SegmentError, MAX_SEGMENT_BYTES, MAX_SEGMENT_FACTS,
-    MAX_WITNESSES_PER_FACT, SEGMENT_DOMAIN, SEGMENT_VERSION,
+    AdmittedAuthorityHistorySegment, AuthorityHistorySegment, SegmentError, MAX_SEGMENT_BYTES,
+    MAX_SEGMENT_FACTS, MAX_WITNESSES_PER_FACT, SEGMENT_DOMAIN, SEGMENT_VERSION,
 };
 use sha2::{Digest, Sha256};
 
@@ -286,9 +286,13 @@ fn a_fork_is_carried_as_a_fork_and_admits_as_one() {
     );
     let decoded = AuthorityHistorySegment::decode(&seg.canonical_bytes()).unwrap();
     assert_eq!(decoded, seg);
-    // The fold over the admitted store sees the dispute: the segment did not pick a side.
-    let store = decoded.admit().unwrap();
-    match derive(f.s.subject, &store) {
+    // Admission keeps both candidates, and the fold over the admitted store sees the dispute:
+    // neither the segment nor admission picked a side.
+    let admitted = decoded.admit().unwrap();
+    assert_eq!(admitted.segment(), &seg);
+    assert!(admitted.store().contains_body(&f.auth_b.body));
+    assert!(admitted.store().contains_body(&f.auth_c.body));
+    match derive(f.s.subject, admitted.store()) {
         AuthorityView::Halted {
             disputed_at,
             candidates,
@@ -335,10 +339,16 @@ fn an_admissible_fact_from_an_unauthorized_signer_is_carried_and_admitted() {
     );
     let seg = segment(f.s.subject, 0, 2, &[&f.s.inception, &f.auth_a, &rogue]).unwrap();
     assert!(seg.facts().contains_key(&rogue.body.event_id()));
-    let store = seg.admit().unwrap();
-    assert!(store.contains_body(&rogue.body));
-    // And the fold, not the segment, is what declines it: position 2 has no authorized candidate.
-    match derive(f.s.subject, &store) {
+    // Admitted, because admission is N1's signature check and nothing more.
+    let admitted = seg.admit().unwrap();
+    assert!(admitted
+        .segment()
+        .facts()
+        .contains_key(&rogue.body.event_id()));
+    assert!(admitted.store().contains_body(&rogue.body));
+    // And the fold, not the segment or admission, is what declines it: position 2 has no
+    // authorized candidate, so the admitted rogue authorize confers nothing.
+    match derive(f.s.subject, admitted.store()) {
         AuthorityView::Live { frontier, .. } => assert_eq!(frontier, 2),
         other => panic!("expected a live view stopped at 2, got {other:?}"),
     }
@@ -362,8 +372,8 @@ fn admit_equals_ingesting_every_pair_directly_including_every_witness() {
     let owned: Vec<SignedAuthorityEvent> = events.iter().map(|e| (*e).clone()).collect();
     let direct = store_of(&owned);
     let admitted = seg.admit().unwrap();
-    assert_eq!(admitted, direct);
-    assert_eq!(admitted.witness_count(), 5);
+    assert_eq!(admitted.store(), &direct);
+    assert_eq!(admitted.store().witness_count(), 5);
 }
 
 #[test]
@@ -893,6 +903,157 @@ fn a_bad_witness_after_a_good_one_on_the_same_fact_is_still_refused() {
     );
 }
 
+/// The linear 1..=3 segment with `target`'s witnesses replaced. `new` checks structure only, so
+/// the witnesses need not verify: that is admission's job.
+fn linear_with_witnesses(
+    f: &Fixture,
+    target: &SignedAuthorityEvent,
+    witnesses: BTreeSet<WitnessSignature>,
+) -> AuthorityHistorySegment {
+    let mut facts = facts_of(&[&f.auth_a, &f.auth_b, &f.revoke_a]);
+    facts
+        .get_mut(&target.body.event_id())
+        .expect("target is one of the linear facts")
+        .witnesses = witnesses;
+    AuthorityHistorySegment::new(f.s.subject, 1, 3, facts).unwrap()
+}
+
+/// `witness` with one bit of `S` flipped. `S` starts at byte 32, so the bytewise order against
+/// any other distinct witness is unchanged.
+fn corrupt(witness: WitnessSignature) -> WitnessSignature {
+    let mut bytes = *witness.as_bytes();
+    bytes[32] ^= 0x01;
+    WitnessSignature::from_bytes(bytes)
+}
+
+#[test]
+fn an_admitted_segment_is_the_decoded_segment_and_exactly_its_evidence() {
+    let f = fixture();
+    let mut facts = facts_of(&[&f.s.inception, &f.auth_a, &f.auth_b, &f.auth_c, &f.revoke_a]);
+    facts
+        .get_mut(&f.auth_b.body.event_id())
+        .unwrap()
+        .witnesses
+        .insert(second_witness(
+            &f.auth_b.body,
+            &f.s.root.authority_signing_key(0),
+            0x5a,
+        ));
+    let seg = AuthorityHistorySegment::new(f.s.subject, 0, 3, facts.clone()).unwrap();
+    let bytes = seg.canonical_bytes();
+
+    let admitted: AdmittedAuthorityHistorySegment = seg.clone().admit().unwrap();
+
+    // The segment passes through admission unchanged: same facts, fork included, same bytes.
+    assert_eq!(admitted.segment(), &seg);
+    assert_eq!(admitted.segment().facts(), &facts);
+    assert_eq!(admitted.segment().canonical_bytes(), bytes);
+    // The store holds exactly the carried bodies and exactly the carried (body, witness) pairs:
+    // nothing dropped for being a fork candidate, nothing added.
+    let bodies: BTreeSet<AuthorityBody> = facts.values().map(|fact| fact.body.clone()).collect();
+    let witnesses: BTreeSet<Witness> = facts
+        .iter()
+        .flat_map(|(event_id, fact)| {
+            fact.witnesses.iter().map(|signature| Witness {
+                event_id: *event_id,
+                signature: *signature,
+            })
+        })
+        .collect();
+    assert_eq!(witnesses.len(), 6);
+    assert_eq!(admitted.store().bodies(), &bodies);
+    assert_eq!(admitted.store().witnesses(), &witnesses);
+}
+
+#[test]
+fn a_real_signature_by_a_key_the_body_does_not_name_is_refused() {
+    let f = fixture();
+    // A genuine Ed25519 signature over auth_b's exact preimage, by a key other than the signer
+    // auth_b names inline. Structurally indistinguishable from a good witness; N1 refuses it.
+    let (other, _) = stranger(0x66);
+    let misattributed =
+        WitnessSignature::from_bytes(other.sign(&f.auth_b.body.signature_preimage()).to_bytes());
+    let seg = linear_with_witnesses(&f, &f.auth_b, BTreeSet::from([misattributed]));
+    assert_eq!(
+        seg.admit().unwrap_err(),
+        SegmentError::Inadmissible {
+            event_id: f.auth_b.body.event_id(),
+            source: AdmissionError::SignatureInvalid
+        }
+    );
+}
+
+#[test]
+fn a_multi_witness_fact_is_refused_wherever_its_one_bad_witness_sorts() {
+    let f = fixture();
+    let key = f.s.root.authority_signing_key(0);
+    let valid: BTreeSet<WitnessSignature> = BTreeSet::from([
+        f.auth_b.signature,
+        second_witness(&f.auth_b.body, &key, 0x5a),
+        second_witness(&f.auth_b.body, &key, 0xa5),
+    ]);
+    assert_eq!(valid.len(), 3);
+    let admitted = linear_with_witnesses(&f, &f.auth_b, valid.clone())
+        .admit()
+        .unwrap();
+    assert_eq!(admitted.store().witness_count(), 5);
+
+    // Corrupt the first, then the middle, then the last witness in canonical order.
+    let sorted: Vec<WitnessSignature> = valid.iter().copied().collect();
+    for rank in 0..sorted.len() {
+        let mut witnesses = sorted.clone();
+        witnesses[rank] = corrupt(witnesses[rank]);
+        let witnesses: BTreeSet<WitnessSignature> = witnesses.into_iter().collect();
+        assert_eq!(
+            witnesses.iter().position(|w| *w == corrupt(sorted[rank])),
+            Some(rank),
+            "the bad witness must sit at rank {rank}"
+        );
+        assert_eq!(
+            linear_with_witnesses(&f, &f.auth_b, witnesses)
+                .admit()
+                .unwrap_err(),
+            SegmentError::Inadmissible {
+                event_id: f.auth_b.body.event_id(),
+                source: AdmissionError::SignatureInvalid
+            },
+            "rank {rank}"
+        );
+    }
+}
+
+#[test]
+fn a_refusal_after_earlier_pairs_were_ingested_returns_no_segment_and_no_store() {
+    let f = fixture();
+    // Corrupt the fact that sorts last, so every other pair has already been ingested into the
+    // scratch store when admission refuses.
+    let linear = [&f.auth_a, &f.auth_b, &f.revoke_a];
+    let last = *linear
+        .iter()
+        .max_by_key(|event| event.body.event_id())
+        .unwrap();
+    for event in linear {
+        if event.body.event_id() != last.body.event_id() {
+            let mut alone = AuthorityStore::new();
+            alone
+                .ingest(event)
+                .expect("every earlier pair is admissible");
+        }
+    }
+    let seg = linear_with_witnesses(&f, last, BTreeSet::from([corrupt(last.signature)]));
+
+    // The only thing that comes back is the refusal naming the fact. There is no partially
+    // admitted segment or store to hand on: the Result has no such value.
+    let result: Result<AdmittedAuthorityHistorySegment, SegmentError> = seg.admit();
+    assert_eq!(
+        result,
+        Err(SegmentError::Inadmissible {
+            event_id: last.body.event_id(),
+            source: AdmissionError::SignatureInvalid
+        })
+    );
+}
+
 // ---------------------------------------------------------------------------------------------
 // 8. Domain separation and purity.
 // ---------------------------------------------------------------------------------------------
@@ -974,6 +1135,8 @@ fn the_module_has_no_clock_randomness_io_or_authority_fold() {
 //   LINEAR:    from 1 to 3, {authorize A @1, authorize B @2 (parent A@1), revoke A @3 (parent B@2)}
 //   FORK:      from 0 to 2, {inception, authorize A @1, authorize B @2, authorize C @2} (both 2s
 //              name A@1 as parent)
+//   MULTIWITNESS: LINEAR, with authorize B also carrying a second valid witness by the same key:
+//              the RFC 8032 signature with nonce prefix `[0x5a; 32]` (`second_witness`)
 // ---------------------------------------------------------------------------------------------
 
 const EXPECT_SUBJECT_ID_HEX: &str =
@@ -987,14 +1150,23 @@ const EXPECT_LINEAR_SEGMENT_ID_HEX: &str =
 const EXPECT_FORK_SEGMENT_HEX: &str = "0000001669636e2e6e312e686973746f72792d7365676d656e740001a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d00000000000000000000000000000002000000041bd0cea4f6f4f62cc9d8e4f091b8d3b0a2cae7a10038720f4a833a4636c1d2bc000000a80000001169636e2e617574686f726974792d6c6f67000103a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d0000000000000001a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d01216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a01db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d00000001010000000001abbd59db38f897f9a93a43f5ac88a8c975dd02ac658930d4e404373afae4d5e629ee42b9cc317efd9ea2b9608db8f6f5565ed06f811c7c2cac03fe1dcb724b0d64b8a7e2c69bba64e972c5b2d1a29df390614b76bc3ba89e5ed83844f37d96d5000000a80000001169636e2e617574686f726974792d6c6f67000103a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d00000000000000021bd0cea4f6f4f62cc9d8e4f091b8d3b0a2cae7a10038720f4a833a4636c1d2bc01216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a0122fc297792f0b6ffc0bfcfdb7edb0c0aa14e025a365ec0e342e86e3829cb74b6000000010100000000016eac35140530f46220f7d52e8e58424cbb1fdff9b6b82adda848ff8f45ac99ee7db46a1b30f7fcea42510df06cc6d1c2f777db0e922df17e7f6045ed14d792059791575df688d534f00463ffd73607c860831557fd2fd66f16894b65dec82afb000000a80000001169636e2e617574686f726974792d6c6f67000103a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d00000000000000021bd0cea4f6f4f62cc9d8e4f091b8d3b0a2cae7a10038720f4a833a4636c1d2bc01216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a012152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12000000010100000000014bd1a312691f057ae0bd38200e13c9ab518d7e46f4020163080543cf92f1368bef5c490df84a20d11e8d4237efb23bc0b18ee9b42139b26d832e90fd706d8500a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d0000009e0000001169636e2e617574686f726974792d6c6f6700010101216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a94949494949494949494949494949494949494949494949494949494949494940000000101216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a03e35d304806178a1a133aec9a7f61be02612aa8b936efff6f8150040cef9f0e00000001cd8c3ab7a2d1302f2566d49188b47700113347117dd846d883cddf10cd9c3613c3d9e4ba9d416152d21503b6faf3add9afa860784e00fbd6865ead25187e6701";
 const EXPECT_FORK_SEGMENT_ID_HEX: &str =
     "d142dba4e58c428fd2b632270622423d4578749503c091aa5e978262f8ec8dd3";
+const EXPECT_MULTIWITNESS_SEGMENT_HEX: &str = "0000001669636e2e6e312e686973746f72792d7365676d656e740001a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d00000000000000010000000000000003000000031bd0cea4f6f4f62cc9d8e4f091b8d3b0a2cae7a10038720f4a833a4636c1d2bc000000a80000001169636e2e617574686f726974792d6c6f67000103a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d0000000000000001a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d01216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a01db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d00000001010000000001abbd59db38f897f9a93a43f5ac88a8c975dd02ac658930d4e404373afae4d5e629ee42b9cc317efd9ea2b9608db8f6f5565ed06f811c7c2cac03fe1dcb724b0d9791575df688d534f00463ffd73607c860831557fd2fd66f16894b65dec82afb000000a80000001169636e2e617574686f726974792d6c6f67000103a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d00000000000000021bd0cea4f6f4f62cc9d8e4f091b8d3b0a2cae7a10038720f4a833a4636c1d2bc01216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a012152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12000000010100000000024bd1a312691f057ae0bd38200e13c9ab518d7e46f4020163080543cf92f1368bef5c490df84a20d11e8d4237efb23bc0b18ee9b42139b26d832e90fd706d85006004acdf6ff26e1defa492c40dfc3af19928307fd830545daa696b6c9ccc91a30a592df0f44635066fff51adf159b304ed4933ddebdc5929806bb33403a72d0eb22bf1bcf74d7cf901f8218b4d6185c1a9c4cc09792c536e777f3eddb35e3dd3000000a20000001169636e2e617574686f726974792d6c6f67000104a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d00000000000000039791575df688d534f00463ffd73607c860831557fd2fd66f16894b65dec82afb01216bcf74f3b911f6fe9065b158c006b7524b4597ddf343364a0bc94859fb948a01db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d000000011f40c4466d86e0394c211944911e60eace9633175e7314a4aa7c194c0846036cd74c73a41a80e4593bfedc444ee0b62d960110a2f45064fb7444da68dad5990c";
+const EXPECT_MULTIWITNESS_SEGMENT_ID_HEX: &str =
+    "afc210fa95088d65f26bc943a384ab6a56d03ba6c8b21c80c01b41d509a614e4";
 
-fn vector_segments() -> (SubjectId, [AuthorityHistorySegment; 3]) {
+fn vector_segments() -> (SubjectId, [AuthorityHistorySegment; 4]) {
     let f = fixture_with(0x31, 0x41, 0x42, 0x43);
     let s = f.s.subject;
     let inception = segment(s, 0, 0, &[&f.s.inception]).unwrap();
     let linear = segment(s, 1, 3, &[&f.auth_a, &f.auth_b, &f.revoke_a]).unwrap();
     let fork = segment(s, 0, 2, &[&f.s.inception, &f.auth_a, &f.auth_b, &f.auth_c]).unwrap();
-    (s, [inception, linear, fork])
+    let resigned = second_witness(&f.auth_b.body, &f.s.root.authority_signing_key(0), 0x5a);
+    let multi = linear_with_witnesses(
+        &f,
+        &f.auth_b,
+        BTreeSet::from([f.auth_b.signature, resigned]),
+    );
+    (s, [inception, linear, fork, multi])
 }
 
 #[test]
@@ -1008,13 +1180,18 @@ fn canonical_vectors_match_the_independent_reference() {
         ),
         (EXPECT_LINEAR_SEGMENT_HEX, EXPECT_LINEAR_SEGMENT_ID_HEX),
         (EXPECT_FORK_SEGMENT_HEX, EXPECT_FORK_SEGMENT_ID_HEX),
+        (
+            EXPECT_MULTIWITNESS_SEGMENT_HEX,
+            EXPECT_MULTIWITNESS_SEGMENT_ID_HEX,
+        ),
     ];
     for (seg, (bytes_hex, id_hex)) in segments.iter().zip(pinned) {
         assert_eq!(hex::encode(seg.canonical_bytes()), bytes_hex);
         assert_eq!(hex::encode(seg.segment_id()), id_hex);
-        // The pinned bytes decode to the same segment and admit.
+        // The pinned bytes decode to the same segment and admit, every witness included.
         let decoded = AuthorityHistorySegment::decode(&hex::decode(bytes_hex).unwrap()).unwrap();
         assert_eq!(&decoded, seg);
-        decoded.admit().unwrap();
+        let pairs: usize = seg.facts().values().map(|fact| fact.witnesses.len()).sum();
+        assert_eq!(decoded.admit().unwrap().store().witness_count(), pairs);
     }
 }

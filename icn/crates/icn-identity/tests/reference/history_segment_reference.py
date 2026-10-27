@@ -3,7 +3,7 @@
 
 WHY THIS FILE EXISTS
 --------------------
-`tests/history_segment.rs` pins fixed expected bytes for three segments. A vector the Rust code
+`tests/history_segment.rs` pins fixed expected bytes for four segments. A vector the Rust code
 generates and then compares against itself proves only that the code is deterministic. It does not
 prove that the *specification* is sufficient for someone else to reimplement, which is what a
 segment handed between operators needs: an implementation in another language must be able to
@@ -26,6 +26,11 @@ RUN IT
 Exits 0 when both implementations agree, 1 on any mismatch, 2 on a setup problem.
 Requires `cryptography` (Ed25519 key derivation, signing and verification). Not wired into CI: it
 is an audit tool, like the other references in this directory.
+
+The multi-witness vector needs a second valid signature by the same key over the same body. Ed25519
+signing is deterministic, so `cryptography` cannot produce one; the RFC 8032 signer below takes the
+nonce prefix as an input instead. It is checked against `cryptography` (same output for the real
+prefix) before it is used, and every signature it makes is verified by `cryptography`.
 
 The strict decoder below applies rules 1-6 and verifies every witness under the body's inline
 signer, which is the signature part of N1 admission (rule 7). It does not re-implement the rest of
@@ -101,11 +106,13 @@ DEVICE_C_SEED = bytes([0x43] * 32)
 
 
 # --- N1 construction, from the prose ----------------------------------------------------------
-def authority_key(generation: int) -> Ed25519PrivateKey:
+def authority_seed(generation: int) -> bytes:
     # seed = SHA-256(LP(KDF_DOMAIN) || b32(nonce) || u64be(g) || b32(root))
-    return Ed25519PrivateKey.from_private_bytes(
-        h(lp(N1_KDF_DOMAIN) + CONTEXT_NONCE + u64(generation) + ROOT_SECRET)
-    )
+    return h(lp(N1_KDF_DOMAIN) + CONTEXT_NONCE + u64(generation) + ROOT_SECRET)
+
+
+def authority_key(generation: int) -> Ed25519PrivateKey:
+    return Ed25519PrivateKey.from_private_bytes(authority_seed(generation))
 
 
 def commitment(generation: int) -> bytes:
@@ -144,6 +151,68 @@ def revoke_body(subject: bytes, position: int, prev: bytes, signer: bytes, devic
 def witness(body: bytes, key: Ed25519PrivateKey) -> bytes:
     # signature preimage = LP(SIGNATURE_DOMAIN) || canonical_body
     return key.sign(lp(N1_SIG_DOMAIN) + body)
+
+
+# --- RFC 8032 §5.1.6 signing with a chosen nonce prefix ----------------------------------------
+_Q = 2**255 - 19
+_L = 2**252 + 27742317777372353535851937790883648493
+_D = -121665 * pow(121666, _Q - 2, _Q) % _Q
+
+
+def _point_add(p1, p2):
+    x1, y1, z1, t1 = p1
+    x2, y2, z2, t2 = p2
+    a = (y1 - x1) * (y2 - x2) % _Q
+    b = (y1 + x1) * (y2 + x2) % _Q
+    c = 2 * t1 * t2 * _D % _Q
+    d = 2 * z1 * z2 % _Q
+    e, f, g, k = b - a, d - c, d + c, b + a
+    return (e * f % _Q, g * k % _Q, f * g % _Q, e * k % _Q)
+
+
+def _point_mul(s: int, p):
+    out = (0, 1, 1, 0)
+    while s:
+        if s & 1:
+            out = _point_add(out, p)
+        p = _point_add(p, p)
+        s >>= 1
+    return out
+
+
+def _compress(p) -> bytes:
+    x, y, z, _ = p
+    zi = pow(z, _Q - 2, _Q)
+    x, y = x * zi % _Q, y * zi % _Q
+    return (y | ((x & 1) << 255)).to_bytes(32, "little")
+
+
+def _base_point():
+    y = 4 * pow(5, _Q - 2, _Q) % _Q
+    x2 = (y * y - 1) * pow(_D * y * y + 1, _Q - 2, _Q)
+    x = pow(x2, (_Q + 3) // 8, _Q)
+    if (x * x - x2) % _Q:
+        x = x * pow(2, (_Q - 1) // 4, _Q) % _Q
+    if x & 1:
+        x = _Q - x
+    return (x, y, 1, x * y % _Q)
+
+
+def sign_with_nonce_prefix(seed: bytes, prefix: bytes, message: bytes) -> bytes:
+    expanded = hashlib.sha512(seed).digest()
+    a = int.from_bytes(expanded[:32], "little")
+    a = (a & ((1 << 254) - 8)) | (1 << 254)
+    base = _base_point()
+    public = _compress(_point_mul(a, base))
+    r = int.from_bytes(hashlib.sha512(prefix + message).digest(), "little") % _L
+    big_r = _compress(_point_mul(r, base))
+    k = int.from_bytes(hashlib.sha512(big_r + public + message).digest(), "little") % _L
+    return big_r + ((r + k * a) % _L).to_bytes(32, "little")
+
+
+def rewitness(body: bytes, seed: bytes, prefix_byte: int) -> bytes:
+    # A second valid signature by the same key: the nonce prefix is [prefix_byte; 32].
+    return sign_with_nonce_prefix(seed, bytes([prefix_byte]) * 32, lp(N1_SIG_DOMAIN) + body)
 
 
 # --- reading the few body fields the segment rules need, from the N1 layout --------------------
@@ -305,6 +374,20 @@ def main() -> int:
     def signed(*bodies):
         return {b: [witness(b, k0)] for b in bodies}
 
+    ok = True
+
+    # The chosen-prefix signer must agree with `cryptography` when given the key's real prefix.
+    seed0 = authority_seed(0)
+    real_prefix = hashlib.sha512(seed0).digest()[32:]
+    if sign_with_nonce_prefix(seed0, real_prefix, lp(N1_SIG_DOMAIN) + auth_b) == witness(auth_b, k0):
+        print("ok       RFC 8032 signer reproduces `cryptography` for the real nonce prefix")
+    else:
+        print("MISMATCH RFC 8032 signer disagrees with `cryptography`")
+        ok = False
+    second_b = rewitness(auth_b, seed0, 0x5A)
+    multi = signed(auth_a, auth_b, revoke_a)
+    multi[auth_b] = [witness(auth_b, k0), second_b]
+
     vectors = {
         # 1. inception only: from == to == 0.
         "INCEPTION": segment(subject, 0, 0, signed(inception)),
@@ -312,9 +395,9 @@ def main() -> int:
         "LINEAR": segment(subject, 1, 3, signed(auth_a, auth_b, revoke_a)),
         # 3. a fork at position 2, both candidates carried: 0..=2.
         "FORK": segment(subject, 0, 2, signed(inception, auth_a, auth_b, auth_c)),
+        # 4. LINEAR, with authorize B carrying two distinct valid witnesses by the same key.
+        "MULTIWITNESS": segment(subject, 1, 3, multi),
     }
-
-    ok = True
 
     def compare(name: str, value: str) -> None:
         nonlocal ok
@@ -338,6 +421,13 @@ def main() -> int:
         except Refused as exc:
             print(f"MISMATCH independent strict decode refused {label}: {exc}")
             ok = False
+
+    carried = strict_decode(vectors["MULTIWITNESS"])[h(auth_b)][1]
+    if sorted(carried) == sorted([witness(auth_b, k0), second_b]) and len(set(carried)) == 2:
+        print("ok       both witnesses of authorize B survive decode and verify")
+    else:
+        print("MISMATCH authorize B did not carry both witnesses")
+        ok = False
 
     fork = strict_decode(vectors["FORK"])
     at_two = sorted(b for b, _ in fork.values() if body_position(b) == 2)
@@ -382,6 +472,10 @@ def main() -> int:
     must_refuse("oversized", b"\x00" * (MAX_SEGMENT_BYTES + 1), "too large")
     bad = {auth_a: [witness(auth_a, k0)], auth_b: [bytes([0xFF]) * 64], revoke_a: [witness(revoke_a, k0)]}
     must_refuse("witness that does not verify", segment(subject, 1, 3, bad), "witness does not verify")
+    one_bad = dict(multi)
+    one_bad[auth_b] = [witness(auth_b, k0), second_b[:32] + bytes([second_b[32] ^ 1]) + second_b[33:]]
+    must_refuse("one bad witness beside a good one", segment(subject, 1, 3, one_bad),
+                "witness does not verify")
 
     return 0 if ok else 1
 
