@@ -35,7 +35,9 @@ import re
 from dataclasses import dataclass
 
 from . import codes
+from . import message as squash_message
 from .errors import GitHubRefused, MergeToolError, TransportIndeterminate
+from .message import SquashMessage
 from .snapshot import Snapshot
 from .strategy import api_merge_method
 
@@ -58,6 +60,8 @@ class MergeOutcome:
     detail: str
     merge_commit_sha: str | None
     attempted: bool
+    # Only for an explicit squash message, and only after a confirmed merge: what landed.
+    message_check: dict | None = None
 
 
 def _read_back(client, snap: Snapshot) -> dict | None:
@@ -68,14 +72,33 @@ def _read_back(client, snap: Snapshot) -> dict | None:
         return None
 
 
-def perform_merge(client, snap: Snapshot, strategy: str) -> MergeOutcome:
+def _message_check(client, snap: Snapshot, sha: str, requested: SquashMessage) -> dict:
+    """What landed, compared with what was asked for. Never raises: the merge has happened."""
+    try:
+        observed = client.commit_message(snap.owner, snap.name, sha)
+    except Exception as exc:  # noqa: BLE001 — after a proved merge, nothing may turn into a crash
+        detail = exc.detail if isinstance(exc, MergeToolError) else f"{type(exc).__name__}: {exc}"
+        return {"verified": squash_message.UNREADABLE, "requested_sha256": requested.sha256,
+                "observed_sha256": None, "observed": None, "detail": detail}
+    verdict = squash_message.compare(requested, observed)
+    return {"verified": verdict, "requested_sha256": requested.sha256,
+            "observed_sha256": (squash_message.digest(observed)
+                                if isinstance(observed, str) else None),
+            "observed": observed if verdict == squash_message.MISMATCH else None,
+            "detail": None}
+
+
+def perform_merge(client, snap: Snapshot, strategy: str,
+                  message: SquashMessage | None = None) -> MergeOutcome:
     """Merge `snap` at exactly the head it recorded, then re-read GitHub to prove what happened."""
     method = api_merge_method(strategy)          # closed-set lookup; never a constructed flag
+    fields = ({} if message is None
+              else {"commit_title": message.title, "commit_message": message.body})
     # Anything raised from here on is resolved against a fresh read, never reported as a refusal
     # on the strength of the failure alone.
     try:
         response = client.merge_pull_request(snap.owner, snap.name, snap.number,
-                                             sha=snap.head_oid, merge_method=method)
+                                             sha=snap.head_oid, merge_method=method, **fields)
     except TransportIndeterminate as exc:
         # GitHub never answered. A read taken now is a point-in-time observation, not proof the
         # dispatched request is finished — the server may still be processing it — so a negative
@@ -173,9 +196,19 @@ def perform_merge(client, snap: Snapshot, strategy: str) -> MergeOutcome:
             f"merge did happen; what is missing is the commit it produced, and a human should "
             f"record that before anything else acts on it.",
             None, attempted=True)
-    return MergeOutcome(
-        codes.MERGED,
-        f"PR #{snap.number} merged into {snap.default_branch} with the {strategy} strategy at "
-        f"head {snap.head_oid[:12]}; merge commit {sha}",
-        sha,
-        attempted=True)
+    detail = (f"PR #{snap.number} merged into {snap.default_branch} with the {strategy} strategy "
+              f"at head {snap.head_oid[:12]}; merge commit {sha}")
+    check = None
+    if message is not None:
+        # Still MERGED whatever this finds: the merge is a fact a read has proved. The message is
+        # a second fact, reported beside it so a human sees a divergence instead of assuming none.
+        check = _message_check(client, snap, sha, message)
+        detail += {
+            squash_message.MATCH: "; the commit message is the one requested",
+            squash_message.MISMATCH: "; the commit message DIFFERS from the one requested — see "
+                                     "merge.commit_message.observed; a human must decide what to "
+                                     "do about history that cannot be rewritten by this program",
+            squash_message.UNREADABLE: "; the commit message could NOT be read back, so whether "
+                                       "it is the one requested is unverified",
+        }[check["verified"]]
+    return MergeOutcome(codes.MERGED, detail, sha, attempted=True, message_check=check)

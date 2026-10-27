@@ -1630,6 +1630,305 @@ check("the bootstrap seals the import path before verifying",
 check("both exit codes for MERGED and MERGE_UNCONFIRMED differ from each other",
       codes.exit_code(codes.MERGED) != codes.exit_code(codes.MERGE_UNCONFIRMED))
 
+# --- an explicit squash message -------------------------------------------------------------------------
+print("an explicit squash message rides the same gated, head-pinned request")
+
+import tempfile                                                               # noqa: E402
+from icn_merge_pr import ghclient as _ghclient, message as squash             # noqa: E402
+
+# A tripwire: nothing in this section may reach a real `gh`. Every GhCli below has its transport
+# replaced; if one did not, this records the attempt instead of talking to GitHub.
+_real_subprocess_run = _ghclient.subprocess.run
+_network_attempts: list = []
+
+
+def _tripwire(*args, **kwargs):
+    _network_attempts.append(args)
+    raise AssertionError("a test reached the real transport")
+
+
+_ghclient.subprocess.run = _tripwire
+
+PERSON = "<PERSONAL-NAME-PLACEHOLDER>"
+HISTORY = ["feat(identity): first slice",
+           f"wip: {PERSON}'s device experiment",          # the historical title that must not land
+           "fix: review batch"]
+TITLE = "feat(identity): add portable device authority evidence and admission (#1)"
+BODY = ("Implement portable authority evidence on the merged foundations.\n\n"
+        "Keeps verified authorship, delegated authority, historical validity and current\n"
+        "admission distinct.\n\n"
+        "@not-a-file = still text\tand a tab, ünïcödé.\n\n"
+        "Closes #1.")
+
+
+class MessageFake(FakeGitHub):
+    """The fake, plus what GitHub would store: explicit fields win, else history is composed."""
+
+    def __init__(self, w):
+        super().__init__(w)
+        self.message_reads: list[str] = []
+        self.stored: str | None = None
+
+    def merge_pull_request(self, owner, name, number, *, sha, merge_method, **fields):
+        self.merge_calls.append({"number": number, "sha": sha, "merge_method": merge_method,
+                                 **fields})
+        if self.w.get("merge_transport_lost"):
+            raise TransportIndeterminate(self.w["merge_transport_lost"])
+        if self.w.get("merge_refused"):
+            raise GitHubRefused(self.w["merge_refused"])
+        if "commit_title" in fields:
+            self.stored = f"{fields['commit_title']}\n\n{fields['commit_message']}\n"
+        else:
+            self.stored = "PR title (#1)\n\n" + "".join(f"* {h}\n\n" for h in HISTORY)
+        if "stored_override" in self.w:
+            self.stored = self.w["stored_override"]
+        return self.w.get("merge_response", {"merged": True, "sha": MERGE_COMMIT})
+
+    def commit_message(self, owner, name, oid):
+        self.message_reads.append(oid)
+        if self.w.get("message_read_error"):
+            raise self.w["message_read_error"]
+        return self.stored if oid == MERGE_COMMIT else None
+
+
+def message_merge(w, **kwargs):
+    fake = MessageFake(w)
+    return fake, run(fake, "example", "icn", 1, authorize=True, **kwargs)
+
+
+MSG = squash.build(TITLE, BODY)
+
+# 1, 3, 4: the authorized head is pinned, the fields arrive unchanged, the strategy stays squash.
+fake, result = message_merge(world(), expected_head=HEAD, squash_message=MSG)
+check("an explicit message merges at the authorized head -> MERGED",
+      result.outcome == codes.MERGED, result.outcome)
+check("exactly one merge request, pinned to the authorized head",
+      [c["sha"] for c in fake.merge_calls] == [HEAD], str(fake.merge_calls))
+check("the strategy is still squash", [c["merge_method"] for c in fake.merge_calls] == ["squash"])
+check("the title is transmitted unchanged", fake.merge_calls[0].get("commit_title") == TITLE)
+check("the body is transmitted unchanged", fake.merge_calls[0].get("commit_message") == BODY)
+check("the receipt records the requested message",
+      result.squash_message == {"title": TITLE, "body": BODY, "sha256": MSG.sha256})
+check("the landed commit is read back and matches",
+      result.merge.get("commit_message", {}).get("verified") == squash.MATCH,
+      str(result.merge))
+check("the stored history excludes the historical personal-name title", PERSON not in fake.stored)
+
+# The control: without an explicit message the composed default carries the historical title.
+fake, result = message_merge(world(), expected_head=HEAD)
+check("without a message the default composition carries the historical title (the hazard)",
+      PERSON in (fake.stored or ""))
+check("without a message no message fields are sent",
+      not any(k in fake.merge_calls[0] for k in ("commit_title", "commit_message")))
+check("without a message there is no read-back and no message record",
+      fake.message_reads == [] and "commit_message" not in result.merge
+      and result.squash_message is None)
+
+# 2: a head mismatch refuses before anything is sent.
+fake, result = message_merge(world(), expected_head="a" * 40, squash_message=MSG)
+check("a message does not loosen the authorized head -> REFUSED_EXPECTED_HEAD",
+      result.outcome == codes.REFUSED_EXPECTED_HEAD, result.outcome)
+check("no merge request after an expected-head refusal", fake.merge_calls == [])
+fake, result = message_merge(racing(set_head), expected_head=HEAD, squash_message=MSG)
+check("a head race with a message -> REFUSED_HEAD_CHANGED",
+      result.outcome == codes.REFUSED_HEAD_CHANGED and fake.merge_calls == [], result.outcome)
+
+# A message never skips a gate.
+for label, w, code in (
+        ("a draft", mutate(isDraft=True), codes.REFUSED_DRAFT),
+        ("an unresolved thread", world(thread_pages=[[{"isResolved": False}]]),
+         codes.REFUSED_THREADS),
+        ("a failed required check", world(check_pages=[[dict(world()["check_pages"][0][0],
+                                                             conclusion="FAILURE")]]),
+         None),
+        ("a bypassable branch", policy_says_bypassable, None)):
+    fake, result = message_merge(w, expected_head=HEAD, squash_message=MSG)
+    check(f"{label} still refuses with a message ({result.outcome})",
+          result.outcome != codes.MERGED and (code is None or result.outcome == code)
+          and fake.merge_calls == [], result.outcome)
+
+# The message is bound to the head on the merge path even if a caller skips the CLI.
+fake, result = message_merge(world(), squash_message=MSG)
+check("run(): a message without an authorized head -> REFUSED_USAGE",
+      result.outcome == codes.REFUSED_USAGE and fake.merge_calls == [] and fake.loads == 0,
+      result.outcome)
+
+# Squash only, checked against the strategy actually selected.
+rebasing = policy_with(lambda d: d["merge"].update(default_strategy="rebase"))
+fake, result = message_merge(rebasing, expected_head=HEAD, squash_message=MSG)
+check("run(): a message with a non-squash policy strategy -> REFUSED_USAGE",
+      result.outcome == codes.REFUSED_USAGE and fake.merge_calls == [], result.outcome)
+fake, result = message_merge(world(), expected_head=HEAD, squash_message=MSG,
+                             requested_strategy="merge", exception_reason="subtree import")
+check("run(): a message with the documented merge-commit exception -> REFUSED_USAGE",
+      result.outcome == codes.REFUSED_USAGE and fake.merge_calls == [], result.outcome)
+
+# Preview: `check` carries the exact message and mutates nothing.
+fake = MessageFake(world())
+preview = run(fake, "example", "icn", 1, authorize=False, squash_message=MSG)
+check("check with a message is a preview -> READY with the exact message",
+      preview.outcome == codes.READY and preview.squash_message["body"] == BODY
+      and fake.merge_calls == [], preview.outcome)
+
+# 7: GitHub's answer is final — one request, no retry without the fields, no alternate path.
+fake, result = message_merge(world(merge_refused="Unprocessable Entity (HTTP 422)",
+                                   post_merge={"state": "OPEN", "merged": False,
+                                               "merge_commit_sha": None}),
+                             expected_head=HEAD, squash_message=MSG)
+check("GitHub refusing a message-carrying merge -> REFUSED_GITHUB",
+      result.outcome == codes.REFUSED_GITHUB, result.outcome)
+check("exactly one request, still carrying the message (no default-message fallback)",
+      len(fake.merge_calls) == 1 and fake.merge_calls[0].get("commit_title") == TITLE)
+check("no read-back after a refusal", fake.message_reads == [])
+fake, result = message_merge(world(merge_transport_lost="connection reset"),
+                             expected_head=HEAD, squash_message=MSG)
+check("a lost answer with a message -> MERGE_UNCONFIRMED, one request",
+      result.outcome == codes.MERGE_UNCONFIRMED and len(fake.merge_calls) == 1, result.outcome)
+
+# 8: the receipt names the commit a fresh read proved, and that is the commit read back.
+fake, result = message_merge(world(merge_response={"merged": True, "sha": "4" * 40}),
+                             expected_head=HEAD, squash_message=MSG)
+check("the receipt records the post-read merge commit, not the response's claim",
+      result.merge["merge_commit_sha"] == MERGE_COMMIT, str(result.merge))
+check("the message is read back from that same commit", fake.message_reads == [MERGE_COMMIT])
+
+# What landed differs: still MERGED (it happened), and the divergence is evidence, not silence.
+diverged = "PR title (#1)\n\n* " + HISTORY[1] + "\n"
+fake, result = message_merge(world(stored_override=diverged), expected_head=HEAD,
+                             squash_message=MSG)
+cm = result.merge.get("commit_message", {})
+check("a stored message that differs -> MERGED with verified=MISMATCH",
+      result.outcome == codes.MERGED and cm.get("verified") == squash.MISMATCH, str(cm))
+check("a mismatch reports what actually landed", cm.get("observed") == diverged)
+check("a mismatch is named in the outcome detail", "DIFFERS" in result.reasons[0].detail)
+for label, err in (("an evidence error", EvidenceUnavailable("GraphQL down")),
+                   ("an unexpected crash", RuntimeError("boom"))):
+    fake, result = message_merge(world(message_read_error=err), expected_head=HEAD,
+                                 squash_message=MSG)
+    check(f"{label} reading back -> MERGED with verified=UNREADABLE, no traceback",
+          result.outcome == codes.MERGED
+          and result.merge["commit_message"]["verified"] == squash.UNREADABLE, result.outcome)
+check("compare: trailing newlines only are tolerated",
+      squash.compare(MSG, MSG.full_text + "\n\n") == squash.MATCH
+      and squash.compare(MSG, MSG.full_text + " ") == squash.MISMATCH
+      and squash.compare(MSG, None) == squash.UNREADABLE)
+
+# The transport: the fields are two more `-f` raw fields on the same PUT; absent, it is unchanged.
+def transport_argv(**fields):
+    client = GhCli()
+    seen = []
+    client._run = lambda argv, on_failure=None: (seen.append(argv), json.dumps({"sha": "x"}))[1]
+    client.merge_pull_request("example", "icn", 1, sha=HEAD, merge_method="squash", **fields)
+    return seen[0]
+
+
+plain = transport_argv()
+check("transport without a message is the historical request",
+      plain == ["api", "--method", "PUT", "repos/example/icn/pulls/1/merge",
+                "-f", f"sha={HEAD}", "-f", "merge_method=squash"], str(plain))
+carried = transport_argv(commit_title=TITLE, commit_message=BODY)
+check("transport carries the message as raw -f fields on the same request",
+      carried == plain + ["-f", f"commit_title={TITLE}", "-f", f"commit_message={BODY}"])
+check("transport never uses -F (which would read `@...` as a file)", "-F" not in carried)
+for half in ({"commit_title": TITLE}, {"commit_message": BODY}):
+    client = GhCli()
+    client._run = lambda argv, on_failure=None: _network_attempts.append(argv) or "{}"
+    try:
+        client.merge_pull_request("example", "icn", 1, sha=HEAD, merge_method="squash", **half)
+        refused = False
+    except MergeToolError as exc:
+        refused = exc.outcome == codes.REFUSED_USAGE
+    check(f"transport refuses half a message ({sorted(half)}) before sending", refused)
+
+
+def read_back(doc):
+    client = GhCli()
+    client._graphql = lambda q, v: doc
+    return client.commit_message("example", "icn", MERGE_COMMIT)
+
+
+check("transport read-back returns the stored message",
+      read_back({"object": {"oid": MERGE_COMMIT, "message": "t\n\nb"}}) == "t\n\nb")
+check("transport read-back of another object is unreadable",
+      read_back({"object": {"oid": "5" * 40, "message": "t"}}) is None)
+check("transport read-back of a non-commit is unreadable", read_back({"object": None}) is None)
+check("transport read-back refuses a non-oid without asking",
+      GhCli().commit_message("example", "icn", "HEAD") is None)
+
+# 6: the command line — partial, empty, malformed and misplaced messages all refuse.
+tmp = pathlib.Path(tempfile.mkdtemp())
+good = tmp / "body.md"
+good.write_text(BODY + "\n", encoding="utf-8")
+
+
+def body_file(name, data: bytes) -> str:
+    path = tmp / name
+    path.write_bytes(data)
+    return str(path)
+
+
+inv = cli.parse(["merge", "1", "--authorize", "--expected-head", HEAD,
+                 "--commit-title", TITLE, "--commit-body-file", str(good)])
+check("the full CLI form parses, and the file's trailing newline is the only change",
+      inv.squash_message == MSG, repr(inv.squash_message))
+check("check accepts a message as a preview",
+      parse_outcome(["check", "1", "--commit-title", TITLE, "--commit-body-file", str(good)])
+      == "PARSED")
+M = ["merge", "1", "--authorize", "--expected-head", HEAD]
+for desc, argv in (
+        ("a title without a body", M + ["--commit-title", TITLE]),
+        ("a body without a title", M + ["--commit-body-file", str(good)]),
+        ("a message on merge without --expected-head",
+         ["merge", "1", "--authorize", "--commit-title", TITLE, "--commit-body-file", str(good)]),
+        ("a message with the merge-commit exception",
+         M + ["--strategy", "merge", "--reason", "x", "--commit-title", TITLE,
+              "--commit-body-file", str(good)]),
+        ("an empty title", M + ["--commit-title", "", "--commit-body-file", str(good)]),
+        ("a whitespace title", M + ["--commit-title", "   ", "--commit-body-file", str(good)]),
+        ("a padded title", M + ["--commit-title", f" {TITLE}", "--commit-body-file", str(good)]),
+        ("a two-line title", M + ["--commit-title", "a\nb", "--commit-body-file", str(good)]),
+        ("a title with an escape", M + ["--commit-title", "a\x1b[31mb",
+                                        "--commit-body-file", str(good)]),
+        ("a title with a bidi override", M + ["--commit-title", "a‮b",
+                                              "--commit-body-file", str(good)]),
+        ("an over-long title", M + ["--commit-title", "x" * 257, "--commit-body-file", str(good)]),
+        ("a title given twice", M + ["--commit-title", TITLE, "--commit-title", TITLE,
+                                     "--commit-body-file", str(good)]),
+        ("a missing body file", M + ["--commit-title", TITLE,
+                                     "--commit-body-file", str(tmp / "absent")]),
+        ("a directory as the body", M + ["--commit-title", TITLE, "--commit-body-file", str(tmp)]),
+        ("an empty body file", M + ["--commit-title", TITLE,
+                                    "--commit-body-file", body_file("e", b"")]),
+        ("a whitespace-only body", M + ["--commit-title", TITLE,
+                                        "--commit-body-file", body_file("w", b" \n\t\n")]),
+        ("a non-UTF-8 body", M + ["--commit-title", TITLE,
+                                  "--commit-body-file", body_file("l1", b"caf\xe9\n")]),
+        ("a body with a BOM", M + ["--commit-title", TITLE,
+                                   "--commit-body-file", body_file("bom", b"\xef\xbb\xbfok\n")]),
+        ("a body with CRLF", M + ["--commit-title", TITLE,
+                                  "--commit-body-file", body_file("crlf", b"a\r\nb\n")]),
+        ("a body with an escape", M + ["--commit-title", TITLE,
+                                       "--commit-body-file", body_file("esc", b"a\x1b[2Jb\n")]),
+        ("a body with a NUL", M + ["--commit-title", TITLE,
+                                   "--commit-body-file", body_file("nul", b"a\x00b\n")]),
+        ("an over-size body", M + ["--commit-title", TITLE, "--commit-body-file",
+                                   body_file("big", b"x" * (squash.MAX_BODY_BYTES + 1))]),
+        ("an empty body path", M + ["--commit-title", TITLE, "--commit-body-file", ""]),
+):
+    check(f"CLI: {desc} -> REFUSED_USAGE", parse_outcome(argv) == codes.REFUSED_USAGE,
+          parse_outcome(argv))
+
+# 9: from the source tree the full message form still reaches no merge at all.
+buffer = io.StringIO()
+with redirect_stdout(buffer), redirect_stderr(io.StringIO()):
+    cli.main(["merge", "1", "--authorize", "--repo", "example/icn", "--expected-head", HEAD,
+              "--commit-title", TITLE, "--commit-body-file", str(good)])
+check("a source-tree copy refuses to mutate even with a complete message",
+      json.loads(buffer.getvalue())["outcome"] == codes.REFUSED_NOT_INSTALLED)
+check("nothing in this section reached the real transport", _network_attempts == [],
+      str(_network_attempts[:1]))
+_ghclient.subprocess.run = _real_subprocess_run
+
 # --- the result envelope ------------------------------------------------------------------------------------
 print("results are machine-readable")
 _, ready = evaluate_world(world())

@@ -15,6 +15,7 @@ from . import codes
 from .errors import MergeToolError, NotInstalled
 from .evaluate import Decision, Reason, evaluate
 from .merge import perform_merge
+from .message import SquashMessage
 from .snapshot import Snapshot, load_snapshot
 from .strategy import select_strategy
 
@@ -30,6 +31,7 @@ class Result:
     evidence: dict | None = None
     strategy: dict | None = None
     merge: dict | None = None
+    squash_message: dict | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -42,6 +44,7 @@ class Result:
             "evidence": self.evidence,
             "strategy": self.strategy,
             "merge": self.merge,
+            "squash_message": self.squash_message,
         }
 
 
@@ -149,11 +152,28 @@ def stale_evaluator(client, owner: str, name: str, installed: str, live: str) ->
 
 def run(client, owner: str, name: str, number: int, *, authorize: bool,
         requested_strategy: str | None = None, exception_reason: str | None = None,
-        installed_commit: str | None = None, expected_head: str | None = None) -> Result:
-    """`check` when `authorize` is false; the full evaluate-refresh-merge path when it is true."""
+        installed_commit: str | None = None, expected_head: str | None = None,
+        squash_message: SquashMessage | None = None) -> Result:
+    """`check` when `authorize` is false; the full evaluate-refresh-merge path when it is true.
+
+    `squash_message` replaces GitHub's composed squash message with an explicit one. It changes
+    what the one merge request carries and nothing about whether that request is made: every
+    gate below runs exactly as it does without it. On `check` it is a preview.
+    """
     command = "merge" if authorize else "check"
     result = Result(command=command, owner=owner, name=name, number=number,
                     outcome=codes.READY)
+    if squash_message is not None:
+        result.squash_message = squash_message.as_dict()
+        if authorize and expected_head is None:
+            # A message is written for the commits it summarizes. Without a named head the merge
+            # could take in commits the message never described.
+            result.outcome = codes.REFUSED_USAGE
+            result.reasons = [Reason(codes.REFUSED_USAGE,
+                                     "an explicit squash message requires --expected-head: the "
+                                     "message describes one reviewed head, and only that head "
+                                     "may be merged under it")]
+            return result
     try:
         snap = load_snapshot(client, owner, name, number)
         strategy, reason = select_strategy(snap.policy, requested_strategy, exception_reason)
@@ -170,6 +190,12 @@ def run(client, owner: str, name: str, number: int, *, authorize: bool,
                   else "operator_exception",
         "reason": reason,
     }
+    if squash_message is not None and strategy != "squash":
+        result.outcome = codes.REFUSED_USAGE
+        result.reasons = [Reason(codes.REFUSED_USAGE,
+                                 f"an explicit squash message applies only to a squash merge, and "
+                                 f"this merge would use {strategy!r}")]
+        return result
     decision: Decision = evaluate(snap, strategy)
     result.outcome = decision.outcome
     result.reasons = list(decision.reasons)
@@ -242,7 +268,7 @@ def run(client, owner: str, name: str, number: int, *, authorize: bool,
         return result
 
     try:
-        merged = perform_merge(client, fresh, strategy)
+        merged = perform_merge(client, fresh, strategy, squash_message)
     except MergeToolError as exc:
         # Reached only BEFORE a request is dispatched — an invalid strategy is the one way in.
         # Everything after dispatch is resolved inside perform_merge against a fresh read, so no
@@ -259,4 +285,6 @@ def run(client, owner: str, name: str, number: int, *, authorize: bool,
         "confirmed_merged": merged.outcome == codes.MERGED,
         "merge_commit_sha": merged.merge_commit_sha,
     }
+    if merged.message_check is not None:
+        result.merge["commit_message"] = merged.message_check
     return result

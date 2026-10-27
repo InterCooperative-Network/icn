@@ -60,6 +60,14 @@ silently rots (icn#2651).
    established the head was fit to merge. Do not substitute, shorten, or re-derive it, and do not
    drop it and merge anyway when it does not match — the program owns that decision.
 
+   If the authorization also states the squash commit message — a title and a body — pass it
+   the same way: the title verbatim as `--commit-title`, the body written unchanged to a file and
+   given as `--commit-body-file` (this form requires `--expected-head`). Preview it first with
+   `icn-merge-pr check "$PR" --commit-title ... --commit-body-file ...` and show the
+   `squash_message` it reports. Never compose, shorten or "tidy" a stated message, and never drop it to get past a
+   refusal. After `MERGED`, report `merge.commit_message.verified`: `MISMATCH` or `UNREADABLE`
+   means the commit that landed was not proved to carry the authorized message.
+
    The program re-reads every signal immediately before acting, so a `READY` from step 1 is a
    report, not a promise. A refusal here means the state genuinely changed; it is not a glitch to
    retry. `REFUSED_EXPECTED_HEAD` means the pull request moved off the head that was authorized:
