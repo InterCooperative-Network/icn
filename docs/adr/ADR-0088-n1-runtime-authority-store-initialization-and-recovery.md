@@ -10,7 +10,7 @@ supersedes: []
 superseded_by: []
 amends: []
 amended_by: ["ADR-0089"]
-implementation_status: "implemented; #2843 merged to main as 94cf94d13 on 2026-10-24. The ADR-0089 amendment (accepted 2026-10-27) is not implemented"
+implementation_status: "implemented; #2843 merged to main as 94cf94d13 on 2026-10-24. Of the ADR-0089 amendment (accepted 2026-10-27), only the §6 import-incomplete refusal is implemented, by ADR-0089 PR2's refusal-only slice (this text lands with it); the importer, marker writer, imported-fact exposure and §12 import recovery are not"
 references:
   - "ADR-0087 (the library persistence contract this ADR builds on and does not change)"
   - "ADR-0018 (ADR lifecycle)"
@@ -47,16 +47,20 @@ implementation is #2843, merged to main as `94cf94d13` on 2026-10-24.
 
 > **Amendment (2026-10-27):** [ADR-0089](ADR-0089-n1-offline-authority-fact-import.md),
 > accepted 2026-10-27 for a fixture-only offline import experiment, amends this
-> ADR. The amendment is an **accepted future contract, not current behaviour**:
-> no offline import producer exists, and `icnd` does not check any import marker.
+> ADR. The amendment is mostly an **accepted future contract, not current
+> behaviour**: no offline import producer exists. One part is implemented, by
+> ADR-0089 PR2's refusal-only slice, which carries this text: `AuthorityRegistry::open`,
+> and so `icnd` startup, refuses while an import-incomplete marker exists. Nothing
+> writes such a marker yet, and its record format is provisional.
 >
 > - **Implemented on `main` today:** everything in this ADR as written — the
 >   initialization state machine and its fail-closed states (§5, §6), the
 >   receipt (§10), the access rules and their exposure limits (§11), and manual
 >   recovery (§12).
-> - **§6, future:** one more fail-closed state, *import incomplete*. Once
->   ADR-0089's marker is implemented, `AuthorityRegistry::open` refuses while
->   it exists. It is not enforced today.
+> - **§6, implemented (refusal side only):** one more fail-closed state, *import
+>   incomplete*. `AuthorityRegistry::open` refuses while any entry exists at the
+>   marker's name, before it writes anything. Creating, completing and resuming
+>   from the marker are not implemented.
 > - **§11, unchanged today:** "no runtime producer writes facts, so nothing is
 >   written after the tightening" remains true until an importer exists. Once
 >   one does, imported facts are written after the tightening, and an account

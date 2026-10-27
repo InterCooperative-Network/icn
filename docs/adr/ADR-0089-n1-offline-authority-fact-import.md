@@ -510,11 +510,15 @@ deployments cannot import (Status, choice 1). Changing that needs a later revisi
 ## Effect on ADR-0088
 
 ADR-0088 is amended by this ADR (its status becomes `amended`, with an amendment note; ADR-0018 §4).
-The amendment is a **future contract, not current behaviour**: no importer exists, and `icnd` does not
-check any import marker today.
+The amendment is mostly a **future contract, not current behaviour**: no importer exists. Two slices
+are implemented: PR1's history-segment codec and admitted-segment type (#2850), and PR2's refusal-only
+slice, which carries this text, under which `AuthorityRegistry::open`, and so `icnd` startup, refuses
+while an import-incomplete marker exists. The import producer, the marker writer and its permanent
+record format, staged persistence, resume, recovery and the §6 fault-injection acceptance suite are
+not implemented, and the fixture-only scope and human-approval requirements above stand.
 
-- §6 gains one fail-closed state, import incomplete, which `open` will refuse once the import marker
-  is implemented (§6, §7 here).
+- §6 gains one fail-closed state, import incomplete, which `open` refuses (§6, §7 here; the refusal
+  side is implemented, the marker's producer is not).
 - §11's "Today no runtime producer writes facts, so nothing is written after the tightening" remains
   true until an importer exists. Once one does, imported facts are written after the tightening, and
   the exposure statement covers them (an account that ever held an open descriptor keeps reading).
