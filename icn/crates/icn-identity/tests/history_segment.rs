@@ -9,9 +9,12 @@
 //! So every test here is one of: the bytes are canonical and deterministic; a structural defect is
 //! refused at decode with its own variant; a bad witness is refused at N1 admission; or evidence
 //! that the N1 fold would not select (a fork, an unauthorized signer) is carried and admitted
-//! unchanged. Negative tests build their bytes with the local encoder below, which is written from
-//! the ADR layout and shares nothing with the crate's `Writer`, so a refusal is tested against
-//! bytes the crate did not produce.
+//! unchanged. Framing, ordering, witness and bound refusals build their bytes with the local
+//! encoder below, which is written from the ADR layout and shares nothing with the crate's
+//! `Writer`, so those refusals are tested against bytes the crate did not produce. Range,
+//! continuity, linkage and inception refusals go through `AuthorityHistorySegment::new`, which
+//! encodes with the crate's `Writer` before decoding; the independent Python reference
+//! (`tests/reference/history_segment_reference.py`) refuses the same defects from its own bytes.
 //!
 //! Fixture identities only. Every key is derived from a seed byte; nothing here is a real person
 //! or a real device.
