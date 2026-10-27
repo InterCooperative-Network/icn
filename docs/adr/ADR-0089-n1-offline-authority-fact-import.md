@@ -224,8 +224,14 @@ resumable**:
    position order, then ascending `event_id`.
 5. After the last barrier, make the store **fully durable** before touching the marker: the
    per-fact barrier is sled's flush, which is process-crash safe but only best effort against power
-   loss (ADR-0087 §4, §9). Close the store so its files are `fsync`ed (or an equivalent full sync),
-   and only then remove the marker and `fsync` the directory. Otherwise a power loss could keep the
+   loss (ADR-0087 §4, §9). Closing the store is **not** that step: ADR-0088 §5 already rejects
+   closing sled to force a sync (its close is a `Drop` that returns nothing, skips I/O after an
+   earlier error, panics on a failed `fsync`, and runs only when the last handle drops). Instead,
+   after every handle to the authority store has been dropped, the tool opens each file under
+   `store/authority`, and the directory itself, with its own descriptors, `fsync`s each, and proceeds
+   only if every one succeeds. Any failure, including a panic in sled's own drop, leaves the marker in
+   place, so the node stays fail closed and `--resume` repeats the sync. Only then remove the marker
+   and `fsync` the data directory. Otherwise a power loss could keep the
    marker's removal while losing trailing facts, such as a `revoke`, and the daemon would start on
    exactly the partial state the marker exists to expose. Only after the marker is gone remove the
    staged copy. A stop between the two leaves an orphan staged copy and no marker, which is harmless
@@ -241,7 +247,10 @@ again. Duplicate writes are semantically idempotent (ADR-0087 §3), so resuming 
 interruption point is safe.
 
 Resume evaluates retention and bounds against the **snapshot in the marker**, not the current
-retention file, and counts bounds over the **union of distinct records** (retained ∪ segment), so the
+retention file, after re-validating the snapshot itself: its basis must still begin `fixture:`, its
+bounds are clamped to the compiled maxima (configuration may lower, never raise), and no allocation
+is sized from the marker's recorded fact count. A hand-written marker therefore cannot raise a bound
+or admit a non-fixture basis; and counts bounds over the **union of distinct records** (retained ∪ segment), so the
 facts the interrupted import already wrote are not counted twice. A withdrawal or a lowered bound
 made while an import is incomplete therefore cannot wedge the node: it takes effect for later
 imports, and the completing import's report states that retention changed after the import began.
@@ -260,8 +269,8 @@ itself is unreadable, resume cannot proceed and the node stays refused; the docu
 procedures are to obtain the same segment again (matching `segment_id`) or to restore the data
 directory from a backup taken before the import (ADR-0088 §12). An implementation is acceptable only
 with a fault-injection suite that stops the import after staging, after the marker, after `k` of `n` facts
-(`k = 0, 1, n-1, n`), between the last barrier and the full store sync, between that sync and the
-marker's removal, and between the marker's
+(`k = 0, 1, n-1, n`), between the last barrier and the store `fsync`s, during them (including a
+failed `fsync`), between them and the marker's removal, and between the marker's
 removal and the staged copy's removal. In every case the daemon must refuse while the marker exists,
 `--resume` must complete, the final store must equal a clean import's, and no case may leave the node
 permanently refused. The suite also covers a withdrawal and a lowered bound made while the marker
@@ -321,14 +330,23 @@ context) and §5.3 (the identifier is public to its context only).
   4,096 facts per import; at most 16 witnesses per fact; at most 65,536 retained facts and 262,144
   retained (fact, witness) records per Subject, counted over distinct records. Witness records are
   bounded separately because a key holder can mint distinct valid signatures over the same body.
-  Configuration may lower these, never raise them. Values to be confirmed by testing.
+  Configuration may lower these, never raise them. Values to be confirmed by testing. A Subject that
+  reaches a bound refuses every later import, including one that carries a `revoke`; since admission
+  is state-independent, anyone holding a valid key for the Subject can fill its bounds. The refusal is
+  open, not silent, but a node in that state can no longer learn of revocations for that Subject, and
+  N4-E over its facts stays at the stale tip.
 - **Withdrawal.** Removing an entry stops further imports for that Subject. It does **not** remove
   retained facts: the fact store has no deletion API, sled can keep deleted bytes, an account that
   held an open descriptor keeps it (ADR-0088 §11), and backups keep their own copies. A withdrawn
   Subject's facts are still rehydrated at every daemon start and listed, with their keys, in the
   startup receipt; still answered by `--node-store`; and still named in the retained import reports.
   Imported facts carry no record of which import wrote them, so a later erasure could not attribute
-  facts to imports from the store alone.
+  facts to imports from the store alone. A withdrawal made while an import is incomplete is
+  **deferred**: the import completes and writes the rest of that segment for the withdrawn Subject
+  (up to the per-import bound) before the withdrawal takes effect (§6). That is forced by the absence
+  of an abandon path, and harmless for fixtures; for real participants it is a consent-semantics
+  choice, and whether a withdrawal may instead override completion, accepting a stale partial
+  history, is a governance decision (§14).
 - **No new index.** Reports and the retention file name `SubjectId`s only. Nothing maps a legacy
   `Did` or any other identifier to a Subject.
 
@@ -376,8 +394,8 @@ Every import report and every `--node-store` answer states, in fixed text:
   There is no replication (N3).
 - Rolling the data directory back, or losing it entirely, cannot be detected (ADR-0088 §9).
 - Persistence survives a process crash. Surviving power loss is best effort per fact (ADR-0087 §4,
-  §9); an import closes the store with a full sync before clearing its marker (§6), on storage that
-  honours `fsync`.
+  §9); an import `fsync`s every file of the authority store with its own descriptors, and checks
+  each result, before clearing its marker (§6), on storage that honours `fsync`.
 - If the store was ever readable by another account, anything imported later is exposed to an open
   descriptor that account may still hold (ADR-0088 §11).
 
@@ -405,6 +423,13 @@ Before any fact about a real participant is retained:
   (governance).
 - Final values of the §8 bounds after testing (maintainer).
 - How a Subject's own client produces segments: out of scope here, and needs its own design.
+- Whether a withdrawal made during an incomplete import may override completion, accepting a stale
+  partial history, instead of being deferred (governance).
+- What a node does when a Subject reaches a bound and a later segment carries a revocation
+  (maintainer, then governance).
+- Whether nodes whose daemon and data directory run as root (for example the container images built
+  without a `USER` line) may import at all, or whether §5's "never root" becomes "euid owns
+  everything, and euid 0 only when root owns the data directory" (maintainer).
 
 ## Irreversible commitments
 
