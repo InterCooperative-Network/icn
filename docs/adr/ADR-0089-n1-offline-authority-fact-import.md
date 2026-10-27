@@ -227,10 +227,11 @@ resumable**:
    loss (ADR-0087 §4, §9). Closing the store is **not** that step: ADR-0088 §5 already rejects
    closing sled to force a sync (its close is a `Drop` that returns nothing, skips I/O after an
    earlier error, panics on a failed `fsync`, and runs only when the last handle drops). Instead,
-   after every handle to the authority store has been dropped, the tool opens each file under
-   `store/authority`, and the directory itself, with its own descriptors, `fsync`s each, and proceeds
-   only if every one succeeds. Any failure, including a panic in sled's own drop, leaves the marker in
-   place, so the node stays fail closed and `--resume` repeats the sync. Only then remove the marker
+   after every handle to the authority store has been dropped, the tool walks `store/authority`
+   recursively (including `blobs/`), opens every file and every directory with its own descriptors
+   using `O_NOFOLLOW`, `fsync`s each, and proceeds only if every one succeeds. Any failure, including
+   a panic in sled's own drop, leaves the marker in place (an implementation must not catch that
+   panic and continue to the sync step), so the node stays fail closed and `--resume` repeats the sync. Only then remove the marker
    and `fsync` the data directory. Otherwise a power loss could keep the
    marker's removal while losing trailing facts, such as a `revoke`, and the daemon would start on
    exactly the partial state the marker exists to expose. Only after the marker is gone remove the
@@ -250,8 +251,8 @@ Resume evaluates retention and bounds against the **snapshot in the marker**, no
 retention file, after re-validating the snapshot itself: its basis must still begin `fixture:`, its
 bounds are clamped to the compiled maxima (configuration may lower, never raise), and no allocation
 is sized from the marker's recorded fact count. A hand-written marker therefore cannot raise a bound
-or admit a non-fixture basis; and counts bounds over the **union of distinct records** (retained ∪ segment), so the
-facts the interrupted import already wrote are not counted twice. A withdrawal or a lowered bound
+or admit a non-fixture basis. Resume also counts bounds over the **union of distinct records**
+(retained ∪ segment), so the facts the interrupted import already wrote are not counted twice. A withdrawal or a lowered bound
 made while an import is incomplete therefore cannot wedge the node: it takes effect for later
 imports, and the completing import's report states that retention changed after the import began.
 Completing the import writes the rest of a segment the operator had already decided to retain; it
@@ -477,7 +478,7 @@ ADR-0087 is unchanged.
 - No network, IPC or credential dependency. No real identity material in tests.
 - Mutation tests that remove the marker write, skip whole-segment admission, publish before the
   barrier, filter by verdict, write a startup receipt from the offline path, let `open` ignore the
-  marker, accept a non-`fixture:` basis, skip the ownership check, check the size after reading, or
+  marker, remove the marker after a failed or skipped store `fsync`, accept a non-`fixture:` basis, skip the ownership check, check the size after reading, or
   resume without comparing the segment id, must each be caught.
 
 ## Consequences
