@@ -227,6 +227,44 @@ pub enum RegistryError {
         reason: String,
     },
 
+    /// An offline authority import into this data directory did not finish (ADR-0089 §6).
+    ///
+    /// The store may hold only part of the named segment. Its history is not complete, so it is
+    /// not opened as if it were.
+    #[error(
+        "refusing to start: an offline N1 authority import into this data directory did not \
+         finish ({marker} names subject {subject}, segment {segment}). The authority store may \
+         hold only part of that segment. `icnctl authority import --resume` is the command that \
+         will complete it, and it is not implemented yet; until it is, restore the data directory \
+         from a backup taken before the import. Do not remove the marker by hand",
+        segment = hex::encode(.segment_id)
+    )]
+    ImportIncomplete {
+        /// The marker.
+        marker: PathBuf,
+        /// The Subject the unfinished segment belongs to.
+        subject: SubjectId,
+        /// `SHA-256` of the unfinished segment's canonical bytes.
+        segment_id: [u8; 32],
+    },
+
+    /// Something is at the import marker's name, but it could not be read as a marker record.
+    ///
+    /// Still a refusal: an unreadable marker is not an absent one.
+    #[error(
+        "refusing to start: {marker} exists, so an offline N1 authority import into this data \
+         directory may not have finished, but it could not be read ({reason}). It is not treated \
+         as absent. `icnctl authority import --resume` is the command that will complete an \
+         import, and it is not implemented yet; until it is, restore the data directory from a \
+         backup taken before the import. Do not remove the marker by hand"
+    )]
+    ImportMarkerUnreadable {
+        /// The marker.
+        marker: PathBuf,
+        /// Why it could not be read.
+        reason: String,
+    },
+
     /// A fact offered to [`AuthorityRegistry::ingest`] is not admissible.
     #[error("authority fact is not admissible: {0}")]
     Inadmissible(#[source] AdmissionError),
@@ -282,6 +320,9 @@ impl AuthorityRegistry {
     ) -> Result<(Self, AuthorityReceipt), RegistryError> {
         check_lock(data_dir, lock)?;
         refuse_incomplete_restore(data_dir)?;
+        // Before anything below writes: a refused open removes no receipt, writes no record and
+        // opens no store (ADR-0089 §7).
+        refuse_incomplete_import(data_dir)?;
 
         let store_dir = crate::config::authority_fact_store_path(data_dir);
         let record_path = init_record_path(data_dir);
@@ -996,6 +1037,23 @@ fn refuse_incomplete_restore(data_dir: &Path) -> Result<(), RegistryError> {
             data_dir: data_dir.to_path_buf(),
             reason: format!("{e:#}"),
         })
+}
+
+/// Any entry at the import marker's name refuses; only a confirmed absence passes (ADR-0089 §6).
+fn refuse_incomplete_import(data_dir: &Path) -> Result<(), RegistryError> {
+    use crate::import_marker::{import_marker_path, inspect_import_marker, ImportMarkerState};
+    match inspect_import_marker(data_dir) {
+        ImportMarkerState::Absent => Ok(()),
+        ImportMarkerState::Incomplete(identity) => Err(RegistryError::ImportIncomplete {
+            marker: import_marker_path(data_dir),
+            subject: identity.subject,
+            segment_id: identity.segment_id,
+        }),
+        ImportMarkerState::Unreadable(reason) => Err(RegistryError::ImportMarkerUnreadable {
+            marker: import_marker_path(data_dir),
+            reason,
+        }),
+    }
 }
 
 fn lock_still_held(data_dir: &Path, lock: &DataDirLock) -> Result<(), RegistryError> {

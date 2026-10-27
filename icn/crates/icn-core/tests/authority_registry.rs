@@ -721,3 +721,238 @@ fn the_configuration_lock_is_not_the_storage_lock() {
     assert!(matches!(error, RegistryError::Lock { .. }), "{error}");
     assert!(!authority_fact_store_path(dir.path()).exists());
 }
+
+// ── the import-incomplete marker (ADR-0089 §6, §7; refusal side only) ───────────────────────────
+
+const MARKER_SUBJECT: &str = "a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d";
+const MARKER_SEGMENT: &str = "f320220a862f9e626da7edb0837e18198539ea27f04919d94441cc61897468ba";
+
+fn write_marker(dir: &Path) -> std::path::PathBuf {
+    let path = icn_core::import_marker::import_marker_path(dir);
+    std::fs::write(
+        &path,
+        format!(
+            "icn-import-incomplete v1\nsegment-id {MARKER_SEGMENT}\nsubject {MARKER_SUBJECT}\n\
+             fact-count 3\n"
+        ),
+    )
+    .unwrap();
+    path
+}
+
+/// Every regular file under `dir`, by relative path, with its bytes: what "unchanged" means for
+/// the authority store and the record.
+fn tree(dir: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    let mut out = std::collections::BTreeMap::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        for entry in std::fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            let kind = std::fs::symlink_metadata(&path).unwrap().file_type();
+            if kind.is_dir() {
+                pending.push(path);
+            } else if kind.is_file() {
+                out.insert(
+                    path.strip_prefix(dir).unwrap().to_path_buf(),
+                    std::fs::read(&path).unwrap(),
+                );
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn without_a_marker_an_initialized_node_still_opens() {
+    // Positive control for everything below: the same fixture opens when no marker exists.
+    let dir = tempfile::tempdir().unwrap();
+    let first = seeded(dir.path());
+    assert_eq!(
+        icn_core::import_marker::inspect_import_marker(dir.path()),
+        icn_core::import_marker::ImportMarkerState::Absent
+    );
+    let (_, again) = open(dir.path()).unwrap();
+    assert_eq!(again, first);
+}
+
+#[test]
+fn a_marker_refuses_the_open_and_names_the_unfinished_import() {
+    let dir = tempfile::tempdir().unwrap();
+    seeded(dir.path());
+    let marker = write_marker(dir.path());
+
+    match open(dir.path()) {
+        Err(RegistryError::ImportIncomplete {
+            marker: named,
+            subject,
+            segment_id,
+        }) => {
+            assert_eq!(named, marker);
+            assert_eq!(subject.to_string(), MARKER_SUBJECT);
+            assert_eq!(hex::encode(segment_id), MARKER_SEGMENT);
+        }
+        Err(other) => panic!("expected ImportIncomplete, got {other}"),
+        Ok(_) => panic!("a node with an unfinished import must not open"),
+    }
+    let message = open(dir.path()).err().unwrap().to_string();
+    assert!(
+        message.contains("icnctl authority import --resume"),
+        "{message}"
+    );
+    assert!(message.contains("not implemented yet"), "{message}");
+}
+
+#[test]
+fn a_refused_open_writes_nothing_and_keeps_every_fact_and_the_marker() {
+    let dir = tempfile::tempdir().unwrap();
+    seeded(dir.path());
+    let marker = write_marker(dir.path());
+    let store = authority_fact_store_path(dir.path());
+    let (store_before, record_before, receipt_before, marker_before) = (
+        tree(&store),
+        std::fs::read(init_record_path(dir.path())).unwrap(),
+        std::fs::read(receipt_path(dir.path())).unwrap(),
+        std::fs::read(&marker).unwrap(),
+    );
+    assert!(!store_before.is_empty(), "fixture: a populated store");
+
+    // Repeated attempts change nothing either.
+    for _ in 0..3 {
+        assert!(matches!(
+            open(dir.path()),
+            Err(RegistryError::ImportIncomplete { .. })
+        ));
+    }
+    assert_eq!(
+        tree(&store),
+        store_before,
+        "the authority store is untouched"
+    );
+    assert_eq!(
+        std::fs::read(init_record_path(dir.path())).unwrap(),
+        record_before
+    );
+    assert_eq!(
+        std::fs::read(&marker).unwrap(),
+        marker_before,
+        "the marker is kept"
+    );
+    // The refusal comes before `open` removes the stale receipt, so `open` itself writes nothing.
+    // (The daemon removes it earlier through `discard_receipt`; see the icnd restart test.)
+    assert_eq!(
+        std::fs::read(receipt_path(dir.path())).unwrap(),
+        receipt_before
+    );
+
+    // And the evidence is whole: once the operator has dealt with the marker, the same store
+    // opens with every fact it had.
+    std::fs::remove_file(&marker).unwrap();
+    let (registry, _) = open(dir.path()).unwrap();
+    assert_eq!(registry.state(), &independent_store(&history()));
+}
+
+#[test]
+fn a_marker_on_a_fresh_data_directory_refuses_and_initializes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    write_marker(dir.path());
+    assert!(matches!(
+        open(dir.path()),
+        Err(RegistryError::ImportIncomplete { .. })
+    ));
+    assert!(!authority_fact_store_path(dir.path()).exists());
+    assert!(!init_record_path(dir.path()).exists());
+    assert!(!receipt_path(dir.path()).exists());
+}
+
+#[test]
+fn an_unreadable_marker_of_any_kind_still_refuses() {
+    type Plant = fn(&Path);
+    let mut plants: Vec<(&str, Plant, &str)> = vec![
+        ("empty file", |p| std::fs::write(p, b"").unwrap(), "empty"),
+        (
+            "malformed",
+            |p| std::fs::write(p, b"icn-import-incomplete v1\nsubject x\n").unwrap(),
+            "",
+        ),
+        (
+            "oversized",
+            |p| std::fs::write(p, vec![b'#'; 64 * 1024 + 1]).unwrap(),
+            "larger than",
+        ),
+        (
+            "directory",
+            |p| std::fs::create_dir(p).unwrap(),
+            "a directory",
+        ),
+    ];
+    #[cfg(unix)]
+    plants.push((
+        "dangling symlink",
+        |p| std::os::unix::fs::symlink("/nonexistent-icn-test-target", p).unwrap(),
+        "a symbolic link",
+    ));
+    for (name, plant, reason) in plants {
+        let dir = tempfile::tempdir().unwrap();
+        seeded(dir.path());
+        let store_before = tree(&authority_fact_store_path(dir.path()));
+        let marker = icn_core::import_marker::import_marker_path(dir.path());
+        plant(&marker);
+
+        match open(dir.path()) {
+            Err(RegistryError::ImportMarkerUnreadable {
+                marker: named,
+                reason: why,
+            }) => {
+                assert_eq!(named, marker, "{name}");
+                assert!(why.contains(reason), "{name}: {why}");
+            }
+            Err(other) => panic!("{name}: expected ImportMarkerUnreadable, got {other}"),
+            Ok(_) => panic!("{name}: an unreadable marker must not be read as absence"),
+        }
+        assert!(
+            std::fs::symlink_metadata(&marker).is_ok(),
+            "{name}: the marker is kept"
+        );
+        assert_eq!(
+            tree(&authority_fact_store_path(dir.path())),
+            store_before,
+            "{name}: the store is untouched"
+        );
+    }
+}
+
+#[test]
+fn the_restore_marker_and_the_lock_are_still_checked_first() {
+    // Both markers present: the restore refusal, which comes first, is the one reported.
+    let dir = tempfile::tempdir().unwrap();
+    write_marker(dir.path());
+    std::fs::write(icn_core::restore_marker_path(dir.path()), b"").unwrap();
+    let seen = icn_core::marker_seen(dir.path()).unwrap().unwrap();
+    let recovery =
+        DataDirLock::acquire_for_restore_recovery(dir.path(), "a recovery", &seen).unwrap();
+    let error = AuthorityRegistry::open(dir.path(), &recovery).unwrap_err();
+    assert!(matches!(error, RegistryError::Lock { .. }), "{error}");
+    assert!(error.to_string().contains("did not finish"), "{error}");
+
+    // A lock on another directory is refused before either marker is looked at.
+    let (target, other) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    write_marker(target.path());
+    let error = AuthorityRegistry::open(target.path(), &lock(other.path())).unwrap_err();
+    assert!(matches!(error, RegistryError::Lock { .. }), "{error}");
+}
+
+#[test]
+fn the_import_marker_is_not_checked_at_lock_acquisition_or_receipt_discard() {
+    // ADR-0089 §7: unlike the restore marker, the import marker leaves the data-directory lock
+    // and `discard_receipt` unchanged, because resume must take the lock.
+    let dir = tempfile::tempdir().unwrap();
+    seeded(dir.path());
+    write_marker(dir.path());
+    let held = lock(dir.path());
+    AuthorityRegistry::discard_receipt(dir.path(), &held).unwrap();
+    assert!(!receipt_path(dir.path()).exists());
+    assert!(matches!(
+        AuthorityRegistry::open(dir.path(), &held),
+        Err(RegistryError::ImportIncomplete { .. })
+    ));
+}

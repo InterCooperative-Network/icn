@@ -477,6 +477,108 @@ fn a_start_refused_by_the_n2a_gate_leaves_no_receipt_from_the_previous_start() {
     );
 }
 
+// ── I: the import-incomplete marker (ADR-0089 §6, §7; refusal side only) ─────────────────────────
+
+/// Every regular file under `dir`, by relative path, with its bytes.
+fn tree(dir: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
+    let mut out = std::collections::BTreeMap::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        for entry in std::fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            let kind = std::fs::symlink_metadata(&path).unwrap().file_type();
+            if kind.is_dir() {
+                pending.push(path);
+            } else if kind.is_file() {
+                out.insert(
+                    path.strip_prefix(dir).unwrap().to_path_buf(),
+                    std::fs::read(&path).unwrap(),
+                );
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn an_unfinished_import_stops_startup_and_keeps_its_evidence() {
+    let node = Node::init("n1r1-i");
+    node.seed_offline();
+    let mut daemon = node.start();
+    assert!(daemon.sigterm().success());
+    assert!(
+        receipt_path(node.dir()).exists(),
+        "fixture: a successful start wrote one"
+    );
+
+    let marker = icn_core::import_marker::import_marker_path(node.dir());
+    let record = format!(
+        "icn-import-incomplete v1\nsegment-id {}\nsubject {}\nfact-count 3\n",
+        "f320220a862f9e626da7edb0837e18198539ea27f04919d94441cc61897468ba",
+        "a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d",
+    );
+    std::fs::write(&marker, &record).unwrap();
+    let store_before = tree(&node.store());
+    let record_before = std::fs::read(init_record_path(node.dir())).unwrap();
+
+    // Twice: a repeated start is refused the same way and clears nothing.
+    for attempt in 0..2 {
+        let (status, log) = node.run_expecting_refusal();
+        assert_refused(&node, status, &log, "offline N1 authority import");
+        assert!(
+            log.contains("not implemented yet"),
+            "attempt {attempt}:\n{log}"
+        );
+        assert_eq!(
+            std::fs::read(&marker).unwrap(),
+            record.as_bytes(),
+            "the marker is kept"
+        );
+        assert_eq!(
+            tree(&node.store()),
+            store_before,
+            "every persisted fact is kept"
+        );
+        assert_eq!(
+            std::fs::read(init_record_path(node.dir())).unwrap(),
+            record_before,
+            "the record is untouched"
+        );
+        // Expected, not damage: the daemon discards the previous start's receipt as soon as it
+        // holds the lock, before the registry refuses, so no stale receipt is read as this one's.
+        assert!(!receipt_path(node.dir()).exists());
+    }
+
+    // The N2-A gate ran before the registry and did not take the marker for a store.
+    let gate: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(icn_store::n2a_startup_gate::receipt_path(node.dir())).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(gate["verdict"], "clear", "{gate:#}");
+    assert!(
+        !gate.to_string().contains(".icn-import-incomplete"),
+        "the marker is not a sled root:\n{gate:#}"
+    );
+
+    // Positive control: once the operator has dealt with the marker, the node starts on exactly
+    // the facts it kept.
+    std::fs::remove_file(&marker).unwrap();
+    let _daemon = node.start();
+    assert_decisions(&node.receipt());
+}
+
+#[test]
+fn an_unreadable_import_marker_stops_startup_too() {
+    let node = Node::init("n1r1-j");
+    node.seed_offline();
+    let marker = icn_core::import_marker::import_marker_path(node.dir());
+    std::fs::create_dir(&marker).unwrap();
+
+    let (status, log) = node.run_expecting_refusal();
+    assert_refused(&node, status, &log, "could not be read");
+    assert!(marker.is_dir(), "the entry is kept");
+}
+
 // ── the daemon process ──────────────────────────────────────────────────────────────────────────
 
 fn free_tcp_port() -> u16 {
