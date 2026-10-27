@@ -1,14 +1,14 @@
 ---
 id: "0089"
 title: "N1 offline authority-fact import and node-store verification"
-status: "proposed"
+status: "accepted"
 date: "2026-10-24"
-revised: "2026-10-27"
-deciders: []
+accepted_date: "2026-10-27"
+deciders: ["Matt Faherty"]
 tags: ["identity", "n1", "n4", "authority-log", "producer", "import", "retention", "icnctl"]
 supersedes: []
 superseded_by: []
-amends: []
+amends: ["ADR-0088"]
 implementation_status: "not implemented"
 references:
   - "ADR-0087 (N1 fact persistence: per-fact durability acknowledgment, fail-closed rehydration)"
@@ -23,23 +23,44 @@ references:
 
 ## Status
 
-**PROPOSED.** Nothing here is implemented, and nothing here is accepted. It stays proposed until
-the maintainer explicitly approves its contract (ADR-0018). If accepted, it would also amend two
-statements in ADR-0088 (see "Effect on ADR-0088").
+**`accepted` (2026-10-27), fixture-only.** Proposed 2026-10-24 and revised 2026-10-27 against `main`
+(`f29d04a2`). The maintainer (Matt Faherty, the decider) accepted it on 2026-10-27 under ADR-0018,
+**as an architectural decision limited to the fixture-only offline authority-import experiment**,
+subject to the restrictions and implementation prerequisites in this text. The acceptance covers the
+architecture and contract only. It does not approve, implement, deploy or operate an importer.
+Implementation status is separate (ADR-0018 §3): nothing here is implemented.
 
-**Revision of 2026-10-27.** Redrafted against `main` at `f29d04a2`, where N1 persistence (#2800),
-the daemon authority registry (#2843), N4-A (#2807) and N4-B..E (#2808) are merged and the five N4
-contracts are normative. The maintainer approved the following **directions for proposal
-development** (not acceptance): a separate facts-only history-segment carrier, with `EvidenceBundle`
-kept for act verification (§3); crash-safe, resumable, fail-closed import (§6); fixture Subjects only,
-with explicit context and retention scope (§8); the §8 limits as provisional defaults; preserving
-conflicting evidence and halting the Subject (§9); import reports kept distinct from startup
-receipts (§11); ownership and permission validation before opening the store (§5); bounded
-owner-only diagnostic reports (§11). No real participant data may be imported, and no operational
-authorization consumer is approved.
+The maintainer explicitly approved these choices for this initial scope:
 
-It was drafted and revised by an agent. Independent agent review is recorded with the revision; no
-human review is claimed.
+1. **Root execution is prohibited.** The importer runs as the unprivileged account that owns the
+   data directory (§5). Existing root-run container deployments are unsupported for importing.
+2. **Withdrawal during an incomplete import is deferred.** Recovery completes the previously
+   validated fixture segment before new retention decisions take effect (§6, §8). This is not a
+   precedent for real participants' consent.
+3. **Retention limits are provisional and fail closed.** Exhausting a Subject's capacity may block
+   later facts, including revocations (§8). This is acceptable only while results gate no real
+   effect.
+4. **The facts-only history-segment format (§3) is accepted as a proposed implementation
+   contract.** Its canonical domain, encoding, independent reference vectors and compatibility
+   obligations must be verified before any implementation merges.
+5. **No completeness or freshness guarantee is established (§4).** Authority evaluation stays
+   relative to the node's retained history.
+6. **Not approved:** real participants, institutional credentials, production authority, network
+   ingestion, and operational authorization consumers.
+
+The `fixture:` retention basis remains an operator assertion, not a cryptographic proof (§8).
+**Fixture-provenance enforcement** (for example, accepting only Subjects whose inception carries a
+context nonce from a published fixture set) is an explicit **implementation review item** for the
+`icnctl` slice. No other governance or institutional permission follows from this acceptance; the
+decisions in §13 and §14 stay open.
+
+**Review history.** Drafted and revised by an agent. Reviews were by independent review agents; no
+other human review is claimed. A FULL generation by two reviewers (identity and privacy; security
+and recovery) found six blockers, all fixed in one batch; a DELTA review found one new blocker in that
+batch (a sync relying on sled's close, which ADR-0088 §5 rejects), fixed by a targeted correction;
+targeted reviews of each later amendment (editorial wording, the symlink-safe durability walk)
+closed with no blockers. Risks accepted knowingly are recorded in §4, §6, §8, §12 and
+"Irreversible commitments".
 
 ## Context
 
@@ -64,7 +85,7 @@ The smallest producer that adds no network surface is an offline operator tool t
 history segment into a stopped node's store. This ADR defines what that tool may do and, as
 importantly, what it may not claim.
 
-## Decision (proposed)
+## Decision
 
 ### 1. Seven properties that must stay separate
 
@@ -439,7 +460,8 @@ Every import report and every `--node-store` answer states, in fixed text:
 
 Before any fact about a real participant is retained:
 
-1. Maintainer acceptance of this ADR, and of a revision lifting §8's fixture-only rule.
+1. A later revision of this ADR, accepted by the maintainer, lifting §8's fixture-only rule (this
+   ADR's acceptance of 2026-10-27 covers fixture Subjects only).
 2. The decision of the institution, or other context authority (IDENTITY_SEMANTICS §2.2 allows
    non-institutional contexts), on whose facts a node may keep, in which context, on what basis, with
    what notice that retained facts cannot currently be erased, and who may run the import.
@@ -459,13 +481,15 @@ Before any fact about a real participant is retained:
   (governance).
 - Final values of the §8 bounds after testing (maintainer).
 - How a Subject's own client produces segments: out of scope here, and needs its own design.
-- Whether a withdrawal made during an incomplete import may override completion, accepting a stale
-  partial history, instead of being deferred (governance).
-- What a node does when a Subject reaches a bound and a later segment carries a revocation
-  (maintainer, then governance).
-- Whether nodes whose daemon and data directory run as root (for example the container images built
-  without a `USER` line) may import at all, or whether §5's "never root" becomes "euid owns
-  everything, and euid 0 only when root owns the data directory" (maintainer).
+- For real participants: whether a withdrawal made during an incomplete import may override
+  completion, accepting a stale partial history, instead of being deferred (governance). For the
+  fixture scope it is deferred (Status, choice 2).
+- For real participants: what a node does when a Subject reaches a bound and a later segment carries
+  a revocation (maintainer, then governance). For the fixture scope the bound fails closed
+  (Status, choice 3).
+
+Decided at acceptance for the fixture scope: root execution is prohibited, and root-run container
+deployments cannot import (Status, choice 1). Changing that needs a later revision.
 
 ## Irreversible commitments
 
@@ -483,12 +507,19 @@ Before any fact about a real participant is retained:
    erasure procedure cannot tell which import wrote which fact. A provenance record would have to
    be designed before real participants are retained.
 
-## Effect on ADR-0088, if accepted
+## Effect on ADR-0088
 
-- §11's "Today no runtime producer writes facts, so nothing is written after the tightening" stops
-  being true for imported facts. The exposure statement would be updated to cover imports.
-- §6 gains one fail-closed state, import incomplete, which `open` refuses.
-- §12 (manual recovery) gains the import-incomplete state and its procedures (§6 here).
+ADR-0088 is amended by this ADR (its status becomes `amended`, with an amendment note; ADR-0018 §4).
+The amendment is a **future contract, not current behaviour**: no importer exists, and `icnd` does not
+check any import marker today.
+
+- §6 gains one fail-closed state, import incomplete, which `open` will refuse once the import marker
+  is implemented (§6, §7 here).
+- §11's "Today no runtime producer writes facts, so nothing is written after the tightening" remains
+  true until an importer exists. Once one does, imported facts are written after the tightening, and
+  the exposure statement covers them (an account that ever held an open descriptor keeps reading).
+- §12 (manual recovery) gains the import-incomplete state and its procedures (§6 here) when they are
+  implemented.
 - §10 is unchanged in substance: the startup receipt stays a daemon diagnostic. Offline tools that
   write facts remove it and never write one.
 
