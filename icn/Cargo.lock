@@ -3986,6 +3986,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "dirs",
+ "ed25519-dalek",
  "hex",
  "icn-appliance",
  "icn-ccl",
