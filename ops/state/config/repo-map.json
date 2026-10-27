@@ -18,14 +18,6 @@
         "docs": "docs/",
         "deploy": "deploy/"
       }
-    },
-    "homelab-inventory": {
-      "local": "../homelab-inventory",
-      "remote": "git@github.com:fahertym/homelab-inventory.git",
-      "primary_branch": "main",
-      "purpose": "Infrastructure inventory and automation for the homelab (Python 3.12+)",
-      "access_mode": "read-only-from-icn-ops",
-      "notes": "Manages the infrastructure ICN runs on. icn-ops observes but never mutates homelab state."
     }
   },
   "org_repos": {
@@ -102,7 +94,7 @@
         "status_envelope": null,
         "claim_enforcement": "none",
         "stack_stage": null,
-        "role_note": "Provider/personal layer (most private), access-gated outside the GitHub org; feeds icn-infra only via the ADR-0005 scrub gate; never referenced by concrete pointer from public icn"
+        "role_note": "Provider/personal layer (most private), access-gated outside the GitHub org; feeds icn-infra only via the ADR-0005 scrub gate; never referenced by concrete pointer from public icn. The single CURRENT provider/operations source: the earlier homelab-inventory lineage it superseded is historical and must not reappear in #repos or #relationships as present provider truth (icn#2809)"
       },
       "demo-repository": {
         "remote": "InterCooperative-Network/demo-repository",
@@ -141,11 +133,11 @@
       "workers": ["role:k3s-worker (private:network-ops)", "role:k3s-worker (private:network-ops)"]
     },
     {
-      "from": "homelab-inventory",
-      "to": "ops/",
-      "type": "infra-observation",
-      "direction": "read-only",
-      "notes": "homelab-inventory data/llm-context/ bundles are authoritative infra state"
+      "from": "role:provider (private:network-ops)",
+      "to": "org_repos.repos.icn-infra",
+      "type": "scrubbed-contract-extraction",
+      "direction": "one-way (provider -> icn-infra via the ADR-0005 scrub gate)",
+      "notes": "Provider/personal operational truth reaches the organization layer only as sanitized contracts; public icn (incl. ops/) never reads provider state directly and holds no concrete pointer. Superseded: the former 'homelab-inventory -> ops/ infra-observation' relationship (icn#2809)."
     }
   ],
   "infrastructure": {

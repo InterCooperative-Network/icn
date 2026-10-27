@@ -17,8 +17,9 @@ mod authority_log_support;
 
 use authority_log_support::{
     authorize_at, authorize_span_at, device, permutations, principal, revoke_at, store_of,
-    stranger, subject, Subject,
+    stranger, subject, subject_with_plan, Subject,
 };
+use ed25519_dalek::Signer as _;
 use ed25519_dalek::SigningKey;
 use icn_identity::authority_log::{
     authorize_event, derive, derive_prefix, sign_body, AuthorityBody, AuthorityStore,
@@ -27,9 +28,9 @@ use icn_identity::authority_log::{
     MAX_POSITION, SIGNATURE_DOMAIN,
 };
 use icn_identity::device_authority::{
-    evaluate_device_authority, sign_device_act, verify_device_act, DeviceActV1,
-    DeviceActVerifyError, DeviceAuthorityRefusal, SignedDeviceAct, DEVICE_ACT_DOMAIN,
-    DEVICE_ACT_VERSION,
+    evaluate_device_authority, sign_device_act, verify_device_act, DeviceActError,
+    DeviceActSignature, DeviceActV1, DeviceActVerifyError, DeviceAuthorityRefusal, SignedDeviceAct,
+    DEVICE_ACT_DOMAIN, DEVICE_ACT_VERSION, MAX_DEVICE_ACT_PAYLOAD,
 };
 use icn_identity::subject_context::{
     GEN_CONTEXT_DOMAIN, INITIAL_DEVICE_BINDING_REF_DOMAIN, SUBJECT_CONTEXT_REF_DOMAIN,
@@ -89,7 +90,7 @@ fn signed(
     position: u64,
 ) -> SignedDeviceAct {
     sign_device_act(
-        &act(subject, device, position, b"katie:open-workspace"),
+        &act(subject, device, position, b"fixture:open-workspace"),
         key,
     )
     .expect("signer holds the device key the act names")
@@ -114,7 +115,10 @@ fn revoked_device_is_refused_while_sibling_device_and_subject_survive() {
         DeviceActVerifyError::Refused(DeviceAuthorityRefusal::DeviceNotAuthorized)
     );
 
-    let evidence = verify_device_act(&b_after, f.s.subject, &f.store, 3).unwrap();
+    let verified = verify_device_act(&b_after, f.s.subject, &f.store, 3).unwrap();
+    assert_eq!(verified.act(), &b_after.act);
+    assert_eq!(verified.act_id(), b_after.act.act_id());
+    let evidence = verified.evidence();
     assert_eq!(evidence.subject, f.s.subject);
     assert_eq!(evidence.device, f.b);
     assert_eq!(evidence.capability, DeviceCapability::Sign);
@@ -157,7 +161,8 @@ fn later_revocation_does_not_erase_earlier_authorized_authorship() {
     let f = fixture();
     // A acted at position 2, before it was revoked at 3.
     let a_then = signed(f.s.subject, f.a, &f.a_key, 2);
-    let evidence = verify_device_act(&a_then, f.s.subject, &f.store, 2).unwrap();
+    let verified = verify_device_act(&a_then, f.s.subject, &f.store, 2).unwrap();
+    let evidence = verified.evidence();
     assert_eq!(evidence.device, f.a);
     assert_eq!(evidence.grant.granted_at, 1);
 
@@ -458,7 +463,9 @@ fn a_superseding_rotation_inside_the_prefix_is_honoured() {
         None,
     );
     let store = store_of(&[s.inception.clone(), auth_1, rotate, auth_after]);
-    let ev = verify_device_act(&signed(s.subject, k, &k_key, 3), s.subject, &store, 3).unwrap();
+    let verified =
+        verify_device_act(&signed(s.subject, k, &k_key, 3), s.subject, &store, 3).unwrap();
+    let ev = verified.evidence();
     assert_eq!(ev.generation, 1);
     assert_eq!(ev.grant.granted_at, 3);
     // The pre-rotation device survives a rotate (N1: rotate preserves grants).
@@ -640,13 +647,13 @@ fn vector_device_key() -> SigningKey {
     SigningKey::from_bytes(&b)
 }
 const VECTOR_EVALUATION_POSITION: u64 = 3;
-const VECTOR_PAYLOAD: &[u8] = b"katie:open-workspace";
+const VECTOR_PAYLOAD: &[u8] = b"fixture:open-workspace";
 
 const EXPECT_DEVICE_PUBKEY_HEX: &str =
     "2543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d";
-const EXPECT_ACT_BYTES_HEX: &str = "0000001169636e2e6e342e6465766963652d6163740001202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f012543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d000000000000000301000000146b617469653a6f70656e2d776f726b7370616365";
-const EXPECT_ACT_ID_HEX: &str = "52df522d5e353e8d2a70f03abd7edb4e8c2770da40b2d395c46d35ff874ef14a";
-const EXPECT_ACT_SIGNATURE_HEX: &str = "0e12ebbe9ab76d54de6a60385ecc27e4af8a601b8eb023f23726ae706f53b50b574342ba713987b5b09bdbe72dfb7d10497532e884cbc4e7751b69b918fe3306";
+const EXPECT_ACT_BYTES_HEX: &str = "0000001169636e2e6e342e6465766963652d6163740001202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f012543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d00000000000000030100000016666978747572653a6f70656e2d776f726b7370616365";
+const EXPECT_ACT_ID_HEX: &str = "0bab45ffa00c413d8c566d7d2a77b8ef6990c281c50bcf884ec7238301067e3d";
+const EXPECT_ACT_SIGNATURE_HEX: &str = "6453bc439a5d7b2124fd72f8637768601f5c7e4ecb3377b4c2413d8aa8d4f933a119dc8be1d53304306c043c7c4833f982d7db12fbc4f5a3386d8a8baa256206";
 
 #[test]
 fn canonical_act_vector_matches_the_independent_reference() {
@@ -674,4 +681,164 @@ fn canonical_act_vector_matches_the_independent_reference() {
         DeviceActV1::decode(&hex::decode(EXPECT_ACT_BYTES_HEX).unwrap()).unwrap(),
         a
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Verified act versus bare authority evaluation.
+// ---------------------------------------------------------------------------------------------
+
+/// Authority alone is not authorship. For a device that *is* authorized, every act whose signature
+/// fails is refused, so no unsigned or wrongly signed act reaches a `VerifiedDeviceAct`, even though
+/// `evaluate_device_authority` succeeds for the same device at the same position.
+#[test]
+fn only_a_valid_signature_over_this_act_yields_a_verified_act() {
+    let f = fixture();
+    let authority =
+        evaluate_device_authority(f.s.subject, &f.store, f.b, DeviceCapability::Sign, 3).unwrap();
+
+    let good = signed(f.s.subject, f.b, &f.b_key, 3);
+    let unsigned = SignedDeviceAct {
+        act: good.act.clone(),
+        signature: DeviceActSignature::from_bytes([0u8; 64]),
+    };
+    let by_another_key = SignedDeviceAct {
+        act: good.act.clone(),
+        signature: DeviceActSignature::from_bytes(
+            f.a_key.sign(&good.act.canonical_bytes()).to_bytes(),
+        ),
+    };
+    let mut other_act = good.clone();
+    other_act.act.payload = b"fixture:another-act".to_vec();
+    for forged in [&unsigned, &by_another_key, &other_act] {
+        assert_eq!(
+            verify_device_act(forged, f.s.subject, &f.store, 3),
+            Err(DeviceActVerifyError::BadSignature)
+        );
+    }
+
+    let verified = verify_device_act(&good, f.s.subject, &f.store, 3).unwrap();
+    assert_eq!(verified.act(), &good.act);
+    assert_eq!(verified.act_id(), good.act.act_id());
+    assert_eq!(verified.evidence(), &authority);
+}
+
+/// An act whose public fields were changed outside the bounds after construction is never signed
+/// and never verified, even with a raw signature over its bytes; the bound itself still signs.
+#[test]
+fn an_act_moved_outside_its_bounds_is_neither_signed_nor_verified() {
+    let f = fixture();
+    let valid = act(f.s.subject, f.b, 3, b"fixture:open-workspace");
+
+    let mut oversized = valid.clone();
+    oversized.payload = vec![0u8; MAX_DEVICE_ACT_PAYLOAD + 1];
+    let mut position_zero = valid.clone();
+    position_zero.evaluation_position = 0;
+    let mut beyond_bound = valid.clone();
+    beyond_bound.evaluation_position = MAX_POSITION + 1;
+
+    for (bad, why) in [
+        (
+            &oversized,
+            DeviceActError::PayloadTooLarge(MAX_DEVICE_ACT_PAYLOAD + 1),
+        ),
+        (&position_zero, DeviceActError::PositionOutOfRange(0)),
+        (
+            &beyond_bound,
+            DeviceActError::PositionOutOfRange(MAX_POSITION + 1),
+        ),
+    ] {
+        assert_eq!(bad.validate(), Err(why.clone()));
+        assert_eq!(sign_device_act(bad, &f.b_key), Err(why.clone()));
+        let raw = SignedDeviceAct {
+            act: bad.clone(),
+            signature: DeviceActSignature::from_bytes(
+                f.b_key.sign(&bad.canonical_bytes()).to_bytes(),
+            ),
+        };
+        assert_eq!(
+            verify_device_act(&raw, f.s.subject, &f.store, bad.evaluation_position),
+            Err(DeviceActVerifyError::MalformedAct(why))
+        );
+        assert!(DeviceActV1::decode(&bad.canonical_bytes()).is_err());
+    }
+
+    // Exactly at the bound: signs, verifies and round-trips.
+    let mut at_bound = valid;
+    at_bound.payload = vec![0x5a; MAX_DEVICE_ACT_PAYLOAD];
+    assert_eq!(at_bound.validate(), Ok(()));
+    let signed_at_bound = sign_device_act(&at_bound, &f.b_key).unwrap();
+    assert!(verify_device_act(&signed_at_bound, f.s.subject, &f.store, 3).is_ok());
+    assert_eq!(
+        DeviceActV1::decode(&at_bound.canonical_bytes()),
+        Ok(at_bound)
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// A verdict at a pinned position is relative to the retained facts, not final.
+// ---------------------------------------------------------------------------------------------
+
+/// A accepted at `E = 2`; then a `recover` arrives at position 2, competing with B's grant there.
+/// The establishment body supersedes it and a recovery clears every device grant, so the same act
+/// at the same `E` is now refused. Pinning `E` did not freeze the facts at or below it.
+#[test]
+fn a_superseding_recovery_inside_the_prefix_withdraws_an_earlier_verdict() {
+    let s = subject_with_plan(0x31, vec![EstablishmentKind::Recover]);
+    let (a_key, a) = stranger(DEVICE_A_SEED);
+    let (_, b) = stranger(DEVICE_B_SEED);
+    let auth_a = authorize_at(&s, 0, 1, s.genesis(), a);
+    let auth_b = authorize_at(&s, 0, 2, auth_a.body.event_id(), b);
+    let a_act = signed(s.subject, a, &a_key, 2);
+
+    let before = store_of(&[s.inception.clone(), auth_a.clone(), auth_b.clone()]);
+    let earlier = verify_device_act(&a_act, s.subject, &before, 2).unwrap();
+    assert_eq!(earlier.evidence().grant.granted_at, 1);
+
+    let recover = s
+        .root
+        .establish(1, s.subject, 2, auth_a.body.event_id())
+        .expect("recover");
+    let after = store_of(&[s.inception.clone(), auth_a, auth_b, recover]);
+    assert_eq!(
+        verify_device_act(&a_act, s.subject, &after, 2),
+        Err(DeviceActVerifyError::Refused(
+            DeviceAuthorityRefusal::DeviceNotAuthorized
+        ))
+    );
+    match derive_prefix(s.subject, &after, 2) {
+        AuthorityView::Live { state, frontier } => {
+            assert_eq!(frontier, 3);
+            assert_eq!(state.generation, 1);
+            assert!(state.devices.is_empty());
+        }
+        other => panic!("expected the recovery to be selected at 2, got {other:?}"),
+    }
+}
+
+/// A accepted at `E = 2`; then a second grant, equally authorized, arrives at position 2. The
+/// Subject is halted at 2, so the same act at the same `E` is now refused rather than read from
+/// either branch.
+#[test]
+fn a_competing_candidate_inside_the_prefix_halts_an_earlier_verdict() {
+    let s = subject(0x32, 2);
+    let (a_key, a) = stranger(DEVICE_A_SEED);
+    let (_, b) = stranger(DEVICE_B_SEED);
+    let auth_a = authorize_at(&s, 0, 1, s.genesis(), a);
+    let auth_b = authorize_at(&s, 0, 2, auth_a.body.event_id(), b);
+    let a_act = signed(s.subject, a, &a_key, 2);
+
+    let before = store_of(&[s.inception.clone(), auth_a.clone(), auth_b.clone()]);
+    assert!(verify_device_act(&a_act, s.subject, &before, 2).is_ok());
+
+    let competing = authorize_at(&s, 0, 2, auth_a.body.event_id(), device(0x77));
+    let after = store_of(&[s.inception.clone(), auth_a, auth_b, competing]);
+    assert_eq!(
+        verify_device_act(&a_act, s.subject, &after, 2),
+        Err(DeviceActVerifyError::Refused(
+            DeviceAuthorityRefusal::AuthorityHalted { disputed_at: 2 }
+        ))
+    );
+    // Below the fork, history is still answerable: A's act at 1 still verifies.
+    let below = verify_device_act(&signed(s.subject, a, &a_key, 1), s.subject, &after, 1).unwrap();
+    assert_eq!(below.evidence().grant.granted_at, 1);
 }

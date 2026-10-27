@@ -241,6 +241,11 @@ pub async fn list_invites(
 }
 
 /// POST /invites/join - Join a cooperative via invite code
+///
+/// **Not mounted** by the production router (#2589): it issues a session for the
+/// DID named in the request body without proof that the caller controls it. See
+/// [`crate::server::invites_scope`]. Kept only so a proof-of-possession
+/// redemption can replace it; do not mount it as-is.
 #[post("/join")]
 pub async fn join_via_invite(
     invite_mgr: web::Data<Arc<InviteManager>>,

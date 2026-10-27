@@ -152,6 +152,17 @@ fn set_created_mode(_path: &Path) -> Result<()> {
 pub struct DataDirLock {
     _file: std::fs::File,
     path: PathBuf,
+    /// Which file this guard actually locked, as the kernel identifies it.
+    ///
+    /// `flock(2)` attaches to an open file description, while this domain's
+    /// identity is a **pathname**. `rename(2)` of the data root separates the
+    /// two: the locked inode travels into the renamed directory while the
+    /// stable path is free to receive a fresh, unlocked file, so two processes
+    /// can hold valid exclusive locks over what each believes is the same root
+    /// and never contend (icn#2758). Recording the inode here is what lets a
+    /// holder ask whether its exclusion still covers the path it named.
+    #[cfg(unix)]
+    anchor: (u64, u64),
 }
 
 impl DataDirLock {
@@ -178,12 +189,18 @@ impl DataDirLock {
     ///
     /// `holder` names the caller in the refusal, so an operator learns which
     /// side to stop.
+    ///
+    /// Refused, with the lock released again, while a restore of this root is
+    /// incomplete: see [`crate::restore_marker`]. Asked *after* locking, so a
+    /// restore cannot be between creating its marker and holding the root.
     pub fn acquire(data_dir: &Path, holder: &str) -> Result<Self> {
-        Self::take(
+        let lock = Self::take(
             Self::lock_path(data_dir),
             Sharing::Exclusive,
             &Self::storage_refusal(data_dir, holder),
-        )
+        )?;
+        crate::restore_marker::refuse_if_restore_incomplete(data_dir, holder)?;
+        Ok(lock)
     }
 
     fn storage_refusal(data_dir: &Path, holder: &str) -> String {
@@ -210,7 +227,50 @@ impl DataDirLock {
     /// There is no check-then-create window to lose, because this never
     /// creates: if the file vanishes between the caller's decision and this
     /// call, the open simply fails and the caller refuses.
+    ///
+    /// Refused, like [`Self::acquire`], while a restore of this root is
+    /// incomplete.
     pub fn acquire_without_creating(data_dir: &Path, holder: &str) -> Result<Self> {
+        let lock = Self::join_existing(data_dir, holder)?;
+        crate::restore_marker::refuse_if_restore_incomplete(data_dir, holder)?;
+        Ok(lock)
+    }
+
+    /// Join the storage domain of a root whose restore did not finish.
+    ///
+    /// For `icnctl restore --recover-incomplete` and nothing else: the one
+    /// holder that must work on such a root, to verify it and put it back --
+    /// which is why it takes a [`MarkerSeen`](crate::restore_marker::MarkerSeen)
+    /// for this root, and refuses one for any other. Otherwise it is
+    /// [`Self::acquire_joining_or_creating`] without the marker check: it joins
+    /// the lock, or creates it (only where this account may) if someone removed
+    /// it by hand, and excludes every other participant as any storage lock does.
+    pub fn acquire_for_restore_recovery(
+        data_dir: &Path,
+        holder: &str,
+        seen: &crate::restore_marker::MarkerSeen,
+    ) -> Result<Self> {
+        if !seen.is_for(data_dir) {
+            bail!(
+                "Refusing to start {holder}: no restore marker was seen on {}",
+                data_dir.display()
+            );
+        }
+        if std::fs::symlink_metadata(Self::lock_path(data_dir)).is_ok() {
+            return Self::join_existing(data_dir, holder);
+        }
+        if new_files_here_belong_to_the_directory_account(data_dir)? {
+            Self::take(
+                Self::lock_path(data_dir),
+                Sharing::Exclusive,
+                &Self::storage_refusal(data_dir, holder),
+            )
+        } else {
+            Self::join_existing(data_dir, holder)
+        }
+    }
+
+    fn join_existing(data_dir: &Path, holder: &str) -> Result<Self> {
         let path = Self::lock_path(data_dir);
 
         // Same containment as `take`: never open through a link, never treat a
@@ -264,6 +324,51 @@ impl DataDirLock {
         )
     }
 
+    /// Join the storage domain, minting the coordination file only when this
+    /// account may.
+    ///
+    /// The create-or-join-or-refuse decision, as **one** definition. Three
+    /// outcomes, and every caller that opens this root's stores needs all
+    /// three:
+    ///
+    /// * new files here would belong to the account that owns the root — create
+    ///   the lock and hold it, the ordinary case;
+    /// * they would not — join an existing lock, because minting one would
+    ///   leave a `0600` file the owning account cannot reopen and the daemon
+    ///   would then refuse to start;
+    /// * they would not and there is none to join — **refuse**. Proceeding
+    ///   unlocked is the failure this domain exists to prevent, not a fallback.
+    ///
+    /// The create-join-refuse decision is lifted from `runtime-root show` (#2749)
+    /// rather than copied -- though `show` itself still probes before joining, a
+    /// pre-existing ordering outside this change: the sweep that added it to inspection is the
+    /// one that missed the maintenance commands (icn#2759), and a rule written
+    /// once at the primitive is a rule a later caller cannot spell differently.
+    ///
+    /// Not a substitute for [`refuse_if_new_files_would_not_belong_to_the_data_root_account`],
+    /// which *refuses* a wrong-account run outright. That is the right answer
+    /// for a ceremony about to mint durable state; this is the right answer for
+    /// a command that only has to be inside the domain while it looks.
+    ///
+    /// **Join before probing.** When the coordination file already exists, joining
+    /// it creates nothing, so there is no account question to ask -- and the probe
+    /// that asks it writes a transient file inside this directory. A contender that
+    /// probed first would write inside a root another process holds before even
+    /// asking for the lock (icn#2777 review). Both acquisitions end in the same
+    /// exclusive `flock` when the file exists, so this changes nothing but the
+    /// write. Only when there is no file to join does create-or-refuse arise, and
+    /// no process can hold a root whose coordination file does not exist yet.
+    pub fn acquire_joining_or_creating(data_dir: &Path, holder: &str) -> Result<Self> {
+        if std::fs::symlink_metadata(Self::lock_path(data_dir)).is_ok() {
+            return Self::acquire_without_creating(data_dir, holder);
+        }
+        if new_files_here_belong_to_the_directory_account(data_dir)? {
+            Self::acquire(data_dir, holder)
+        } else {
+            Self::acquire_without_creating(data_dir, holder)
+        }
+    }
+
     /// Join the configuration domain as a reader, but never create the file.
     ///
     /// The configuration counterpart of [`Self::acquire_without_creating`], and
@@ -285,6 +390,12 @@ impl DataDirLock {
         config_root: &Path,
         holder: &str,
     ) -> Result<Self> {
+        let lock = Self::join_config_shared(config_root, holder)?;
+        crate::restore_marker::refuse_if_restore_incomplete(config_root, holder)?;
+        Ok(lock)
+    }
+
+    fn join_config_shared(config_root: &Path, holder: &str) -> Result<Self> {
         let path = Self::config_lock_path(config_root);
 
         // Same containment as `take`: never open through a link, never treat a
@@ -351,7 +462,33 @@ impl DataDirLock {
     /// must exclude every daemon that has already consumed bytes from that
     /// directory — including daemons whose *storage* is somewhere else entirely
     /// and which therefore do not contend for [`Self::acquire`] at all.
+    ///
+    /// Refused, with the lock released again, while a restore of this directory
+    /// is incomplete -- a configuration writer must not publish into a
+    /// half-restored root any more than a store opener may read one.
     pub fn acquire_config(config_root: &Path, holder: &str) -> Result<Self> {
+        let lock = Self::take_config_exclusive(config_root, holder)?;
+        crate::restore_marker::refuse_if_restore_incomplete(config_root, holder)?;
+        Ok(lock)
+    }
+
+    /// The configuration side of [`Self::acquire_for_restore_recovery`]: for
+    /// `icnctl restore --recover-incomplete` and nothing else.
+    pub fn acquire_config_for_restore_recovery(
+        config_root: &Path,
+        holder: &str,
+        seen: &crate::restore_marker::MarkerSeen,
+    ) -> Result<Self> {
+        if !seen.is_for(config_root) {
+            bail!(
+                "Refusing to start {holder}: no restore marker was seen on {}",
+                config_root.display()
+            );
+        }
+        Self::take_config_exclusive(config_root, holder)
+    }
+
+    fn take_config_exclusive(config_root: &Path, holder: &str) -> Result<Self> {
         Self::take(
             Self::config_lock_path(config_root),
             Sharing::Exclusive,
@@ -406,6 +543,14 @@ impl DataDirLock {
         config_root: &Path,
         holder: &str,
     ) -> Result<Option<Self>> {
+        let lock = Self::config_shared_if_manageable(config_root, holder)?;
+        if lock.is_some() {
+            crate::restore_marker::refuse_if_restore_incomplete(config_root, holder)?;
+        }
+        Ok(lock)
+    }
+
+    fn config_shared_if_manageable(config_root: &Path, holder: &str) -> Result<Option<Self>> {
         let path = Self::config_lock_path(config_root);
         let refusal = Self::config_refusal(config_root, holder);
 
@@ -596,9 +741,78 @@ impl DataDirLock {
             Sharing::Shared => file.try_lock_shared(),
         };
         match taken {
-            Ok(()) => Ok(Self { _file: file, path }),
+            Ok(()) => {
+                // Read from the *descriptor*, not the path. The whole point of
+                // the anchor is that the two can disagree later, so taking it
+                // from the path would record what this guard is supposed to be
+                // able to detect having changed.
+                #[cfg(unix)]
+                let anchor = {
+                    use std::os::unix::fs::MetadataExt as _;
+                    let meta = file.metadata().with_context(|| {
+                        format!(
+                            "Failed to identify the lock {} after taking it, so this guard \
+                             could not establish which file its exclusion covers",
+                            path.display()
+                        )
+                    })?;
+                    (meta.dev(), meta.ino())
+                };
+                Ok(Self {
+                    _file: file,
+                    path,
+                    #[cfg(unix)]
+                    anchor,
+                })
+            }
             Err(_) => bail!("{refusal}"),
         }
+    }
+
+    /// Does this guard still exclude a process arriving at the path it names?
+    ///
+    /// True when the lock file at [`Self::path`] is still the inode this guard
+    /// locked. False once something has replaced or moved it — after which this
+    /// guard excludes nobody, because a newcomer resolving the same pathname
+    /// opens a different file and takes an uncontended lock on it.
+    ///
+    /// The claim is deliberately narrow: it says the *anchor* is intact, not
+    /// that the state under the root is unchanged.
+    #[cfg(unix)]
+    pub fn still_anchored(&self) -> bool {
+        use std::os::unix::fs::MetadataExt as _;
+        std::fs::symlink_metadata(&self.path)
+            .map(|m| (m.dev(), m.ino()) == self.anchor)
+            .unwrap_or(false)
+    }
+
+    /// Non-Unix makes no anchor claim, exactly as it makes no mode claim.
+    #[cfg(not(unix))]
+    pub fn still_anchored(&self) -> bool {
+        true
+    }
+
+    /// Refuse rather than act on an exclusion that has stopped covering its
+    /// path.
+    ///
+    /// Call this before any step whose correctness depends on being the only
+    /// writer — committing a completion marker, above all. A holder that has
+    /// lost its anchor is not merely unlucky: it is about to write into a
+    /// directory that is no longer the one its pathname resolves to, while some
+    /// other process legitimately owns that pathname.
+    pub fn assert_still_anchored(&self, what: &str) -> Result<()> {
+        if self.still_anchored() {
+            return Ok(());
+        }
+        bail!(
+            "Refusing to continue {what}: the exclusion this process holds no longer covers \
+             {}.\n\
+             The lock file it took has been moved or replaced — a data-root rename, a restore, \
+             or a manual repair — so another ICN process can now hold that same path without \
+             contending with this one. Anything written from here would land outside the \
+             directory that path now names. Re-run once the data root is settled.",
+            self.path.display()
+        );
     }
 
     /// The lock file this guard holds.
@@ -744,6 +958,32 @@ pub fn identity_new_files_receive(dir: &Path) -> Result<AccessIdentity> {
     identity
 }
 
+/// May this account mint a retained coordination file in this directory?
+///
+/// The boolean form of the same question
+/// [`refuse_if_new_files_would_not_belong_to_the_data_root_account`] answers by
+/// refusing — for callers whose answer to "no" is *join instead of create*
+/// rather than *stop*.
+///
+/// A directory that does not exist is an **error** here, not a pass. The
+/// refusing form lets an absent root through because its caller is about to
+/// create that root itself and has a better message for the failure; a caller
+/// asking this is about to open state it expects to already be there.
+#[cfg(unix)]
+pub fn new_files_here_belong_to_the_directory_account(dir: &Path) -> Result<bool> {
+    let owner =
+        data_root_account(dir).with_context(|| format!("Failed to inspect {}", dir.display()))?;
+    Ok(matches!(
+        classify_ownership_transfer(owner, identity_new_files_receive(dir)?),
+        OwnershipTransfer::Preserved
+    ))
+}
+
+#[cfg(not(unix))]
+pub fn new_files_here_belong_to_the_directory_account(_dir: &Path) -> Result<bool> {
+    Ok(true)
+}
+
 /// Refuse when this account would create files the owning account cannot use.
 ///
 /// Call before any *creating* acquisition. A root that does not exist yet is
@@ -784,6 +1024,71 @@ pub fn refuse_if_new_files_would_not_belong_to_the_data_root_account(_dir: &Path
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// While a restore of a root is incomplete, every storage acquisition
+    /// refuses -- and gives the lock back, so the refusal itself holds nothing.
+    /// Only recovery's own join is admitted, and it still excludes everyone.
+    #[test]
+    fn an_incomplete_restore_refuses_every_storage_acquisition_but_recovery() {
+        use crate::restore_marker::{RestoreInProgress, RestorePhase, RestoreRecord};
+        let dir = tempfile::TempDir::new().unwrap();
+        drop(DataDirLock::acquire(dir.path(), "provisioning").unwrap());
+        let marker = RestoreInProgress::begin(
+            dir.path(),
+            RestoreRecord {
+                phase: RestorePhase::Moving,
+                archive: PathBuf::from("/srv/backup.tar"),
+                archive_checksum: "0".repeat(64),
+                move_aside: None,
+                inventory: vec![],
+            },
+        )
+        .unwrap();
+
+        for refused in [
+            DataDirLock::acquire(dir.path(), "the daemon"),
+            DataDirLock::acquire_without_creating(dir.path(), "an inspection"),
+            DataDirLock::acquire_joining_or_creating(dir.path(), "coop maintenance"),
+            DataDirLock::acquire_config(dir.path(), "a configuration writer"),
+            DataDirLock::acquire_config_shared_without_creating(dir.path(), "a reader"),
+            DataDirLock::acquire_config_shared_if_manageable(dir.path(), "the daemon")
+                .map(|lock| lock.expect("a writable directory is manageable")),
+        ] {
+            let err = format!("{:#}", refused.unwrap_err());
+            assert!(err.contains("did not finish"), "{err}");
+        }
+
+        // The refusals released what they took: recovery can join, and while it
+        // holds the root nobody else gets in.
+        let seen = crate::restore_marker::marker_seen(dir.path())
+            .unwrap()
+            .expect("the marker is there");
+        // The token is for this root and no other.
+        let elsewhere = tempfile::TempDir::new().unwrap();
+        let err = format!(
+            "{:#}",
+            DataDirLock::acquire_for_restore_recovery(elsewhere.path(), "recovery", &seen)
+                .unwrap_err()
+        );
+        assert!(err.contains("no restore marker was seen"), "{err}");
+        let recovery_config =
+            DataDirLock::acquire_config_for_restore_recovery(dir.path(), "recovery", &seen)
+                .unwrap();
+        let recovery =
+            DataDirLock::acquire_for_restore_recovery(dir.path(), "recovery", &seen).unwrap();
+        let err = format!(
+            "{:#}",
+            DataDirLock::acquire_for_restore_recovery(dir.path(), "another recovery", &seen)
+                .unwrap_err()
+        );
+        assert!(err.contains("already holds"), "{err}");
+
+        marker.finish().unwrap();
+        drop(recovery);
+        drop(recovery_config);
+        drop(DataDirLock::acquire(dir.path(), "the daemon").unwrap());
+        drop(DataDirLock::acquire_config(dir.path(), "a configuration writer").unwrap());
+    }
 
     #[test]
     fn a_second_acquisition_is_refused_while_the_first_is_held() {
@@ -1125,5 +1430,197 @@ mod tests {
         let _storage = DataDirLock::acquire(data_root.path(), "the daemon").unwrap();
         DataDirLock::acquire_config(config_root.path(), "a ceremony")
             .expect("a storage lock on another root cannot protect this directory");
+    }
+
+    // -----------------------------------------------------------------------
+    // icn#2758: the anchor. `flock(2)` binds to an open file description; this
+    // domain's identity is a pathname. These pin the gap between the two.
+    // -----------------------------------------------------------------------
+
+    #[cfg(unix)]
+    fn inode_at(path: &Path) -> Option<(u64, u64)> {
+        use std::os::unix::fs::MetadataExt as _;
+        std::fs::symlink_metadata(path)
+            .ok()
+            .map(|m| (m.dev(), m.ino()))
+    }
+
+    /// A held lock stays held, and stays *anchored*, when nothing moves it.
+    ///
+    /// The control for the two below. Without it, "not anchored" could be an
+    /// artefact of the check rather than of the rename.
+    #[cfg(unix)]
+    #[test]
+    fn an_undisturbed_holder_remains_anchored() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let held = DataDirLock::acquire(dir.path(), "a daemon").unwrap();
+        assert!(held.still_anchored(), "nothing moved; the anchor must hold");
+        held.assert_still_anchored("this witness")
+            .expect("an intact anchor must not refuse");
+        // And it is still a real lock, not merely a file that exists.
+        assert!(
+            DataDirLock::acquire(dir.path(), "a second process").is_err(),
+            "the holder must still exclude a newcomer"
+        );
+    }
+
+    /// Renaming the data root splits the domain: the holder keeps the inode,
+    /// the pathname gets a fresh one, and both locks are valid at once.
+    ///
+    /// This is icn#2758's mechanism, reproduced at the primitive rather than
+    /// through `icnctl restore`. Two things are asserted and they are different
+    /// claims: that a second holder is admitted at the same pathname (the harm),
+    /// and that `still_anchored` reports the split (the detection).
+    #[cfg(unix)]
+    #[test]
+    fn a_renamed_root_splits_the_domain_and_the_anchor_reports_it() {
+        let parent = tempfile::TempDir::new().unwrap();
+        let root = parent.path().join("data");
+        std::fs::create_dir(&root).unwrap();
+
+        let first = DataDirLock::acquire(&root, "a daemon").unwrap();
+        let held_inode = inode_at(first.path()).expect("the lock file must exist");
+        assert!(first.still_anchored());
+
+        // Exactly what `restore --force` used to do.
+        let moved = parent.path().join("data.backup");
+        std::fs::rename(&root, &moved).unwrap();
+        std::fs::create_dir(&root).unwrap();
+
+        // The holder's lock travelled with the inode.
+        assert_eq!(
+            inode_at(&moved.join(LOCK_FILE_NAME)),
+            Some(held_inode),
+            "the locked inode must have moved into the renamed directory"
+        );
+
+        // And the stable pathname is now free for the taking.
+        let second = DataDirLock::acquire(&root, "a second process")
+            .expect("the split is exactly that a newcomer is admitted at the same path");
+        assert_ne!(
+            inode_at(second.path()),
+            Some(held_inode),
+            "the newcomer must be holding a different file — that is the split"
+        );
+
+        // Two valid exclusive locks over one pathname, neither contending. The
+        // anchor check is what makes that visible to the holder that lost it.
+        assert!(
+            !first.still_anchored(),
+            "the first holder's exclusion no longer covers the path it names"
+        );
+        assert!(
+            second.still_anchored(),
+            "the newcomer's exclusion does cover it"
+        );
+        let refusal = first
+            .assert_still_anchored("this witness")
+            .expect_err("a holder that has lost its anchor must refuse");
+        let msg = format!("{refusal:#}");
+        assert!(
+            msg.contains("no longer covers"),
+            "the refusal must say the exclusion stopped covering the path: {msg}"
+        );
+    }
+
+    /// Replacing the lock file in place loses the anchor just as a rename does.
+    ///
+    /// The rename is the sequence that was observed in the field; the general
+    /// property is about the *inode*, so a same-path replacement must be caught
+    /// too. It is also the hazard an archive extraction would create by
+    /// unpacking over a coordination file.
+    #[cfg(unix)]
+    #[test]
+    fn replacing_the_lock_file_in_place_also_loses_the_anchor() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let held = DataDirLock::acquire(dir.path(), "a daemon").unwrap();
+        let path = held.path().to_path_buf();
+
+        std::fs::remove_file(&path).unwrap();
+        std::fs::write(&path, b"").unwrap();
+
+        assert!(
+            !held.still_anchored(),
+            "a same-path replacement is the same loss of exclusion as a rename"
+        );
+    }
+
+    /// The shared side records an anchor too.
+    ///
+    /// Readers are not exempt: a daemon holding the configuration shared is
+    /// acting on bytes from a directory, and if that directory is renamed its
+    /// exclusion stops covering the path a publisher will resolve.
+    #[cfg(unix)]
+    #[test]
+    fn a_shared_configuration_holder_is_anchored_as_well() {
+        let parent = tempfile::TempDir::new().unwrap();
+        let root = parent.path().join("config");
+        std::fs::create_dir(&root).unwrap();
+
+        let reader = DataDirLock::acquire_config_shared_if_manageable(&root, "the daemon")
+            .unwrap()
+            .expect("manageable");
+        assert!(reader.still_anchored());
+
+        std::fs::rename(&root, parent.path().join("config.moved")).unwrap();
+        std::fs::create_dir(&root).unwrap();
+
+        assert!(
+            !reader.still_anchored(),
+            "a reader whose directory was renamed no longer excludes a publisher at that path"
+        );
+        DataDirLock::acquire_config(&root, "a ceremony")
+            .expect("which is demonstrated by the publisher being admitted");
+    }
+
+    /// The create-or-join decision is one definition, and it really acquires.
+    ///
+    /// Under the test account, new files in a fresh directory belong to it, so
+    /// this takes the creating arm — the arm every maintenance command uses on
+    /// an ordinary deployment. What matters is that it produces a lock that
+    /// excludes, not merely a boolean.
+    #[test]
+    fn joining_or_creating_yields_a_lock_that_excludes() {
+        let dir = tempfile::TempDir::new().unwrap();
+        assert!(
+            new_files_here_belong_to_the_directory_account(dir.path()).unwrap(),
+            "a directory this test just created must be owned by this account"
+        );
+        let held =
+            DataDirLock::acquire_joining_or_creating(dir.path(), "coop maintenance").unwrap();
+        assert!(
+            DataDirLock::acquire(dir.path(), "a ceremony").is_err(),
+            "the joining-or-creating acquire must be a real exclusive hold"
+        );
+        drop(held);
+        DataDirLock::acquire(dir.path(), "a ceremony").expect("and must release like any other");
+    }
+
+    /// It joins an existing lock rather than insisting on creating one.
+    #[test]
+    fn joining_or_creating_joins_a_lock_that_is_already_there() {
+        let dir = tempfile::TempDir::new().unwrap();
+        // Mint and release, so the file exists with no holder.
+        drop(DataDirLock::acquire(dir.path(), "an earlier command").unwrap());
+        let path = DataDirLock::lock_path(dir.path());
+        assert!(path.exists());
+        let held =
+            DataDirLock::acquire_joining_or_creating(dir.path(), "coop maintenance").unwrap();
+        assert_eq!(held.path(), path, "it must join the file that is there");
+    }
+
+    /// A directory that does not exist is an error, not a silent pass.
+    ///
+    /// The refusing form deliberately lets an absent root through, because its
+    /// caller is about to create that root. A caller asking *this* is about to
+    /// open state it expects to find, so "I could not tell" must not read as
+    /// "yes".
+    #[test]
+    fn the_create_or_join_question_has_no_answer_for_a_root_that_is_not_there() {
+        let dir = tempfile::TempDir::new().unwrap();
+        assert!(
+            new_files_here_belong_to_the_directory_account(&dir.path().join("absent")).is_err(),
+            "an unanswerable ownership question must not resolve to permission"
+        );
     }
 }

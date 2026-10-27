@@ -135,8 +135,12 @@ impl Writer {
 
     /// Write a length-prefixed byte string: `u32be(len) || bytes`.
     pub(crate) fn lp(&mut self, value: &[u8]) {
-        // Domain separators and every other length-prefixed field in this module are short,
-        // fixed, compile-time constants; a `u32` length is more than sufficient.
+        // This writer neither bounds nor checks `len`: a value of 4 GiB or more gets a wrapped
+        // prefix. Any bound is the caller's. Callers today: domain separators (short constants);
+        // an N4 device act's payload, which `DeviceActV1::validate` bounds to
+        // `MAX_DEVICE_ACT_PAYLOAD` before signing or verifying, but which `canonical_bytes` and
+        // `act_id` frame unchecked; and a GEN context identifier, which is checked only for being
+        // non-empty and has no upper bound.
         self.u32(value.len() as u32);
         self.buf.extend_from_slice(value);
     }

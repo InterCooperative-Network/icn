@@ -388,9 +388,12 @@ Principal.
 The authority separation is normative now; the evidence object that carries FACT
 B is not specified here (§7, §13).
 
-*Live enforcement gap, recorded not solved:* #2589 — invite redemption mints a
-token for a caller-supplied DID with no proof of key control. The rule above
-presupposes that gap closes. N2 does not implement it.
+*Enforcement gap, contained not solved:* #2589 — invite redemption minted a
+token for a caller-supplied DID with no proof of key control. The production
+gateway no longer mounts that redemption route (`POST /v1/invites/join`,
+#2821), so the issuance path is closed; the handler remains in source, unmounted,
+for a redemption that proves possession of the named DID. That redemption does
+not exist yet. The rule above presupposes it; N2 does not implement it.
 
 ---
 
@@ -698,9 +701,10 @@ Every boundary N2 sets, and who owns what remains.
 | **#2606** | **O-N7** — finality under forks | The historical-authorization limit across superseding transitions (§2.2) — the precise fact O-N7 must reason about | **Policy-scoped finality evidence for irreversible effects under authority forks.** N2 states the limit; it does not bound it |
 
 **Coordination, not ownership.** #2480 (sender identity — N2 keeps it shippable
-now via §9), #2469 (authorship ≠ authority at the substrate), #2589 (the live
-enforcement gap §6 presupposes will close), #2441 (authenticated standing, which
-#2605 cannot be built before), #2448, #2591, #2613.
+now via §9), #2469 (authorship ≠ authority at the substrate), #2589 (the
+enforcement gap §6 presupposes will close — contained by unmounting, not
+solved), #2441 (authenticated standing, which #2605 cannot be built before),
+#2448, #2591, #2613.
 
 **Explicitly not smuggled into N2.** Byzantine reliable broadcast · device
 authorization mechanics · member-origin envelopes · protected continuity

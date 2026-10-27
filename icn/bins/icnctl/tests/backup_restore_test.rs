@@ -477,3 +477,69 @@ fn test_verify_backup_nonexistent_file() -> Result<()> {
 
     Ok(())
 }
+
+/// N1-R1 (ADR-0088 §11): an authority store is owner-only, and a whole-directory backup and
+/// restore keeps it usable. The restored store opens as the same instance, and a restored
+/// directory left wider than owner-only is set back to `0700` without losing anything.
+#[cfg(unix)]
+#[test]
+fn an_authority_store_survives_backup_and_restore_and_stays_owner_only() -> Result<()> {
+    use icn_core::authority_registry::{AuthorityRegistry, Startup};
+    use icn_core::config::authority_fact_store_path;
+    use icn_core::DataDirLock;
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let mode = |p: &std::path::Path| -> u32 {
+        fs::symlink_metadata(p).unwrap().permissions().mode() & 0o7777
+    };
+    let open = |dir: &std::path::Path| {
+        let lock = DataDirLock::acquire(dir, "the authority backup test").unwrap();
+        AuthorityRegistry::open(dir, &lock).unwrap().1
+    };
+
+    let temp_dir = TempDir::new()?;
+    let data_dir = temp_dir.path().join("data");
+    let backup_file = temp_dir.path().join("backup.tar");
+    let restore_dir = temp_dir.path().join("restore");
+    fs::create_dir(&data_dir)?;
+
+    let initialized = open(&data_dir);
+    assert_eq!(initialized.startup, Startup::Initialized);
+    assert_eq!(mode(&authority_fact_store_path(&data_dir)), 0o700);
+
+    let backup = Command::new(icnctl_bin())
+        .arg("--data-dir")
+        .arg(&data_dir)
+        .arg("backup")
+        .arg(&backup_file)
+        .output()?;
+    assert!(
+        backup.status.success(),
+        "backup: {}",
+        String::from_utf8_lossy(&backup.stderr)
+    );
+    let restore = Command::new(icnctl_bin())
+        .arg("--data-dir")
+        .arg(&restore_dir)
+        .arg("restore")
+        .arg(&backup_file)
+        .output()?;
+    assert!(
+        restore.status.success(),
+        "restore: {}",
+        String::from_utf8_lossy(&restore.stderr)
+    );
+
+    let restored = open(&restore_dir);
+    assert_eq!(restored.startup, Startup::Rehydrated);
+    assert_eq!(restored.instance, initialized.instance);
+    let store = authority_fact_store_path(&restore_dir);
+    assert_eq!(mode(&store), 0o700);
+
+    fs::set_permissions(&store, fs::Permissions::from_mode(0o755))?;
+    let widened = open(&restore_dir);
+    assert_eq!(widened.startup, Startup::Rehydrated);
+    assert_eq!(widened.instance, initialized.instance);
+    assert_eq!(mode(&store), 0o700);
+    Ok(())
+}

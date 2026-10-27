@@ -110,13 +110,14 @@ export function registerRepoTools(
 ): void {
   server.tool(
     "repo_status",
-    "Get current branch, dirty files, and sync status for all ICN repos.",
+    "Get current branch, dirty files, and sync status for the ICN monorepo. " +
+      "Provider/infrastructure repositories are private roles (repo-map.json#org_repos) " +
+      "that public icn tooling never opens.",
     {},
     async () => {
-      const repos = [
-        { name: "icn", path: ICN_ROOT },
-        { name: "homelab-inventory", path: join(ICN_ROOT, "..", "homelab-inventory") },
-      ];
+      // Only repo-map.json#repos entries are addressable from here; the
+      // provider/personal operations layer is a pointer-free role (icn#2809).
+      const repos = [{ name: "icn", path: ICN_ROOT }];
       const results = await Promise.all(
         repos.map((r) => repoStatus(r.path, r.name))
       );
@@ -231,7 +232,7 @@ export function registerRepoTools(
         .string()
         .optional()
         .default("icn")
-        .describe("Repo name: icn, homelab-inventory"),
+        .describe("Repo name under the InterCooperative-Network org (default: icn)"),
       branch: z.string().optional().describe("Branch name, defaults to current"),
     },
     async ({ repo, branch }) => {

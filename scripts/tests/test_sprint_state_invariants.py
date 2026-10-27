@@ -29,6 +29,16 @@ spec.loader.exec_module(cts)
 failures = []
 
 
+def write_minimal_repo_map(root):
+    """The provider-pointer guard (icn#2809) fails closed on an absent/malformed
+    repo-map, so every synthetic root that drives main() carries the minimal
+    valid map; these tests are about sprint/SessionStart semantics, not #repos."""
+    (root / "ops/state/config").mkdir(parents=True, exist_ok=True)
+    (root / "ops/state/config/repo-map.json").write_text(json.dumps({
+        "repos": {"icn": {"local": ".", "remote": "git@github.com:InterCooperative-Network/icn.git"}}
+    }))
+
+
 def check(desc, cond):
     if cond:
         print(f"  ok   {desc}")
@@ -85,6 +95,7 @@ def run_spine(owner_payload, stability="volatile", settings=None):
             }
         }))
         (root / "ops/state/sprint/current.json").write_text(json.dumps(owner_payload))
+        write_minimal_repo_map(root)
         if settings is not None:
             (root / ".claude").mkdir(parents=True)
             (root / ".claude/settings.json").write_text(json.dumps(settings))
@@ -156,6 +167,7 @@ def run_with_docs(settings, make_paths=()):
         (root / "docs").mkdir(parents=True)
         (root / ".claude").mkdir(parents=True)
         (root / "ops/state/truth/sources.json").write_text(json.dumps({"domains": {}}))
+        write_minimal_repo_map(root)
         (root / ".claude/settings.json").write_text(json.dumps(settings))
         for rel in make_paths:
             p = root / rel
@@ -195,6 +207,7 @@ with tempfile.TemporaryDirectory() as td:
     for d in ("ops/state/truth", "docs", ".claude/hooks"):
         (root / d).mkdir(parents=True, exist_ok=True)
     (root / "ops/state/truth/sources.json").write_text(json.dumps({"domains": {}}))
+    write_minimal_repo_map(root)
     (root / ".claude/settings.json").write_text(json.dumps(NESTED))
     (root / ".claude/hooks/orient.sh").write_text(
         "#!/bin/bash\ncat docs/planning/FORWARD_PLAN_2026-03.md\n")

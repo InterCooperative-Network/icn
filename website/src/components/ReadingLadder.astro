@@ -355,6 +355,14 @@ function isFork(
     }
     .ladder-here {
       align-self: flex-start;
+      /* In the horizontal rail each step is one sixth of the row. At 768px
+         that column is narrower than the nowrap badge (120px), so the badge
+         used to poke 6px past the viewport (caught by the layout audit on
+         /for-cooperatives). Let the badge wrap inside its column instead. */
+      white-space: normal;
+      max-width: 100%;
+      min-width: 0;
+      text-align: center;
     }
     .ladder-step-fork .ladder-fork {
       flex-direction: column;

@@ -33,7 +33,7 @@ cat "$(git rev-parse --show-toplevel)/ops/state/sprint/current.json"
 Show: sprint number + name, goals, task counts by status (pending/in-progress/in-review/done).
 
 **3. Repository status** — call MCP tool `repo_status`
-Show branch, dirty/clean, ahead/behind for icn and homelab-inventory.
+Show branch, dirty/clean, ahead/behind for icn. (Provider/infrastructure repositories are private roles — see `repo-map.json#org_repos` — and are never opened from here.)
 
 **4. Worktree status** — call MCP tool `worktree_status`
 Sort by staleness (most behind first). Flag stale (>10 commits behind) with ⚠️.

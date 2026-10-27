@@ -21,9 +21,19 @@
 //!   [`derive_prefix`] through the evaluation position, so a later `revoke` does not erase
 //!   authorship that was authorized at an earlier position, and an earlier `revoke` is not
 //!   hidden by a later `authorize`.
-//! - **Verification returns a grant, not a bool** (I5). Success yields
-//!   [`DeviceAuthorityEvidence`] naming the Subject, the device, the capability, the position, the
-//!   grant that covered it and the establishment generation it was evaluated under.
+//! - **Verification returns a grant, not a bool** (I5). Success yields a [`VerifiedDeviceAct`]:
+//!   the act, its `act_id`, and the [`DeviceAuthorityEvidence`] naming the Subject, the device, the
+//!   capability, the position, the grant that covered it and the establishment generation.
+//! - **Only verification yields a verified act.** [`evaluate_device_authority`] answers the
+//!   authority question alone, for no act in particular, and returns bare
+//!   [`DeviceAuthorityEvidence`]. That is never an authorization receipt for an act: it proves no
+//!   signature and names no act. [`VerifiedDeviceAct`] has private fields and no public
+//!   constructor, so the only way to hold one is through [`verify_device_act`], which checked both
+//!   the signature and the authority.
+//! - **A verdict is relative to the retained facts, not final.** Pinning a position fixes which
+//!   positions are evaluated, not which facts exist there. A fact that later arrives at or below
+//!   that position (a superseding recovery, a competing candidate) can change the verdict for the
+//!   same act at the same position. Nothing here is institutional or network finality.
 //! - **Forks and gaps fail closed.** A `Halted` view at or below the position, or a prefix
 //!   whose frontier does not reach the position, is a refusal. There is no branch selection and no
 //!   "probably still authorized".
@@ -110,7 +120,9 @@ pub enum DeviceActError {
 ///
 /// The fields are public because every one of them is public protocol data bound under the
 /// signature. Construct through [`DeviceActV1::new`] or [`DeviceActV1::decode`], both of which
-/// enforce the position and payload bounds.
+/// enforce the position and payload bounds. Because a field can still be changed afterwards,
+/// [`sign_device_act`] and [`verify_device_act`] check [`DeviceActV1::validate`] again before they
+/// touch the bytes: an act outside its bounds is never signed and never verified.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceActV1 {
     /// The Subject the device acts for. A Subject has no key; it is named, never a signer.
@@ -136,20 +148,32 @@ impl DeviceActV1 {
         evaluation_position: u64,
         payload: Vec<u8>,
     ) -> Result<Self, DeviceActError> {
-        check_position(evaluation_position)?;
-        if payload.len() > MAX_DEVICE_ACT_PAYLOAD {
-            return Err(DeviceActError::PayloadTooLarge(payload.len()));
-        }
-        Ok(DeviceActV1 {
+        let act = DeviceActV1 {
             subject,
             device,
             capability,
             evaluation_position,
             payload,
-        })
+        };
+        act.validate()?;
+        Ok(act)
+    }
+
+    /// Check the position and payload bounds. Construction checks them once; this checks them
+    /// again for an act whose public fields may have changed since.
+    pub fn validate(&self) -> Result<(), DeviceActError> {
+        check_position(self.evaluation_position)?;
+        if self.payload.len() > MAX_DEVICE_ACT_PAYLOAD {
+            return Err(DeviceActError::PayloadTooLarge(self.payload.len()));
+        }
+        Ok(())
     }
 
     /// The canonical byte encoding — the exact bytes that are signed and hashed.
+    ///
+    /// Canonical only for an act that passes [`DeviceActV1::validate`]. The payload's length
+    /// prefix is 32 bits, so bytes for an act outside the bounds are not a device act and
+    /// [`DeviceActV1::decode`] refuses them; signing and verification refuse such an act first.
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut w = Writer::new();
         w.lp(DEVICE_ACT_DOMAIN);
@@ -221,6 +245,7 @@ pub fn sign_device_act(
     act: &DeviceActV1,
     device_key: &SigningKey,
 ) -> Result<SignedDeviceAct, DeviceActError> {
+    act.validate()?;
     if PrincipalKey::from_signing_key(device_key) != act.device {
         return Err(DeviceActError::SignerIsNotDevice);
     }
@@ -276,7 +301,12 @@ pub enum DeviceAuthorityRefusal {
     CapabilityNotGranted(DeviceCapability),
 }
 
-/// What a successful evaluation establishes. A grant, not a bool.
+/// What a successful authority evaluation establishes. A grant, not a bool.
+///
+/// **An evaluation, not a verified act.** [`evaluate_device_authority`] returns this without
+/// looking at any act or signature, so it proves nothing about authorship and names no act. It
+/// must not be accepted, logged or relied on as an authorization receipt for an act; only a
+/// [`VerifiedDeviceAct`] is that.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceAuthorityEvidence {
     /// The Subject whose log was evaluated.
@@ -299,6 +329,9 @@ pub struct DeviceAuthorityEvidence {
 /// `position` is the relying party's choice — the last position it relies on, typically the
 /// position of the last fact it has itself observed and retained. The prefix must contain exactly
 /// one authorized candidate at every position `1..=position`; a gap or a fork fails closed.
+///
+/// This checks authority only. No act and no signature are involved, and the result is not a
+/// [`VerifiedDeviceAct`].
 pub fn evaluate_device_authority(
     subject: SubjectId,
     store: &AuthorityStore,
@@ -351,6 +384,10 @@ pub fn evaluate_device_authority(
 /// Why a [`SignedDeviceAct`] was rejected. Every variant is a refusal.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum DeviceActVerifyError {
+    /// The act is outside its bounds (its public fields changed after construction), so its bytes
+    /// are not a canonical device act.
+    #[error("act is not a canonical device act: {0}")]
+    MalformedAct(#[source] DeviceActError),
     /// The act names a Subject other than the one the relying party is evaluating for.
     #[error("act names a different subject than the relying party expects")]
     ActSubjectMismatch,
@@ -370,24 +407,84 @@ pub enum DeviceActVerifyError {
     Refused(#[source] DeviceAuthorityRefusal),
 }
 
+/// One signed act that passed both of N4-A's checks: its signature verifies under the device it
+/// names (authorship), and that device held a covering grant at the relying party's position
+/// (authorization).
+///
+/// The fields are private and there is no public constructor: [`verify_device_act`] is the only
+/// way to obtain one. That is what makes it usable as an authorization receipt for this act, where
+/// a bare [`DeviceAuthorityEvidence`] is not.
+///
+/// Building one outside this module does not compile (the fields are private, E0451):
+///
+/// ```compile_fail,E0451
+/// use icn_identity::device_authority::{DeviceActV1, DeviceAuthorityEvidence, VerifiedDeviceAct};
+/// fn forge(e: DeviceAuthorityEvidence, a: DeviceActV1) -> VerifiedDeviceAct {
+///     VerifiedDeviceAct { act_id: a.act_id(), act: a, evidence: e }
+/// }
+/// ```
+///
+/// Stable rustdoc does not check the error code of a `compile_fail` test, so this control compiles
+/// everything the test above uses except the struct literal. If it compiles, the literal is what
+/// fails above.
+///
+/// ```
+/// use icn_identity::device_authority::{DeviceActV1, DeviceAuthorityEvidence, VerifiedDeviceAct};
+/// fn read(v: &VerifiedDeviceAct) -> ([u8; 32], &DeviceActV1, &DeviceAuthorityEvidence) {
+///     (v.act_id(), v.act(), v.evidence())
+/// }
+/// fn parts(e: DeviceAuthorityEvidence, a: DeviceActV1) -> ([u8; 32], DeviceActV1, DeviceAuthorityEvidence) {
+///     (a.act_id(), a, e)
+/// }
+/// ```
+///
+/// It is relative to the facts the relying party retained when it verified (see the module docs):
+/// it is not a statement that the act stays authorized as more facts arrive.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedDeviceAct {
+    act: DeviceActV1,
+    act_id: [u8; 32],
+    evidence: DeviceAuthorityEvidence,
+}
+
+impl VerifiedDeviceAct {
+    /// The act that was verified.
+    pub fn act(&self) -> &DeviceActV1 {
+        &self.act
+    }
+
+    /// `act_id` of the verified act: the key an action family uses for its replay slot.
+    pub fn act_id(&self) -> [u8; 32] {
+        self.act_id
+    }
+
+    /// The authority evidence the act was verified against.
+    pub fn evidence(&self) -> &DeviceAuthorityEvidence {
+        &self.evidence
+    }
+}
+
 /// Verify a signed device act for `subject` at the relying party's `position`.
 ///
 /// Order of checks, each fail-closed:
 ///
-/// 1. the act names `subject`;
-/// 2. the act's bound position equals `position` (the signer does not choose the window);
-/// 3. the signature verifies under the act's device key — authorship, state-independent;
-/// 4. [`evaluate_device_authority`] — authorization, over the retained prefix.
+/// 1. the act is within its bounds ([`DeviceActV1::validate`]);
+/// 2. the act names `subject`;
+/// 3. the act's bound position equals `position` (the signer does not choose the window);
+/// 4. the signature verifies under the act's device key — authorship, state-independent;
+/// 5. [`evaluate_device_authority`] — authorization, over the retained prefix.
 ///
-/// Steps 3 and 4 are two checks of two different things and are never merged: a verifying
-/// signature proves that key signed these bytes, never that the key was authorized.
+/// Steps 4 and 5 are two checks of two different things and are never merged: a verifying
+/// signature proves that key signed these bytes, never that the key was authorized. Only when
+/// both pass is a [`VerifiedDeviceAct`] returned.
 pub fn verify_device_act(
     signed: &SignedDeviceAct,
     subject: SubjectId,
     store: &AuthorityStore,
     position: u64,
-) -> Result<DeviceAuthorityEvidence, DeviceActVerifyError> {
+) -> Result<VerifiedDeviceAct, DeviceActVerifyError> {
     let act = &signed.act;
+    act.validate().map_err(DeviceActVerifyError::MalformedAct)?;
     if act.subject != subject {
         return Err(DeviceActVerifyError::ActSubjectMismatch);
     }
@@ -397,13 +494,19 @@ pub fn verify_device_act(
             relying: position,
         });
     }
+    let bytes = act.canonical_bytes();
     let signature = Signature::from_bytes(signed.signature.as_bytes());
     act.device
         .verifying_key()
-        .verify_strict(&act.canonical_bytes(), &signature)
+        .verify_strict(&bytes, &signature)
         .map_err(|_| DeviceActVerifyError::BadSignature)?;
-    evaluate_device_authority(subject, store, act.device, act.capability, position)
-        .map_err(DeviceActVerifyError::Refused)
+    let evidence = evaluate_device_authority(subject, store, act.device, act.capability, position)
+        .map_err(DeviceActVerifyError::Refused)?;
+    Ok(VerifiedDeviceAct {
+        act: act.clone(),
+        act_id: sha256(&bytes),
+        evidence,
+    })
 }
 
 fn check_position(position: u64) -> Result<(), DeviceActError> {

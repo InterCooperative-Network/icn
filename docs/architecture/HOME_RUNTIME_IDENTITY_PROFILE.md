@@ -14,7 +14,9 @@ Last Reviewed: 2026-10-04
 > **Truth status.** This is a **decision record and consumption profile**, not a new identity
 > model and not an implementation claim. Every primitive it names is classified below as
 > PRODUCTION / LIB-TESTED / FIXTURE-ONLY / EXPERIMENTAL / DOC-ONLY / MISSING against the live
-> checkout at `main` `7ef8a670a` plus PR #2807. Where a class says MISSING, nothing downstream may
+> checkout at `main` `7ef8a670a` plus PR #2807 (2026-10-04). Rows (f) and §6.3 were updated on
+> 2026-10-24 after N1-D (#2800) and its daemon rehydration (#2843) merged; every other class is as
+> of the original snapshot. Where a class says MISSING, nothing downstream may
 > build a substitute. The motivating deployment (a thin client to a hosted workstation) is a
 > **fixture for requirements**; it is not part of ICN and no real person's identity material exists
 > or may be created from this document.
@@ -60,7 +62,7 @@ but unreachable, stubbed or unsafe · **DOC-ONLY** · **MISSING**.
 | (d) revocation | N1 `Revoke` + `derive_prefix` | LIB-TESTED (semantics); MISSING (propagation/effectiveness) | IS §2.7; #2599 invariant 5; N3 #2598 | `derive.rs:304` removes the grant; prefix evaluation makes "at E" answerable |
 | (e) recovery | N1 pre-rotation `Rotate`/`Recover` establishment | LIB-TESTED (establishment transitions); MISSING (guardian/threshold protocol, backup) | IS §2.5; N7 #2603 | `construct::establish`; `Recover` clears device grants (`derive.rs:288`) |
 | (e′) legacy recovery | `recovery.rs`, RPC `recovery.*`, SDIS recovery routes | EXPERIMENTAL — **unsafe**: node key signs the trustee attestation; SDIS complete is a stub | HIA F13; #2591, #2448 | `icn-rpc/src/handler/recovery.rs:138`; `api/sdis/recovery.rs:306` |
-| (f) durable local facts | `AuthorityFactStore` + sled adapter (N1-D) | PROPOSED (PR #2800 open) | #2799/#2694 | record = `event_id ‖ signature → canonical body`; `icnd` wiring deferred to #2777 |
+| (f) durable local facts | `AuthorityFactStore` + sled adapter (N1-D) | LIB-TESTED; merged in #2800, rehydrated fail-closed at `icnd` startup since #2843 | #2799/#2694; ADR-0087, ADR-0088 | record = `event_id ‖ signature → canonical body`; no runtime producer writes facts |
 | (g) external facts+act container | `EvidenceBundle` (`icn.n4.evidence-bundle`), `verify_evidence_bundle` (N4-B, converged 2026-10-04) | LIB-TESTED (24 tests observed on icn-dev + an independent Python reference) | `N4B_PORTABLE_EVIDENCE_BUNDLE.md` | `evidence_bundle.rs`; fact record = N1-D layout |
 | (h) stateless CLI consumer | `icnctl device-authority verify\|inspect` | CLI-REACHABLE (5 end-to-end tests observed on icn-dev) — a relying party, never an authority; not PRODUCTION: no runtime, route or deployment exercises it | N4-B §4 | `bins/icnctl/src/device_authority.rs` |
 | (h′) enrollment request and attenuated approval | `EnrollmentRequestV1`, `approve_enrollment` (N4-C) | LIB-TESTED (10 tests observed on icn-dev; ceremony end to end in a fixture) | `N4C_DEVICE_ENROLLMENT_REQUEST.md` | `device_enrollment.rs`; transport, UI, delivery not built |
@@ -120,8 +122,8 @@ and a context kind for personal/household contexts (#2602).
 
 Mechanically, yes: GEN-A accepts any non-empty UTF-8 `context_id` and never checks that a
 `GovernanceDomain` exists (`subject_context.rs:293–305`). Semantically, **no**: the only kind tag
-is `GovernanceDomainV1` (`0x01`), so a Subject incepted for `"household.smith"` is a Subject *in a
-governance domain called household.smith*. That is the institutional collapse the contract leaves
+is `GovernanceDomainV1` (`0x01`), so a Subject incepted for `"household.example"` is a Subject *in a
+governance domain called household.example*. That is the institutional collapse the contract leaves
 to GEN to avoid (IS §2.2: "a context may later be bilateral, informal, community-level … GEN
 defines").
 
@@ -147,7 +149,7 @@ Three routes were weighed:
   ever needs institutional authority it undergoes institutional genesis and becomes an
   Institution — it is not promoted in place.
 
-Each human still holds **one Subject per context**, so *Katie-in-Household* and *Matt-in-Household*
+Each human still holds **one Subject per context**, so *person-A-in-Household* and *person-B-in-Household*
 are two Subjects, unlinkable to their Private Subjects except through each person's own
 `ContinuityRoot`.
 
@@ -191,7 +193,7 @@ The device presents a *key*, nothing more. Possession of the device proves nothi
 | Step | Produces | Class | Rule |
 |---|---|---|---|
 | the authority edge (the person's phone, holding the context's establishment key) decides | — | — | a human decision on the person's own client |
-| it authors an N1 **`Authorize`** event: `subject`, `position`, `prev_digest`, `device`, `capabilities ⊆ {Sign, Present, Encrypt}`, `validity: Option<ValiditySpan>` | `SignedAuthorityEvent` | LIB-TESTED (`construct::authorize_event`) | `Recover` is never granted to a device; the establishment key is never the device |
+| it authors an N1 **`Authorize`** event: `subject`, `position`, `prev_digest`, `device`, `capabilities ⊆ {Sign, Present, Encrypt}`, `validity: Option<ValiditySpan>` | `SignedAuthorityEvent` | LIB-TESTED (`construct::authorize_event`) | `Recover` is never granted to a device: **enforced at N4-C approval** (`approve_enrollment` refuses it), but N1 admission and N4-A evaluation do not enforce it, so a `Recover` grant authored outside the approval path is still honoured (routed to #2599); the establishment key is never the device (enforced: `DeviceIsEstablishmentAuthority`) |
 | the edge turns the request into the fact: `approve_enrollment` (attenuated; refuses another Subject, a wider grant, an empty grant, `Recover`, the establishment key) | `SignedAuthorityEvent` | **LIB-TESTED** (N4-C) | the human decides; the function only refuses what the contract forbids |
 | the event reaches the device and every relying party | facts in their stores | **MISSING** — delivery/transport | in-process construction is no longer the only path to the *fact*; carrying it still is fixture-only |
 
@@ -203,8 +205,8 @@ device authority.
 
 | Stored | Class | Rule |
 |---|---|---|
-| per Subject it serves: the **public** N1 facts — canonical bodies and witnesses — using the N1-D record layout `event_id ‖ signature → canonical body` | PROPOSED (#2800) | re-admit every record through `admissible_bytes` on load; storage never selects branches |
-| device acts (`DeviceActV1` bytes + signature) and the `DeviceAuthorityEvidence` the runtime computed for them | LIB-TESTED | evidence is reproducible from facts + act + `E`; it is a log, not an oracle |
+| per Subject it serves: the **public** N1 facts — canonical bodies and witnesses — using the N1-D record layout `event_id ‖ signature → canonical body` | record layout on main (#2800); serving MISSING | re-admit every record through `admissible_bytes` on load; storage never selects branches |
+| device acts (`DeviceActV1` bytes + signature) and the `VerifiedDeviceAct` the runtime obtained for each | LIB-TESTED | evidence is reproducible from facts + act + `E`; it is a log, not an oracle |
 | the Home's **own** per-context device keys (the VM-as-device) | — | the VM is a device Principal |
 | **never:** any `ContinuityRoot`, any other device's secret, any human establishment key, any cross-context mapping of one person's Subjects | — | R1.2 [HARD]; IS §5.4; I10 |
 
@@ -238,9 +240,13 @@ humans or devices. Therefore:
 
 ### 6.6 The MAY / MUST NOT list
 
-A Home runtime or deployment **MAY** rely on: the N4-A verdict and evidence; `act_id` as an act's
-identity; the refusal classes; the rule that a revoked device is refused at every `E` at or after
-the revoke and unaffected before it; the N1-D record layout once merged.
+A Home runtime or deployment **MAY** rely on: the N4-A verdict and the `VerifiedDeviceAct` that
+`verify_device_act` returns (never bare `DeviceAuthorityEvidence` from `evaluate_device_authority`,
+which checks no signature and names no act); `act_id` as an act's identity; the refusal classes;
+the rule that a revoked device is refused at every `E` at or after the revoke and unaffected before
+it, under the facts retained (N4-A §2); the N1-D record layout (merged, #2800). No hosted verifier
+and no consumer that enforces an action on an N4-A result exists today. When one is built, it must
+enforce on a `VerifiedDeviceAct`, never on an authority evaluation alone.
 
 It **MUST NOT**: reimplement encodings, the fold, grant semantics or refusal logic in another
 language; treat any account, key, token, VM or machine as the Subject or derive a `SubjectId` from
