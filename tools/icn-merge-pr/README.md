@@ -108,10 +108,12 @@ options state the message instead.
 - **On `merge`, `--expected-head` is required.** A message describes one reviewed head; without a
   named head the merge could take in commits it never described.
 - **The body comes from a file** (UTF-8, at most 64 KiB, not blank), so it needs no shell quoting
-  and never sits in shell history. Trailing newlines are dropped; nothing else is altered. Control
-  and invisible characters are refused in both title and body (newline and tab are allowed in the
-  body), as are leading/trailing whitespace in the title, a byte-order mark and a title over 256
-  characters — what is previewed must be what lands.
+  and never sits in shell history. Trailing newlines are dropped; nothing else is altered. Unicode
+  control, format, surrogate, private-use and unassigned characters (category C) and line/paragraph
+  separators (Zl/Zp) are refused in both title and body (newline and tab are allowed in the body),
+  as are leading/trailing whitespace in the title, a byte-order mark and a title over 256
+  characters — what is previewed must be what lands. This is a screen for the characters a preview
+  hides, not a full confusable-character filter.
 - **Nothing else changes.** Every gate runs exactly as before. The message travels as two more
   structured fields (`commit_title`, `commit_message`) of the **same** head-pinned request. There
   is no second request, and a refusal is final: the program never retries without the message or

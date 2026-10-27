@@ -1808,6 +1808,27 @@ for label, err in (("an evidence error", EvidenceUnavailable("GraphQL down")),
     check(f"{label} reading back -> MERGED with verified=UNREADABLE, no traceback",
           result.outcome == codes.MERGED
           and result.merge["commit_message"]["verified"] == squash.UNREADABLE, result.outcome)
+# Review fix: the read-back's comparison and hash are guarded too, not only the read. A lone
+# surrogate is valid JSON and used to raise from the hash after a proved merge.
+fake, result = message_merge(world(stored_override="x\n\n\ud800"), expected_head=HEAD,
+                             squash_message=MSG)
+check("a lone surrogate in the stored message -> MERGED with verified=MISMATCH, no traceback",
+      result.outcome == codes.MERGED
+      and result.merge["commit_message"]["verified"] == squash.MISMATCH, str(result.merge))
+check("the receipt with an unpaired surrogate still serialises",
+      isinstance(json.dumps(result.as_dict()), str))
+
+
+class Unhashable(str):
+    def rstrip(self, *a):
+        raise ValueError("comparison exploded")
+
+
+fake, result = message_merge(world(stored_override=Unhashable("x")), expected_head=HEAD,
+                             squash_message=MSG)
+check("a failure while comparing -> MERGED with verified=UNREADABLE, no traceback",
+      result.outcome == codes.MERGED
+      and result.merge["commit_message"]["verified"] == squash.UNREADABLE, str(result.merge))
 check("compare: trailing newlines only are tolerated",
       squash.compare(MSG, MSG.full_text + "\n\n") == squash.MATCH
       and squash.compare(MSG, MSG.full_text + " ") == squash.MISMATCH
@@ -1892,6 +1913,12 @@ for desc, argv in (
         ("a title with a bidi override", M + ["--commit-title", "a‮b",
                                               "--commit-body-file", str(good)]),
         ("an over-long title", M + ["--commit-title", "x" * 257, "--commit-body-file", str(good)]),
+        ("a title with a line separator", M + ["--commit-title", "a\u2028b",
+                                                "--commit-body-file", str(good)]),
+        ("a title with a paragraph separator", M + ["--commit-title", "a\u2029b",
+                                                     "--commit-body-file", str(good)]),
+        ("a body with a line separator", M + ["--commit-title", TITLE, "--commit-body-file",
+                                              body_file("ls", "a\u2028b\n".encode())]),
         ("a title given twice", M + ["--commit-title", TITLE, "--commit-title", TITLE,
                                      "--commit-body-file", str(good)]),
         ("a missing body file", M + ["--commit-title", TITLE,

@@ -45,12 +45,15 @@ UNREADABLE = "UNREADABLE"
 
 
 def digest(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    # `surrogatepass`: this also hashes text GitHub returned, which may hold a lone surrogate.
+    return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 def _hidden(ch: str) -> bool:
-    """Control, format, surrogate, private-use or unassigned: not reliably visible in a preview."""
-    return unicodedata.category(ch).startswith("C")
+    """Control, format, surrogate, private-use or unassigned (C*), or a Unicode line/paragraph
+    separator (Zl/Zp), which breaks a line without looking like a newline in a preview."""
+    category = unicodedata.category(ch)
+    return category.startswith("C") or category in ("Zl", "Zp")
 
 
 @dataclass(frozen=True)

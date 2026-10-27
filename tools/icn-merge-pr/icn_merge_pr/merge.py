@@ -73,19 +73,25 @@ def _read_back(client, snap: Snapshot) -> dict | None:
 
 
 def _message_check(client, snap: Snapshot, sha: str, requested: SquashMessage) -> dict:
-    """What landed, compared with what was asked for. Never raises: the merge has happened."""
+    """What landed, compared with what was asked for. Never raises: the merge has happened.
+
+    The WHOLE body is guarded, not only the read. Comparing and hashing what GitHub returned is
+    work on untrusted text too — a lone surrogate decodes from valid JSON and used to raise from
+    the hash — and an exception anywhere here would replace the receipt of a proved merge with a
+    traceback.
+    """
     try:
         observed = client.commit_message(snap.owner, snap.name, sha)
+        verdict = squash_message.compare(requested, observed)
+        return {"verified": verdict, "requested_sha256": requested.sha256,
+                "observed_sha256": (squash_message.digest(observed)
+                                    if isinstance(observed, str) else None),
+                "observed": observed if verdict == squash_message.MISMATCH else None,
+                "detail": None}
     except Exception as exc:  # noqa: BLE001 — after a proved merge, nothing may turn into a crash
         detail = exc.detail if isinstance(exc, MergeToolError) else f"{type(exc).__name__}: {exc}"
         return {"verified": squash_message.UNREADABLE, "requested_sha256": requested.sha256,
                 "observed_sha256": None, "observed": None, "detail": detail}
-    verdict = squash_message.compare(requested, observed)
-    return {"verified": verdict, "requested_sha256": requested.sha256,
-            "observed_sha256": (squash_message.digest(observed)
-                                if isinstance(observed, str) else None),
-            "observed": observed if verdict == squash_message.MISMATCH else None,
-            "detail": None}
 
 
 def perform_merge(client, snap: Snapshot, strategy: str,
