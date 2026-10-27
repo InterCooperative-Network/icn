@@ -143,10 +143,10 @@ device set up to `E`, not only the one device that acted.
 A bundle proves what the verifier's third claim says: a verdict **under the facts supplied**. It
 does not prove the bundler supplied every fact that exists. A bundler can omit a fact at or below
 `E` (for example one candidate of a fork, or the revocation at `E` itself) and the verifier cannot
-detect the omission from the bundle alone. Withholding the fact at `E` leaves the prefix incomplete
-and the verifier fails closed (`PrefixIncomplete`). Withholding one candidate of a fork below `E`
-is **not** detectable: the remaining chain is clean, and the verifier returns a verdict where the
-full fact set would have halted the Subject. A bundle therefore proves a verdict under the facts it
+detect the omission from the bundle alone. Withholding the only fact at `E` leaves the prefix
+incomplete and the verifier fails closed (`PrefixIncomplete`). Withholding one candidate of a fork
+**at or below** `E` is **not** detectable: the remaining chain is clean, and the verifier returns a
+verdict where the full fact set would have halted the Subject. A bundle therefore proves a verdict under the facts it
 carries, never that no conflicting fact exists. That is N1's O-N7 (late fork discovery) and
 the N3 replication question (#2598), neither of which a transport format can close. What the
 container **does** guarantee is that the bundler cannot *add* a fact outside scope (§3.4), cannot
