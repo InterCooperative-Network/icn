@@ -1,0 +1,593 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="NORMATIVE CONTRACT for N4-A (first tranche of icn#2599; rung 5 of the #2694 convergence ladder): how a relying party decides whether one device-signed act is covered by a human Subject's delegation at one relying-party-chosen log position. Specifies derive_prefix - the existing N1 fold applied to the retained prefix through position E, which is what makes 'authorized at E' answerable after a later revoke - the canonical DeviceActV1 bytes under the icn.n4.device-act domain, the fail-closed verifier whose signature check and authority check are two separate steps, the refusal classes, the rule that the evaluation position is supplied by the relying party and merely echoed by the signer, and the mapping onto the act classes of HUMAN_IDENTITY_ARCHITECTURE.md section 9.3. States the external-consumer boundary: a stateless verifier over retained canonical N1 facts plus the act, and what a downstream deployment may rely on versus must not reimplement. Library, spec and tests only: no gateway route, no transport container, no persistence, no replication, no recovery, no session coupling, no attenuation beyond what N1 records, no household or personal context kind, no production wiring, and no claim about any real person's identity. Fixture identities only."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N4-A — relying-party evaluation of delegated device authority | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>N4A DEVICE AUTHORITY EVALUATION</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-10-03</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="n4-a--relying-party-evaluation-of-delegated-device-authority">N4-A — relying-party evaluation of delegated device authority</h1>
+<p><strong>Implements:</strong> first bounded tranche of <a href="https://github.com/InterCooperative-Network/icn/issues/2599" target="_blank" rel="noopener">icn#2599</a> (N4) ·
+<strong>Parent ladder:</strong> <a href="https://github.com/InterCooperative-Network/icn/issues/2694" target="_blank" rel="noopener">icn#2694</a> §7, rung 5 of 12 ·
+<strong>Code:</strong> <code>icn/crates/icn-identity/src/device_authority.rs</code>, <code>icn/crates/icn-identity/src/authority_log/derive.rs</code> (<code>derive_prefix</code>) ·
+<strong>Tests:</strong> <code>icn/crates/icn-identity/tests/device_authority.rs</code> ·
+<strong>Reference:</strong> <code>icn/crates/icn-identity/tests/reference/device_act_reference.py</code></p>
+<p>This document is the <strong>contract</strong> for N4-A. It is written so that an implementation in another
+language can reproduce the canonical act bytes in §8 from this text alone, and so that a relying
+party in any language can state exactly what it has checked when it accepts a device-signed act.</p>
+<blockquote>
+<p><strong>Truth status.</strong> Library, specification and tests only. Nothing here is wired into <code>icnd</code>, the
+gateway, <code>icnctl</code>, an SDK or any deployment. It makes no claim of institutional recognition,
+membership, standing, session authorization, replication, durability, recovery or production
+readiness. Fixture identities only; no real person&#39;s identity, keys or records are involved.</p>
+</blockquote>
+<hr>
+<h2 id="1-the-question-this-answers">1. The question this answers</h2>
+<blockquote>
+<p>At a log position the <strong>relying party</strong> has chosen, does this device Principal hold a grant
+from this human Subject that covers this capability — and did that device sign this act?</p>
+</blockquote>
+<p>Two questks, two answers, never one function:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Proves</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Authorship</strong></td>
+<td>key <code>K</code> signed these bytes</td>
+<td>Ed25519 <code>verify_strict</code> over the canonical act (§6)</td>
+</tr>
+<tr>
+<td><strong>Authorization</strong></td>
+<td><code>K</code> held a covering grant from Subject <code>S</code> at position <code>E</code></td>
+<td>the N1 fold over the retained prefix through <code>E</code> (§5)</td>
+</tr>
+</tbody></table>
+<p><code>IDENTITY_SEMANTICS.md</code> §4: <em>named ≠ signed ≠ authorized</em>. A verifying signature never establishes
+authorization; a derived grant never establishes that any particular bytes were signed.</p>
+<h3 id="11-what-n4-a-is-not">1.1 What N4-A is not</h3>
+<p>It is <strong>not</strong> the N4 lifecycle. Device enrollment ceremonies, rotation, replacement, lost-versus-
+stolen handling, revocation <em>effectiveness</em> under partition, and legacy <code>multi_device.rs</code>
+disposition remain owned by #2599 and are not advanced by this document. N4-A is the <strong>relying-
+party evaluation primitive</strong> those later tranches, and the #2694 vote path (N5-A), consume.</p>
+<p>It introduces <strong>no new authority event</strong>. N1&#39;s <code>Authorize</code> and <code>Revoke</code> bodies are the only facts;
+this layer reads them.</p>
+<hr>
+<h2 id="2-what-a-verified-act-proves--and-what-it-does-not">2. What a verified act proves — and what it does not</h2>
+<p>A successful [<code>verify_device_act</code>] returns a <code>VerifiedDeviceAct</code> and proves exactly:</p>
+<blockquote>
+<p>Under the N1 facts this verifier has retained for Subject <code>S</code>, folded through position <code>E</code>
+which the verifier itself chose, the chain was live and gap-free through <code>E</code>; device Principal
+<code>K</code> held a grant in force at <code>E</code> carrying capability <code>C</code>; <code>K</code> is not <code>S</code>&#39;s establishment
+authority at <code>E</code>; and <code>K</code> produced a valid signature over this exact act, which names <code>S</code>, <code>K</code>,
+<code>C</code> and <code>E</code>.</p>
+</blockquote>
+<p>It does <strong>not</strong> prove: that <code>K</code> is authorized <em>now</em> (a later <code>revoke</code> is outside the prefix by
+construction); that any other replica would reach <code>E</code> (that is N3, #2598); that the act has not
+been presented before (replay slots belong to the action family, §7.3); that <code>S</code> is recognized
+by any institution (GEN-B / N5); that <code>E</code> is the <em>right</em> position for the relying party&#39;s purpose
+(§7.1 states the rule, the relying party applies it); or anything about a session, token or
+transport.</p>
+<p><strong>There is no registrar, directory, clock, network lookup or randomness.</strong> Same retained facts,
+same act, same <code>E</code> ⇒ same verdict, on every replica.</p>
+<p><strong>Same <code>E</code> is not the same facts.</strong> A verdict is relative to the facts retained when it was
+computed. Pinning <code>E</code> fixes which positions are read, not which facts exist at them. A fact that
+arrives later at a position at or below <code>E</code> can change the verdict for the same act at the same
+<code>E</code>: a superseding <code>recover</code> there clears every device grant, and a second authorized candidate
+there halts the Subject. An act accepted earlier is then refused. N4-A states no institutional or
+network finality. Whether a decision already taken on an earlier verdict stands is the deciding
+institution&#39;s rule, not this primitive&#39;s. The tests
+<code>a_superseding_recovery_inside_the_prefix_withdraws_an_earlier_verdict</code> and
+<code>a_competing_candidate_inside_the_prefix_halts_an_earlier_verdict</code> pin this.</p>
+<p><strong>Only verification yields a verified act.</strong> <code>evaluate_device_authority</code> answers the authority
+question for no act in particular and returns bare <code>DeviceAuthorityEvidence</code>, which proves no
+signature and names no act. <code>VerifiedDeviceAct</code> (the act, its <code>act_id</code> and that evidence) has no
+public constructor, so it can only come from <code>verify_device_act</code>.</p>
+<hr>
+<h2 id="3-primitives">3. Primitives</h2>
+<p>Reused from N1 (<code>icn/crates/icn-identity/src/authority_log/</code>), not redefined:</p>
+<pre><code class="language-text">LP(x)  := u32be(len(x)) || x          -- length-prefixed byte string
+b32(x) := 32 raw bytes, no prefix
+P(k)   := u8(0x01) || b32(k)          -- a tagged Ed25519 principal, exactly as in an N1 body
+u8/u16be/u64be                        -- big-endian, fixed width
+H(x)   := SHA-256(x)
+</code></pre>
+<p>The principal tag is load-bearing: a <code>SubjectId</code> placed in the device slot is a <strong>decode error</strong>,
+not a 32-byte blob (<code>IDENTITY_SEMANTICS.md</code> I2).</p>
+<h2 id="4-constants-frozen-for-v1">4. Constants (frozen for v1)</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DEVICE_ACT_DOMAIN</code></td>
+<td>ASCII <code>icn.n4.device-act</code> (17 bytes)</td>
+</tr>
+<tr>
+<td><code>DEVICE_ACT_VERSION</code></td>
+<td><code>1</code> (<code>u16be</code>)</td>
+</tr>
+<tr>
+<td><code>MAX_DEVICE_ACT_PAYLOAD</code></td>
+<td><code>65536</code> bytes</td>
+</tr>
+<tr>
+<td>capability tags</td>
+<td><code>Sign 0x01</code>, <code>Encrypt 0x02</code>, <code>Present 0x03</code>, <code>Recover 0x04</code> — N1&#39;s, never renumbered</td>
+</tr>
+<tr>
+<td>position bound</td>
+<td><code>1 ..= MAX_POSITION</code> (N1&#39;s <code>1_048_576</code>)</td>
+</tr>
+</tbody></table>
+<p><code>DEVICE_ACT_DOMAIN</code> is length-prefixed and pairwise distinct from every N1 separator
+(<code>icn.authority-log</code>, <code>.sig</code>, <code>.commit</code>, <code>.kdf</code>) and every GEN separator, so act bytes can never
+be reinterpreted as an authority body, a signature preimage, a commitment, a KDF input or a GEN
+reference — and none of those can be presented as an act.</p>
+<hr>
+<h2 id="5-prefix-derivation--derive_prefix">5. Prefix derivation — <code>derive_prefix</code></h2>
+<pre><code class="language-text">derive_prefix(σ, S, E) := derive(σ, { b ∈ Bodies_S(σ) : position(b) ≤ E })
+</code></pre>
+<p>The existing N1 fold, applied to the retained prefix. <strong>Nothing about the fold changes</strong>: the
+candidate set at position <code>p</code> is drawn only from bodies at exactly <code>p</code>, <code>supersede</code>/<code>resolve</code> remain
+the single decision point, a fork at or below <code>E</code> still halts, and no body above <code>E</code> can alter
+what the fold concludes at or below it. Consequently:</p>
+<pre><code class="language-text">derive_prefix(σ, S, E)            == derive(σ, S)     whenever E ≥ frontier(derive(σ, S)) − 1
+derive_prefix(σ, S, MAX_POSITION) == derive(σ, S)
+</code></pre>
+<h3 id="51-why-it-is-needed">5.1 Why it is needed</h3>
+<p>N1&#39;s <code>Revoke</code> <strong>removes</strong> the grant from the derived state; there is no <code>revoked_at</code>. The frontier
+view therefore answers &quot;is <code>K</code> authorized at the frontier&quot; only. Two things the N4 invariants
+require are unanswerable from it:</p>
+<ul>
+<li><strong>non-retroactive revocation</strong> — an act <code>K</code> signed at position 2, when <code>K</code> was revoked at 3,
+must still verify at <code>E = 2</code> (#2599 invariant 9; #2694 §7 &quot;later revocation does not erase
+historical authorship&quot;);</li>
+<li><strong>a relying-party-pinned position</strong> — a governance process that pins <code>E</code> must get the state
+<em>as of</em> <code>E</code>, not as of whatever the verifier happens to have retained since.</li>
+</ul>
+<p><code>derive_prefix</code> makes both answerable without touching N1&#39;s semantics or wire format.</p>
+<h3 id="52-reading-the-result">5.2 Reading the result</h3>
+<table>
+<thead>
+<tr>
+<th><code>derive_prefix(σ, S, E)</code></th>
+<th>Meaning for evaluation at <code>E</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Unknown</code></td>
+<td>no inception retained — refuse</td>
+</tr>
+<tr>
+<td><code>Halted { disputed_at ≤ E }</code></td>
+<td>fork inside the prefix — refuse</td>
+</tr>
+<tr>
+<td><code>Live { frontier ≤ E }</code></td>
+<td>gap: the prefix does not reach <code>E</code> — refuse</td>
+</tr>
+<tr>
+<td><code>Live { state, frontier = E + 1 }</code></td>
+<td>clean prefix through <code>E</code>; <code>state</code> is the authority state <strong>as of <code>E</code></strong></td>
+</tr>
+</tbody></table>
+<p>A clean prefix means exactly one authorized candidate at every position <code>1..=E</code>.</p>
+<hr>
+<h2 id="6-canonical-device-act--deviceactv1">6. Canonical device act — <code>DeviceActV1</code></h2>
+<pre><code class="language-text">device_act_v1 :=
+      LP(DEVICE_ACT_DOMAIN)
+   || u16be(DEVICE_ACT_VERSION)
+   || b32(subject)                       -- the SubjectId the device acts FOR
+   || P(device)                          -- the device Principal that signs
+   || u64be(evaluation_position)         -- the position the signer asks to be evaluated at
+   || u8(capability_tag)                 -- the capability exercised
+   || LP(payload)                        -- opaque application bytes, ≤ MAX_DEVICE_ACT_PAYLOAD
+
+act_id    := H(device_act_v1)
+signature := Ed25519-sign(device_key, device_act_v1)
+</code></pre>
+<p>Strict decode: wrong domain, wrong version, a non-principal in the device slot, position <code>0</code> or
+above the bound, an oversized payload, or trailing bytes are each errors.</p>
+<h3 id="61-field-semantics">6.1 Field semantics</h3>
+<ul>
+<li><strong><code>subject</code></strong> — named, never a signer. A Subject has no key. The relying party supplies the
+Subject it is evaluating <em>for</em>, and refuses an act that names another (§7, step 2).</li>
+<li><strong><code>device</code></strong> — an ordinary Principal. Device-ness is in the grant, not the identifier.</li>
+<li><strong><code>evaluation_position</code></strong> — <strong>advisory until a relying party agrees.</strong> It is bound so that an
+act cannot be re-evaluated at a position its signer never saw, but it confers nothing: the
+verifier refuses unless it equals the position the relying party supplies (§7, step 3). This is
+how N4 invariant 6, <em>the evaluation position is not signer-chosen</em>, is met while still binding
+the position into the signature.</li>
+<li><strong><code>capability</code></strong> — one capability per act. An act that needs two is two acts.</li>
+<li><strong><code>payload</code></strong> — opaque. An action family that signs through this envelope places its <strong>own
+domain-separated canonical bytes</strong> here; N4-A never parses them. <code>act_id</code> is witness-independent
+(it hashes the act, not the signature) and is the identity a replay slot should key by.</li>
+</ul>
+<h3 id="62-signing">6.2 Signing</h3>
+<p><code>sign_device_act(act, key)</code> refuses a key whose Principal is not <code>act.device</code>. A client cannot
+produce an act it could not use; a hand-assembled envelope with a foreign signature is refused at
+verification instead (§7, step 4).</p>
+<hr>
+<h2 id="7-verification--verify_device_act">7. Verification — <code>verify_device_act</code></h2>
+<p>Given a <code>SignedDeviceAct</code>, and independently supplied <code>(subject, store, E)</code> from the relying party:</p>
+<ol>
+<li>Require the act to be within its bounds, <code>act.validate()</code>: <code>1 ≤ act.evaluation_position ≤ MAX_POSITION</code> and a payload of at most <code>MAX_DEVICE_ACT_PAYLOAD</code> bytes. Its fields are public, so
+an act changed after construction is checked again here. <em>(MalformedAct)</em></li>
+<li>Require <code>act.subject == subject</code>. <em>(ActSubjectMismatch)</em></li>
+<li>Require <code>act.evaluation_position == E</code>. <em>(EvaluationPositionMismatch)</em></li>
+<li>Verify the signature under <code>act.device</code> over <code>act.canonical_bytes()</code>, <code>verify_strict</code>.
+State-independent, exactly as N1 admission is. <em>(BadSignature)</em></li>
+<li><code>evaluate_device_authority(subject, store, act.device, act.capability, E)</code>:<ol>
+<li>require <code>1 ≤ E ≤ MAX_POSITION</code>; <em>(PositionOutOfRange)</em></li>
+<li><code>derive_prefix(subject, store, E)</code>; refuse <code>Unknown</code> <em>(SubjectUnknown)</em> and <code>Halted</code>
+<em>(AuthorityHalted{disputed_at})</em>;</li>
+<li>require <code>frontier &gt; E</code>; <em>(PrefixIncomplete{frontier, required: E})</em></li>
+<li>require <code>device ∉ state.authority</code>; <em>(DeviceIsEstablishmentAuthority)</em></li>
+<li>require a grant for <code>device</code> in <code>state.devices</code>; <em>(DeviceNotAuthorized)</em></li>
+<li>require <code>grant.in_force_at(E)</code> — <code>E ≥ granted_at</code> and inside the validity span if any;
+<em>(GrantNotInForce{granted_at, validity})</em></li>
+<li>require <code>capability ∈ grant.capabilities</code>. <em>(CapabilityNotGranted)</em></li>
+</ol>
+</li>
+</ol>
+<p>Every failure is a refusal. There is no partial success and no &quot;verified except&quot;. Refusal variants
+carry positions and spans only — never payload bytes.</p>
+<p>Success returns a <code>VerifiedDeviceAct</code>: the act, its <code>act_id</code> (computed over the exact bytes whose
+signature verified), and the <code>DeviceAuthorityEvidence { subject, device, capability, evaluation_position, grant, generation }</code> it was authorized under — <strong>a grant, not a bool</strong>
+(<code>IDENTITY_SEMANTICS.md</code> I5). It has no public constructor, so only this procedure produces one.
+Step 5 on its own (<code>evaluate_device_authority</code>) returns bare <code>DeviceAuthorityEvidence</code>: an
+authority evaluation for no act, never a verification result.</p>
+<h3 id="71-choosing-e--the-relying-partys-rule">7.1 Choosing <code>E</code> — the relying party&#39;s rule</h3>
+<p><code>E</code> is <strong>the last position the relying party relies on</strong>: the position of the last authority fact
+it has itself observed, retained and admitted for this Subject. It is a position, never a
+timestamp, and it is never read from the act. Concretely:</p>
+<table>
+<thead>
+<tr>
+<th>Relying-party situation</th>
+<th><code>E</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>a governance process that pinned a prefix when it froze its electorate (#2694 §6)</td>
+<td>the pinned position, the same for every ballot in that process</td>
+</tr>
+<tr>
+<td>a verifier holding a store whose <code>derive</code> reports <code>Live { frontier }</code></td>
+<td><code>frontier − 1</code></td>
+</tr>
+<tr>
+<td>a verifier that has not retained position <code>E</code> the act names</td>
+<td><strong>refuse</strong>; do not fetch, guess or fall back to the frontier</td>
+</tr>
+</tbody></table>
+<p><code>E</code> chosen as <code>frontier − 1</code> of a store that has not seen a revoke is <strong>prospective only</strong>: it
+evaluates the authority the verifier knows about. That is the honest semantics of class-2 acts
+(§7.2), not a defect of this primitive.</p>
+<h3 id="72-act-classes-human_identity_architecturemd-93">7.2 Act classes (<code>HUMAN_IDENTITY_ARCHITECTURE.md</code> §9.3)</h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>How N4-A applies</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1 — deferred-decision</strong> (votes, nominations, anything tallied at a decision point)</td>
+<td>the decision pins <code>E</code>; every act in the process is evaluated at that one <code>E</code>; a device revoked after <code>E</code> still counts, a device revoked at or before <code>E</code> never does. The verdict is still relative to the facts retained at <code>E</code>: a recovery or fork later found at or below <code>E</code> changes it (§2)</td>
+</tr>
+<tr>
+<td><strong>2 — immediately settled</strong> (ledger entries, irreversible effects)</td>
+<td>the acceptor evaluates at its own retained <code>frontier − 1</code> once, at admission; <strong>no validity bound exists</strong> and R5.1 remains unmet for this class, exactly as HIA states — N4-A does not pretend otherwise</td>
+</tr>
+<tr>
+<td><strong>3 — authority events</strong></td>
+<td>not acts; the log orders them itself</td>
+</tr>
+</tbody></table>
+<h3 id="73-deliberately-outside-the-verifier">7.3 Deliberately outside the verifier</h3>
+<ul>
+<li><strong>Replay.</strong> <code>act_id</code> is provided; the one-ballot rule of #2694 §9 (<code>slot = (process_hash, SubjectId)</code>) and any other replay policy belong to the action family that owns the slot.</li>
+<li><strong>Attenuation enforcement.</strong> N1 records a capability set and an optional position span; it has
+no caveat, amount or resource field. N4-A checks exactly what N1 recorded. Richer scope is a
+contract change for #2599, not something to improvise here.</li>
+<li><strong>Session coupling.</strong> A session proves a request may enter a handler now; the act proves
+durable authorship. They are never bound together (#2694 §8).</li>
+</ul>
+<h3 id="74-the-establishment-authority-rule">7.4 The establishment-authority rule</h3>
+<p>N1 permits a Subject&#39;s own generation-0 authority key to be named in an <code>Authorize</code> event. N4-A
+refuses to treat an act signed by the current establishment authority as a <em>device</em> act, for the
+reason GEN-A refuses it at genesis (<code>GEN_SUBJECT_CONTEXT_GENESIS.md</code> §6.3): a credential that is
+also the log-writer key has no bounded scope, so a <code>{Sign}</code> grant to it is illusory. This is an
+<strong>Alpha-profile</strong> rule stated for N4-A and GEN-A together; it is not a claim about every future
+profile.</p>
+<hr>
+<h2 id="8-test-vectors">8. Test vectors</h2>
+<p>Inputs, stated in full:</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>subject</code></td>
+<td><code>subject[i] = 0x20 + i</code> for i in 0..32 → <code>2021…3e3f</code></td>
+</tr>
+<tr>
+<td>device seed</td>
+<td><code>seed[i] = 0x40 + i</code> → <code>4041…5e5f</code></td>
+</tr>
+<tr>
+<td><code>evaluation_position</code></td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td><code>capability</code></td>
+<td><code>Sign</code> (<code>0x01</code>)</td>
+</tr>
+<tr>
+<td><code>payload</code></td>
+<td>ASCII <code>fixture:open-workspace</code> (22 bytes)</td>
+</tr>
+</tbody></table>
+<p>Outputs (hex):</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Bytes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>device pubkey</td>
+<td><code>2543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d</code></td>
+</tr>
+<tr>
+<td><code>device_act_v1</code> (123 B)</td>
+<td><code>0000001169636e2e6e342e6465766963652d6163740001202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f012543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d00000000000000030100000016666978747572653a6f70656e2d776f726b7370616365</code></td>
+</tr>
+<tr>
+<td><strong><code>act_id</code></strong></td>
+<td><code>0bab45ffa00c413d8c566d7d2a77b8ef6990c281c50bcf884ec7238301067e3d</code></td>
+</tr>
+<tr>
+<td>signature (RFC 8032, deterministic)</td>
+<td><code>6453bc43…256206</code> — verified by the reference, not part of identity</td>
+</tr>
+</tbody></table>
+<p>These were produced by an <strong>independent reference written from this document</strong> (Python, sharing
+no code, library or constant with <code>icn-identity</code>) and pinned as literals in
+<code>tests/device_authority.rs</code>. The reference is self-checking:</p>
+<pre><code class="language-bash">python3 icn/crates/icn-identity/tests/reference/device_act_reference.py
+</code></pre>
+<p>It re-derives the bytes and <code>act_id</code> from this document, reads the <code>EXPECT_*</code> literals out of the
+Rust test purely as a comparison target, verifies the Rust-produced signature over its own bytes,
+and exits non-zero on any disagreement.</p>
+<h3 id="81-behaviour-pinned-by-the-fixture-scenario">8.1 Behaviour pinned by the fixture scenario</h3>
+<p>One Subject <code>S</code>; devices <code>A</code> (authorized at 1) and <code>B</code> (authorized at 2); <code>A</code> revoked at 3.</p>
+<ul>
+<li><code>A</code>&#39;s act at <code>E = 3</code> → <code>Refused(DeviceNotAuthorized)</code>; <code>B</code>&#39;s act at <code>E = 3</code> → evidence with
+<code>granted_at = 2</code>, <code>generation = 0</code>.</li>
+<li><code>S</code>&#39;s identifier, establishment authority, generation and next commitment are <strong>identical</strong>
+before and after the revoke; <code>A</code> is absent from, and <code>B</code> present in, the post-revoke state; <code>B</code>
+is not in the authority set; the device bytes are not the Subject bytes.</li>
+<li><code>A</code>&#39;s act at <code>E = 2</code> → accepted (authorized then); the same bytes at <code>E = 3</code> → refused.</li>
+<li>act claims <code>E = 2</code>, relying party evaluates at <code>3</code> → <code>EvaluationPositionMismatch</code>.</li>
+<li><code>E = 4</code> with frontier <code>4</code> → <code>PrefixIncomplete{frontier: 4, required: 4}</code>; a missing position 2
+with <code>E = 3</code> → <code>PrefixIncomplete{frontier: 2, required: 3}</code>.</li>
+<li>two authorized candidates at 2 → <code>AuthorityHalted{disputed_at: 2}</code> at <code>E = 2</code>, accepted at <code>E = 1</code>.</li>
+<li>act names another Subject → <code>ActSubjectMismatch</code>; foreign signature → <code>BadSignature</code>; mutated
+payload → <code>BadSignature</code>; capability not in grant → <code>CapabilityNotGranted</code>; grant with span
+<code>[1, 2]</code> → accepted at 2, <code>GrantNotInForce</code> at 3; never-authorized device → <code>DeviceNotAuthorized</code>;
+the authority key as device → <code>DeviceIsEstablishmentAuthority</code>; unknown Subject →
+<code>SubjectUnknown</code>; position <code>0</code> and <code>&gt; MAX_POSITION</code> refused at construction and evaluation.</li>
+<li>a rotation inside the prefix is honoured: a device authorized by generation 1 evaluates with
+<code>generation = 1</code>; a device authorized before the rotation survives it (N1: rotate preserves).</li>
+<li>every verdict is identical across all <code>4!</code> ingest orders of the four facts.</li>
+<li><code>derive_prefix</code> through the bound, and through any position at or past the frontier, equals
+<code>derive</code>; through <code>0</code> yields the inception-only state; it hides a later fork and reveals an
+earlier one.</li>
+<li>act bytes are not an admissible N1 body and an N1 body is not an act; the module reads no clock
+and no randomness.</li>
+</ul>
+<hr>
+<h2 id="9-the-external-consumer-boundary">9. The external-consumer boundary</h2>
+<p>This section answers #2599&#39;s &quot;exact verifier algorithm&quot; for the bounded tranche, and records the
+boundary decision a downstream deployment needs so that it does not build a parallel identity
+model.</p>
+<h3 id="91-what-a-verifier-needs">9.1 What a verifier needs</h3>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Source</th>
+<th>Mutable?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>the Subject&#39;s retained N1 facts: canonical bodies + witnesses</td>
+<td>the verifier&#39;s own admitted store (local, or rehydrated through the N1-D fact store: merged in #2800, rehydrated by <code>icnd</code> at startup since #2843)</td>
+<td>append-only; the verifier admits each fact through <code>admissible_bytes</code> itself</td>
+</tr>
+<tr>
+<td>the act: <code>device_act_v1</code> bytes + 64-byte signature</td>
+<td>the client</td>
+<td>immutable once signed</td>
+</tr>
+<tr>
+<td><code>(subject, E)</code></td>
+<td>the relying party&#39;s own context</td>
+<td>chosen by the relying party, never by the client</td>
+</tr>
+</tbody></table>
+<p>Nothing else. No directory, no resolver, no token, no clock.</p>
+<h3 id="92-where-the-boundary-sits">9.2 Where the boundary sits</h3>
+<p><strong>The boundary is a stateless verifier over retained canonical facts, not a query to a
+service.</strong> A downstream system obtains ICN truth by holding the facts and running this verifier;
+it does not obtain it by asking a gateway &quot;is this device authorized?&quot; and trusting the answer. A
+gateway may <em>host</em> a verifier for a client that cannot run one, but the gateway is then a relying
+party making its own evaluation at its own <code>E</code>, and the thing it returns is the verified act (the act,
+its <code>act_id</code> and the evidence it was authorized under) plus the facts it evaluated, never bare
+<code>DeviceAuthorityEvidence</code> — reproducible, not an oracle verdict. <strong>The gateway is not the owner
+of this truth.</strong> This keeps the trust surface where it is: exposing the verifier expands no
+authority, because the verifier can only refuse or return a grant that already exists in the log.</p>
+<p>The first consumable surface, in order of smallness, is therefore:</p>
+<ol>
+<li><strong>this library API</strong> (<code>icn_identity::device_authority</code>) — exists;</li>
+<li>a strict, deterministic <strong>container</strong> for <em>(facts, act)</em> so a non-Rust client can carry them —
+<strong>not yet specified</strong>; <code>DeviceActV1</code> already has canonical bytes, the N1-D record layout
+(<code>event_id || signature → canonical body</code>) is the natural fact framing, and GEN-A&#39;s rule holds:
+serde/JSON bytes are never the cryptographic identity of anything;</li>
+<li>an <code>icnctl</code> verb that consumes that container and prints the verified act&#39;s evidence or the
+refusal — <strong>not built</strong>. Like any future consumer that enforces an action, it must rest on
+<code>verify_device_act</code> and its <code>VerifiedDeviceAct</code>, never on <code>evaluate_device_authority</code> alone; it is the right first non-Rust entry point for network-ops because it is local,
+stateless and needs no running daemon;</li>
+<li>only after that, a gateway route — and only as a hosted relying party, never as an authority.</li>
+</ol>
+<p><strong>The one missing boundary to build next is item 2.</strong> Items 3 and 4 follow from it mechanically.</p>
+<h3 id="93-downstream-contract-what-a-deployment-may-rely-on-must-not-reimplement">9.3 Downstream contract (what a deployment MAY rely on, MUST NOT reimplement)</h3>
+<p>A downstream deployment (for example a personal home-runtime deployment) <strong>MAY</strong> rely on:</p>
+<ul>
+<li>the N4-A verdict as the sole answer to &quot;is this device acting for this Subject with this
+capability at this position&quot;; and on <code>VerifiedDeviceAct</code>, returned only by <code>verify_device_act</code>,
+as the thing to log, display or gate on for an act;</li>
+<li><code>act_id</code> as a stable, witness-independent identity for an act;</li>
+<li>the refusal classes in §7 as the complete vocabulary for <em>why</em> an act was refused, with no
+payload leakage;</li>
+<li>the rule that a revoked device is refused at every <code>E</code> at or after the revoke, and that an
+earlier <code>E</code> is unaffected.</li>
+</ul>
+<p>It <strong>MUST NOT</strong>:</p>
+<ul>
+<li>reimplement signature domains, canonical encodings, the N1 fold, grant semantics or refusal
+logic in Python, shell, JavaScript or deployment YAML;</li>
+<li>treat a session, SSH key, OS account, RDP login, VM, Pi, phone or any node key as the Subject,
+or derive a <code>SubjectId</code> from any of them;</li>
+<li>hold or derive a <code>ContinuityRoot</code> on infrastructure, or mint a Subject on a person&#39;s behalf;</li>
+<li>cache a verdict across positions, choose <code>E</code> from the act, or fall back to the frontier when the
+act&#39;s <code>E</code> is not retained;</li>
+<li>promote fixture identities, keys or vectors into anything real;</li>
+<li>gate an act on bare <code>DeviceAuthorityEvidence</code> from <code>evaluate_device_authority</code>: it checks no
+signature and names no act;</li>
+<li>treat a verdict as final: it is relative to the facts retained when it was computed (§2);</li>
+<li>reuse one device Principal across a person&#39;s separate Subject contexts. N1 <code>Authorize</code> facts and
+signed acts carry the device key, so a reused key links those Subjects for anyone who sees both
+(<code>IDENTITY_SEMANTICS.md</code> §2.1, §5). One device Principal per (device, context).</li>
+</ul>
+<h3 id="94-what-is-still-open-for-the-boundary">9.4 What is still open for the boundary</h3>
+<p>The container (§9.2 item 2); how a relying party learns <em>which</em> position a process pinned
+(G1-A, #2694 §6); and replication of facts between replicas (N3, #2598). None of these changes
+the verifier.</p>
+<hr>
+<h2 id="10-deliberate-scope-boundaries">10. Deliberate scope boundaries</h2>
+<p>Not in this slice, by design: a transport container; gateway routes; <code>icnctl</code> exposure; SDK
+bindings; persistence (N1-D, #2800, and its daemon rehydration, #2843, both now merged, are
+siblings, not dependencies — the verifier takes an
+<code>AuthorityStore</code> however it was filled); replication; recovery; session or JWT coupling; the N4
+enrollment, rotation, replacement and lost/stolen lifecycle; disposition of legacy
+<code>multi_device.rs</code> and the dormant <code>/v1/devices</code> route (#2588, #2590); any new context kind for
+personal or household use (GEN, #2602); any production wiring.</p>
+<p><code>DeviceActV1</code> has <strong>no serde impl and no wire encoding beyond its canonical bytes.</strong> That is
+intentional and mirrors GEN-A: the canonical bytes <em>are</em> the act.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

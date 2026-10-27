@@ -1,0 +1,563 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="PROPOSED decision record and consumption profile, not an identity model: which ICN primitives a person's Home runtime consumes for the human Subject, device Principals, bounded delegation, revocation and recovery, each classified PRODUCTION / LIB-TESTED / FIXTURE-ONLY / EXPERIMENTAL / DOC-ONLY / MISSING against the live checkout with its canonical owner; the external verification boundary status (library + canonical act bytes + vectors exist; the (N1 facts, act) container and stateless icnctl consumer are the named missing pieces); the GEN stance for personal and household contexts (new GEN context kinds proposed and routed to #2602; an Individual-owned InstitutionalDomain is rejected for this use because it extends the person-as-Entity debt and puts a registrar in human genesis); four contradictions settled against cited text (per-context device keys; the ContinuityRoot stays on the person's own client and a VM-hosted Home is a device Principal, never a custodian; N1 DeviceGrant versus ADR-0014 AuthorityGrant are different objects; Mutualware is ICN's public name, not a layer); and an implementable spec for a deployment track with every MISSING step marked and its forbidden substitute named (no bearer-token enrollment, no TLS root as identity, nothing identity-bearing stored on infrastructure). Fixture identities only; no deployment, enrollment ceremony, context kind, container or recovery protocol is claimed."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Home runtime identity profile — decision record for the first personal-domain vertical slice | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>HOME RUNTIME IDENTITY PROFILE</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-10-04</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="home-runtime-identity-profile--decision-record-for-the-first-personal-domain-vertical-slice">Home runtime identity profile — decision record for the first personal-domain vertical slice</h1>
+<p><strong>Companion to:</strong> <code>N4A_DEVICE_AUTHORITY_EVALUATION.md</code> (the primitive), <code>IDENTITY_SEMANTICS.md</code>
+(the canonical contract), <code>GEN_SUBJECT_CONTEXT_GENESIS.md</code> (genesis) ·
+<strong>Issues:</strong> #2599 (N4), #2602 (GEN), #2694 (ladder), #2800 (N1-D), #2801 (naming), #2806 (ADR-0083 drift) ·
+<strong>PR:</strong> #2807</p>
+<blockquote>
+<p><strong>Truth status.</strong> This is a <strong>decision record and consumption profile</strong>, not a new identity
+model and not an implementation claim. Every primitive it names is classified below as
+PRODUCTION / LIB-TESTED / FIXTURE-ONLY / EXPERIMENTAL / DOC-ONLY / MISSING against the live
+checkout at <code>main</code> <code>7ef8a670a</code> plus PR #2807 (2026-10-04). Rows (f) and §6.3 were updated on
+2026-10-24 after N1-D (#2800) and its daemon rehydration (#2843) merged; every other class is as
+of the original snapshot. Where a class says MISSING, nothing downstream may
+build a substitute. The motivating deployment (a thin client to a hosted workstation) is a
+<strong>fixture for requirements</strong>; it is not part of ICN and no real person&#39;s identity material exists
+or may be created from this document.</p>
+</blockquote>
+<hr>
+<h2 id="0-the-question-and-the-one-line-answer">0. The question and the one-line answer</h2>
+<blockquote>
+<p>Which ICN primitives does a person&#39;s <em>Home</em> runtime consume so that a phone, a small desk
+computer, a PC and a hosted workstation can be <strong>replaceable device Principals</strong> under <strong>one
+durable human</strong>, in <strong>several contexts</strong>, without any device, host or operator becoming the human?</p>
+</blockquote>
+<p><strong>Answer.</strong> The human is an N1 Subject per context (GEN-A inception, client-held <code>ContinuityRoot</code>);
+each device is an ordinary Principal holding a per-context key of its own; authority is an N1
+<code>Authorize</code> grant in the Subject&#39;s log, bounded by capability set and optional position span;
+revocation is an N1 <code>Revoke</code>; a relying party decides any act with N4-A <code>verify_device_act</code> at a
+position it chose. All of that is <strong>LIB-TESTED</strong> today. What is <strong>MISSING</strong> is the enrollment
+ceremony that moves a grant request from a new device to the phone and the event back (N4), a
+transport container for facts and acts (next slice), a GEN context kind for personal and household
+contexts (#2602), and recovery (N7). The Home runtime consumes; it never defines.</p>
+<p>On naming: per #2801, <em>Mutualware</em> is the intended public name of ICN itself, public-brand-first
+and protocol-stable. There is no &quot;Mutualware identity&quot; and no &quot;contract layer&quot; above ICN. A
+downstream document that frames a Home runtime as a <em>contract layer</em> should read it as <strong>a
+consumption profile of ICN identity</strong> — this document — and nothing more.</p>
+<hr>
+<h2 id="1-primitive-map-acceptance-item-1">1. Primitive map (acceptance item 1)</h2>
+<p>Classes: <strong>PRODUCTION</strong> reachable from a shipped binary/route · <strong>LIB-TESTED</strong> implemented and
+tested, no runtime caller · <strong>FIXTURE-ONLY</strong> exists only inside tests · <strong>EXPERIMENTAL</strong> present
+but unreachable, stubbed or unsafe · <strong>DOC-ONLY</strong> · <strong>MISSING</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Responsibility</th>
+<th>Primitive</th>
+<th>Class</th>
+<th>Canonical owner</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>(a) the human Subject, per context</td>
+<td><code>authority_log::SubjectId</code> = inception event id; GEN-A <code>incept_subject_context_v1</code></td>
+<td>LIB-TESTED</td>
+<td><code>IDENTITY_SEMANTICS.md</code> §2.2; <code>GEN_SUBJECT_CONTEXT_GENESIS.md</code></td>
+<td><code>subject_context.rs</code>; <code>tests/gen_subject_context.rs</code> + Python reference; zero runtime callers</td>
+</tr>
+<tr>
+<td>(a′) continuity across contexts</td>
+<td><code>ContinuityRoot</code> (secret + plan + per-context nonce), client-held only</td>
+<td>LIB-TESTED (construction), DOC-ONLY (custody)</td>
+<td>IS §2.5, §10; HIA §12.2</td>
+<td><code>authority_log/construct.rs:82</code>; custody rule R1.2 [HARD] HIA L202</td>
+</tr>
+<tr>
+<td>(b) device Principals under the Subject</td>
+<td><code>PrincipalKey</code>; an <code>Authorize</code> body naming the device</td>
+<td>LIB-TESTED</td>
+<td>IS §2.7</td>
+<td><code>body.rs</code> <code>AuthorizeBody</code>; <code>construct::authorize_event</code></td>
+</tr>
+<tr>
+<td>(b′) per-context device keys</td>
+<td>deterministic per-context key from the device&#39;s own secret</td>
+<td>DOC-ONLY</td>
+<td>HIA §11.1 L1614–1616</td>
+<td>no derivation helper exists in code; client-side, trivial, and must not take <code>SubjectId</code> as input (HIA L1618)</td>
+</tr>
+<tr>
+<td>(c) bounded delegation</td>
+<td><code>CapabilitySet</code> {Sign, Encrypt, Present, Recover} + <code>Option&lt;ValiditySpan&gt;</code>; N4-A evaluation</td>
+<td>LIB-TESTED</td>
+<td>IS §2.7 (attenuation mandatory, I5); N4-A doc</td>
+<td><code>device_authority.rs</code>; 25 tests (#2807). No caveat/resource field: richer scope is #2599</td>
+</tr>
+<tr>
+<td>(c′) relying-party verification of a device act</td>
+<td><code>verify_device_act</code> at a relying-party position</td>
+<td>LIB-TESTED</td>
+<td>N4-A doc §7</td>
+<td><code>tests/device_authority.rs</code></td>
+</tr>
+<tr>
+<td>(d) revocation</td>
+<td>N1 <code>Revoke</code> + <code>derive_prefix</code></td>
+<td>LIB-TESTED (semantics); MISSING (propagation/effectiveness)</td>
+<td>IS §2.7; #2599 invariant 5; N3 #2598</td>
+<td><code>derive.rs:304</code> removes the grant; prefix evaluation makes &quot;at E&quot; answerable</td>
+</tr>
+<tr>
+<td>(e) recovery</td>
+<td>N1 pre-rotation <code>Rotate</code>/<code>Recover</code> establishment</td>
+<td>LIB-TESTED (establishment transitions); MISSING (guardian/threshold protocol, backup)</td>
+<td>IS §2.5; N7 #2603</td>
+<td><code>construct::establish</code>; <code>Recover</code> clears device grants (<code>derive.rs:288</code>)</td>
+</tr>
+<tr>
+<td>(e′) legacy recovery</td>
+<td><code>recovery.rs</code>, RPC <code>recovery.*</code>, SDIS recovery routes</td>
+<td>EXPERIMENTAL — <strong>unsafe</strong>: node key signs the trustee attestation; SDIS complete is a stub</td>
+<td>HIA F13; #2591, #2448</td>
+<td><code>icn-rpc/src/handler/recovery.rs:138</code>; <code>api/sdis/recovery.rs:306</code></td>
+</tr>
+<tr>
+<td>(f) durable local facts</td>
+<td><code>AuthorityFactStore</code> + sled adapter (N1-D)</td>
+<td>LIB-TESTED; merged in #2800, rehydrated fail-closed at <code>icnd</code> startup since #2843</td>
+<td>#2799/#2694; ADR-0087, ADR-0088</td>
+<td>record = <code>event_id ‖ signature → canonical body</code>; no runtime producer writes facts</td>
+</tr>
+<tr>
+<td>(g) external facts+act container</td>
+<td>—</td>
+<td><strong>MISSING</strong></td>
+<td>N4-A doc §9.2 item 2</td>
+<td>nothing carries N1 facts across a process boundary</td>
+</tr>
+<tr>
+<td>(h) stateless CLI consumer</td>
+<td>—</td>
+<td><strong>MISSING</strong></td>
+<td>N4-A doc §9.2 item 3</td>
+<td><code>icnctl</code> has <code>id</code>/<code>device</code>/<code>recovery</code> verbs over legacy objects only</td>
+</tr>
+<tr>
+<td>(i) context kinds</td>
+<td>GEN-A <code>GovernanceDomainV1</code> only</td>
+<td>LIB-TESTED (one kind); MISSING (personal/household)</td>
+<td>GEN doc §5; #2602</td>
+<td><code>subject_context.rs:180</code></td>
+</tr>
+<tr>
+<td>(j) legacy device path</td>
+<td><code>multi_device.rs</code>, <code>/v1/devices/*</code></td>
+<td>EXPERIMENTAL — unreachable: no DID document is ever created</td>
+<td>HIA F8; #2588/#2590; superseded by N4</td>
+<td><code>identity_mgr.rs:156</code></td>
+</tr>
+<tr>
+<td>(k) sessions</td>
+<td>gateway HS256 JWT + <code>jti</code> revocation</td>
+<td>PRODUCTION — <strong>not identity</strong></td>
+<td><code>AUTHORITY_SPINE.md</code></td>
+<td>a session proves a request may enter a handler; never authorship</td>
+</tr>
+<tr>
+<td>(l) node transport identity</td>
+<td>DID-TLS <code>BindingInfo</code> in Hello</td>
+<td>PRODUCTION — <strong>node Principal only</strong></td>
+<td>IS §9; <code>network-session-identity-binding.md</code></td>
+<td><code>bundle.rs:181</code>; <code>handlers/hello.rs</code></td>
+</tr>
+</tbody></table>
+<p><strong>What a Home runtime consumes today, truthfully:</strong> rows (a), (b), (c), (c′), (d) as a Rust
+library. Nothing else. Rows (g)–(i) are the seam it is waiting on.</p>
+<hr>
+<h2 id="2-the-fixture-test-acceptance-item-2--done">2. The fixture test (acceptance item 2) — done</h2>
+<p><code>icn/crates/icn-identity/tests/device_authority.rs</code> (PR #2807): Subject <code>S</code>; <code>A</code> authorized at 1,
+<code>B</code> at 2, <code>A</code> revoked at 3. <code>A</code>&#39;s act at <code>E = 3</code> → <code>Refused(DeviceNotAuthorized)</code>; <code>B</code>&#39;s →
+evidence <code>{granted_at: 2, generation: 0}</code>; <code>S</code>&#39;s identifier, authority set, generation and next
+commitment identical before and after; <code>A ∉ devices</code>, <code>B ∈ devices</code>, <code>B ∉ authority</code>; device bytes ≠
+Subject bytes. <code>A</code>&#39;s act at <code>E = 2</code> still verifies. 25 tests; independent reference 4/4.</p>
+<hr>
+<h2 id="3-the-external-verification-boundary-acceptance-item-3">3. The external verification boundary (acceptance item 3)</h2>
+<table>
+<thead>
+<tr>
+<th>Form</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>library API <code>icn_identity::device_authority</code></td>
+<td>LIB-TESTED</td>
+</tr>
+<tr>
+<td>documented canonical act bytes + cross-implementation vectors</td>
+<td>done — N4-A doc §6, §8</td>
+</tr>
+<tr>
+<td>deterministic container for <strong>(N1 facts, act)</strong> that a non-Rust client can carry</td>
+<td><strong>MISSING — the exact missing piece</strong></td>
+</tr>
+<tr>
+<td>stateless <code>icnctl</code> verb consuming that container, no <code>icnd</code></td>
+<td>MISSING (follows the container)</td>
+</tr>
+<tr>
+<td>gateway route</td>
+<td>deliberately not planned as an authority; at most a hosted relying party (N4-A §9.2)</td>
+</tr>
+</tbody></table>
+<p>The container&#39;s record layout should align with #2800&#39;s <code>event_id ‖ signature → canonical body</code>
+so that &quot;what the daemon persists&quot; and &quot;what a client carries&quot; are one framing. Until it lands,
+<em>external systems consume ICN truth</em> stops at the Rust API, and the Home runtime has no
+identity-bearing thing to build.</p>
+<hr>
+<h2 id="4-gen-stance-for-private--household--a-persons-own-project-acceptance-item-4">4. GEN stance for Private / Household / a person&#39;s own project (acceptance item 4)</h2>
+<p><strong>Can a personal or household context exist today without a <code>GovernanceDomain</code>?</strong></p>
+<p>Mechanically, yes: GEN-A accepts any non-empty UTF-8 <code>context_id</code> and never checks that a
+<code>GovernanceDomain</code> exists (<code>subject_context.rs:293–305</code>). Semantically, <strong>no</strong>: the only kind tag
+is <code>GovernanceDomainV1</code> (<code>0x01</code>), so a Subject incepted for <code>&quot;household.example&quot;</code> is a Subject <em>in a
+governance domain called household.example</em>. That is the institutional collapse the contract leaves
+to GEN to avoid (IS §2.2: &quot;a context may later be bilateral, informal, community-level … GEN
+defines&quot;).</p>
+<p>Three routes were weighed:</p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Verdict</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Individual-owned <code>InstitutionalDomain</code></strong> (ADR-0083 L88–92 admits <code>Individual</code> as an owning entity class)</td>
+<td><strong>rejected for personal/household use</strong></td>
+<td>It makes a person an <em>owning entity class</em> and so extends the person-as-Entity debt IS §8 L538–544 dispositions for retirement. Declaration is mandate-gated and reached through a <code>governance:write</code> bearer (PRINCIPAL_MODEL §2.8), i.e. a registrar in the human&#39;s genesis path, against R1.1 [HARD]. A household is not a tiny cooperative and must not need a charter, a steward or a <code>GovernanceDomain</code> row to exist.</td>
+</tr>
+<tr>
+<td><strong><code>GovernanceDomainV1</code> with a household/personal string</strong></td>
+<td><strong>rejected</strong></td>
+<td>Correct bytes, wrong meaning; nothing could later distinguish a household from a domain; no object exists for members to recognize each other against.</td>
+</tr>
+<tr>
+<td><strong>New GEN context kinds</strong></td>
+<td><strong>PROPOSED — route to #2602</strong></td>
+<td>The kind tag is inside every GEN preimage, N1 is unchanged, and N4-A evaluates identically whatever the kind. The gap is GEN&#39;s alone.</td>
+</tr>
+</tbody></table>
+<p><strong>Proposed shape, for #2602 to decide (not decided here):</strong></p>
+<ul>
+<li><code>PersonalContextV1</code> — one human, no other party. <code>context_id</code> is an opaque 32-byte descriptor
+digest the person&#39;s own client mints and keeps; it is never published beyond the person&#39;s own
+clients and devices. No registrar, no founder, no charter. <em>Private</em> and <em>a person&#39;s own small
+project</em> are both this kind; if a project later takes on members it becomes a household or an
+institution through genesis, not by relabelling.</li>
+<li><code>HouseholdContextV1</code> — two or more humans, no governance object. <code>context_id</code> is the genesis
+digest of a household descriptor the founding members&#39; clients agree on; membership is <strong>mutual
+recognition between members&#39; Subjects</strong> (the GEN-B recognition shape, bilateral), never an
+<code>AuthorityGrant</code>, never a steward. A household has no treasury, no charter and no office; if it
+ever needs institutional authority it undergoes institutional genesis and becomes an
+Institution — it is not promoted in place.</li>
+</ul>
+<p>Each human still holds <strong>one Subject per context</strong>, so <em>person-A-in-Household</em> and <em>person-B-in-Household</em>
+are two Subjects, unlinkable to their Private Subjects except through each person&#39;s own
+<code>ContinuityRoot</code>.</p>
+<p><strong>What this means for the vertical slice now.</strong> The device-authority proof is context-agnostic,
+so it is testable today against a <strong>fixture</strong> <code>GovernanceDomainV1</code> context. No <em>production</em>
+Private or Household context may be created until a GEN kind exists; the deployment track is not
+blocked by that, because it does not create any context.</p>
+<hr>
+<h2 id="5-contradictions-settled-against-the-text">5. Contradictions, settled against the text</h2>
+<table>
+<thead>
+<tr>
+<th>Contradiction</th>
+<th>Resolution</th>
+<th>Basis</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>per-context device keys vs one key per endpoint</td>
+<td><strong>per-context.</strong> A device holds one key per (device, context); the same key in two contexts links the person&#39;s Subjects to any observer that sees both (a Principal is &quot;fully correlatable across contexts by construction&quot;, IS §2.1). The Pi, with three contexts, holds three device Principals derived from one local device secret. The derivation is client-side and must not take <code>SubjectId</code> as input. &quot;One key per endpoint&quot; stays withdrawn.</td>
+<td>HIA §11.1 L1614–1620; IS §2.1</td>
+</tr>
+<tr>
+<td>where the <code>ContinuityRoot</code> may live vs a VM-hosted Home</td>
+<td><strong>on the person&#39;s own client — the phone is the authority edge — with pre-rotation material backed up off-device at onboarding (HIA §12.2 default (a)).</strong> A VM-hosted Home runtime holds <em>public</em> N1 facts and the VM&#39;s own device keys; it is a <strong>device Principal</strong> (the &quot;hosted/client device&quot;), not a custodian. A Home process may hold the root only if the person has chosen that process as their own client, which makes its operator a custodian of the person&#39;s identity; the default is <strong>refuse</strong>, and a host operated for someone else never qualifies.</td>
+<td>HIA R1.2 [HARD] L202–203, §12.2 L1741–1745; IS §5 L337–339, §10</td>
+</tr>
+<tr>
+<td><code>AuthorityGrant</code> grantor must be chartered vs household authority</td>
+<td><strong>two different objects.</strong> An N1 <code>DeviceGrant</code> is a fact in a <em>Subject&#39;s</em> log and needs no entity, charter or grantor beyond the Subject&#39;s own establishment authority (IS §2.7). ADR-0014&#39;s <code>AuthorityGrant</code> is <em>institutional</em> authority and its grantor rule is correct for institutions. A household mints no <code>AuthorityGrant</code>; its members delegate to their own devices in their own logs. Household <em>shared</em> decisions are recognition and app-layer policy, not grants.</td>
+<td>ADR-0014 L191–196; IS §2.7, §8</td>
+</tr>
+<tr>
+<td>Mutualware naming vs a network-ops &quot;contract layer&quot;</td>
+<td><strong>Mutualware = ICN&#39;s public name; no layer.</strong> Rename the framing to &quot;Home runtime consumption profile of ICN&quot;; protocol identifiers (<code>icn-*</code>, <code>did:icn:</code>, domains) do not change.</td>
+<td>#2801; PR #2802 claim ledger C-ID-01 / C-BRAND-01</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="6-what-a-home-runtime-may-implement-against-today-acceptance-item-5">6. What a Home runtime may implement against today (acceptance item 5)</h2>
+<p>This is the specification a deployment track may build to <strong>without inventing identity</strong>. Every
+step says which ICN object it produces or consumes and whether that object exists. Steps marked
+MISSING may be <em>designed around</em> but <strong>must not be substituted</strong> by a conventional mechanism that
+pretends to be the ICN one.</p>
+<h3 id="61-first-boot-of-a-device-any-endpoint-desk-computer-pc-hosted-client">6.1 First boot of a device (any endpoint: desk computer, PC, hosted client)</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Produces</th>
+<th>Class</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>generate a <strong>device secret</strong> locally, hardware-backed where available</td>
+<td>nothing ICN-visible</td>
+<td>—</td>
+<td>never leaves the device; never a human key</td>
+</tr>
+<tr>
+<td>derive one <strong>device Principal per context</strong> from that secret and the context descriptor</td>
+<td><code>PrincipalKey</code> (32-byte Ed25519)</td>
+<td>LIB-TESTED (<code>PrincipalKey::try_from_bytes</code>); DOC-ONLY (derivation)</td>
+<td>no <code>SubjectId</code> in the derivation</td>
+</tr>
+<tr>
+<td><strong>present</strong> to the authority edge: the per-context device public key, spelled <code>did:icn:&lt;multibase&gt;</code> or raw 32 bytes, plus a human-readable device label</td>
+<td>an enrollment <em>request</em> — not an ICN object yet</td>
+<td><strong>MISSING</strong> (N4 request shape)</td>
+<td>the request carries <strong>no</strong> certificate, no Subject, no claim of authority</td>
+</tr>
+</tbody></table>
+<p>The device presents a <em>key</em>, nothing more. Possession of the device proves nothing about the human.</p>
+<h3 id="62-enrollment-approval">6.2 Enrollment approval</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Produces</th>
+<th>Class</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>the authority edge (the person&#39;s phone, holding the context&#39;s establishment key) decides</td>
+<td>—</td>
+<td>—</td>
+<td>a human decision on the person&#39;s own client</td>
+</tr>
+<tr>
+<td>it authors an N1 <strong><code>Authorize</code></strong> event: <code>subject</code>, <code>position</code>, <code>prev_digest</code>, <code>device</code>, <code>capabilities ⊆ {Sign, Present, Encrypt}</code>, <code>validity: Option&lt;ValiditySpan&gt;</code></td>
+<td><code>SignedAuthorityEvent</code></td>
+<td>LIB-TESTED (<code>construct::authorize_event</code>)</td>
+<td><code>Recover</code> is never granted to a device (<strong>DOC-ONLY</strong>: a proposed rule; N1 admits and N4-A evaluates a <code>Recover</code> grant like any other capability, so nothing enforces it yet, routed to #2599); the establishment key is never the device (enforced: <code>DeviceIsEstablishmentAuthority</code>)</td>
+</tr>
+<tr>
+<td>the event reaches the device and every relying party</td>
+<td>facts in their stores</td>
+<td><strong>MISSING</strong> — the N4 ceremony/transport</td>
+<td>until it exists the only path is in-process construction with the root present, i.e. fixture-only</td>
+</tr>
+</tbody></table>
+<p><strong>Forbidden substitute:</strong> a bearer token, invite code, OS account, SSH key, RDP login or TLS client
+certificate standing in for the <code>Authorize</code> event. These may <em>gate a transport</em>; none of them is
+device authority.</p>
+<h3 id="63-what-the-home-runtime-stores">6.3 What the Home runtime stores</h3>
+<table>
+<thead>
+<tr>
+<th>Stored</th>
+<th>Class</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>per Subject it serves: the <strong>public</strong> N1 facts — canonical bodies and witnesses — using the N1-D record layout <code>event_id ‖ signature → canonical body</code></td>
+<td>record layout on main (#2800); serving MISSING</td>
+<td>re-admit every record through <code>admissible_bytes</code> on load; storage never selects branches</td>
+</tr>
+<tr>
+<td>device acts (<code>DeviceActV1</code> bytes + signature) and the <code>VerifiedDeviceAct</code> the runtime obtained for each</td>
+<td>LIB-TESTED</td>
+<td>evidence is reproducible from facts + act + <code>E</code>; it is a log, not an oracle</td>
+</tr>
+<tr>
+<td>the Home&#39;s <strong>own</strong> per-context device keys (the VM-as-device)</td>
+<td>—</td>
+<td>the VM is a device Principal</td>
+</tr>
+<tr>
+<td><strong>never:</strong> any <code>ContinuityRoot</code>, any other device&#39;s secret, any human establishment key, any cross-context mapping of one person&#39;s Subjects</td>
+<td>—</td>
+<td>R1.2 [HARD]; IS §5.4; I10</td>
+</tr>
+</tbody></table>
+<h3 id="64-what-revocation-does">6.4 What revocation does</h3>
+<ol>
+<li>The authority edge authors N1 <strong><code>Revoke { device }</code></strong> at the next position.</li>
+<li>Any relying party that has retained that fact evaluates every later act at <code>E ≥</code> the revoke
+position and refuses the device (<code>DeviceNotAuthorized</code>). Acts at earlier <code>E</code> remain verifiable:
+history is not rewritten.</li>
+<li><strong>Effectiveness is per relying party</strong>, exactly as far as its retained facts go. There is no
+global instant revocation and no claim of one (#2599 invariant 5; N3 owns propagation).</li>
+<li>Replacing a device is <code>Revoke(old)</code> + <code>Authorize(new)</code>; the Subject is untouched. Reflashing a
+device is the same two events; a reflashed device with a fresh secret is a <strong>new Principal</strong>.</li>
+<li>A Home runtime that loses contact with the authority edge cannot revoke anything; it can only
+stop <em>relaying</em>. Stopping relay is a hosting decision and confers no authority.</li>
+</ol>
+<h3 id="65-what-the-tls-trust-root-is">6.5 What the TLS trust root is</h3>
+<p>ICN binds a Principal to a TLS certificate <strong>only for nodes</strong>, through <code>BindingInfo</code> in the network
+Hello (<code>bundle.rs:181</code>; IS §9), and that binding is per connection and node-scoped. There is <strong>no</strong>
+device-Principal-to-TLS binding for Home transports, and <code>BindingInfo</code> must not be repurposed for
+humans or devices. Therefore:</p>
+<ul>
+<li>the thin-client transport (remote desktop to a hosted workstation) keeps its <strong>conventional</strong>
+PKI, owned and operated by the deployment track; it is a transport fact, not an identity fact;</li>
+<li>a future Home transport that wants &quot;this connection is device Principal <code>K</code>&quot; needs a device
+binding object designed under N4, with the same three-fact shape (key signs the cert digest;
+current cert matches) — <strong>MISSING</strong>, routed with #2599;</li>
+<li>nothing about a TLS root ever identifies the human.</li>
+</ul>
+<h3 id="66-the-may--must-not-list">6.6 The MAY / MUST NOT list</h3>
+<p>A Home runtime or deployment <strong>MAY</strong> rely on: the N4-A verdict and the <code>VerifiedDeviceAct</code> that
+<code>verify_device_act</code> returns (never bare <code>DeviceAuthorityEvidence</code> from <code>evaluate_device_authority</code>,
+which checks no signature and names no act); <code>act_id</code> as an act&#39;s identity; the refusal classes;
+the rule that a revoked device is refused at every <code>E</code> at or after the revoke and unaffected before
+it, under the facts retained (N4-A §2); the N1-D record layout (merged, #2800). No hosted verifier
+and no consumer that enforces an action on an N4-A result exists today. When one is built, it must
+enforce on a <code>VerifiedDeviceAct</code>, never on an authority evaluation alone.</p>
+<p>It <strong>MUST NOT</strong>: reimplement encodings, the fold, grant semantics or refusal logic in another
+language; treat any account, key, token, VM or machine as the Subject or derive a <code>SubjectId</code> from
+one; hold or derive a <code>ContinuityRoot</code> on infrastructure; mint a Subject or a context on a
+person&#39;s behalf; choose <code>E</code> from the act or fall back to the frontier when the act&#39;s <code>E</code> is not
+retained; build an enrollment, revocation or recovery mechanism of its own; promote fixture
+identities into anything real.</p>
+<hr>
+<h2 id="7-acceptance-scenario-status">7. Acceptance scenario status</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. decision record with classes and owners</td>
+<td><strong>this document §1</strong></td>
+</tr>
+<tr>
+<td>2. fixture-backed test</td>
+<td><strong>done</strong> — PR #2807</td>
+</tr>
+<tr>
+<td>3. external verification boundary</td>
+<td><strong>library + canonical bytes + vectors done; the (facts, act) container is the named missing piece</strong></td>
+</tr>
+<tr>
+<td>4. GEN stance</td>
+<td><strong>§4</strong> — new GEN context kinds, routed to #2602; Individual-owned <code>InstitutionalDomain</code> rejected for this use</td>
+</tr>
+<tr>
+<td>5. implementable spec</td>
+<td><strong>§6</strong> — with every MISSING step marked and its forbidden substitute named</td>
+</tr>
+</tbody></table>
+<h2 id="8-routing">8. Routing</h2>
+<p>#2694 (ladder; container as the shared missing boundary) · #2599 (device case; ceremony, device
+TLS binding) · #2602 (context kinds) · #2806 (ADR-0083 status drift) · PR #2807 (this branch).</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
