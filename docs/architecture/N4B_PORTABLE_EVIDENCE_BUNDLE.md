@@ -513,7 +513,8 @@ Everything in `N4A_DEVICE_AUTHORITY_EVALUATION.md` §9.3, plus:
 
 **MAY:** carry a bundle over any transport; store a bundle as the record of what was evaluated,
 where the consumer has its own basis to retain it — a valid bundle is not permission to keep it,
-and retention is a separate decision (see the PROPOSED ADR-0089);
+and retention is a separate decision (see ADR-0089, accepted 2026-10-27 for fixture Subjects
+only, not implemented);
 treat `bundle_id` as the identity of *what was carried* (it is witness-dependent, unlike `act_id`);
 run `icnctl device-authority verify` as its relying party and gate on exit code and `class`;
 re-verify at a later `position` once it has retained more facts, by assembling a new bundle.

@@ -1,7 +1,7 @@
 ---
 id: "0088"
 title: "N1 runtime authority-store initialization and recovery boundary"
-status: "accepted"
+status: "amended"
 date: "2026-10-24"
 accepted_date: "2026-10-24"
 deciders: ["Matt Faherty"]
@@ -9,7 +9,8 @@ tags: ["identity", "n1", "authority-log", "persistence", "startup", "recovery", 
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "implemented; #2843 merged to main as 94cf94d13 on 2026-10-24"
+amended_by: ["ADR-0089"]
+implementation_status: "implemented; #2843 merged to main as 94cf94d13 on 2026-10-24. The ADR-0089 amendment (accepted 2026-10-27) is not implemented"
 references:
   - "ADR-0087 (the library persistence contract this ADR builds on and does not change)"
   - "ADR-0018 (ADR lifecycle)"
@@ -25,7 +26,7 @@ references:
 
 ## Status
 
-**`accepted` (2026-10-24).** Drafted with #2843. The maintainer (Matt
+**`accepted` (2026-10-24); `amended` (2026-10-27).** Drafted with #2843. The maintainer (Matt
 Faherty, the decider) accepted it on 2026-10-24:
 
 - the substantive architecture as proposed: the initialization state machine
@@ -43,6 +44,29 @@ were by independent review agents; no other human review is claimed.
 
 Decision status and implementation status are separate axes (ADR-0018). The
 implementation is #2843, merged to main as `94cf94d13` on 2026-10-24.
+
+> **Amendment (2026-10-27):** [ADR-0089](ADR-0089-n1-offline-authority-fact-import.md),
+> accepted 2026-10-27 for a fixture-only offline import experiment, amends this
+> ADR. The amendment is an **accepted future contract, not current behaviour**:
+> no offline import producer exists, and `icnd` does not check any import marker.
+>
+> - **Implemented on `main` today:** everything in this ADR as written — the
+>   initialization state machine and its fail-closed states (§5, §6), the
+>   receipt (§10), the access rules and their exposure limits (§11), and manual
+>   recovery (§12).
+> - **§6, future:** one more fail-closed state, *import incomplete*. Once
+>   ADR-0089's marker is implemented, `AuthorityRegistry::open` refuses while
+>   it exists. It is not enforced today.
+> - **§11, unchanged today:** "no runtime producer writes facts, so nothing is
+>   written after the tightening" remains true until an importer exists. Once
+>   one does, imported facts are written after the tightening, and an account
+>   that ever held an open descriptor on the store can read them; ADR-0089 §12
+>   requires that limit to be stated to operators.
+> - **§12, future:** manual recovery gains the import-incomplete state and its
+>   procedures (`icnctl authority import --resume`, re-obtaining the same
+>   segment, or restoring a pre-import backup; ADR-0089 §6), when implemented.
+> - **Unchanged:** the startup receipt stays a daemon diagnostic (§10); offline
+>   tools never write one. ADR-0087 is unchanged.
 
 ## Context
 
