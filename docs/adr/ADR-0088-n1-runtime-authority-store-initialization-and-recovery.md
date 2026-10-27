@@ -9,7 +9,7 @@ tags: ["identity", "n1", "authority-log", "persistence", "startup", "recovery", 
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "implemented in #2843 (not merged)"
+implementation_status: "implemented; #2843 merged to main as 94cf94d13 on 2026-10-24"
 references:
   - "ADR-0087 (the library persistence contract this ADR builds on and does not change)"
   - "ADR-0018 (ADR lifecycle)"
@@ -42,7 +42,7 @@ ADR-0018 requires no separate signature. The reviews of the implementation
 were by independent review agents; no other human review is claimed.
 
 Decision status and implementation status are separate axes (ADR-0018). The
-implementation is in #2843, not yet merged.
+implementation is #2843, merged to main as `94cf94d13` on 2026-10-24.
 
 ## Context
 
