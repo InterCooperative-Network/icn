@@ -289,11 +289,13 @@ opens a path that contains a directory it has not itself opened:
 - It descends only through descriptors: each entry is opened with `openat` relative to its parent
   directory's descriptor, with `O_NOFOLLOW | O_NOCTTY`, plus `O_DIRECTORY` for directories and
   `O_NONBLOCK` for regular files. Every opened descriptor is checked with `fstat` against the
-  entry's type before it is used. No multi-component path is ever opened. The walk refuses beyond a
-  fixed depth (sled's layout is about two levels deep; the N2-A gate's discovery uses a similar
-  bound) and closes each descriptor after its `fsync`.
-- It refuses any entry that `readdir` reports as a symlink, FIFO, socket, block or character device,
-  or any type other than a regular file or a directory, without opening it. If an entry is swapped
+  entry's type before it is used. No multi-component path is ever opened. The walk refuses below a
+  depth of 8 directories under `store/authority` (sled's layout is about two levels deep; the N2-A
+  gate's discovery uses a similar bound) and closes each descriptor after its `fsync`.
+- It classifies each entry by the type `readdir` reports; where that is `DT_UNKNOWN` (some
+  filesystems report it for every entry), by `fstatat(parent, name, AT_SYMLINK_NOFOLLOW)`. It refuses
+  any entry so classified as a symlink, FIFO, socket, block or character device, or any type other
+  than a regular file or a directory, without opening it. If an entry is swapped
   between `readdir` and `openat`, the open flags still fail closed (`ELOOP` for a symlink,
   `O_DIRECTORY` for a wrong directory type, `O_NONBLOCK` so a FIFO cannot block) and `fstat` refuses
   the result; a device node swapped in at that instant can be opened before `fstat` refuses it, and
