@@ -461,7 +461,7 @@ icnctl device-authority inspect --bundle FILE
 | exit | `verdict` | when |
 |---|---|---|
 | 0 | `authorized` | the act is covered; the document carries the N4-A evidence |
-| 1 | `refused` | all facts admissible and N4-A refused (`class` = one of the N4-A refusal names: `ActSubjectMismatch`, `EvaluationPositionMismatch`, `BadSignature`, `PositionOutOfRange`, `SubjectUnknown`, `AuthorityHalted`, `PrefixIncomplete`, `DeviceIsEstablishmentAuthority`, `DeviceNotAuthorized`, `GrantNotInForce`, `CapabilityNotGranted`), **or** one fact was inadmissible (`class` = `InadmissibleFact`, with the fact's `event_id`) |
+| 1 | `refused` | all facts admissible and N4-A refused (`class` = one of the N4-A refusal names: `MalformedAct`, `ActSubjectMismatch`, `EvaluationPositionMismatch`, `BadSignature`, `PositionOutOfRange`, `SubjectUnknown`, `AuthorityHalted`, `PrefixIncomplete`, `DeviceIsEstablishmentAuthority`, `DeviceNotAuthorized`, `GrantNotInForce`, `CapabilityNotGranted`), **or** one fact was inadmissible (`class` = `InadmissibleFact`, with the fact's `event_id`) |
 | 2 | `malformed` | not a strict canonical bundle, unreadable file, or an unusable `--subject` |
 
 `authorized` document:
@@ -476,6 +476,13 @@ icnctl device-authority inspect --bundle FILE
   "act_id": "<hex32>", "bundle_id": "<hex32>", "fact_count": 4
 }
 ```
+
+Every field comes from the `VerifiedDeviceAct` that `verify_evidence_bundle` returned; `act_id`
+is that verified act's own id, over the exact bytes whose signature verified, not an id computed
+apart from verification. `authorized` means "authorized under the facts this bundle carries, at
+the position the relying party named": it is not current authorization, completeness of the
+Subject's history, or finality (N4-A §2, §3.3 above). The verb is CLI-REACHABLE library code;
+nothing in production calls it.
 
 `inspect` prints the bundle's own scope (`subject`, `evaluation_position`), each fact (`index`,
 `kind_tag`, `subject`, `position`, `event_id`, `witness_count`) and the act (`subject`, `device`,
