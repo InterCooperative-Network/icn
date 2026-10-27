@@ -10,7 +10,7 @@ externally transportable container actually needs: a stateless consumer in anoth
 able to produce, and more importantly parse, these exact bytes from the prose alone.
 
 This file is that someone else. It is written from the prose in
-`docs/architecture/N4A_PORTABLE_EVIDENCE_BUNDLE.md` (container framing, ordering, scope), the N1
+`docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md` (container framing, ordering, scope), the N1
 canonical-encoding contract it cites (`icn/crates/icn-identity/src/authority_log/mod.rs` §1-§2 /
 HUMAN_IDENTITY_ARCHITECTURE.md §9.2.1), and the N4-A act contract
 (`docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md` §6). It shares no code, no library and no
@@ -87,7 +87,7 @@ TERMINAL_COMMITMENT = bytes(32)
 DEVICE_ACT_DOMAIN = b"icn.n4.device-act"
 DEVICE_ACT_VERSION = 1
 
-# --- bundle constants, N4A_PORTABLE_EVIDENCE_BUNDLE.md §4 -------------------------------------
+# --- bundle constants, N4B_PORTABLE_EVIDENCE_BUNDLE.md §4 -------------------------------------
 BUNDLE_DOMAIN = b"icn.n4.evidence-bundle"
 BUNDLE_VERSION = 1
 

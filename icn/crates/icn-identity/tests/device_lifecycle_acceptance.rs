@@ -13,8 +13,9 @@
 //! > `A`'s act is refused and `B`'s is accepted. `S` keeps its identity, its establishment
 //! > authority, its generation and its pre-rotation commitment — nothing rotates because nothing
 //! > needs to. Every verdict follows from admitted ICN facts carried as bytes; no verifier holds
-//! > a side table; facts arriving in any order give the same verdicts; and a relying party whose
-//! > facts stop short of the revocation fails closed rather than accepting the revoked device.
+//! > a side table; facts arriving in any order give the same verdicts; and a relying party that
+//! > evaluates at a position it does not hold fails closed. One whose facts stop short of the
+//! > revocation still accepts the revoked device at its own older tip: it is behind (N4-E §4).
 //!
 //! `tests/device_authority.rs` proves the core over a local store; this file proves it over the
 //! external boundary and the enrollment ceremony. Fixture identities only.
@@ -241,9 +242,9 @@ fn the_backbone_two_devices_one_revoked_the_other_and_the_subject_unharmed() {
         .is_ok());
     }
 
-    // 14b. A relying party whose facts stop before the revocation fails closed at the current
-    // position: it does not accept A because it "never heard" of the revocation. History it does
-    // hold stays verifiable.
+    // 14b. A relying party whose facts stop before the revocation cannot evaluate at the
+    // revocation's position (PrefixIncomplete); it never treats a position it does not hold as
+    // covered. At its own older tip it still accepts A: it is behind, not deceived (N4-E §4).
     let stale = &all[..3];
     assert_eq!(
         refused_as(relying_party(
@@ -267,10 +268,9 @@ fn the_backbone_two_devices_one_revoked_the_other_and_the_subject_unharmed() {
 }
 
 #[test]
-fn a_device_cannot_be_enrolled_twice_into_a_wider_grant_by_resubmitting_its_request() {
-    // Resubmission is not escalation: a second approval of the same device at a later position
-    // is a new fact with its own grant, and the relying party evaluates whichever is in force
-    // at its position. It never merges grants.
+fn an_attenuated_grant_refuses_a_capability_the_approver_did_not_grant() {
+    // The approval grants Present only; an act exercising Sign is refused with
+    // CapabilityNotGranted. (Resubmission and grant merging are not exercised here.)
     let s = subject(0x01, 4);
     let edge = s.root.authority_signing_key(0);
     let (a_key, a, auth_a) = enroll(

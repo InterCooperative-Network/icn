@@ -1,5 +1,5 @@
 //! N4-A portable evidence bundle — the transport boundary over canonical N1 facts plus one signed
-//! device act (`docs/architecture/N4A_PORTABLE_EVIDENCE_BUNDLE.md`).
+//! device act (`docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md`).
 //!
 //! The one question this suite answers, from the reviewer's side:
 //!

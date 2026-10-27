@@ -156,15 +156,17 @@ family. A transport profile that adopts the binding chooses one of two sound rul
 - **channel-unique digest**: `channel` itself is unique per connection (a `tls-exporter` value),
   so a replayed binding names a channel that no longer exists.
 
-Either way, replaying a binding onto a *different* channel is already refused by step 4; the
+Either way, replaying a binding onto a *different* channel is already refused by step 5; the
 nonce decides only whether the *same* channel may be re-bound.
 
 ## 7. Evaluation position
 
-The relying party supplies `position` exactly as for any act (N4-A §7.1). For a live connection
-that is a current admission (class 2); the current-admission rule and helper are defined in
-`N4E_CURRENT_ADMISSION.md`. A binding bound to a position the relying party does not hold is
-`PrefixIncomplete` / `EvaluationPositionMismatch`, never "probably fine".
+For a live connection the position is **not** the caller's: `admit_channel_binding` takes it from
+the relying party's own retained clean tip (N4-E, `N4E_CURRENT_ADMISSION.md`), and a binding below
+it is `StaleAct`, above it `RelyingPartyBehind`, never "probably fine". Only the historical
+operation, `verify_channel_binding_at`, takes a position from the relying party, as for any N4-A
+act (N4-A §7.1); there a position the relying party does not hold is `PrefixIncomplete`, and an
+act bound elsewhere is `EvaluationPositionMismatch`.
 
 ## 8. Scope boundaries
 

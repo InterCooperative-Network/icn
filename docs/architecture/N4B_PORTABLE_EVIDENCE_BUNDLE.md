@@ -133,14 +133,21 @@ state as of the parent) rather than assumed:
 - **Every witness over a carried body is carried.** Several witnesses over one body are a re-signing,
   not duplicity (N1 §9.2.1); dropping to one would mean *choosing* a signature.
 
+**What a bundle discloses.** Every retained body for `S` through `E` goes to the relying party,
+including the grants to the Subject's other devices in this context. It stays within one context
+(one `SubjectId`), but a consumer that hands bundles around should know it reveals the Subject's
+device set up to `E`, not only the one device that acted.
+
 ### 3.3 What the bundler's selection does and does not prove
 
 A bundle proves what the verifier's third claim says: a verdict **under the facts supplied**. It
 does not prove the bundler supplied every fact that exists. A bundler can omit a fact at or below
 `E` (for example one candidate of a fork, or the revocation at `E` itself) and the verifier cannot
-detect the omission from the bundle alone — but it cannot be *deceived* by it either: withholding
-the fact at `E` leaves the prefix incomplete and the verifier fails closed (`PrefixIncomplete`),
-it does not conclude the device is still authorized. That is N1's O-N7 (late fork discovery) and
+detect the omission from the bundle alone. Withholding the fact at `E` leaves the prefix incomplete
+and the verifier fails closed (`PrefixIncomplete`). Withholding one candidate of a fork below `E`
+is **not** detectable: the remaining chain is clean, and the verifier returns a verdict where the
+full fact set would have halted the Subject. A bundle therefore proves a verdict under the facts it
+carries, never that no conflicting fact exists. That is N1's O-N7 (late fork discovery) and
 the N3 replication question (#2598), neither of which a transport format can close. What the
 container **does** guarantee is that the bundler cannot *add* a fact outside scope (§3.4), cannot
 substitute a body for the one its witnesses are over (§5), and cannot make the verifier evaluate at
@@ -481,8 +488,10 @@ Every field comes from the `VerifiedDeviceAct` that `verify_evidence_bundle` ret
 is that verified act's own id, over the exact bytes whose signature verified, not an id computed
 apart from verification. `authorized` means "authorized under the facts this bundle carries, at
 the position the relying party named": it is not current authorization, completeness of the
-Subject's history, or finality (N4-A §2, §3.3 above). The verb is CLI-REACHABLE library code;
-nothing in production calls it.
+Subject's history, or finality (N4-A §2; §3.3 above). The verb is CLI-REACHABLE library code;
+nothing in production calls it. `device_did` is the key-derived spelling of the device Principal
+(IS §3): it names a device, never a Subject or a member, and MUST NOT be fed into a legacy
+`did:icn:` member or Subject path.
 
 `inspect` prints the bundle's own scope (`subject`, `evaluation_position`), each fact (`index`,
 `kind_tag`, `subject`, `position`, `event_id`, `witness_count`) and the act (`subject`, `device`,
@@ -502,7 +511,9 @@ facts and passes that.)
 
 Everything in `N4A_DEVICE_AUTHORITY_EVALUATION.md` §9.3, plus:
 
-**MAY:** carry a bundle over any transport; store a bundle as the record of what was evaluated;
+**MAY:** carry a bundle over any transport; store a bundle as the record of what was evaluated,
+where the consumer has its own basis to retain it — a valid bundle is not permission to keep it,
+and retention is a separate decision (see the PROPOSED ADR-0089);
 treat `bundle_id` as the identity of *what was carried* (it is witness-dependent, unlike `act_id`);
 run `icnctl device-authority verify` as its relying party and gate on exit code and `class`;
 re-verify at a later `position` once it has retained more facts, by assembling a new bundle.

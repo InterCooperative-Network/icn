@@ -64,7 +64,7 @@ but unreachable, stubbed or unsafe · **DOC-ONLY** · **MISSING**.
 | (e′) legacy recovery | `recovery.rs`, RPC `recovery.*`, SDIS recovery routes | EXPERIMENTAL — **unsafe**: node key signs the trustee attestation; SDIS complete is a stub | HIA F13; #2591, #2448 | `icn-rpc/src/handler/recovery.rs:138`; `api/sdis/recovery.rs:306` |
 | (f) durable local facts | `AuthorityFactStore` + sled adapter (N1-D) | LIB-TESTED; merged in #2800, rehydrated fail-closed at `icnd` startup since #2843 | #2799/#2694; ADR-0087, ADR-0088 | record = `event_id ‖ signature → canonical body`; no runtime producer writes facts |
 | (g) external facts+act container | `EvidenceBundle` (`icn.n4.evidence-bundle`), `verify_evidence_bundle` (N4-B, converged 2026-10-04) | LIB-TESTED (25 tests observed 2026-10-27 + an independent Python reference) | `N4B_PORTABLE_EVIDENCE_BUNDLE.md` | `evidence_bundle.rs`; fact record = N1-D layout |
-| (h) stateless CLI consumer | `icnctl device-authority verify\|inspect` | CLI-REACHABLE (5 end-to-end tests observed on icn-dev) — a relying party, never an authority; not PRODUCTION: no runtime, route or deployment exercises it | N4-B §4 | `bins/icnctl/src/device_authority.rs` |
+| (h) stateless CLI consumer | `icnctl device-authority verify\|inspect` | CLI-REACHABLE (5 end-to-end tests observed on icn-dev) — a relying party, never an authority; not PRODUCTION: no runtime, route or deployment exercises it | N4-B §9 | `bins/icnctl/src/device_authority.rs` |
 | (h′) enrollment request and attenuated approval | `EnrollmentRequestV1`, `approve_enrollment` (N4-C) | LIB-TESTED (11 tests observed 2026-10-27; ceremony end to end in a fixture) | `N4C_DEVICE_ENROLLMENT_REQUEST.md` | `device_enrollment.rs`; transport, UI, delivery not built |
 | (m) device ↔ transport-channel binding | `ChannelBindingV1` as the payload of a `Present` `DeviceActV1` (N4-D) | LIB-TESTED (16 tests observed 2026-10-27; a connection is admitted only through N4-E current admission, `admit_channel_binding`; `verify_channel_binding_at` is the separate historical question); no runtime calls it | `N4D_DEVICE_CHANNEL_BINDING.md` | `device_channel_binding.rs`; node `BindingInfo` not reused |
 | (n) current admission position (class 2) | `admission_position`, `verify_device_act_at_admission` (N4-E) | LIB-TESTED (9 tests observed 2026-10-27) | `N4E_CURRENT_ADMISSION.md` | `device_admission.rs`; position from the relying party's own facts, never the act |
@@ -93,8 +93,9 @@ and `B` through N4-C requests and attenuated approvals, carries the facts and ea
 bytes to an independent relying party, revokes `A`, and pins: `A` refused and `B` accepted at the
 current position; `S`'s identifier, authority set, generation (still 0: nothing rotates) and
 pre-rotation commitment unchanged; the same verdicts for every arrival order of the facts; and a
-relying party whose facts stop before the revocation failing closed (`PrefixIncomplete`) rather
-than accepting `A`. 2 tests observed on icn-dev.
+relying party that evaluates at a position it does not hold failing closed (`PrefixIncomplete`).
+A relying party whose facts stop before the revocation still accepts `A` at its own older tip:
+it is behind, not deceived (N4-E §4). 2 tests observed 2026-10-27.
 
 ---
 
@@ -104,7 +105,7 @@ than accepting `A`. 2 tests observed on icn-dev.
 |---|---|
 | library API `icn_identity::device_authority` | LIB-TESTED |
 | documented canonical act bytes + cross-implementation vectors | done — N4-A doc §6, §8 |
-| deterministic container for **(N1 facts, act)** that a non-Rust client can carry | **built — N4-B** (`EvidenceBundle`, `icn.n4.evidence-bundle`; 24 tests; independent Python reference) |
+| deterministic container for **(N1 facts, act)** that a non-Rust client can carry | **built — N4-B** (`EvidenceBundle`, `icn.n4.evidence-bundle`; 25 tests; independent Python reference) |
 | stateless `icnctl` verb consuming that container, no `icnd` | **built — `icnctl device-authority verify\|inspect`** (exit 0/1/2 = authorized/refused/malformed; 5 end-to-end tests) |
 | gateway route | deliberately not planned as an authority; at most a hosted relying party (N4-A §9.2) |
 
@@ -251,7 +252,8 @@ it, under the facts retained (N4-A §2); the N1-D record layout (merged, #2800).
 and no consumer that enforces an action on an N4-A result exists today. When one is built, it must
 enforce on a `VerifiedDeviceAct`, never on an authority evaluation alone.
 
-It **MUST NOT**: reimplement encodings, the fold, grant semantics or refusal logic in another
+It **MUST NOT**: use a node's transport or network key as a device Principal (a public node key
+would make the device a correlation handle for the person, IS §2.4); reimplement encodings, the fold, grant semantics or refusal logic in another
 language; treat any account, key, token, VM or machine as the Subject or derive a `SubjectId` from
 one; hold or derive a `ContinuityRoot` on infrastructure; mint a Subject or a context on a
 person's behalf; choose `E` from the act or fall back to the frontier when the act's `E` is not

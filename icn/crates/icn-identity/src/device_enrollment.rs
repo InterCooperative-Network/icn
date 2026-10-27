@@ -284,7 +284,9 @@ pub enum EnrollmentApprovalError {
     /// The approver tried to grant `Recover`, which this path never does.
     #[error("Recover is never granted by enrollment")]
     RecoverNeverGranted,
-    /// The device is the Subject's establishment authority at this generation.
+    /// The device is the establishment key the approver signs with. A device that is another
+    /// member of a multi-key authority set is not caught here; N4-A refuses it at evaluation
+    /// (`DeviceIsEstablishmentAuthority`).
     #[error("the establishment authority cannot be enrolled as a device")]
     DeviceIsEstablishmentAuthority,
 }

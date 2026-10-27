@@ -9,7 +9,7 @@
 //!
 //! It is the container named as "the one missing boundary to build next" in
 //! `docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md` §9.2 item 2. Its contract is
-//! `docs/architecture/N4A_PORTABLE_EVIDENCE_BUNDLE.md`.
+//! `docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md`.
 //!
 //! # The invariant: the container transports evidence, it does not interpret authority
 //!

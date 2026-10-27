@@ -12,8 +12,8 @@ Last Reviewed: 2026-10-04
 `HOME_RUNTIME_IDENTITY_PROFILE.md` (who consumes this) · **Issue:** #2599 (N4) ·
 **Code:** `icn/crates/icn-identity/src/device_enrollment.rs`, `tests/device_enrollment.rs`
 
-> **Truth status.** Normative for the request bytes and the approval rules; **LIB-TESTED** (10
-> tests, including the ceremony end to end in a fixture: request → possession check → attenuated
+> **Truth status.** Normative for the request bytes and the approval rules; **LIB-TESTED** (11
+> tests, observed 2026-10-27, including the ceremony end to end in a fixture: request → possession check → attenuated
 > approval → act accepted inside the grant, refused outside it → revoke → refused; Subject
 > unchanged). Transport, approval UI, persistence of pending requests, delivery of the resulting
 > fact, rotation, replacement and recovery are **not** built. Fixture identities only.
@@ -42,8 +42,8 @@ the device and the person's authority edge.
 | 6. show the human: label, device key fingerprint, requested capabilities, the context | edge UI | — | not built |
 | 7. the human approves with an **attenuated** grant (`granted ⊆ requested`, non-empty, never `Recover`), optionally a position span | edge | decision | — |
 | 8. `approve_enrollment`: refuses a request for another Subject, a wider-than-requested grant, an empty grant, `Recover`, or the establishment key as device; otherwise authors the N1 `Authorize` fact with the edge's establishment key at the next log position | edge | `SignedAuthorityEvent` | **LIB-TESTED** |
-| 9. the fact becomes durable at the edge (N1-D store, #2800) and reaches the device and relying parties | transport | facts in stores | N1-D PROPOSED; delivery not built |
-| 10. a relying party evaluates any later act with N4-A over the facts (carried by N4-B); the result it relies on is the `VerifiedDeviceAct`, never bare evidence | relying party | `DeviceAuthorityEvidence` or a refusal | LIB-TESTED + `icnctl` |
+| 9. the fact becomes durable at the edge (N1-D store, #2800) and reaches the device and relying parties | transport | facts in stores | N1-D merged (#2800, ADR-0087), rehydrated at `icnd` startup (#2843); delivery not built |
+| 10. a relying party evaluates any later act with N4-A over the facts (carried by N4-B); the result it relies on is the `VerifiedDeviceAct`, never bare evidence | relying party | `VerifiedDeviceAct` or a refusal | LIB-TESTED + `icnctl` |
 | 11. the device is lost or replaced: the edge authors `Revoke`; a fresh install presents a **new** request with a **new** key | edge, device | `SignedAuthorityEvent` | LIB-TESTED (`revoke_event`) |
 
 **Rejection** is silence: no fact is produced, and an unapproved request is never durable.
@@ -86,6 +86,9 @@ The domain is distinct from every N1, GEN, N4-A and N4-B separator (pinned).
   behaviour the natural one.
 - **Not an invitation, token or code.** Possession of request bytes confers nothing; only the
   edge's `Authorize` fact does, and only a relying party that holds it concludes anything.
+- **Not a node key.** A device Principal MUST NOT reuse a node's transport or network key: a node
+  key is publicly observable, so the device would become a correlation handle for the person
+  (IS §2.4). A runtime hosted on a node still holds its own per-context device keys.
 
 ## 5. Contradictions settled by the executable ceremony
 
@@ -113,8 +116,10 @@ relationship is the resulting N1 `Authorize` fact and nothing else. The bounded 
 grant's capability set and optional span.
 
 **Runtime.** The Home runtime (a device Principal itself) stores public N1 facts in the N1-D
-layout and its own device keys; it asks "is this act covered?" by building an N4-B bundle and
-running the N4-A verifier (`icnctl device-authority verify`, or the library). The device itself
+layout and its own device keys; it asks "is this act covered?" with the matching operation: **current admission** (N4-E,
+`verify_device_act_at_admission`, or `admit_channel_binding` for a connection) for anything
+settled now, and the historical N4-A verifier (`icnctl device-authority verify`, or the library)
+only for "was it covered at a position I choose". A historical answer never admits anything now. The device itself
 needs locally: its secret, its per-context Principals, and the facts it has received.
 
 **Revocation.** Lost, stolen or reflashed: the edge authors `Revoke`; every relying party that

@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-10-04T04:55:06+00:00
+Generated: 2026-10-27T04:16:16+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-10-04T04:55:06+00:00
 
 ## Snapshot
 
-- Source commit: `2e7dcd4a2b93612bb517d66eec35c31b20680b3e`
+- Source commit: `19df721eacc796e2ea7c31573fae3de8b2986284`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -40,56 +40,56 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl amendment add-change` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2048 |
-| `icnctl amendment list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1947 |
-| `icnctl amendment open-voting` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1990 |
-| `icnctl amendment propose` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1912 |
-| `icnctl amendment show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1966 |
-| `icnctl amendment submit` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1976 |
-| `icnctl amendment vote` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2004 |
-| `icnctl amendment withdraw` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2030 |
-| `icnctl appeal add-evidence` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2153 |
-| `icnctl appeal file` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2085 |
-| `icnctl appeal list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2124 |
-| `icnctl appeal respond` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2183 |
-| `icnctl appeal show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2143 |
-| `icnctl appeal withdraw` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2205 |
-| `icnctl charter create` | live | L1 | `icn/bins/icnctl/src/main.rs`:1795 |
-| `icnctl charter deploy` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1899 |
-| `icnctl charter inspect` | live | L1 | `icn/bins/icnctl/src/main.rs`:1885 |
-| `icnctl charter list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1832 |
-| `icnctl charter ratify` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1865 |
-| `icnctl charter show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1822 |
-| `icnctl charter sign` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1847 |
-| `icnctl charter validate` | live | L1 | `icn/bins/icnctl/src/main.rs`:1879 |
-| `icnctl commons affiliations` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1763 |
-| `icnctl commons anchor` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1756 |
-| `icnctl commons enroll` | live | L1 | `icn/bins/icnctl/src/main.rs`:1745 |
-| `icnctl commons join` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1770 |
-| `icnctl commons leave` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1781 |
-| `icnctl commons status` | live | L1 | `icn/bins/icnctl/src/main.rs`:1742 |
-| `icnctl dispute add-evidence` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1575 |
-| `icnctl dispute assign-mediator` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1586 |
-| `icnctl dispute file` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1547 |
-| `icnctl dispute get` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1569 |
-| `icnctl dispute list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1558 |
-| `icnctl dispute resolve` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1597 |
-| `icnctl gov domain add-member` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1349 |
-| `icnctl gov domain create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1308 |
-| `icnctl gov domain list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1346 |
-| `icnctl gov domain show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1339 |
-| `icnctl gov proposal cancel` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1459 |
-| `icnctl gov proposal close` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1452 |
-| `icnctl gov proposal create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1372 |
-| `icnctl gov proposal list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1434 |
-| `icnctl gov proposal open` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1423 |
-| `icnctl gov proposal show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1445 |
-| `icnctl gov vote cast` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1469 |
-| `icnctl gov vote delegate` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1491 |
-| `icnctl gov vote delegations` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1506 |
-| `icnctl gov vote revoke` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1509 |
-| `icnctl gov vote show` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1484 |
-| `icnctl init-coop` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:134 |
+| `icnctl amendment add-change` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2055 |
+| `icnctl amendment list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1954 |
+| `icnctl amendment open-voting` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1997 |
+| `icnctl amendment propose` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1919 |
+| `icnctl amendment show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1973 |
+| `icnctl amendment submit` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1983 |
+| `icnctl amendment vote` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2011 |
+| `icnctl amendment withdraw` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2037 |
+| `icnctl appeal add-evidence` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2160 |
+| `icnctl appeal file` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2092 |
+| `icnctl appeal list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2131 |
+| `icnctl appeal respond` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2190 |
+| `icnctl appeal show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2150 |
+| `icnctl appeal withdraw` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2212 |
+| `icnctl charter create` | live | L1 | `icn/bins/icnctl/src/main.rs`:1802 |
+| `icnctl charter deploy` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1906 |
+| `icnctl charter inspect` | live | L1 | `icn/bins/icnctl/src/main.rs`:1892 |
+| `icnctl charter list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1839 |
+| `icnctl charter ratify` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1872 |
+| `icnctl charter show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1829 |
+| `icnctl charter sign` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1854 |
+| `icnctl charter validate` | live | L1 | `icn/bins/icnctl/src/main.rs`:1886 |
+| `icnctl commons affiliations` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1770 |
+| `icnctl commons anchor` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1763 |
+| `icnctl commons enroll` | live | L1 | `icn/bins/icnctl/src/main.rs`:1752 |
+| `icnctl commons join` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1777 |
+| `icnctl commons leave` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1788 |
+| `icnctl commons status` | live | L1 | `icn/bins/icnctl/src/main.rs`:1749 |
+| `icnctl dispute add-evidence` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1582 |
+| `icnctl dispute assign-mediator` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1593 |
+| `icnctl dispute file` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1554 |
+| `icnctl dispute get` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1576 |
+| `icnctl dispute list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1565 |
+| `icnctl dispute resolve` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1604 |
+| `icnctl gov domain add-member` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1356 |
+| `icnctl gov domain create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1315 |
+| `icnctl gov domain list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1353 |
+| `icnctl gov domain show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1346 |
+| `icnctl gov proposal cancel` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1466 |
+| `icnctl gov proposal close` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1459 |
+| `icnctl gov proposal create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1379 |
+| `icnctl gov proposal list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1441 |
+| `icnctl gov proposal open` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1430 |
+| `icnctl gov proposal show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1452 |
+| `icnctl gov vote cast` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1476 |
+| `icnctl gov vote delegate` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1498 |
+| `icnctl gov vote delegations` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1513 |
+| `icnctl gov vote revoke` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1516 |
+| `icnctl gov vote show` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1491 |
+| `icnctl init-coop` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:141 |
 | `icnctl institution bootstrap apply` | partial | L1 | `icn/bins/icnctl/src/institution_bootstrap.rs`:68 |
 | `icnctl institution bootstrap plan` | live | L1 | `icn/bins/icnctl/src/institution_bootstrap.rs`:57 |
 | `icnctl institution bootstrap validate` | live | L1 | `icn/bins/icnctl/src/institution_bootstrap.rs`:46 |
@@ -100,137 +100,137 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl audit verify` | partial | L1 | `icn/bins/icnctl/src/main.rs`:493 |
+| `icnctl audit verify` | partial | L1 | `icn/bins/icnctl/src/main.rs`:500 |
 | `icnctl backup` | live | L1 | `icn/bins/icnctl/src/main.rs`:104 |
-| `icnctl federation add` | live | L1 | `icn/bins/icnctl/src/main.rs`:1043 |
-| `icnctl federation attestation from` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1203 |
-| `icnctl federation attestation issue` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1209 |
-| `icnctl federation attestation list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1197 |
-| `icnctl federation clearing create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1240 |
-| `icnctl federation clearing list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1231 |
-| `icnctl federation clearing position` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1278 |
-| `icnctl federation clearing rate` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1259 |
-| `icnctl federation clearing settle` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1284 |
-| `icnctl federation clearing show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1234 |
-| `icnctl federation config` | live | L1 | `icn/bins/icnctl/src/main.rs`:1065 |
-| `icnctl federation connect` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1059 |
-| `icnctl federation coop list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1125 |
-| `icnctl federation coop register` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1134 |
-| `icnctl federation coop show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1128 |
-| `icnctl federation coop update` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1153 |
-| `icnctl federation gateway-connect` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1080 |
-| `icnctl federation invite` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1077 |
-| `icnctl federation peers` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1040 |
-| `icnctl federation remove` | live | L1 | `icn/bins/icnctl/src/main.rs`:1053 |
-| `icnctl federation set` | live | L1 | `icn/bins/icnctl/src/main.rs`:1068 |
-| `icnctl federation status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1037 |
-| `icnctl federation vouch issue` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1170 |
-| `icnctl federation vouch list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1185 |
-| `icnctl federation vouch revoke` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1188 |
-| `icnctl network dial` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1018 |
-| `icnctl network peers` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1015 |
-| `icnctl network stats` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1028 |
-| `icnctl network status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1031 |
-| `icnctl policy list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:712 |
-| `icnctl policy remove` | partial | L1 | `icn/bins/icnctl/src/main.rs`:715 |
-| `icnctl policy set` | partial | L1 | `icn/bins/icnctl/src/main.rs`:694 |
-| `icnctl policy show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:705 |
-| `icnctl preflight` | partial | L1 | `icn/bins/icnctl/src/main.rs`:217 |
-| `icnctl quota list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:736 |
-| `icnctl quota show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:725 |
+| `icnctl federation add` | live | L1 | `icn/bins/icnctl/src/main.rs`:1050 |
+| `icnctl federation attestation from` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1210 |
+| `icnctl federation attestation issue` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1216 |
+| `icnctl federation attestation list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1204 |
+| `icnctl federation clearing create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1247 |
+| `icnctl federation clearing list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1238 |
+| `icnctl federation clearing position` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1285 |
+| `icnctl federation clearing rate` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1266 |
+| `icnctl federation clearing settle` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1291 |
+| `icnctl federation clearing show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1241 |
+| `icnctl federation config` | live | L1 | `icn/bins/icnctl/src/main.rs`:1072 |
+| `icnctl federation connect` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1066 |
+| `icnctl federation coop list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1132 |
+| `icnctl federation coop register` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1141 |
+| `icnctl federation coop show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1135 |
+| `icnctl federation coop update` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1160 |
+| `icnctl federation gateway-connect` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1087 |
+| `icnctl federation invite` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1084 |
+| `icnctl federation peers` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1047 |
+| `icnctl federation remove` | live | L1 | `icn/bins/icnctl/src/main.rs`:1060 |
+| `icnctl federation set` | live | L1 | `icn/bins/icnctl/src/main.rs`:1075 |
+| `icnctl federation status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1044 |
+| `icnctl federation vouch issue` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1177 |
+| `icnctl federation vouch list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1192 |
+| `icnctl federation vouch revoke` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1195 |
+| `icnctl network dial` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1025 |
+| `icnctl network peers` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1022 |
+| `icnctl network stats` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1035 |
+| `icnctl network status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1038 |
+| `icnctl policy list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:719 |
+| `icnctl policy remove` | partial | L1 | `icn/bins/icnctl/src/main.rs`:722 |
+| `icnctl policy set` | partial | L1 | `icn/bins/icnctl/src/main.rs`:701 |
+| `icnctl policy show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:712 |
+| `icnctl preflight` | partial | L1 | `icn/bins/icnctl/src/main.rs`:224 |
+| `icnctl quota list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:743 |
+| `icnctl quota show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:732 |
 | `icnctl restore` | live | L1 | `icn/bins/icnctl/src/main.rs`:110 |
-| `icnctl snapshot cleanup` | live | L1 | `icn/bins/icnctl/src/main.rs`:1537 |
-| `icnctl snapshot create` | live | L1 | `icn/bins/icnctl/src/main.rs`:1519 |
-| `icnctl snapshot delete` | live | L1 | `icn/bins/icnctl/src/main.rs`:1531 |
-| `icnctl snapshot list` | live | L1 | `icn/bins/icnctl/src/main.rs`:1522 |
-| `icnctl snapshot verify` | live | L1 | `icn/bins/icnctl/src/main.rs`:1525 |
+| `icnctl snapshot cleanup` | live | L1 | `icn/bins/icnctl/src/main.rs`:1544 |
+| `icnctl snapshot create` | live | L1 | `icn/bins/icnctl/src/main.rs`:1526 |
+| `icnctl snapshot delete` | live | L1 | `icn/bins/icnctl/src/main.rs`:1538 |
+| `icnctl snapshot list` | live | L1 | `icn/bins/icnctl/src/main.rs`:1529 |
+| `icnctl snapshot verify` | live | L1 | `icn/bins/icnctl/src/main.rs`:1532 |
 | `icnctl status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:53 |
-| `icnctl steward attesters` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1639 |
-| `icnctl steward check-vui` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1677 |
-| `icnctl steward config` | live | L1 | `icn/bins/icnctl/src/main.rs`:1614 |
-| `icnctl steward enrollment-status` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1694 |
-| `icnctl steward info` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1617 |
-| `icnctl steward issue-token` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1725 |
-| `icnctl steward list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1626 |
-| `icnctl steward recovery-status` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1719 |
-| `icnctl steward register` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1646 |
-| `icnctl steward retire` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1668 |
-| `icnctl steward start-enrollment` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1683 |
-| `icnctl steward start-recovery` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1700 |
-| `icnctl steward status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1611 |
-| `icnctl steward topics` | live | L1 | `icn/bins/icnctl/src/main.rs`:1736 |
-| `icnctl trust add` | partial | L1 | `icn/bins/icnctl/src/main.rs`:875 |
-| `icnctl trust list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:888 |
-| `icnctl trust remove` | partial | L1 | `icn/bins/icnctl/src/main.rs`:897 |
-| `icnctl trust show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:891 |
-| `icnctl verify-backup` | live | L1 | `icn/bins/icnctl/src/main.rs`:120 |
+| `icnctl steward attesters` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1646 |
+| `icnctl steward check-vui` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1684 |
+| `icnctl steward config` | live | L1 | `icn/bins/icnctl/src/main.rs`:1621 |
+| `icnctl steward enrollment-status` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1701 |
+| `icnctl steward info` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1624 |
+| `icnctl steward issue-token` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1732 |
+| `icnctl steward list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1633 |
+| `icnctl steward recovery-status` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1726 |
+| `icnctl steward register` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1653 |
+| `icnctl steward retire` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1675 |
+| `icnctl steward start-enrollment` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1690 |
+| `icnctl steward start-recovery` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1707 |
+| `icnctl steward status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1618 |
+| `icnctl steward topics` | live | L1 | `icn/bins/icnctl/src/main.rs`:1743 |
+| `icnctl trust add` | partial | L1 | `icn/bins/icnctl/src/main.rs`:882 |
+| `icnctl trust list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:895 |
+| `icnctl trust remove` | partial | L1 | `icn/bins/icnctl/src/main.rs`:904 |
+| `icnctl trust show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:898 |
+| `icnctl verify-backup` | live | L1 | `icn/bins/icnctl/src/main.rs`:127 |
 
 ### developer (43)
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl api export-openapi` | live | L1 | `icn/bins/icnctl/src/main.rs`:354 |
-| `icnctl auth token` | partial | L1 | `icn/bins/icnctl/src/main.rs`:573 |
-| `icnctl completions` | live | L1 | `icn/bins/icnctl/src/main.rs`:228 |
-| `icnctl compute cancel` | partial | L1 | `icn/bins/icnctl/src/main.rs`:681 |
-| `icnctl compute status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:675 |
-| `icnctl compute submit` | partial | L1 | `icn/bins/icnctl/src/main.rs`:613 |
-| `icnctl compute submit-wasm` | partial | L1 | `icn/bins/icnctl/src/main.rs`:644 |
-| `icnctl contract call` | partial | L1 | `icn/bins/icnctl/src/main.rs`:993 |
-| `icnctl contract deploy` | partial | L1 | `icn/bins/icnctl/src/main.rs`:960 |
-| `icnctl contract deploy-signed` | partial | L1 | `icn/bins/icnctl/src/main.rs`:987 |
-| `icnctl contract list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1009 |
-| `icnctl contract prepare` | live | L1 | `icn/bins/icnctl/src/main.rs`:967 |
-| `icnctl contract sign` | live | L1 | `icn/bins/icnctl/src/main.rs`:977 |
-| `icnctl device add` | live | L1 | `icn/bins/icnctl/src/main.rs`:781 |
-| `icnctl device approve` | live | L1 | `icn/bins/icnctl/src/main.rs`:795 |
-| `icnctl device list` | live | L1 | `icn/bins/icnctl/src/main.rs`:778 |
-| `icnctl device revoke` | live | L1 | `icn/bins/icnctl/src/main.rs`:801 |
-| `icnctl id export` | live | L1 | `icn/bins/icnctl/src/main.rs`:763 |
-| `icnctl id import` | live | L1 | `icn/bins/icnctl/src/main.rs`:769 |
-| `icnctl id init` | live | L1 | `icn/bins/icnctl/src/main.rs`:746 |
-| `icnctl id rotate` | live | L1 | `icn/bins/icnctl/src/main.rs`:752 |
-| `icnctl id show` | live | L1 | `icn/bins/icnctl/src/main.rs`:749 |
-| `icnctl ledger balance` | partial | L1 | `icn/bins/icnctl/src/main.rs`:909 |
-| `icnctl ledger head` | partial | L1 | `icn/bins/icnctl/src/main.rs`:906 |
-| `icnctl ledger history` | partial | L1 | `icn/bins/icnctl/src/main.rs`:919 |
-| `icnctl ledger quarantine drop` | partial | L1 | `icn/bins/icnctl/src/main.rs`:948 |
-| `icnctl ledger quarantine get` | partial | L1 | `icn/bins/icnctl/src/main.rs`:936 |
-| `icnctl ledger quarantine list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:933 |
-| `icnctl ledger quarantine purge` | partial | L1 | `icn/bins/icnctl/src/main.rs`:954 |
-| `icnctl ledger quarantine release` | partial | L1 | `icn/bins/icnctl/src/main.rs`:942 |
-| `icnctl receipts allocation` | partial | L1 | `icn/bins/icnctl/src/main.rs`:462 |
-| `icnctl receipts chain` | partial | L1 | `icn/bins/icnctl/src/main.rs`:444 |
-| `icnctl receipts intent` | partial | L1 | `icn/bins/icnctl/src/main.rs`:476 |
-| `icnctl recovery attest` | partial | L1 | `icn/bins/icnctl/src/main.rs`:837 |
-| `icnctl recovery cancel` | partial | L1 | `icn/bins/icnctl/src/main.rs`:862 |
-| `icnctl recovery config` | live | L1 | `icn/bins/icnctl/src/main.rs`:828 |
-| `icnctl recovery finalize` | partial | L1 | `icn/bins/icnctl/src/main.rs`:856 |
-| `icnctl recovery initiate` | partial | L1 | `icn/bins/icnctl/src/main.rs`:831 |
-| `icnctl recovery list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:847 |
-| `icnctl recovery setup` | live | L1 | `icn/bins/icnctl/src/main.rs`:814 |
-| `icnctl recovery status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:850 |
-| `icnctl registry list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:529 |
-| `icnctl registry trace` | partial | L1 | `icn/bins/icnctl/src/main.rs`:552 |
+| `icnctl api export-openapi` | live | L1 | `icn/bins/icnctl/src/main.rs`:361 |
+| `icnctl auth token` | partial | L1 | `icn/bins/icnctl/src/main.rs`:580 |
+| `icnctl completions` | live | L1 | `icn/bins/icnctl/src/main.rs`:235 |
+| `icnctl compute cancel` | partial | L1 | `icn/bins/icnctl/src/main.rs`:688 |
+| `icnctl compute status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:682 |
+| `icnctl compute submit` | partial | L1 | `icn/bins/icnctl/src/main.rs`:620 |
+| `icnctl compute submit-wasm` | partial | L1 | `icn/bins/icnctl/src/main.rs`:651 |
+| `icnctl contract call` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1000 |
+| `icnctl contract deploy` | partial | L1 | `icn/bins/icnctl/src/main.rs`:967 |
+| `icnctl contract deploy-signed` | partial | L1 | `icn/bins/icnctl/src/main.rs`:994 |
+| `icnctl contract list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1016 |
+| `icnctl contract prepare` | live | L1 | `icn/bins/icnctl/src/main.rs`:974 |
+| `icnctl contract sign` | live | L1 | `icn/bins/icnctl/src/main.rs`:984 |
+| `icnctl device add` | live | L1 | `icn/bins/icnctl/src/main.rs`:788 |
+| `icnctl device approve` | live | L1 | `icn/bins/icnctl/src/main.rs`:802 |
+| `icnctl device list` | live | L1 | `icn/bins/icnctl/src/main.rs`:785 |
+| `icnctl device revoke` | live | L1 | `icn/bins/icnctl/src/main.rs`:808 |
+| `icnctl id export` | live | L1 | `icn/bins/icnctl/src/main.rs`:770 |
+| `icnctl id import` | live | L1 | `icn/bins/icnctl/src/main.rs`:776 |
+| `icnctl id init` | live | L1 | `icn/bins/icnctl/src/main.rs`:753 |
+| `icnctl id rotate` | live | L1 | `icn/bins/icnctl/src/main.rs`:759 |
+| `icnctl id show` | live | L1 | `icn/bins/icnctl/src/main.rs`:756 |
+| `icnctl ledger balance` | partial | L1 | `icn/bins/icnctl/src/main.rs`:916 |
+| `icnctl ledger head` | partial | L1 | `icn/bins/icnctl/src/main.rs`:913 |
+| `icnctl ledger history` | partial | L1 | `icn/bins/icnctl/src/main.rs`:926 |
+| `icnctl ledger quarantine drop` | partial | L1 | `icn/bins/icnctl/src/main.rs`:955 |
+| `icnctl ledger quarantine get` | partial | L1 | `icn/bins/icnctl/src/main.rs`:943 |
+| `icnctl ledger quarantine list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:940 |
+| `icnctl ledger quarantine purge` | partial | L1 | `icn/bins/icnctl/src/main.rs`:961 |
+| `icnctl ledger quarantine release` | partial | L1 | `icn/bins/icnctl/src/main.rs`:949 |
+| `icnctl receipts allocation` | partial | L1 | `icn/bins/icnctl/src/main.rs`:469 |
+| `icnctl receipts chain` | partial | L1 | `icn/bins/icnctl/src/main.rs`:451 |
+| `icnctl receipts intent` | partial | L1 | `icn/bins/icnctl/src/main.rs`:483 |
+| `icnctl recovery attest` | partial | L1 | `icn/bins/icnctl/src/main.rs`:844 |
+| `icnctl recovery cancel` | partial | L1 | `icn/bins/icnctl/src/main.rs`:869 |
+| `icnctl recovery config` | live | L1 | `icn/bins/icnctl/src/main.rs`:835 |
+| `icnctl recovery finalize` | partial | L1 | `icn/bins/icnctl/src/main.rs`:863 |
+| `icnctl recovery initiate` | partial | L1 | `icn/bins/icnctl/src/main.rs`:838 |
+| `icnctl recovery list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:854 |
+| `icnctl recovery setup` | live | L1 | `icn/bins/icnctl/src/main.rs`:821 |
+| `icnctl recovery status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:857 |
+| `icnctl registry list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:536 |
+| `icnctl registry trace` | partial | L1 | `icn/bins/icnctl/src/main.rs`:559 |
 
 ### maintainer (3)
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl coop entity-backfill-surrogates` | live | L1 | `icn/bins/icnctl/src/main.rs`:285 |
-| `icnctl coop entity-report` | live | L1 | `icn/bins/icnctl/src/main.rs`:246 |
-| `icnctl coop unknown-legacy-report` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:271 |
+| `icnctl coop entity-backfill-surrogates` | live | L1 | `icn/bins/icnctl/src/main.rs`:292 |
+| `icnctl coop entity-report` | live | L1 | `icn/bins/icnctl/src/main.rs`:253 |
+| `icnctl coop unknown-legacy-report` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:278 |
 
 ### unknown (6)
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl appliance emit-manifest` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:368 |
-| `icnctl appliance verify-manifest` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:430 |
+| `icnctl appliance emit-manifest` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:375 |
+| `icnctl appliance verify-manifest` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:437 |
 | `icnctl device-authority inspect` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/device_authority.rs`:59 |
 | `icnctl device-authority verify` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/device_authority.rs`:47 |
-| `icnctl treasury entity-backfill-apply` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:335 |
-| `icnctl treasury entity-backfill-report` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:316 |
+| `icnctl treasury entity-backfill-apply` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:342 |
+| `icnctl treasury entity-backfill-report` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:323 |
 
 ## Feature-gated commands (not in the default build)
 
@@ -238,7 +238,7 @@ These commands are guarded by a Cargo `#[cfg(feature = …)]` and are **absent f
 
 | Command | Required cfg | Role (curated) | Proof | Source |
 |---|---|---|---|---|
-| `icnctl id upgrade-pq` | `cfg(feature = "post-quantum")` | developer | L1 | `icn/bins/icnctl/src/main.rs`:760 |
+| `icnctl id upgrade-pq` | `cfg(feature = "post-quantum")` | developer | L1 | `icn/bins/icnctl/src/main.rs`:767 |
 
 ## Implementation status classification
 
@@ -268,167 +268,167 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 
 | Command | Status | Basis (source/test evidence) | Source |
 |---|---|---|---|
-| `icnctl api export-openapi` | live | serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`icn/bins/icnctl/src/main.rs` ApiCommands::ExportOpenapi) | `icn/bins/icnctl/src/main.rs`:354 |
+| `icnctl api export-openapi` | live | serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`icn/bins/icnctl/src/main.rs` ApiCommands::ExportOpenapi) | `icn/bins/icnctl/src/main.rs`:361 |
 | `icnctl backup` | live | local data-dir backup; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs` asserts success + tarball created) | `icn/bins/icnctl/src/main.rs`:104 |
-| `icnctl charter create` | live | local charter-document construction; builds the charter and `std::fs::write`s it to a file; no client/network (`icn/bins/icnctl/src/main.rs` CharterCommands::Create) | `icn/bins/icnctl/src/main.rs`:1795 |
-| `icnctl charter inspect` | live | local CCL parse+print `icn_ccl::schema::CclDocument::from_yaml`; no client/network (`icn/bins/icnctl/src/main.rs` CharterCommands::Inspect) | `icn/bins/icnctl/src/main.rs`:1885 |
-| `icnctl charter validate` | live | local CCL validation `icn_ccl::schema::CclDocument::from_yaml` of a charter file; no client/network (`icn/bins/icnctl/src/main.rs` CharterCommands::Validate) | `icn/bins/icnctl/src/main.rs`:1879 |
-| `icnctl commons enroll` | live | local: reads the keystore for the DID and prints enrollment guidance (the actual enrollment is the out-of-band steward/in-person flow); no network (`icn/bins/icnctl/src/main.rs` CommonsCommands::Enroll) | `icn/bins/icnctl/src/main.rs`:1745 |
-| `icnctl commons status` | live | local Commons-holder status: reads the keystore via `AgeKeyStore` and prints identity/enrollment status; no network (`icn/bins/icnctl/src/main.rs` CommonsCommands::Status) | `icn/bins/icnctl/src/main.rs`:1742 |
-| `icnctl completions` | live | shell-completion generation via `clap_complete::generate`; local-only, no network (`icn/bins/icnctl/src/main.rs` Commands::Completions) | `icn/bins/icnctl/src/main.rs`:228 |
-| `icnctl contract prepare` | live | local contract-deployment preparation `handle_contract_prepare` (reads contract JSON, signs with keystore, `std::fs::write`s the deployment file); sync, no client/network (`icn/bins/icnctl/src/main.rs` ContractCommands::Prepare) | `icn/bins/icnctl/src/main.rs`:967 |
-| `icnctl contract sign` | live | local deployment-file co-signing `handle_contract_sign` (reads deployment file, signs with keystore, `std::fs::write`s output); sync, no client/network (`icn/bins/icnctl/src/main.rs` ContractCommands::Sign) | `icn/bins/icnctl/src/main.rs`:977 |
-| `icnctl coop entity-backfill-surrogates` | live | local coop-store surrogate backfill; integration-tested (`icn/bins/icnctl/tests/coop_entity_backfill_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:285 |
-| `icnctl coop entity-report` | live | read-only local coop-store report; integration-tested (`icn/bins/icnctl/tests/coop_entity_report_test.rs`, `icn/bins/icnctl/tests/coop_entity_backfill_test.rs` assert success + JSON) | `icn/bins/icnctl/src/main.rs`:246 |
-| `icnctl device add` | live | local keystore device add; integration-tested (`icn/bins/icnctl/tests/qr_code_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:781 |
-| `icnctl device approve` | live | local keystore device-approval from a request file via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Approve) | `icn/bins/icnctl/src/main.rs`:795 |
-| `icnctl device list` | live | local keystore device listing (`AgeKeyStore::get_did_document`/`get_device_id`) in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::List) | `icn/bins/icnctl/src/main.rs`:778 |
-| `icnctl device revoke` | live | local keystore device revocation via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Revoke) | `icn/bins/icnctl/src/main.rs`:801 |
-| `icnctl federation add` | live | local-only: validates the `icn://` URL then appends the peer to `network.bootstrap_peers` and `config.to_file(icn.toml)` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Add) | `icn/bins/icnctl/src/main.rs`:1043 |
-| `icnctl federation config` | live | local-only: reads `icn.toml` and prints the `[federation]` config — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Config) | `icn/bins/icnctl/src/main.rs`:1065 |
-| `icnctl federation remove` | live | local-only: removes matching bootstrap peers from `icn.toml` and `config.to_file` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Remove) | `icn/bins/icnctl/src/main.rs`:1053 |
-| `icnctl federation set` | live | local-only: sets a `federation.*` key in `icn.toml` and `config.to_file` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Set) | `icn/bins/icnctl/src/main.rs`:1068 |
-| `icnctl id export` | live | local passphrase-gated keystore export via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Export) | `icn/bins/icnctl/src/main.rs`:763 |
-| `icnctl id import` | live | local keystore import via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Import) | `icn/bins/icnctl/src/main.rs`:769 |
-| `icnctl id init` | live | local keystore init; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs` spawn the binary, assert success) | `icn/bins/icnctl/src/main.rs`:746 |
-| `icnctl id rotate` | live | local keystore rotation `AgeKeyStore::rotate` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Rotate) | `icn/bins/icnctl/src/main.rs`:752 |
-| `icnctl id show` | live | local keystore read; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs`) | `icn/bins/icnctl/src/main.rs`:749 |
+| `icnctl charter create` | live | local charter-document construction; builds the charter and `std::fs::write`s it to a file; no client/network (`icn/bins/icnctl/src/main.rs` CharterCommands::Create) | `icn/bins/icnctl/src/main.rs`:1802 |
+| `icnctl charter inspect` | live | local CCL parse+print `icn_ccl::schema::CclDocument::from_yaml`; no client/network (`icn/bins/icnctl/src/main.rs` CharterCommands::Inspect) | `icn/bins/icnctl/src/main.rs`:1892 |
+| `icnctl charter validate` | live | local CCL validation `icn_ccl::schema::CclDocument::from_yaml` of a charter file; no client/network (`icn/bins/icnctl/src/main.rs` CharterCommands::Validate) | `icn/bins/icnctl/src/main.rs`:1886 |
+| `icnctl commons enroll` | live | local: reads the keystore for the DID and prints enrollment guidance (the actual enrollment is the out-of-band steward/in-person flow); no network (`icn/bins/icnctl/src/main.rs` CommonsCommands::Enroll) | `icn/bins/icnctl/src/main.rs`:1752 |
+| `icnctl commons status` | live | local Commons-holder status: reads the keystore via `AgeKeyStore` and prints identity/enrollment status; no network (`icn/bins/icnctl/src/main.rs` CommonsCommands::Status) | `icn/bins/icnctl/src/main.rs`:1749 |
+| `icnctl completions` | live | shell-completion generation via `clap_complete::generate`; local-only, no network (`icn/bins/icnctl/src/main.rs` Commands::Completions) | `icn/bins/icnctl/src/main.rs`:235 |
+| `icnctl contract prepare` | live | local contract-deployment preparation `handle_contract_prepare` (reads contract JSON, signs with keystore, `std::fs::write`s the deployment file); sync, no client/network (`icn/bins/icnctl/src/main.rs` ContractCommands::Prepare) | `icn/bins/icnctl/src/main.rs`:974 |
+| `icnctl contract sign` | live | local deployment-file co-signing `handle_contract_sign` (reads deployment file, signs with keystore, `std::fs::write`s output); sync, no client/network (`icn/bins/icnctl/src/main.rs` ContractCommands::Sign) | `icn/bins/icnctl/src/main.rs`:984 |
+| `icnctl coop entity-backfill-surrogates` | live | local coop-store surrogate backfill; integration-tested (`icn/bins/icnctl/tests/coop_entity_backfill_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:292 |
+| `icnctl coop entity-report` | live | read-only local coop-store report; integration-tested (`icn/bins/icnctl/tests/coop_entity_report_test.rs`, `icn/bins/icnctl/tests/coop_entity_backfill_test.rs` assert success + JSON) | `icn/bins/icnctl/src/main.rs`:253 |
+| `icnctl device add` | live | local keystore device add; integration-tested (`icn/bins/icnctl/tests/qr_code_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:788 |
+| `icnctl device approve` | live | local keystore device-approval from a request file via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Approve) | `icn/bins/icnctl/src/main.rs`:802 |
+| `icnctl device list` | live | local keystore device listing (`AgeKeyStore::get_did_document`/`get_device_id`) in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::List) | `icn/bins/icnctl/src/main.rs`:785 |
+| `icnctl device revoke` | live | local keystore device revocation via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Revoke) | `icn/bins/icnctl/src/main.rs`:808 |
+| `icnctl federation add` | live | local-only: validates the `icn://` URL then appends the peer to `network.bootstrap_peers` and `config.to_file(icn.toml)` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Add) | `icn/bins/icnctl/src/main.rs`:1050 |
+| `icnctl federation config` | live | local-only: reads `icn.toml` and prints the `[federation]` config — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Config) | `icn/bins/icnctl/src/main.rs`:1072 |
+| `icnctl federation remove` | live | local-only: removes matching bootstrap peers from `icn.toml` and `config.to_file` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Remove) | `icn/bins/icnctl/src/main.rs`:1060 |
+| `icnctl federation set` | live | local-only: sets a `federation.*` key in `icn.toml` and `config.to_file` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Set) | `icn/bins/icnctl/src/main.rs`:1075 |
+| `icnctl id export` | live | local passphrase-gated keystore export via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Export) | `icn/bins/icnctl/src/main.rs`:770 |
+| `icnctl id import` | live | local keystore import via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Import) | `icn/bins/icnctl/src/main.rs`:776 |
+| `icnctl id init` | live | local keystore init; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs` spawn the binary, assert success) | `icn/bins/icnctl/src/main.rs`:753 |
+| `icnctl id rotate` | live | local keystore rotation `AgeKeyStore::rotate` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Rotate) | `icn/bins/icnctl/src/main.rs`:759 |
+| `icnctl id show` | live | local keystore read; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs`) | `icn/bins/icnctl/src/main.rs`:756 |
 | `icnctl institution bootstrap plan` | live | local bootstrap plan report `build_plan_report` (sync `pub fn`, no network) (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap -> InstitutionBootstrapCommands::Plan) | `icn/bins/icnctl/src/institution_bootstrap.rs`:57 |
 | `icnctl institution bootstrap validate` | live | local package validation `validate_package` (sync `pub fn`, reads the package dir, no network) (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap -> InstitutionBootstrapCommands::Validate) | `icn/bins/icnctl/src/institution_bootstrap.rs`:46 |
-| `icnctl recovery config` | live | local keystore read: opens+unlocks `AgeKeyStore` and prints the DID document's recovery config; no client/network (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Config) | `icn/bins/icnctl/src/main.rs`:828 |
-| `icnctl recovery setup` | live | local keystore op: opens+unlocks `AgeKeyStore` and writes the social-recovery config into the DID document via `update_did_document`; no client/network (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Setup) | `icn/bins/icnctl/src/main.rs`:814 |
+| `icnctl recovery config` | live | local keystore read: opens+unlocks `AgeKeyStore` and prints the DID document's recovery config; no client/network (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Config) | `icn/bins/icnctl/src/main.rs`:835 |
+| `icnctl recovery setup` | live | local keystore op: opens+unlocks `AgeKeyStore` and writes the social-recovery config into the DID document via `update_did_document`; no client/network (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Setup) | `icn/bins/icnctl/src/main.rs`:821 |
 | `icnctl restore` | live | local data-dir restore; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:110 |
-| `icnctl snapshot cleanup` | live | local snapshot cleanup `icn_snapshot::cleanup_old_snapshots` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Cleanup) | `icn/bins/icnctl/src/main.rs`:1537 |
-| `icnctl snapshot create` | live | local snapshot creation via `icn_snapshot` on the store dir in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Create) | `icn/bins/icnctl/src/main.rs`:1519 |
-| `icnctl snapshot delete` | live | local snapshot deletion (`std::fs::remove_file`) in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Delete) | `icn/bins/icnctl/src/main.rs`:1531 |
-| `icnctl snapshot list` | live | local snapshot listing via `icn_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::List) | `icn/bins/icnctl/src/main.rs`:1522 |
-| `icnctl snapshot verify` | live | local snapshot integrity check `icn_snapshot::verify_snapshot`/`verify_timestamped_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Verify) | `icn/bins/icnctl/src/main.rs`:1525 |
-| `icnctl steward config` | live | local read+print of the `[steward]` section of `data_dir/config.toml`; no client/network (`icn/bins/icnctl/src/main.rs` StewardCommands::Config) | `icn/bins/icnctl/src/main.rs`:1614 |
-| `icnctl steward topics` | live | prints static steward gossip-topic constants (`icn_steward::topics::*`); local-only, no network (`icn/bins/icnctl/src/main.rs` StewardCommands::Topics) | `icn/bins/icnctl/src/main.rs`:1736 |
-| `icnctl verify-backup` | live | local backup verification; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:120 |
-| `icnctl amendment add-change` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/changes` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::AddChange); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2048 |
-| `icnctl amendment list` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/amendments` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1947 |
-| `icnctl amendment open-voting` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/vote` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::OpenVoting); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1990 |
-| `icnctl amendment propose` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments` (route in `docs/reference/project-index/generated/route-inventory.md`; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Propose); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1912 |
-| `icnctl amendment show` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/amendments/{id}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Show); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1966 |
-| `icnctl amendment submit` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/submit` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Submit); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1976 |
-| `icnctl amendment vote` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/ratify` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Vote); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2004 |
-| `icnctl amendment withdraw` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/withdraw` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Withdraw); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2030 |
-| `icnctl appeal add-evidence` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/evidence` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::AddEvidence); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2153 |
-| `icnctl appeal file` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::File); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2085 |
-| `icnctl appeal list` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/appeals` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2124 |
-| `icnctl appeal respond` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/respond` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::Respond); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2183 |
-| `icnctl appeal show` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/appeals/{id}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::Show); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2143 |
-| `icnctl appeal withdraw` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/withdraw` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::Withdraw); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2205 |
-| `icnctl audit verify` | partial | concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested | `icn/bins/icnctl/src/main.rs`:493 |
-| `icnctl auth token` | partial | gateway auth client: signs a keystore challenge then `reqwest POST {gateway}/v1/auth/challenge` + `/v1/auth/verify` (routes in `docs/reference/project-index/generated/route-inventory.md`) in `handle_auth_command` (`icn/bins/icnctl/src/main.rs` AuthCommands::Token); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:573 |
-| `icnctl charter list` | partial | gateway client `reqwest GET {gateway}/v1/charter` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` CharterCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1832 |
-| `icnctl charter ratify` | partial | gateway client `reqwest POST {gateway}/v1/charter/{id}/activate` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` CharterCommands::Ratify); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1865 |
-| `icnctl charter show` | partial | gateway client `reqwest GET {gateway}/v1/charter/{id}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` CharterCommands::Show); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1822 |
-| `icnctl charter sign` | partial | gateway client `reqwest POST {gateway}/v1/charter/{id}/sign` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` CharterCommands::Sign); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1847 |
-| `icnctl commons anchor` | partial | gateway client `reqwest GET {gateway}/v1/commons/anchor/by-did/{did}` (gateway from `ICN_GATEWAY` env) (`icn/bins/icnctl/src/main.rs` CommonsCommands::Anchor); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1756 |
-| `icnctl compute cancel` | partial | authenticated daemon RPC `client.call("compute.cancel", ...)` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Cancel); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:681 |
-| `icnctl compute status` | partial | authenticated daemon RPC `client.call("compute.status", ...)` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:675 |
-| `icnctl compute submit` | partial | authenticated daemon RPC `client.call("compute.submit", ...)` via `create_authenticated_rpc_client` in `handle_compute_command` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Submit); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:613 |
-| `icnctl compute submit-wasm` | partial | authenticated daemon RPC `client.call("compute.submit", ...)` (reads a local wasm file) via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ComputeCommands::SubmitWasm); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:644 |
-| `icnctl contract call` | partial | daemon RPC `client.call_contract()` (`icn/bins/icnctl/src/main.rs` ContractCommands::Call); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:993 |
-| `icnctl contract deploy` | partial | signs the deployment locally then daemon RPC `client.deploy_contract()` (`icn_rpc::RpcClient`) in `handle_contract_command` (`icn/bins/icnctl/src/main.rs` ContractCommands::Deploy); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:960 |
-| `icnctl contract deploy-signed` | partial | daemon RPC deploy of a pre-signed deployment file via `handle_contract_deploy_signed(.., &mut client)` (`icn/bins/icnctl/src/main.rs` ContractCommands::DeploySigned); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:987 |
-| `icnctl contract list` | partial | daemon RPC `client.list_contracts()` (`icn/bins/icnctl/src/main.rs` ContractCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1009 |
-| `icnctl dispute add-evidence` | partial | daemon RPC `client.dispute_add_evidence()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::AddEvidence); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1575 |
-| `icnctl dispute assign-mediator` | partial | daemon RPC `client.dispute_assign_mediator()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::AssignMediator); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1586 |
-| `icnctl dispute file` | partial | daemon RPC `client.dispute_file()` (`icn_rpc::RpcClient`) (`icn/bins/icnctl/src/main.rs` DisputeCommands::File); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1547 |
-| `icnctl dispute get` | partial | daemon RPC `client.dispute_get()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Get); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1569 |
-| `icnctl dispute list` | partial | daemon RPC `client.dispute_list()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1558 |
-| `icnctl dispute resolve` | partial | daemon RPC `client.dispute_resolve()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Resolve); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1597 |
-| `icnctl federation attestation from` | partial | daemon RPC `client.federation_attestation_from()` -> `federation.attestation.from` (registered server.rs:884) (`icn/bins/icnctl/src/main.rs` AttestationCommands::From); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1203 |
-| `icnctl federation attestation issue` | partial | daemon RPC `client.federation_attestation_issue()` -> `federation.attestation.issue` (registered server.rs:888) (`icn/bins/icnctl/src/main.rs` AttestationCommands::Issue); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1209 |
-| `icnctl federation attestation list` | partial | daemon RPC `client.federation_attestation_list()` -> `federation.attestation.list` (registered server.rs:880) (`icn/bins/icnctl/src/main.rs` AttestationCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1197 |
-| `icnctl federation clearing create` | partial | daemon RPC `client.federation_clearing_create()` -> `federation.clearing.create` (registered server.rs:905) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1240 |
-| `icnctl federation clearing list` | partial | daemon RPC `client.federation_clearing_list()` -> `federation.clearing.list` (registered server.rs:899) (`icn/bins/icnctl/src/main.rs` ClearingCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1231 |
-| `icnctl federation clearing position` | partial | daemon RPC `client.federation_clearing_position()` -> `federation.clearing.position` (registered server.rs:914) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Position); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1278 |
-| `icnctl federation clearing settle` | partial | daemon RPC `client.federation_clearing_settle()` -> `federation.clearing.settle` (registered server.rs:918) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Settle); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1284 |
-| `icnctl federation clearing show` | partial | daemon RPC `client.federation_clearing_show()` -> `federation.clearing.show` (registered server.rs:902) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1234 |
-| `icnctl federation connect` | partial | daemon RPC `client.dial(did, addr)` -> `network.dial` (registered server.rs:640) (`icn/bins/icnctl/src/main.rs` FederationCommands::Connect); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1059 |
-| `icnctl federation coop list` | partial | daemon RPC `client.federation_coop_list()` -> `federation.coop.list` (registered server.rs:852) (`icn/bins/icnctl/src/main.rs` CoopCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1125 |
-| `icnctl federation coop register` | partial | daemon RPC `client.federation_coop_register()` -> `federation.coop.register` (registered server.rs:858) (`icn/bins/icnctl/src/main.rs` CoopCommands::Register); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1134 |
-| `icnctl federation coop show` | partial | daemon RPC `client.federation_coop_get()` -> `federation.coop.get` (registered server.rs:855) (`icn/bins/icnctl/src/main.rs` CoopCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1128 |
-| `icnctl federation coop update` | partial | daemon RPC `client.federation_own_update()` -> `federation.own.update` (registered server.rs:865) (`icn/bins/icnctl/src/main.rs` CoopCommands::Update); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1153 |
-| `icnctl federation gateway-connect` | partial | gateway client `reqwest POST {gateway}/v1/federation/connect` (bearer_auth; route `federation_connect` @ `icn/crates/icn-gateway/src/api/federation.rs`, in route-inventory) (`icn/bins/icnctl/src/main.rs` FederationCommands::GatewayConnect); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1080 |
-| `icnctl federation invite` | partial | derives DID from the local keystore, then best-effort daemon RPC `client.get_status()` -> `network.status` (registered server.rs:642) for the listen address (`icn/bins/icnctl/src/main.rs` FederationCommands::Invite); requires a running daemon for the full invite URL, not integration-tested | `icn/bins/icnctl/src/main.rs`:1077 |
-| `icnctl federation peers` | partial | lists `icn.toml` bootstrap peers, then annotates connection state via daemon RPC `client.get_peers()` -> `network.peers` (server.rs:639, best-effort) (`icn/bins/icnctl/src/main.rs` FederationCommands::Peers); requires a running daemon for status, not integration-tested | `icn/bins/icnctl/src/main.rs`:1040 |
-| `icnctl federation status` | partial | daemon RPC `client.get_peers()` -> `network.peers` (registered `icn/crates/icn-rpc/src/server.rs`:639); prints config-only status if the daemon is down (`icn/bins/icnctl/src/main.rs` FederationCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1037 |
-| `icnctl federation vouch issue` | partial | daemon RPC `client.federation_vouch_issue()` -> `federation.vouch.issue` (registered server.rs:871) (`icn/bins/icnctl/src/main.rs` VouchCommands::Issue); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1170 |
-| `icnctl federation vouch list` | partial | daemon RPC `client.federation_own_get()` -> `federation.own.get` (server.rs:864) + `federation_coop_list()` -> `federation.coop.list` (852) + `federation_vouch_list()` -> `federation.vouch.list` (registered server.rs:868) (`icn/bins/icnctl/src/main.rs` VouchCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1185 |
-| `icnctl federation vouch revoke` | partial | daemon RPC `client.federation_vouch_remove()` -> `federation.vouch.remove` (registered server.rs:875) (`icn/bins/icnctl/src/main.rs` VouchCommands::Revoke); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1188 |
-| `icnctl gov domain add-member` | partial | gateway client `reqwest POST {gateway}/v1/gov/domains/{domain_id}/members` (bearer_auth; route `add_domain_member` @ `icn/apps/governance/src/http/configure.rs`, in route-inventory) — does not use the RPC client (`icn/bins/icnctl/src/main.rs` DomainCommands::AddMember); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1349 |
-| `icnctl gov domain create` | partial | daemon RPC `client.call("governance.domain.create")` via `create_authenticated_rpc_client` in `handle_gov_command` (`icn/bins/icnctl/src/main.rs` DomainCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1308 |
-| `icnctl gov domain list` | partial | daemon RPC `client.call("governance.domain.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1346 |
-| `icnctl gov domain show` | partial | daemon RPC `client.call("governance.domain.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1339 |
-| `icnctl gov proposal close` | partial | daemon RPC `client.call("governance.proposal.close")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Close); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1452 |
-| `icnctl gov proposal create` | partial | daemon RPC `client.call("governance.proposal.create")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1372 |
-| `icnctl gov proposal list` | partial | daemon RPC `client.call("governance.proposal.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1434 |
-| `icnctl gov proposal open` | partial | three daemon RPC calls via `create_authenticated_rpc_client`: `client.call("governance.proposal.get")`, then `client.call("governance.domain.get")`, then `client.call("governance.proposal.open")` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Open); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1423 |
-| `icnctl gov proposal show` | partial | daemon RPC `client.call("governance.proposal.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1445 |
-| `icnctl gov vote cast` | partial | daemon RPC `client.call("governance.vote.cast")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Cast); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1469 |
-| `icnctl gov vote delegate` | partial | daemon RPC `client.call("governance.delegation.create")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegate); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_create` (`icn/crates/icn-rpc/src/handler/governance.rs`), which binds the delegator to `ctx.caller_did` (a caller can only delegate their own vote); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1491 |
-| `icnctl gov vote delegations` | partial | daemon RPC `client.call("governance.delegation.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegations); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_list` (`icn/crates/icn-rpc/src/handler/governance.rs`), which returns only the caller's own given/received delegations; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1506 |
-| `icnctl gov vote revoke` | partial | daemon RPC `client.call("governance.delegation.revoke")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Revoke); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_revoke` (`icn/crates/icn-rpc/src/handler/governance.rs`), which revokes only when `delegation.delegator == ctx.caller_did`; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1509 |
+| `icnctl snapshot cleanup` | live | local snapshot cleanup `icn_snapshot::cleanup_old_snapshots` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Cleanup) | `icn/bins/icnctl/src/main.rs`:1544 |
+| `icnctl snapshot create` | live | local snapshot creation via `icn_snapshot` on the store dir in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Create) | `icn/bins/icnctl/src/main.rs`:1526 |
+| `icnctl snapshot delete` | live | local snapshot deletion (`std::fs::remove_file`) in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Delete) | `icn/bins/icnctl/src/main.rs`:1538 |
+| `icnctl snapshot list` | live | local snapshot listing via `icn_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::List) | `icn/bins/icnctl/src/main.rs`:1529 |
+| `icnctl snapshot verify` | live | local snapshot integrity check `icn_snapshot::verify_snapshot`/`verify_timestamped_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Verify) | `icn/bins/icnctl/src/main.rs`:1532 |
+| `icnctl steward config` | live | local read+print of the `[steward]` section of `data_dir/config.toml`; no client/network (`icn/bins/icnctl/src/main.rs` StewardCommands::Config) | `icn/bins/icnctl/src/main.rs`:1621 |
+| `icnctl steward topics` | live | prints static steward gossip-topic constants (`icn_steward::topics::*`); local-only, no network (`icn/bins/icnctl/src/main.rs` StewardCommands::Topics) | `icn/bins/icnctl/src/main.rs`:1743 |
+| `icnctl verify-backup` | live | local backup verification; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:127 |
+| `icnctl amendment add-change` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/changes` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::AddChange); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2055 |
+| `icnctl amendment list` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/amendments` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1954 |
+| `icnctl amendment open-voting` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/vote` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::OpenVoting); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1997 |
+| `icnctl amendment propose` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments` (route in `docs/reference/project-index/generated/route-inventory.md`; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Propose); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1919 |
+| `icnctl amendment show` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/amendments/{id}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Show); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1973 |
+| `icnctl amendment submit` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/submit` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Submit); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1983 |
+| `icnctl amendment vote` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/ratify` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Vote); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2011 |
+| `icnctl amendment withdraw` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/withdraw` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Withdraw); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2037 |
+| `icnctl appeal add-evidence` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/evidence` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::AddEvidence); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2160 |
+| `icnctl appeal file` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::File); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2092 |
+| `icnctl appeal list` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/appeals` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2131 |
+| `icnctl appeal respond` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/respond` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::Respond); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2190 |
+| `icnctl appeal show` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/appeals/{id}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::Show); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2150 |
+| `icnctl appeal withdraw` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/withdraw` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::Withdraw); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2212 |
+| `icnctl audit verify` | partial | concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested | `icn/bins/icnctl/src/main.rs`:500 |
+| `icnctl auth token` | partial | gateway auth client: signs a keystore challenge then `reqwest POST {gateway}/v1/auth/challenge` + `/v1/auth/verify` (routes in `docs/reference/project-index/generated/route-inventory.md`) in `handle_auth_command` (`icn/bins/icnctl/src/main.rs` AuthCommands::Token); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:580 |
+| `icnctl charter list` | partial | gateway client `reqwest GET {gateway}/v1/charter` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` CharterCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1839 |
+| `icnctl charter ratify` | partial | gateway client `reqwest POST {gateway}/v1/charter/{id}/activate` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` CharterCommands::Ratify); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1872 |
+| `icnctl charter show` | partial | gateway client `reqwest GET {gateway}/v1/charter/{id}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` CharterCommands::Show); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1829 |
+| `icnctl charter sign` | partial | gateway client `reqwest POST {gateway}/v1/charter/{id}/sign` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` CharterCommands::Sign); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1854 |
+| `icnctl commons anchor` | partial | gateway client `reqwest GET {gateway}/v1/commons/anchor/by-did/{did}` (gateway from `ICN_GATEWAY` env) (`icn/bins/icnctl/src/main.rs` CommonsCommands::Anchor); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1763 |
+| `icnctl compute cancel` | partial | authenticated daemon RPC `client.call("compute.cancel", ...)` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Cancel); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:688 |
+| `icnctl compute status` | partial | authenticated daemon RPC `client.call("compute.status", ...)` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:682 |
+| `icnctl compute submit` | partial | authenticated daemon RPC `client.call("compute.submit", ...)` via `create_authenticated_rpc_client` in `handle_compute_command` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Submit); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:620 |
+| `icnctl compute submit-wasm` | partial | authenticated daemon RPC `client.call("compute.submit", ...)` (reads a local wasm file) via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ComputeCommands::SubmitWasm); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:651 |
+| `icnctl contract call` | partial | daemon RPC `client.call_contract()` (`icn/bins/icnctl/src/main.rs` ContractCommands::Call); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1000 |
+| `icnctl contract deploy` | partial | signs the deployment locally then daemon RPC `client.deploy_contract()` (`icn_rpc::RpcClient`) in `handle_contract_command` (`icn/bins/icnctl/src/main.rs` ContractCommands::Deploy); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:967 |
+| `icnctl contract deploy-signed` | partial | daemon RPC deploy of a pre-signed deployment file via `handle_contract_deploy_signed(.., &mut client)` (`icn/bins/icnctl/src/main.rs` ContractCommands::DeploySigned); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:994 |
+| `icnctl contract list` | partial | daemon RPC `client.list_contracts()` (`icn/bins/icnctl/src/main.rs` ContractCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1016 |
+| `icnctl dispute add-evidence` | partial | daemon RPC `client.dispute_add_evidence()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::AddEvidence); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1582 |
+| `icnctl dispute assign-mediator` | partial | daemon RPC `client.dispute_assign_mediator()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::AssignMediator); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1593 |
+| `icnctl dispute file` | partial | daemon RPC `client.dispute_file()` (`icn_rpc::RpcClient`) (`icn/bins/icnctl/src/main.rs` DisputeCommands::File); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1554 |
+| `icnctl dispute get` | partial | daemon RPC `client.dispute_get()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Get); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1576 |
+| `icnctl dispute list` | partial | daemon RPC `client.dispute_list()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1565 |
+| `icnctl dispute resolve` | partial | daemon RPC `client.dispute_resolve()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Resolve); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1604 |
+| `icnctl federation attestation from` | partial | daemon RPC `client.federation_attestation_from()` -> `federation.attestation.from` (registered server.rs:884) (`icn/bins/icnctl/src/main.rs` AttestationCommands::From); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1210 |
+| `icnctl federation attestation issue` | partial | daemon RPC `client.federation_attestation_issue()` -> `federation.attestation.issue` (registered server.rs:888) (`icn/bins/icnctl/src/main.rs` AttestationCommands::Issue); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1216 |
+| `icnctl federation attestation list` | partial | daemon RPC `client.federation_attestation_list()` -> `federation.attestation.list` (registered server.rs:880) (`icn/bins/icnctl/src/main.rs` AttestationCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1204 |
+| `icnctl federation clearing create` | partial | daemon RPC `client.federation_clearing_create()` -> `federation.clearing.create` (registered server.rs:905) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1247 |
+| `icnctl federation clearing list` | partial | daemon RPC `client.federation_clearing_list()` -> `federation.clearing.list` (registered server.rs:899) (`icn/bins/icnctl/src/main.rs` ClearingCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1238 |
+| `icnctl federation clearing position` | partial | daemon RPC `client.federation_clearing_position()` -> `federation.clearing.position` (registered server.rs:914) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Position); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1285 |
+| `icnctl federation clearing settle` | partial | daemon RPC `client.federation_clearing_settle()` -> `federation.clearing.settle` (registered server.rs:918) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Settle); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1291 |
+| `icnctl federation clearing show` | partial | daemon RPC `client.federation_clearing_show()` -> `federation.clearing.show` (registered server.rs:902) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1241 |
+| `icnctl federation connect` | partial | daemon RPC `client.dial(did, addr)` -> `network.dial` (registered server.rs:640) (`icn/bins/icnctl/src/main.rs` FederationCommands::Connect); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1066 |
+| `icnctl federation coop list` | partial | daemon RPC `client.federation_coop_list()` -> `federation.coop.list` (registered server.rs:852) (`icn/bins/icnctl/src/main.rs` CoopCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1132 |
+| `icnctl federation coop register` | partial | daemon RPC `client.federation_coop_register()` -> `federation.coop.register` (registered server.rs:858) (`icn/bins/icnctl/src/main.rs` CoopCommands::Register); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1141 |
+| `icnctl federation coop show` | partial | daemon RPC `client.federation_coop_get()` -> `federation.coop.get` (registered server.rs:855) (`icn/bins/icnctl/src/main.rs` CoopCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1135 |
+| `icnctl federation coop update` | partial | daemon RPC `client.federation_own_update()` -> `federation.own.update` (registered server.rs:865) (`icn/bins/icnctl/src/main.rs` CoopCommands::Update); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1160 |
+| `icnctl federation gateway-connect` | partial | gateway client `reqwest POST {gateway}/v1/federation/connect` (bearer_auth; route `federation_connect` @ `icn/crates/icn-gateway/src/api/federation.rs`, in route-inventory) (`icn/bins/icnctl/src/main.rs` FederationCommands::GatewayConnect); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1087 |
+| `icnctl federation invite` | partial | derives DID from the local keystore, then best-effort daemon RPC `client.get_status()` -> `network.status` (registered server.rs:642) for the listen address (`icn/bins/icnctl/src/main.rs` FederationCommands::Invite); requires a running daemon for the full invite URL, not integration-tested | `icn/bins/icnctl/src/main.rs`:1084 |
+| `icnctl federation peers` | partial | lists `icn.toml` bootstrap peers, then annotates connection state via daemon RPC `client.get_peers()` -> `network.peers` (server.rs:639, best-effort) (`icn/bins/icnctl/src/main.rs` FederationCommands::Peers); requires a running daemon for status, not integration-tested | `icn/bins/icnctl/src/main.rs`:1047 |
+| `icnctl federation status` | partial | daemon RPC `client.get_peers()` -> `network.peers` (registered `icn/crates/icn-rpc/src/server.rs`:639); prints config-only status if the daemon is down (`icn/bins/icnctl/src/main.rs` FederationCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1044 |
+| `icnctl federation vouch issue` | partial | daemon RPC `client.federation_vouch_issue()` -> `federation.vouch.issue` (registered server.rs:871) (`icn/bins/icnctl/src/main.rs` VouchCommands::Issue); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1177 |
+| `icnctl federation vouch list` | partial | daemon RPC `client.federation_own_get()` -> `federation.own.get` (server.rs:864) + `federation_coop_list()` -> `federation.coop.list` (852) + `federation_vouch_list()` -> `federation.vouch.list` (registered server.rs:868) (`icn/bins/icnctl/src/main.rs` VouchCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1192 |
+| `icnctl federation vouch revoke` | partial | daemon RPC `client.federation_vouch_remove()` -> `federation.vouch.remove` (registered server.rs:875) (`icn/bins/icnctl/src/main.rs` VouchCommands::Revoke); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1195 |
+| `icnctl gov domain add-member` | partial | gateway client `reqwest POST {gateway}/v1/gov/domains/{domain_id}/members` (bearer_auth; route `add_domain_member` @ `icn/apps/governance/src/http/configure.rs`, in route-inventory) — does not use the RPC client (`icn/bins/icnctl/src/main.rs` DomainCommands::AddMember); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1356 |
+| `icnctl gov domain create` | partial | daemon RPC `client.call("governance.domain.create")` via `create_authenticated_rpc_client` in `handle_gov_command` (`icn/bins/icnctl/src/main.rs` DomainCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1315 |
+| `icnctl gov domain list` | partial | daemon RPC `client.call("governance.domain.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1353 |
+| `icnctl gov domain show` | partial | daemon RPC `client.call("governance.domain.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1346 |
+| `icnctl gov proposal close` | partial | daemon RPC `client.call("governance.proposal.close")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Close); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1459 |
+| `icnctl gov proposal create` | partial | daemon RPC `client.call("governance.proposal.create")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1379 |
+| `icnctl gov proposal list` | partial | daemon RPC `client.call("governance.proposal.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1441 |
+| `icnctl gov proposal open` | partial | three daemon RPC calls via `create_authenticated_rpc_client`: `client.call("governance.proposal.get")`, then `client.call("governance.domain.get")`, then `client.call("governance.proposal.open")` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Open); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1430 |
+| `icnctl gov proposal show` | partial | daemon RPC `client.call("governance.proposal.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1452 |
+| `icnctl gov vote cast` | partial | daemon RPC `client.call("governance.vote.cast")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Cast); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1476 |
+| `icnctl gov vote delegate` | partial | daemon RPC `client.call("governance.delegation.create")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegate); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_create` (`icn/crates/icn-rpc/src/handler/governance.rs`), which binds the delegator to `ctx.caller_did` (a caller can only delegate their own vote); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1498 |
+| `icnctl gov vote delegations` | partial | daemon RPC `client.call("governance.delegation.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegations); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_list` (`icn/crates/icn-rpc/src/handler/governance.rs`), which returns only the caller's own given/received delegations; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1513 |
+| `icnctl gov vote revoke` | partial | daemon RPC `client.call("governance.delegation.revoke")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Revoke); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_revoke` (`icn/crates/icn-rpc/src/handler/governance.rs`), which revokes only when `delegation.delegator == ctx.caller_did`; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1516 |
 | `icnctl institution bootstrap apply` | partial | async `apply_package` posts the package to the gateway via `reqwest::Client` (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap -> InstitutionBootstrapCommands::Apply); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/institution_bootstrap.rs`:68 |
-| `icnctl ledger balance` | partial | daemon RPC client `client.get_ledger_balance()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Balance); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:909 |
-| `icnctl ledger head` | partial | daemon RPC client `client.get_ledger_head()` via `create_rpc_client` in `handle_ledger_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Head); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:906 |
-| `icnctl ledger history` | partial | daemon RPC client `client.get_ledger_history()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::History); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:919 |
-| `icnctl ledger quarantine drop` | partial | daemon RPC client `client.quarantine_drop()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Drop); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:948 |
-| `icnctl ledger quarantine get` | partial | daemon RPC client `client.quarantine_get()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Get); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:936 |
-| `icnctl ledger quarantine list` | partial | daemon RPC client `client.quarantine_list()` via `create_rpc_client` in `handle_quarantine_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:933 |
-| `icnctl ledger quarantine purge` | partial | daemon RPC client `client.quarantine_purge()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Purge); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:954 |
-| `icnctl ledger quarantine release` | partial | daemon RPC client `client.quarantine_release()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Release); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:942 |
-| `icnctl network dial` | partial | daemon RPC client `client.dial(did, addr)` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Dial); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1018 |
-| `icnctl network peers` | partial | daemon RPC client `client.get_peers()` via `create_rpc_client` in `handle_network_command` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Peers); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1015 |
-| `icnctl network stats` | partial | daemon RPC client `client.get_stats()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Stats); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1028 |
-| `icnctl network status` | partial | daemon RPC client `client.get_status()` then optionally `client.get_nat_status()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1031 |
-| `icnctl policy list` | partial | daemon RPC `client.call("policy.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::List); method registered server.rs:774; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:712 |
-| `icnctl policy remove` | partial | daemon RPC `client.call("policy.remove")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::Remove); method registered server.rs:777; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:715 |
-| `icnctl policy set` | partial | daemon RPC `client.call("policy.set")` via `create_authenticated_rpc_client` (reads the policy JSON file locally first) (`icn/bins/icnctl/src/main.rs` PolicyCommands::Set); method registered `icn/crates/icn-rpc/src/server.rs`:768; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:694 |
-| `icnctl policy show` | partial | daemon RPC `client.call("policy.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::Show); method registered server.rs:771; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:705 |
-| `icnctl preflight` | partial | runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested | `icn/bins/icnctl/src/main.rs`:217 |
-| `icnctl quota list` | partial | authenticated daemon RPC `client.call("quota.list", ...)` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` QuotaCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:736 |
-| `icnctl quota show` | partial | authenticated daemon RPC `client.call("quota.usage", ...)` via `create_authenticated_rpc_client` in `handle_quota_command` (`icn/bins/icnctl/src/main.rs` QuotaCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:725 |
-| `icnctl receipts allocation` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/allocations/{hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Allocation); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:462 |
-| `icnctl receipts chain` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/chain/{decision_hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Chain); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:444 |
-| `icnctl receipts intent` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/intents/{hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Intent); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:476 |
-| `icnctl recovery attest` | partial | authenticated daemon RPC `client.attest_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Attest); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:837 |
-| `icnctl recovery cancel` | partial | authenticated daemon RPC `client.cancel_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Cancel); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:862 |
-| `icnctl recovery finalize` | partial | authenticated daemon RPC `client.finalize_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Finalize); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:856 |
-| `icnctl recovery initiate` | partial | authenticated daemon RPC `client.initiate_recovery()` via `create_authenticated_rpc_client` in `handle_recovery_command` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Initiate); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:831 |
-| `icnctl recovery list` | partial | authenticated daemon RPC `client.list_recoveries()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:847 |
-| `icnctl recovery status` | partial | authenticated daemon RPC `client.get_recovery_status()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:850 |
-| `icnctl registry list` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:529 |
-| `icnctl registry trace` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions/{receipt_id}/trace` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::Trace); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:552 |
+| `icnctl ledger balance` | partial | daemon RPC client `client.get_ledger_balance()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Balance); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:916 |
+| `icnctl ledger head` | partial | daemon RPC client `client.get_ledger_head()` via `create_rpc_client` in `handle_ledger_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Head); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:913 |
+| `icnctl ledger history` | partial | daemon RPC client `client.get_ledger_history()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::History); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:926 |
+| `icnctl ledger quarantine drop` | partial | daemon RPC client `client.quarantine_drop()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Drop); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:955 |
+| `icnctl ledger quarantine get` | partial | daemon RPC client `client.quarantine_get()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Get); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:943 |
+| `icnctl ledger quarantine list` | partial | daemon RPC client `client.quarantine_list()` via `create_rpc_client` in `handle_quarantine_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:940 |
+| `icnctl ledger quarantine purge` | partial | daemon RPC client `client.quarantine_purge()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Purge); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:961 |
+| `icnctl ledger quarantine release` | partial | daemon RPC client `client.quarantine_release()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Release); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:949 |
+| `icnctl network dial` | partial | daemon RPC client `client.dial(did, addr)` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Dial); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1025 |
+| `icnctl network peers` | partial | daemon RPC client `client.get_peers()` via `create_rpc_client` in `handle_network_command` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Peers); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1022 |
+| `icnctl network stats` | partial | daemon RPC client `client.get_stats()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Stats); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1035 |
+| `icnctl network status` | partial | daemon RPC client `client.get_status()` then optionally `client.get_nat_status()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1038 |
+| `icnctl policy list` | partial | daemon RPC `client.call("policy.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::List); method registered server.rs:774; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:719 |
+| `icnctl policy remove` | partial | daemon RPC `client.call("policy.remove")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::Remove); method registered server.rs:777; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:722 |
+| `icnctl policy set` | partial | daemon RPC `client.call("policy.set")` via `create_authenticated_rpc_client` (reads the policy JSON file locally first) (`icn/bins/icnctl/src/main.rs` PolicyCommands::Set); method registered `icn/crates/icn-rpc/src/server.rs`:768; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:701 |
+| `icnctl policy show` | partial | daemon RPC `client.call("policy.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::Show); method registered server.rs:771; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:712 |
+| `icnctl preflight` | partial | runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested | `icn/bins/icnctl/src/main.rs`:224 |
+| `icnctl quota list` | partial | authenticated daemon RPC `client.call("quota.list", ...)` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` QuotaCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:743 |
+| `icnctl quota show` | partial | authenticated daemon RPC `client.call("quota.usage", ...)` via `create_authenticated_rpc_client` in `handle_quota_command` (`icn/bins/icnctl/src/main.rs` QuotaCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:732 |
+| `icnctl receipts allocation` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/allocations/{hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Allocation); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:469 |
+| `icnctl receipts chain` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/chain/{decision_hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Chain); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:451 |
+| `icnctl receipts intent` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/intents/{hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Intent); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:483 |
+| `icnctl recovery attest` | partial | authenticated daemon RPC `client.attest_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Attest); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:844 |
+| `icnctl recovery cancel` | partial | authenticated daemon RPC `client.cancel_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Cancel); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:869 |
+| `icnctl recovery finalize` | partial | authenticated daemon RPC `client.finalize_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Finalize); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:863 |
+| `icnctl recovery initiate` | partial | authenticated daemon RPC `client.initiate_recovery()` via `create_authenticated_rpc_client` in `handle_recovery_command` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Initiate); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:838 |
+| `icnctl recovery list` | partial | authenticated daemon RPC `client.list_recoveries()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:854 |
+| `icnctl recovery status` | partial | authenticated daemon RPC `client.get_recovery_status()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:857 |
+| `icnctl registry list` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:536 |
+| `icnctl registry trace` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions/{receipt_id}/trace` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::Trace); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:559 |
 | `icnctl status` | partial | RPC client to the daemon (`create_rpc_client` + `client.get_status()`) in `handle_status_command` (`icn/bins/icnctl/src/main.rs` Commands::Status); prints local config and fails gracefully when no daemon; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:53 |
-| `icnctl steward attesters` | partial | gateway client `reqwest GET {gateway}/v1/steward/attesters` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Attesters); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1639 |
-| `icnctl steward info` | partial | gateway client `reqwest GET` whose route branches on the input: `{gateway}/v1/steward/by-did/{steward}` if it starts with `did:`, else `{gateway}/v1/steward/{steward}` (both routes in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Info); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1617 |
-| `icnctl steward list` | partial | gateway client `reqwest GET {gateway}/v1/steward` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1626 |
-| `icnctl steward register` | partial | gateway client `reqwest POST {gateway}/v1/steward` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Register); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1646 |
-| `icnctl steward retire` | partial | gateway client `reqwest POST {gateway}/v1/steward/{id}/retire` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Retire); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1668 |
-| `icnctl steward status` | partial | daemon RPC client `create_rpc_client` + `client.get_status()` (also reads local config.toml) in `handle_steward_command` (`icn/bins/icnctl/src/main.rs` StewardCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1611 |
-| `icnctl trust add` | partial | daemon RPC client `client.add_trust()` via `create_authenticated_rpc_client` in `handle_trust_command` (`icn/bins/icnctl/src/main.rs` TrustCommands::Add); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:875 |
-| `icnctl trust list` | partial | daemon RPC client `client.list_trust()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:888 |
-| `icnctl trust remove` | partial | daemon RPC client `client.remove_trust()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::Remove); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:897 |
-| `icnctl trust show` | partial | daemon RPC client (compute-trust-score call) via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::Show); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:891 |
-| `icnctl charter deploy` | planned | handler validates the CCL doc locally, then prints "Not yet implemented — charter deployment requires gateway integration" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy) | `icn/bins/icnctl/src/main.rs`:1899 |
-| `icnctl commons affiliations` | planned | prints "Affiliation lookup requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Affiliations) | `icn/bins/icnctl/src/main.rs`:1763 |
-| `icnctl commons join` | planned | prints "Join request requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Join) | `icn/bins/icnctl/src/main.rs`:1770 |
-| `icnctl commons leave` | planned | prints "Leave request requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Leave) | `icn/bins/icnctl/src/main.rs`:1781 |
-| `icnctl federation clearing rate` | planned | no client call — prints "Exchange rate noted..." + a note; in-source comment "Rate updates are not yet implemented via RPC" (`icn/bins/icnctl/src/main.rs` ClearingCommands::Rate) | `icn/bins/icnctl/src/main.rs`:1259 |
-| `icnctl gov proposal cancel` | planned | `bail!("Cancel command not yet supported via RPC. Use 'proposal close' instead, or stop the daemon and modify the store directly.")` before any client call (`icn/bins/icnctl/src/main.rs` ProposalCommands::Cancel) | `icn/bins/icnctl/src/main.rs`:1459 |
-| `icnctl gov vote show` | planned | `bail!("Vote show command not yet supported via RPC. Use 'proposal show {proposal_id}' to see the proposal.")` before any client call (`icn/bins/icnctl/src/main.rs` VoteCommands::Show) | `icn/bins/icnctl/src/main.rs`:1484 |
-| `icnctl steward check-vui` | planned | placeholder; validates input then prints "VUI registry check requires running steward daemon" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui) | `icn/bins/icnctl/src/main.rs`:1677 |
-| `icnctl steward enrollment-status` | planned | placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::EnrollmentStatus) | `icn/bins/icnctl/src/main.rs`:1694 |
-| `icnctl steward issue-token` | planned | placeholder for the full SDIS token issuance flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::IssueToken) | `icn/bins/icnctl/src/main.rs`:1725 |
-| `icnctl steward recovery-status` | planned | placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::RecoveryStatus) | `icn/bins/icnctl/src/main.rs`:1719 |
-| `icnctl steward start-enrollment` | planned | placeholder for the full SDIS enrollment flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartEnrollment) | `icn/bins/icnctl/src/main.rs`:1683 |
-| `icnctl steward start-recovery` | planned | placeholder for the full SDIS recovery flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartRecovery) | `icn/bins/icnctl/src/main.rs`:1700 |
+| `icnctl steward attesters` | partial | gateway client `reqwest GET {gateway}/v1/steward/attesters` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Attesters); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1646 |
+| `icnctl steward info` | partial | gateway client `reqwest GET` whose route branches on the input: `{gateway}/v1/steward/by-did/{steward}` if it starts with `did:`, else `{gateway}/v1/steward/{steward}` (both routes in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Info); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1624 |
+| `icnctl steward list` | partial | gateway client `reqwest GET {gateway}/v1/steward` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1633 |
+| `icnctl steward register` | partial | gateway client `reqwest POST {gateway}/v1/steward` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Register); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1653 |
+| `icnctl steward retire` | partial | gateway client `reqwest POST {gateway}/v1/steward/{id}/retire` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Retire); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1675 |
+| `icnctl steward status` | partial | daemon RPC client `create_rpc_client` + `client.get_status()` (also reads local config.toml) in `handle_steward_command` (`icn/bins/icnctl/src/main.rs` StewardCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1618 |
+| `icnctl trust add` | partial | daemon RPC client `client.add_trust()` via `create_authenticated_rpc_client` in `handle_trust_command` (`icn/bins/icnctl/src/main.rs` TrustCommands::Add); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:882 |
+| `icnctl trust list` | partial | daemon RPC client `client.list_trust()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:895 |
+| `icnctl trust remove` | partial | daemon RPC client `client.remove_trust()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::Remove); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:904 |
+| `icnctl trust show` | partial | daemon RPC client (compute-trust-score call) via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::Show); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:898 |
+| `icnctl charter deploy` | planned | handler validates the CCL doc locally, then prints "Not yet implemented — charter deployment requires gateway integration" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy) | `icn/bins/icnctl/src/main.rs`:1906 |
+| `icnctl commons affiliations` | planned | prints "Affiliation lookup requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Affiliations) | `icn/bins/icnctl/src/main.rs`:1770 |
+| `icnctl commons join` | planned | prints "Join request requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Join) | `icn/bins/icnctl/src/main.rs`:1777 |
+| `icnctl commons leave` | planned | prints "Leave request requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Leave) | `icn/bins/icnctl/src/main.rs`:1788 |
+| `icnctl federation clearing rate` | planned | no client call — prints "Exchange rate noted..." + a note; in-source comment "Rate updates are not yet implemented via RPC" (`icn/bins/icnctl/src/main.rs` ClearingCommands::Rate) | `icn/bins/icnctl/src/main.rs`:1266 |
+| `icnctl gov proposal cancel` | planned | `bail!("Cancel command not yet supported via RPC. Use 'proposal close' instead, or stop the daemon and modify the store directly.")` before any client call (`icn/bins/icnctl/src/main.rs` ProposalCommands::Cancel) | `icn/bins/icnctl/src/main.rs`:1466 |
+| `icnctl gov vote show` | planned | `bail!("Vote show command not yet supported via RPC. Use 'proposal show {proposal_id}' to see the proposal.")` before any client call (`icn/bins/icnctl/src/main.rs` VoteCommands::Show) | `icn/bins/icnctl/src/main.rs`:1491 |
+| `icnctl steward check-vui` | planned | placeholder; validates input then prints "VUI registry check requires running steward daemon" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui) | `icn/bins/icnctl/src/main.rs`:1684 |
+| `icnctl steward enrollment-status` | planned | placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::EnrollmentStatus) | `icn/bins/icnctl/src/main.rs`:1701 |
+| `icnctl steward issue-token` | planned | placeholder for the full SDIS token issuance flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::IssueToken) | `icn/bins/icnctl/src/main.rs`:1732 |
+| `icnctl steward recovery-status` | planned | placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::RecoveryStatus) | `icn/bins/icnctl/src/main.rs`:1726 |
+| `icnctl steward start-enrollment` | planned | placeholder for the full SDIS enrollment flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartEnrollment) | `icn/bins/icnctl/src/main.rs`:1690 |
+| `icnctl steward start-recovery` | planned | placeholder for the full SDIS recovery flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartRecovery) | `icn/bins/icnctl/src/main.rs`:1707 |
 
 ### Status non-claims
 

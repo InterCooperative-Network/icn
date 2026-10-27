@@ -43,6 +43,11 @@ Paths below are relative to the repo root; Rust under `icn/crates/`.
 
 ## A. Context kinds (GEN, #2602)
 
+> **NON-NORMATIVE.** The `PersonalContextV1` / `HouseholdContextV1` kinds throughout section A (tables included) are a
+> survey recommendation, not a decision. #2602 owns GEN context kinds, and the kind byte feeds the N1
+> KDF permanently, so nothing here may be implemented or relied on until #2602 decides.
+
+
 ### A.0 Sources read
 
 - `docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md` (427 lines, all of it; status `normative`, canonical `no`)
@@ -124,10 +129,6 @@ So the device holds three `PrincipalKey`s, sends three `EnrollmentRequestV1`s na
 **What is missing here:** the per-context device key derivation helper is DOC-ONLY (Home row b′ L57: "no derivation helper exists in code"); N4-C §2 row 2 L38: "derivation DOC-ONLY, client-side"; N4-C §4 L84-86 admits the request shape "does not prevent a misbehaving device" from reusing one key. Rule it must obey: HIA L1616-1618 (no `SubjectId` input). No issue owns it by name; it belongs with the device lifecycle (#2599).
 
 ### A.6 Recommendation for A
-
-> **NON-NORMATIVE.** The `PersonalContextV1` / `HouseholdContextV1` kinds below are a survey
-> recommendation, not a decision. #2602 owns GEN context kinds, and the kind byte feeds the N1
-> KDF permanently, so nothing here may be implemented or relied on until #2602 decides.
 
 **Implement the tags now, on the branch, in one PR that revises the GEN doc first** — with one explicit decision written down before code. The architecture is settled enough for the *tags*: three committed documents (Home profile §4/§7, the handoff L114, N4-A/N4-B/N4-C scope sections) already say "a new GEN kind, never a `GovernanceDomainV1` string", IS delegates kinds to GEN, and the verifier was built with the mismatch check waiting. What is *not* settled is representable without deciding it: make `context_id` for both new kinds an **opaque 32-byte value carried as 64 lowercase hex ASCII bytes** (preimage grammar unchanged, byte-exact comparison unchanged), validated at the constructor, and push "what those 32 bytes digest" to the client. That keeps GEN-A ignorant of descriptor contents, exactly as it is ignorant of what a `GovernanceDomainId` string means.
 
