@@ -68,6 +68,12 @@ icn-merge-pr merge <PR> --authorize --expected-head <full 40-hex sha>
                                      # ...and refuse unless the live head is still
                                      # exactly that commit
 icn-merge-pr provenance              # which commit is installed
+
+icn-merge-pr check <PR> --commit-title "<title>" --commit-body-file <path>
+                                     # preview the exact squash message; mutates nothing
+icn-merge-pr merge <PR> --authorize --expected-head <full 40-hex sha> \
+                        --commit-title "<title>" --commit-body-file <path>
+                                     # merge with that message, at that head, or refuse
 ```
 
 ### `--expected-head`
@@ -87,6 +93,38 @@ only when it comes from whatever established that the head was fit to merge — 
 `ship-pr` passes its recorded freeze head down through `merge-pr`, and `merge-pr` forwards it
 verbatim rather than re-deriving one. An invocation that omits it is exactly as bound as this
 program was before the option existed: no weaker, and no stronger.
+
+### `--commit-title` / `--commit-body-file`
+
+Without them GitHub composes the squash commit from repository settings — in ICN the PR title and
+**every commit message on the branch**. Those messages were never reviewed as mainline history,
+and one can carry something that must not land there (a personal name, a machine path). These
+options state the message instead.
+
+- **Both or neither.** Half a message is refused: GitHub would fill the other half from the
+  branch's commits, which is what stating one is meant to prevent.
+- **Squash only.** Refused with `--strategy merge`, and refused at run time if the strategy policy
+  selects is not `squash`.
+- **On `merge`, `--expected-head` is required.** A message describes one reviewed head; without a
+  named head the merge could take in commits it never described.
+- **The body comes from a file** (UTF-8, at most 64 KiB, not blank), so it needs no shell quoting
+  and never sits in shell history. Trailing newlines are dropped; nothing else is altered. Unicode
+  control, format, surrogate, private-use and unassigned characters (category C) and line/paragraph
+  separators (Zl/Zp) are refused in both title and body (newline and tab are allowed in the body),
+  as are leading/trailing whitespace in the title, a byte-order mark and a title over 256
+  characters — what is previewed must be what lands. This is a screen for the characters a preview
+  hides, not a full confusable-character filter.
+- **Nothing else changes.** Every gate runs exactly as before. The message travels as two more
+  structured fields (`commit_title`, `commit_message`) of the **same** head-pinned request. There
+  is no second request, and a refusal is final: the program never retries without the message or
+  falls back to GitHub's default.
+- **Preview with `check`.** The result carries `squash_message` (`title`, `body`, `sha256`).
+- **Proved after the fact.** After a confirmed merge the commit is read back and
+  `merge.commit_message.verified` reports `MATCH`, `MISMATCH` (with the `observed` text) or
+  `UNREADABLE`. The outcome is still `MERGED` — the merge is a proved fact and cannot be undone
+  here — so a caller that stated a message **must** read this field. GitHub documents the REST
+  `commit_message` field as "extra detail to append to automatic commit message"; the read-back is
+  what turns that wording into evidence rather than an assumption.
 
 Results are JSON on stdout with a stable `outcome` code (`icn_merge_pr/codes.py`); a summary goes
 to stderr.
@@ -139,7 +177,8 @@ Unknown options fail. `--admin`, `--auto` and their privileged or deferred relat
    policy and live branch protection.
 8. Before mutating, run the **same** loader again, refuse if any pinned identity moved, and
    re-evaluate every gate.
-9. Merge once, with the expected head SHA pinned in the request.
+9. Merge once, with the expected head SHA pinned in the request — and, when one was stated, the
+   explicit squash title and body as fields of that same request.
 
    **Accepted platform limitation.** GitHub conditions an ordinary pull-request merge on the
    expected *head* SHA and offers no expected-*base* precondition — `MergePullRequestInput` has
@@ -164,6 +203,7 @@ Unknown options fail. `--admin`, `--auto` and their privileged or deferred relat
 | `icn_merge_pr/evaluate.py` | the gate — pure, no I/O |
 | `icn_merge_pr/strategy.py` | the only mapping from a policy value to an API value |
 | `icn_merge_pr/merge.py` | the single head-pinned mutation and its proof |
+| `icn_merge_pr/message.py` | the explicit squash message: its shape, preview and read-back comparison |
 | `icn_merge_pr/run.py` | evaluate → refresh → re-evaluate → merge |
 | `install.py` | the provenance gate |
 
