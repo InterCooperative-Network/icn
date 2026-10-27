@@ -1,0 +1,720 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="ACCEPTED 2026-10-27, fixture-only; not implemented. The contract for an offline, operator-run, unprivileged producer of N1 facts for fixture Subjects: icnctl authority import of one facts-only history segment (a canonical, contiguous, linked excerpt of one Subject's history; EvidenceBundle stays for act verification) into a stopped node's store, through a no-receipt offline open with ownership and permission checks, a fail-closed resumable import-incomplete marker with a symlink-safe durability walk, fixture-only retention with explicit context, provisional fail-closed bounds, preserved forks, bounded owner-only import reports, and an offline device-authority check against the node's retained facts. Neither completeness nor freshness is established; no real participants, credentials, network ingestion or authorization consumers are approved."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR-0089: N1 offline authority-fact import and node-store verification | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0089 n1 offline authority fact import</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Decision record</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-10-27</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="adr-0089-n1-offline-authority-fact-import-and-node-store-verification">ADR-0089: N1 offline authority-fact import and node-store verification</h1>
+<h2 id="status">Status</h2>
+<p><strong><code>accepted</code> (2026-10-27), fixture-only.</strong> Proposed 2026-10-24 and revised 2026-10-27 against <code>main</code>
+(<code>f29d04a2</code>). The maintainer (Matt Faherty, the decider) accepted it on 2026-10-27 under ADR-0018,
+<strong>as an architectural decision limited to the fixture-only offline authority-import experiment</strong>,
+subject to the restrictions and implementation prerequisites in this text. The acceptance covers the
+architecture and contract only. It does not approve, implement, deploy or operate an importer.
+Implementation status is separate (ADR-0018 §3): nothing here is implemented.</p>
+<p>The maintainer explicitly approved these choices for this initial scope:</p>
+<ol>
+<li><strong>Root execution is prohibited.</strong> The importer runs as the unprivileged account that owns the
+data directory (§5). Existing root-run container deployments are unsupported for importing.</li>
+<li><strong>Withdrawal during an incomplete import is deferred.</strong> Recovery completes the previously
+validated fixture segment before new retention decisions take effect (§6, §8). This is not a
+precedent for real participants&#39; consent.</li>
+<li><strong>Retention limits are provisional and fail closed.</strong> Exhausting a Subject&#39;s capacity may block
+later facts, including revocations (§8). This is acceptable only while results gate no real
+effect.</li>
+<li><strong>The facts-only history-segment format (§3) is accepted as a proposed implementation
+contract.</strong> Its canonical domain, encoding, independent reference vectors and compatibility
+obligations must be verified before any implementation merges.</li>
+<li><strong>No completeness or freshness guarantee is established (§4).</strong> Authority evaluation stays
+relative to the node&#39;s retained history.</li>
+<li><strong>Not approved:</strong> real participants, institutional credentials, production authority, network
+ingestion, and operational authorization consumers.</li>
+</ol>
+<p>The <code>fixture:</code> retention basis remains an operator assertion, not a cryptographic proof (§8).
+<strong>Fixture-provenance enforcement</strong> (for example, accepting only Subjects whose inception carries a
+context nonce from a published fixture set) is an explicit <strong>implementation review item</strong> for the
+<code>icnctl</code> slice. No other governance or institutional permission follows from this acceptance; the
+decisions in §13 and §14 stay open.</p>
+<p><strong>Review history.</strong> Drafted and revised by an agent. Reviews of the text were by independent review
+agents; beyond the maintainer&#39;s acceptance decision, no human review is claimed. A FULL generation by two reviewers (identity and privacy; security
+and recovery) found six blockers, all fixed in one batch; a DELTA review found one new blocker in that
+batch (a sync relying on sled&#39;s close, which ADR-0088 §5 rejects), fixed by a targeted correction;
+targeted reviews of each later amendment (editorial wording, the symlink-safe durability walk)
+closed with no blockers. Risks accepted knowingly are recorded in §4, §6, §8, §12 and
+&quot;Irreversible commitments&quot;.</p>
+<h2 id="context">Context</h2>
+<p><code>main</code> can persist N1 facts durably (ADR-0087), rehydrate them fail closed at every daemon start
+(ADR-0088), and answer <code>derive</code> over the result. It has no <strong>producer</strong>: <code>AuthorityRegistry::ingest</code>
+has no production caller, and every fact on any node was written by a test. It has no <strong>consumer</strong>
+either: nothing makes an authorization decision from N1 state.</p>
+<p>N4-A answers &quot;did device D hold capability C from Subject S at position E&quot; over an <code>AuthorityStore</code>.
+N4-B&#39;s <code>EvidenceBundle</code> carries the evidence for <strong>one device act</strong>: the facts <code>derive_prefix</code>
+reads up to the act&#39;s evaluation position E, plus the act. N4-E answers the same question at a
+relying party&#39;s current position.</p>
+<p>A bundle is the wrong carrier for history. It cannot exist without an act, and it cannot carry a
+fact after E. A node fed only bundles would learn a Subject&#39;s history only up to positions where
+some act happened, and would never learn a later revocation unless another act&#39;s bundle happened to
+include it. N4-E current admission over that node&#39;s facts would then admit a device its Subject has
+revoked. This revision therefore introduces a facts-only carrier for history (§3) and keeps the
+bundle for what it is: evidence for one act (§10).</p>
+<p>The smallest producer that adds no network surface is an offline operator tool that imports a
+history segment into a stopped node&#39;s store. This ADR defines what that tool may do and, as
+importantly, what it may not claim.</p>
+<h2 id="decision">Decision</h2>
+<h3 id="1-seven-properties-that-must-stay-separate">1. Seven properties that must stay separate</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Meaning</th>
+<th>Established by</th>
+<th>Does <strong>not</strong> imply</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cryptographic validity</td>
+<td>key K signed these canonical bytes</td>
+<td><code>verify_strict</code> inside N1 admission</td>
+<td>that K had any authority</td>
+</tr>
+<tr>
+<td>N1 admission</td>
+<td>the body is canonical, in bounds, and verifies under its inline signer</td>
+<td><code>admissible</code> (ADR-0087 §5)</td>
+<td>authority; that the history is complete</td>
+</tr>
+<tr>
+<td>Durable persistence</td>
+<td>the record survived the store&#39;s durability barrier</td>
+<td><code>put_fact</code> Ok (ADR-0087 §4)</td>
+<td>power-loss durability; that the node may keep it</td>
+</tr>
+<tr>
+<td>Retention record</td>
+<td>the operator recorded a decision to keep this Subject&#39;s facts, for a stated context</td>
+<td>§8: written before import</td>
+<td>permission, consent, institutional authorization, or anything about the Subject&#39;s authority</td>
+</tr>
+<tr>
+<td>Completeness and freshness</td>
+<td>the node holds every fact that exists, up to the Subject&#39;s real tip</td>
+<td><strong>nothing</strong> (§4)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Derived authority</td>
+<td>what <code>derive</code> concludes from the retained facts</td>
+<td><code>derive</code> / <code>derive_prefix</code> over the rehydrated store</td>
+<td>that the node holds every fact that exists</td>
+</tr>
+<tr>
+<td>N4 relying-party enforcement</td>
+<td>a device act is accepted at a relying-party-chosen position</td>
+<td><code>verify_device_act</code> / current admission (N4-A, N4-E)</td>
+<td>that any effect is gated on it today</td>
+</tr>
+</tbody></table>
+<p>The import tool establishes admission and durable persistence for each fact it writes, and checks
+that a retention record (§8) exists before writing any. It never evaluates, and never reports, completeness,
+derived authority or enforcement as a property of the import.</p>
+<h3 id="2-scope-of-the-producer">2. Scope of the producer</h3>
+<ul>
+<li>One command, <code>icnctl authority import &lt;segment-file&gt;</code>, run by the node operator against a
+<strong>stopped</strong> node. It takes the data-directory lock; if <code>icnd</code> holds it, the import is refused.</li>
+<li>Input is exactly one <strong>history segment</strong> v1 file (§3). <code>EvidenceBundle</code> is not an import input
+in this version.</li>
+<li>No network listener, IPC socket, gateway route, gossip or N3 ingest, and no credentials. A running
+daemon sees imported facts only at its next start, through the existing rehydration.</li>
+<li>Fixture Subjects only (§8).</li>
+</ul>
+<h3 id="3-the-history-segment-candidate-format-v1">3. The history segment (candidate format, v1)</h3>
+<p>A history segment is a canonical, facts-only excerpt of <strong>one Subject&#39;s</strong> N1 history over a
+contiguous position range. It carries no device act and asserts nothing about authority.</p>
+<p><strong>Fields.</strong> <code>subject: SubjectId</code>, <code>from: u64</code>, <code>to: u64</code>, and <code>facts</code>: a map from <code>EventId</code> to
+<code>{ body: AuthorityBody, witnesses: set of WitnessSignature }</code> (the same <code>BundledFact</code> shape as N4-B).</p>
+<p><strong>Canonical encoding</strong> (the N1/N4 <code>Writer</code> conventions: big-endian integers, <code>lp</code> = <code>u32</code> length
+prefix, <code>b32</code>/<code>b64</code> fixed arrays):</p>
+<pre><code>lp(&quot;icn.n1.history-segment&quot;)      domain (proposed literal; registered in the
+                                  domain-separation audit before any implementation)
+u16  version = 1
+b32  subject
+u64  from
+u64  to
+u32  fact_count
+repeat fact_count, ascending by event_id:
+  b32  event_id
+  lp   body.canonical_bytes()
+  u32  witness_count            (&gt;= 1)
+  repeat witness_count, ascending:
+    b64  witness signature
+</code></pre>
+<p><code>segment_id = SHA-256(canonical bytes)</code>. Strict decode: the encoder&#39;s output is the only accepted
+form, and trailing bytes are refused.</p>
+<p><strong>Validity rules</strong> (all checked by decode or by whole-segment admission, before anything is
+written):</p>
+<ol>
+<li><code>0 &lt;= from &lt;= to &lt;= MAX_POSITION</code>.</li>
+<li>Every fact&#39;s <code>body.subject()</code> equals <code>subject</code>, and its <code>event_id</code> equals the hash of its body.</li>
+<li>Every fact&#39;s position lies in <code>from..=to</code>.</li>
+<li><strong>Continuity:</strong> every position in <code>from..=to</code> holds at least one fact.</li>
+<li><strong>Linkage:</strong> every fact at position <code>p &gt; from</code> names in <code>prev_digest</code> a fact this segment holds
+at <code>p - 1</code>. If <code>from == 0</code> the segment holds the inception, whose event id is <code>subject</code>.</li>
+<li>Facts ascend strictly by <code>event_id</code>; witnesses ascend strictly within a fact; every fact has at
+least one witness.</li>
+<li>Every <strong>(body, witness) pair</strong> passes N1 admission, and the segment as a whole admits into an
+empty in-memory store (<code>admit</code>), all or nothing. A bad witness must be refused here, before
+anything is written, not by <code>ingest</code> part-way through an import (where every resume would refuse
+it again).</li>
+</ol>
+<p><strong>At import</strong> (against the node&#39;s retained facts), one more rule: if <code>from &gt; 0</code>, every fact at
+<code>from</code> must name in <code>prev_digest</code> a fact the node <strong>already retains for the same Subject</strong> at
+<code>from - 1</code>. A segment that
+would leave an unanchored fragment is refused. Retaining facts that <code>derive</code> cannot reach would
+cost retention without any use.</p>
+<p><strong>Competing candidates.</strong> Several admissible facts at one position are allowed in a segment (rule 4
+says &quot;at least one&quot;). They are evidence of a fork and are kept (§9).</p>
+<p><strong>Refusals</strong> (each a distinct error): framing; version; range out of bounds; fact for another
+Subject; event id mismatch; fact outside range; gap in continuity; broken linkage; ordering
+(facts or witnesses); missing witness; inadmissible fact; unanchored at import; any bound in §8.</p>
+<h3 id="4-what-a-segment-cannot-establish-completeness-and-freshness">4. What a segment cannot establish: completeness and freshness</h3>
+<p>Holding a valid segment proves only that these facts are admissible and form a contiguous, linked
+excerpt over <code>from..=to</code>. It does <strong>not</strong> prove:</p>
+<ul>
+<li>that <code>to</code> is the Subject&#39;s tip. Later facts, including revocations, may exist.</li>
+<li>that no competing candidate exists at any position the segment covers. An omitted fork candidate
+is undetectable at or below <code>to</code> (the same limit as N4-B §3.3).</li>
+<li>freshness. There is no clock or authority that dates a segment, and a segment can be replayed
+from any earlier time.</li>
+</ul>
+<p>A node therefore holds a <strong>retained tip</strong> per Subject, never a &quot;current&quot; one. Every answer computed
+from a node&#39;s store is &quot;as of the facts this node retains&quot; (§10, §12). Nothing here changes how a
+relying party must treat incompleteness; any future consumer must address it in its own ADR.</p>
+<h3 id="5-opening-the-store-offline">5. Opening the store offline</h3>
+<p><code>AuthorityRegistry::open</code> is the daemon&#39;s start: it may initialize a fresh history, and it always
+writes the startup receipt. An offline tool must do neither. A separate entry point is specified,
+<code>AuthorityRegistry::open_offline(data_dir, lock, access)</code> with <code>access</code> one of <code>Inspect</code>, <code>Import</code>
+or <code>Resume</code>:</p>
+<ul>
+<li><strong>Ownership and permissions are checked first, before the lock is taken and before the N2-A
+gate runs</strong>, because both create files: the lock acquisition can create the lock file, and the
+gate opens every sled store and writes its own receipt. The tool refuses unless the effective uid
+is not 0 and owns the data directory, <code>store/</code>, <code>store/authority</code> and the existing lock file;
+neither the data directory nor <code>store/</code> is group- or other-writable; and <code>store/authority</code> grants
+no group or other permissions (ADR-0088 §11 already keeps it 0700). The data directory may
+otherwise follow the umask, as ADR-0088 §11 allows. sled has no read-only open and creates files
+as it runs; an offline tool run by another account, or by root, would leave files the daemon&#39;s
+account may not be able to open, wedging the node.</li>
+<li>It then takes the storage lock <strong>without creating it</strong> (the data directory must already have been
+initialized by <code>icnd</code>), runs the N2-A gate (ADR-0088 §7&#39;s order), and refuses an incomplete
+restore, like <code>open</code>. <code>open_offline</code> repeats the ownership and permission checks immediately
+before sled opens the store, to narrow the window between check and use.</li>
+<li>It opens only an <strong>initialized</strong> store whose record and instance row agree. Every other ADR-0088
+§6 state (no record, missing store, replaced store, interrupted initialization) is refused. A new
+authority history is created by <code>icnd</code> only.</li>
+<li>It writes no startup receipt. <code>Import</code> and <code>Resume</code> remove the previous receipt with the existing
+<code>AuthorityRegistry::discard_receipt</code> before writing any fact, because once facts change that
+receipt misdescribes the store. <code>Inspect</code> leaves it alone.</li>
+<li><code>Inspect</code> and <code>Import</code> refuse while an import is incomplete (§6). <code>Resume</code> requires it.</li>
+<li>&quot;Writes no facts&quot; is not &quot;writes nothing&quot;: the N2-A gate writes its receipt, and sled may write
+its own files, on every offline open, including <code>Inspect</code>.</li>
+</ul>
+<h3 id="6-atomicity-interruption-and-resumption">6. Atomicity, interruption and resumption</h3>
+<p><strong>Per-fact durability stays as ADR-0087 defines it.</strong> A segment is not made atomic in the store, and
+nothing may describe an import as atomic. Whole-segment admission in memory proves the segment is
+well formed; it does not make the writes atomic.</p>
+<p><strong>Why a partial import must not be used silently.</strong> A partial import is not wrong authority in
+itself: a gap stops the <code>derive</code> frontier. What it breaks is the operator&#39;s knowledge of what the
+node holds. If an import stops after a device&#39;s <code>authorize</code> is durable but before the later <code>revoke</code>
+is, the retained tip is behind the facts the node was handed, and N4-E at that tip still admits the
+device. Durable partial state is therefore permitted on disk but must be <strong>fail-closed and
+resumable</strong>:</p>
+<ol>
+<li>Decode the whole segment strictly, apply §3 and §8, and admit it in memory. Anything refused
+writes nothing.</li>
+<li>Write the segment bytes to the <strong>staged file</strong> (a regular, owner-only file in the data directory),
+<code>fsync</code> it, and <code>fsync</code> the directory, so the staged file&#39;s directory entry is durable too. Only
+then write the <strong>import-incomplete marker</strong> (synced temporary file, then a rename that refuses to
+replace an existing entry, such as <code>RENAME_NOREPLACE</code>, after checking under the lock that no
+marker exists), and <code>fsync</code> the directory. The marker records the segment id, Subject, fact count,
+and a <strong>snapshot of the retention entry and bounds in force</strong> when the import began. On storage
+that honours <code>fsync</code>, a durable marker therefore always has a durable staged copy behind it; on
+storage that does not, nothing here holds, as for the restore marker.</li>
+<li>Remove the startup receipt (§5).</li>
+<li>Write each fact through <code>ingest</code> (admission, durability barrier, publication), in ascending
+position order, then ascending <code>event_id</code>.</li>
+<li>After the last barrier, make the store <strong>fully durable</strong> before touching the marker: the
+per-fact barrier is sled&#39;s flush, which is process-crash safe but only best effort against power
+loss (ADR-0087 §4, §9). Closing the store is <strong>not</strong> that step: ADR-0088 §5 already rejects
+closing sled to force a sync (its close is a <code>Drop</code> that returns nothing, skips I/O after an
+earlier error, panics on a failed <code>fsync</code>, and runs only when the last handle drops). Instead,
+after every handle to the authority store has been dropped, the tool runs the <strong>durability walk</strong>
+below over <code>store/authority</code> and proceeds only if it succeeds. Any failure, including a panic in
+sled&#39;s own drop, leaves the marker in place (an implementation must not catch that panic and
+continue to the sync step), so the node stays fail closed and <code>--resume</code> repeats the walk. Only
+then remove the marker and <code>fsync</code> the data directory. Otherwise a power loss could keep the
+marker&#39;s removal while losing trailing facts, such as a <code>revoke</code>, and the daemon would start on
+exactly the partial state the marker exists to expose. Only after the marker is gone remove the
+staged copy. A stop between the two leaves an orphan staged copy and no marker, which is harmless
+and is removed by the next import.</li>
+</ol>
+<p><strong>Existence is the safety property</strong>, as for the restore marker: any entry at the marker&#39;s name
+refuses, and so does any error other than &quot;not found&quot; while looking. It is removed only by a
+completed import or resume. Nothing removes it on drop.</p>
+<p>Recovery is <code>icnctl authority import --resume</code>. It re-reads the staged copy (or the original file if
+the operator supplies it), checks its id against the marker, re-applies §3, and writes the facts
+again. Duplicate writes are semantically idempotent (ADR-0087 §3), so resuming after any
+interruption point is safe.</p>
+<p>Resume evaluates retention and bounds against the <strong>snapshot in the marker</strong>, not the current
+retention file, after re-validating the snapshot itself: its basis must still begin <code>fixture:</code>, its
+bounds are clamped to the compiled maxima (configuration may lower, never raise), and no allocation
+is sized from the marker&#39;s recorded fact count. A hand-written marker therefore cannot raise a bound
+or admit a non-fixture basis. Resume also counts bounds over the <strong>union of distinct records</strong>
+(retained ∪ segment), so the facts the interrupted import already wrote are not counted twice. A withdrawal or a lowered bound
+made while an import is incomplete therefore cannot wedge the node: it takes effect for later
+imports, and the completing import&#39;s report states that retention changed after the import began.
+Completing the import writes the rest of a segment the operator had already decided to retain; it
+does not create a new retention decision. Retention edits are meant to be made when no import is
+incomplete, and tooling that edits the retention file should refuse while a marker exists.</p>
+<p>There is no &quot;abandon&quot; in this version. Facts already written cannot be removed (the store has no
+erasure path), so abandoning would leave exactly the stale partial history the marker exists to
+expose. Whether a governed abandon or erasure exists is a governance decision (§14).</p>
+<p><strong>Never wedged (an acceptance obligation, not a hope), for interruptions of the import process</strong>
+(crash, kill, or power loss on storage that honours <code>fsync</code>), with the staged copy or the original
+file available. If both the staged copy and the original file are lost or corrupt, or the marker
+itself is unreadable, resume cannot proceed and the node stays refused; the documented operator
+procedures are to obtain the same segment again (matching <code>segment_id</code>) or to restore the data
+directory from a backup taken before the import (ADR-0088 §12). An implementation is acceptable only
+with a fault-injection suite that stops the import after staging, after the marker, after <code>k</code> of <code>n</code> facts
+(<code>k = 0, 1, n-1, n</code>), between the last barrier and the store <code>fsync</code>s, during them (including a
+failed <code>fsync</code>), between them and the marker&#39;s removal, and between the marker&#39;s
+removal and the staged copy&#39;s removal. In every case the daemon must refuse while the marker exists,
+<code>--resume</code> must complete, the final store must equal a clean import&#39;s, and no case may leave the node
+permanently refused. The suite also covers a withdrawal and a lowered bound made while the marker
+exists, and a resume near the per-Subject bound. A store damaged in a way the durability walk
+refuses (a planted symlink, an unexpected file type) is outside this obligation: the node stays
+refused until the operator repairs the store, and the refusal names the entry.</p>
+<p><strong>The durability walk.</strong> <code>O_NOFOLLOW</code> guards only the last component of a path, so the walk never
+opens a path that contains a directory it has not itself opened:</p>
+<ul>
+<li>It starts from a descriptor for the data directory whose <code>fstat</code> identity (device and inode)
+matches the directory §5 checked and the lock anchors. From it, it opens <code>store</code>, then from that
+descriptor <code>authority</code>, <strong>one component at a time</strong>, each with <code>O_NOFOLLOW | O_DIRECTORY</code>, and
+checks with <code>fstat</code> that each is a directory owned by the effective uid (§5). A symlinked <code>store</code>
+or <code>authority</code> is therefore refused, never followed.</li>
+<li>It descends only through descriptors: each entry is opened with <code>openat</code> relative to its parent
+directory&#39;s descriptor, with <code>O_NOFOLLOW | O_NOCTTY</code>, plus <code>O_DIRECTORY</code> for directories and
+<code>O_NONBLOCK</code> for regular files. Every opened descriptor is checked with <code>fstat</code> against the
+entry&#39;s type before it is used. No multi-component path is ever opened. The walk refuses below a
+depth of 8 directories under <code>store/authority</code> (sled&#39;s layout is about two levels deep; the N2-A
+gate&#39;s discovery uses a similar bound) and closes each descriptor after its <code>fsync</code>.</li>
+<li>It classifies each entry by the type <code>readdir</code> reports; where that is <code>DT_UNKNOWN</code> (some
+filesystems report it for every entry), by <code>fstatat(parent, name, AT_SYMLINK_NOFOLLOW)</code>. It refuses
+any entry so classified as a symlink, FIFO, socket, block or character device, or any type other
+than a regular file or a directory, without opening it. If an entry is swapped
+between <code>readdir</code> and <code>openat</code>, the open flags still fail closed (<code>ELOOP</code> for a symlink,
+<code>O_DIRECTORY</code> for a wrong directory type, <code>O_NONBLOCK</code> so a FIFO cannot block) and <code>fstat</code> refuses
+the result; a device node swapped in at that instant can be opened before <code>fstat</code> refuses it, and
+<code>O_NOCTTY</code> keeps that open from acquiring a terminal. Only the owning account or root can make
+such a swap (§5).</li>
+<li>It <code>fsync</code>s every regular file and every directory it opened, including <code>store/authority</code> itself
+and every subdirectory such as <code>blobs/</code>, and succeeds only if every <code>openat</code>, <code>fstat</code> and <code>fsync</code>
+succeeded.</li>
+<li>On any refusal or failure the marker stays in place and nothing further is removed.</li>
+</ul>
+<p>A refusal for a planted symlink or an unexpected file type is <strong>expected fail-closed behaviour</strong>,
+not a &quot;never wedged&quot; violation: only the account that owns the store (or root) can plant one there
+(§5). Resume repeats the walk and refuses again until the operator repairs the store, for example by
+removing the planted entry, so <code>--resume</code> can complete. The same rule already applies to the N2-A
+gate&#39;s discovery of sled roots, which refuses any symlink.</p>
+<h3 id="7-reconciliation-with-daemon-startup-what-changes">7. Reconciliation with daemon startup: what changes</h3>
+<p><code>icnd</code> starts in this order (main.rs): take the data-directory lock, <code>discard_receipt</code>, run the N2-A
+gate, <code>AuthorityRegistry::open</code>. The marker fits that order without moving any step:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-core</code> <code>import_marker</code> (new)</td>
+<td>Create, read and complete the marker and staged file. Modelled on <code>restore_marker</code> (existence refuses; <code>fsync</code> of file and directory; no removal on drop), but created by temp file plus a no-replace rename after an absence check under the lock, so it is never torn and never silently replaces an existing marker.</td>
+</tr>
+<tr>
+<td><code>icn-core</code> <code>AuthorityRegistry::open</code></td>
+<td>After <code>refuse_incomplete_restore</code>, refuse <code>ImportIncomplete</code> while the marker exists. The daemon&#39;s start then fails closed, naming <code>icnctl authority import --resume</code>.</td>
+</tr>
+<tr>
+<td><code>icn-core</code> <code>AuthorityRegistry::open_offline</code> (new)</td>
+<td>§5.</td>
+</tr>
+<tr>
+<td><code>icn-core</code> <code>RegistryError</code></td>
+<td>New <code>ImportIncomplete { marker, subject, segment_id }</code>.</td>
+</tr>
+<tr>
+<td><code>icn-core</code> <code>DataDirLock</code></td>
+<td><strong>Unchanged.</strong> Unlike the restore marker, the import marker is not checked at lock acquisition: resume must take the lock, and the condition only makes the authority store untrustworthy, not the rest of the data directory.</td>
+</tr>
+<tr>
+<td><code>icn-core</code> <code>discard_receipt</code></td>
+<td>Unchanged. An import has already removed the receipt before its first write.</td>
+</tr>
+<tr>
+<td><code>icn-store</code> N2-A gate</td>
+<td>Unchanged. The marker and staged file are top-level regular files, never directories, so they are not discovered as sled roots. A test must show this.</td>
+</tr>
+<tr>
+<td><code>icnd</code> main.rs</td>
+<td>No ordering change. The startup error surfaces the new refusal and its recovery command.</td>
+</tr>
+<tr>
+<td><code>icnctl</code></td>
+<td>New <code>authority import [--resume]</code> and <code>device-authority verify --node-store</code> (§10). Backup and restore carry the marker and staged file with the data directory, so a node restored from a mid-import backup refuses until resumed (intended). Reporting the marker in <code>verify-backup</code> is a follow-up.</td>
+</tr>
+<tr>
+<td>ADR-0088</td>
+<td>Amended (see &quot;Effect on ADR-0088&quot;): §6 gains the import-incomplete state; §11&#39;s exposure statement extends to imported facts once an importer exists; §12 gains import recovery.</td>
+</tr>
+</tbody></table>
+<h3 id="8-retention-fixture-subjects-only-with-explicit-context-and-scope">8. Retention: fixture Subjects only, with explicit context and scope</h3>
+<p>Admission accepts any self-incepted Subject, and the store only grows. Without a retention rule, any
+segment the operator is handed becomes a permanent record on the node, and a node collecting
+Subjects across contexts works against IDENTITY_SEMANTICS §5.1 (one <code>SubjectId</code> per institutional
+context) and §5.3 (the identifier is public to its context only).</p>
+<ul>
+<li><strong>Retention file.</strong> An owner-only (0600) file in the data directory lists each Subject the node
+may keep. Each entry records the <code>subject</code>, the <code>context</code> it is retained for, the <code>basis</code> (a
+reference, never personal data), who added it, and when. A segment whose Subject has no entry is
+refused before anything is written.</li>
+<li><strong>Fixture only (v1).</strong> An entry&#39;s <code>basis</code> must begin <code>fixture:</code>. Any other basis is refused. The
+prefix is the <strong>operator&#39;s declaration</strong>, not a technical control: anyone can type it in front of
+a real Subject. What keeps real participants out is §13, which needs people, and the operator&#39;s
+obligation not to mislabel. An implementation may add a content check, for example accepting only
+Subjects whose inception carries a context nonce from a published fixture set (the N4 test vectors),
+since a compliant real Subject cannot carry a fixture nonce. N4-A §9.3 already forbids promoting
+fixture identities into anything real. No real participant may be retained until §13 is met and a
+later revision of this ADR permits it.</li>
+<li><strong>Context is recorded per Subject, never assumed per node.</strong> A node may host several autonomous
+institutional domains, and a person may hold context-specific Subjects in overlapping communities,
+cooperatives, federations and other institutions. Until GEN (#2602) binds a Subject to a context
+structurally, <code>context</code> is the operator&#39;s recorded claim, not a verified fact. It is never used to
+join or compare Subjects. The label is not the only correlation path: authorize, revoke and
+establishment facts carry Principal keys, which are correlatable across contexts by construction.
+A node retaining Subjects from several contexts can link any of them that reuse a device key, and
+the startup receipt already lists every retained Subject&#39;s keys in one file. Separation therefore
+also depends on clients using one device Principal per (device, context) (N4-A §9.3), which a node
+cannot verify. A first implementation may support one context per store as an
+implementation limit; that limit must not become an ICN substrate invariant.</li>
+<li><strong>The retention file is the operator&#39;s record of a retention decision.</strong> It is not the person&#39;s
+consent or the institution&#39;s authorization, and nothing may treat an entry as either.</li>
+<li><strong>Provisional bounds</strong>, checked before reading or allocating: segment file at most 1 MiB; at most
+4,096 facts per import; at most 16 witnesses per fact; at most 65,536 retained facts and 262,144
+retained (fact, witness) records per Subject, counted over distinct records. Witness records are
+bounded separately because a key holder can mint distinct valid signatures over the same body.
+Configuration may lower these, never raise them. Values to be confirmed by testing. A Subject that
+reaches a bound refuses every later import, including one that carries a <code>revoke</code>; since admission
+is state-independent, anyone holding a valid key for the Subject can fill its bounds. The refusal is
+open, not silent, but a node in that state can no longer learn of revocations for that Subject, and
+N4-E over its facts stays at the stale tip.</li>
+<li><strong>Withdrawal.</strong> Removing an entry stops further imports for that Subject. It does <strong>not</strong> remove
+retained facts: the fact store has no deletion API, sled can keep deleted bytes, an account that
+held an open descriptor keeps it (ADR-0088 §11), and backups keep their own copies. A withdrawn
+Subject&#39;s facts are still rehydrated at every daemon start and listed, with their keys, in the
+startup receipt; still answered by <code>--node-store</code>; and still named in the retained import reports.
+Imported facts carry no record of which import wrote them, so a later erasure could not attribute
+facts to imports from the store alone. A withdrawal made while an import is incomplete is
+<strong>deferred</strong>: the import completes and writes the rest of that segment for the withdrawn Subject
+(up to the per-import bound) before the withdrawal takes effect (§6). That is forced by the absence
+of an abandon path, and harmless for fixtures; for real participants it is a consent-semantics
+choice, and whether a withdrawal may instead override completion, accepting a stale partial
+history, is a governance decision (§14).</li>
+<li><strong>No new index.</strong> Reports and the retention file name <code>SubjectId</code>s only. Nothing maps a legacy
+<code>Did</code> or any other identifier to a Subject.</li>
+</ul>
+<h3 id="9-forks-are-evidence">9. Forks are evidence</h3>
+<p>An import never filters facts by what <code>derive</code> would conclude. If the retained facts, or the union
+of retained and imported facts, contain admissible competing candidates at one position, all are
+kept, and <code>derive</code> reports the Subject as halted. The import report states the halt. Dropping a
+candidate would hide the duplicity that halting exists to expose. A segment that leads to a halted
+Subject is not an import failure. One exclusion is structural, not a filter: §3&#39;s linkage rule keeps
+admissible bodies whose predecessor is not in the segment (or, at <code>from</code>, not retained) out of a
+segment. <code>derive</code> could not select them, so no duplicity is hidden, but an N4-B bundle may carry such
+bodies and a segment may not.</p>
+<h3 id="10-icnctl-device-authority-verify---node-store">10. <code>icnctl device-authority verify --node-store</code></h3>
+<p>An offline check of a device act, given as an N4-B <code>EvidenceBundle</code>, against the node&#39;s own retained
+facts. It uses <code>open_offline(Inspect)</code> under the same lock, refuses while an import is incomplete,
+writes no facts, and neither writes nor removes the startup receipt (the N2-A gate still writes its
+receipt, and sled may write its own files, §5). It reports, separately: the historical verdict
+(N4-A, at the position the act binds), and the N4-E current-admission verdict over the node&#39;s
+retained facts, in N4-E&#39;s own vocabulary. N4-E evaluates at the retained frontier minus one and
+requires the act to bind exactly that position, so for an act bound to an earlier position the
+verdict is a refusal such as <code>StaleAct</code>, and a halted Subject gives <code>AuthorityHalted</code>. It names the
+retained tip and labels every answer &quot;as of the facts this node retains&quot;; it never calls the
+retained tip current. The bundle&#39;s own facts are not imported.</p>
+<h3 id="11-import-reports">11. Import reports</h3>
+<p>An import writes an owner-only <strong>import report</strong>, a different file name and format from the
+startup receipt and never called one: segment id, Subject, <code>from..=to</code>, facts and witnesses
+written, facts already present, the retained tip, and a summary of the <code>derive</code> view afterwards
+(its state, such as active or halted, and counts of authority keys and devices; never the keys
+themselves), labelled as a diagnostic in the way ADR-0088 §10 labels the receipt. The last 8 reports are kept; older ones are
+removed by the next import. Reports and logs carry digests, counts and <code>SubjectId</code>s only, never fact
+bodies, keys or payloads.</p>
+<h3 id="12-how-the-limits-are-communicated">12. How the limits are communicated</h3>
+<p>Every import report and every <code>--node-store</code> answer states, in fixed text:</p>
+<ul>
+<li>Imported facts are admitted, not authorized. Authority is what <code>derive</code> concludes, at the point of
+use, over the facts held there.</li>
+<li>A segment cannot prove it is complete or current (§4). The node holds only what it was given.
+There is no replication (N3).</li>
+<li>Rolling the data directory back, or losing it entirely, cannot be detected (ADR-0088 §9).</li>
+<li>Persistence survives a process crash. Surviving power loss is best effort per fact (ADR-0087 §4,
+§9); an import <code>fsync</code>s every file of the authority store with its own descriptors, and checks
+each result, before clearing its marker (§6), on storage that honours <code>fsync</code>.</li>
+<li>If the store was ever readable by another account, anything imported later is exposed to an open
+descriptor that account may still hold (ADR-0088 §11).</li>
+</ul>
+<h3 id="13-prerequisites-that-need-people-not-code">13. Prerequisites that need people, not code</h3>
+<p>Before any fact about a real participant is retained:</p>
+<ol>
+<li>A later revision of this ADR, accepted by the maintainer, lifting §8&#39;s fixture-only rule (this
+ADR&#39;s acceptance of 2026-10-27 covers fixture Subjects only).</li>
+<li>The decision of the institution, or other context authority (IDENTITY_SEMANTICS §2.2 allows
+non-institutional contexts), on whose facts a node may keep, in which context, on what basis, with
+what notice that retained facts cannot currently be erased, and who may run the import.</li>
+<li>A withdrawal and erasure procedure, or an explicit institutional decision to proceed without one.</li>
+<li>A custody decision for the real Subject and device keys that sign the facts. Facts are authored
+only by the Subject&#39;s keys; assembling or carrying a segment (by the Subject&#39;s client, or later
+by N3 relaying) is carriage, not authorship. The node never authors facts, and hosting a store
+confers no authority.</li>
+<li>A security review of the import implementation before it runs against a real store.</li>
+</ol>
+<h3 id="14-decisions-still-open">14. Decisions still open</h3>
+<ul>
+<li>Whether a governed abandon or erasure procedure exists, and who may invoke it (governance).</li>
+<li>Whether the retention file stays an operator-edited file or becomes a governed record
+(maintainer, then governance).</li>
+<li>Who may run an import for a real institution, and how consent is recorded and withdrawn
+(governance).</li>
+<li>Final values of the §8 bounds after testing (maintainer).</li>
+<li>How a Subject&#39;s own client produces segments: out of scope here, and needs its own design.</li>
+<li>For real participants: whether a withdrawal made during an incomplete import may override
+completion, accepting a stale partial history, instead of being deferred (governance). For the
+fixture scope it is deferred (Status, choice 2).</li>
+<li>For real participants: what a node does when a Subject reaches a bound and a later segment carries
+a revocation (maintainer, then governance). For the fixture scope the bound fails closed
+(Status, choice 3).</li>
+</ul>
+<p>Decided at acceptance for the fixture scope: root execution is prohibited, and root-run container
+deployments cannot import (Status, choice 1). Changing that needs a later revision.</p>
+<h2 id="irreversible-commitments">Irreversible commitments</h2>
+<ol>
+<li>The segment&#39;s domain literal and layout become permanent once published; canonical vectors and an
+independent reference implementation must exist before any implementation merges.</li>
+<li>A new fail-closed state in every registry open; operators handle it for the life of the node.
+§6&#39;s fault-injection obligation is what makes it acceptable.</li>
+<li>Retained facts cannot be erased. The fixture-only rule exists because of this.</li>
+<li>The retention file&#39;s semantics. They must never be read as consent or authority, by this or any
+later code.</li>
+<li>The on-disk names and formats of the marker, staged file, import report and retention file:
+backup, restore and verify-backup handle data-directory entries by name.</li>
+<li><code>segment_id</code> as an identity (SHA-256 over the canonical bytes).</li>
+<li>Imported facts carry no import provenance and reports rotate after 8, so a later withdrawal or
+erasure procedure cannot tell which import wrote which fact. A provenance record would have to
+be designed before real participants are retained.</li>
+</ol>
+<h2 id="effect-on-adr-0088">Effect on ADR-0088</h2>
+<p>ADR-0088 is amended by this ADR (its status becomes <code>amended</code>, with an amendment note; ADR-0018 §4).
+The amendment is a <strong>future contract, not current behaviour</strong>: no importer exists, and <code>icnd</code> does not
+check any import marker today.</p>
+<ul>
+<li>§6 gains one fail-closed state, import incomplete, which <code>open</code> will refuse once the import marker
+is implemented (§6, §7 here).</li>
+<li>§11&#39;s &quot;Today no runtime producer writes facts, so nothing is written after the tightening&quot; remains
+true until an importer exists. Once one does, imported facts are written after the tightening, and
+the exposure statement covers them (an account that ever held an open descriptor keeps reading).</li>
+<li>§12 (manual recovery) gains the import-incomplete state and its procedures (§6 here) when they are
+implemented.</li>
+<li>§10 is unchanged in substance: the startup receipt stays a daemon diagnostic. Offline tools that
+write facts remove it and never write one.</li>
+</ul>
+<p>ADR-0087 is unchanged.</p>
+<h2 id="security-and-privacy-controls-required-of-an-implementation">Security and privacy controls (required of an implementation)</h2>
+<ul>
+<li>Data-directory lock held for the whole import; refused while <code>icnd</code> runs.</li>
+<li>N2-A gate before open; incomplete-restore and incomplete-import refusals before any write.</li>
+<li>Ownership and permissions (§5) checked before the lock is taken and before the N2-A gate, and
+again immediately before sled opens the store; never run as root.</li>
+<li>The input is opened once with <code>O_NOFOLLOW | O_NONBLOCK</code>; the open descriptor must be a regular
+file (<code>fstat</code>); it is read with a hard limit of the size bound plus one byte. Every count in the
+encoding is checked against the bytes remaining before anything is allocated, and decoding is
+strict. The retention file and the marker record are parsed with their own size bounds (64 KiB
+each).</li>
+<li>Whole-segment admission in memory before the marker. Per-fact admission, then barrier, then
+publication.</li>
+<li>Marker, staged copy, import report and retention file are each created owner-only (0600) as
+top-level regular files in the data directory.</li>
+<li>Logs carry digests, counts and the <code>SubjectId</code> only. Never fact bodies, keys or payloads.</li>
+<li>No network, IPC or credential dependency. No real identity material in tests.</li>
+<li>Acceptance tests for the durability walk: <code>store</code> itself replaced by a symlink; <code>authority</code>
+replaced by a symlink; a data-directory descriptor whose identity does not match the directory
+§5 checked; a symlinked intermediate directory under <code>store/authority</code> (for example <code>blobs/</code>
+replaced by a symlink to a directory outside the store); a symlinked file; a FIFO, a socket and (where the test can create one) a device node at a file
+position; and an injected <code>fsync</code> failure on a file and on a directory. In each case the import or
+resume refuses, names the entry, opens nothing outside the store, never blocks, and leaves the
+marker in place; after the operator repairs the store, <code>--resume</code> completes.</li>
+<li>Mutation tests that remove the marker write, skip whole-segment admission, publish before the
+barrier, filter by verdict, write a startup receipt from the offline path, let <code>open</code> ignore the
+marker, remove the marker after a failed or skipped store <code>fsync</code>, accept a non-<code>fixture:</code> basis,
+skip the ownership check, check the size after reading, resume without comparing the segment id,
+open a child by full path instead of relative to its parent&#39;s descriptor, open <code>store/authority</code>
+as one multi-component path, drop <code>O_NOFOLLOW</code>,
+follow a symlinked directory, open a FIFO or other non-regular, non-directory entry, or skip the
+<code>fsync</code> of a directory, must each be caught.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>A node can hold N1 history for fixture Subjects without any new network surface, and the daemon&#39;s
+existing fail-closed rehydration covers it.</li>
+<li>Revocations reach a node through the same carrier as everything else, so a node&#39;s retained tip can
+include them; it still cannot prove it holds the latest.</li>
+<li>An operator handles a new refusal (import incomplete), with a resume path instead of a manual
+procedure.</li>
+<li>Retention becomes an explicit, recorded decision instead of a side effect of admission.</li>
+<li>Nothing here creates a consumer. N4 enforcement over a node&#39;s store stays a separate decision.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not now</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Import <code>EvidenceBundle</code>s</td>
+<td>Act-centred and prefix-bounded: cannot carry a revocation after the act&#39;s position, cannot exist without an act. Kept for act verification only (§10).</td>
+</tr>
+<tr>
+<td>Atomic batch in the store</td>
+<td>Changes ADR-0087&#39;s accepted contract. Possible later by amendment.</td>
+</tr>
+<tr>
+<td>Check the marker at <code>DataDirLock</code> acquisition</td>
+<td>Would block resume and the rest of the data directory for a condition local to the authority store.</td>
+</tr>
+<tr>
+<td>Import through a running daemon (IPC, socket, gateway)</td>
+<td>A new authority write surface. Needs its own design and security review.</td>
+</tr>
+<tr>
+<td>Reuse <code>AuthorityRegistry::open</code></td>
+<td>Would initialize histories outside <code>icnd</code> and write a false startup receipt.</td>
+</tr>
+<tr>
+<td>Filter out facts that make a Subject halted</td>
+<td>Hides duplicity. Halting is the intended outcome.</td>
+</tr>
+<tr>
+<td>No retention rule, admit anything</td>
+<td>Unbounded permanent storage, and a cross-context correlation surface.</td>
+</tr>
+<tr>
+<td>Accept unanchored segments (<code>from &gt; 0</code> with no retained predecessor)</td>
+<td>Retention cost with no use: <code>derive</code> cannot reach the facts.</td>
+</tr>
+</tbody></table>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0089-n1-offline-authority-fact-import.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
