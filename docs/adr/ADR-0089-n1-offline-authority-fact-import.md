@@ -281,16 +281,24 @@ refused until the operator repairs the store, and the refusal names the entry.
 **The durability walk.** `O_NOFOLLOW` guards only the last component of a path, so the walk never
 opens a path that contains a directory it has not itself opened:
 
-- It opens `store/authority` relative to a descriptor for the data directory, with
-  `O_NOFOLLOW | O_DIRECTORY`, and checks with `fstat` that the result is a directory owned by the
-  effective uid (§5).
+- It starts from a descriptor for the data directory whose `fstat` identity (device and inode)
+  matches the directory §5 checked and the lock anchors. From it, it opens `store`, then from that
+  descriptor `authority`, **one component at a time**, each with `O_NOFOLLOW | O_DIRECTORY`, and
+  checks with `fstat` that each is a directory owned by the effective uid (§5). A symlinked `store`
+  or `authority` is therefore refused, never followed.
 - It descends only through descriptors: each entry is opened with `openat` relative to its parent
-  directory's descriptor, with `O_NOFOLLOW`, plus `O_DIRECTORY` for directories, and `O_NONBLOCK`
-  for regular files. Every opened descriptor is checked with `fstat` against the entry's type before
-  it is used. No full path below `store/authority` is ever opened.
-- It refuses, and does not open, any entry that is a symlink, FIFO, socket, block or character
-  device, or any type other than a regular file or a directory. A FIFO is never opened, so the walk
-  cannot block on one.
+  directory's descriptor, with `O_NOFOLLOW | O_NOCTTY`, plus `O_DIRECTORY` for directories and
+  `O_NONBLOCK` for regular files. Every opened descriptor is checked with `fstat` against the
+  entry's type before it is used. No multi-component path is ever opened. The walk refuses beyond a
+  fixed depth (sled's layout is about two levels deep; the N2-A gate's discovery uses a similar
+  bound) and closes each descriptor after its `fsync`.
+- It refuses any entry that `readdir` reports as a symlink, FIFO, socket, block or character device,
+  or any type other than a regular file or a directory, without opening it. If an entry is swapped
+  between `readdir` and `openat`, the open flags still fail closed (`ELOOP` for a symlink,
+  `O_DIRECTORY` for a wrong directory type, `O_NONBLOCK` so a FIFO cannot block) and `fstat` refuses
+  the result; a device node swapped in at that instant can be opened before `fstat` refuses it, and
+  `O_NOCTTY` keeps that open from acquiring a terminal. Only the owning account or root can make
+  such a swap (§5).
 - It `fsync`s every regular file and every directory it opened, including `store/authority` itself
   and every subdirectory such as `blobs/`, and succeeds only if every `openat`, `fstat` and `fsync`
   succeeded.
@@ -501,9 +509,10 @@ ADR-0087 is unchanged.
   top-level regular files in the data directory.
 - Logs carry digests, counts and the `SubjectId` only. Never fact bodies, keys or payloads.
 - No network, IPC or credential dependency. No real identity material in tests.
-- Acceptance tests for the durability walk: a symlinked intermediate directory under
-  `store/authority` (for example `blobs/` replaced by a symlink to a directory outside the store); a
-  symlinked file; a FIFO, a socket and (where the test can create one) a device node at a file
+- Acceptance tests for the durability walk: `store` itself replaced by a symlink; `authority`
+  replaced by a symlink; a data-directory descriptor whose identity does not match the directory
+  §5 checked; a symlinked intermediate directory under `store/authority` (for example `blobs/`
+  replaced by a symlink to a directory outside the store); a symlinked file; a FIFO, a socket and (where the test can create one) a device node at a file
   position; and an injected `fsync` failure on a file and on a directory. In each case the import or
   resume refuses, names the entry, opens nothing outside the store, never blocks, and leaves the
   marker in place; after the operator repairs the store, `--resume` completes.
@@ -511,7 +520,8 @@ ADR-0087 is unchanged.
   barrier, filter by verdict, write a startup receipt from the offline path, let `open` ignore the
   marker, remove the marker after a failed or skipped store `fsync`, accept a non-`fixture:` basis,
   skip the ownership check, check the size after reading, resume without comparing the segment id,
-  open a child by full path instead of relative to its parent's descriptor, drop `O_NOFOLLOW`,
+  open a child by full path instead of relative to its parent's descriptor, open `store/authority`
+  as one multi-component path, drop `O_NOFOLLOW`,
   follow a symlinked directory, open a FIFO or other non-regular, non-directory entry, or skip the
   `fsync` of a directory, must each be caught.
 
