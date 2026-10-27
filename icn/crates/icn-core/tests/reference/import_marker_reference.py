@@ -29,12 +29,12 @@ from pathlib import Path
 
 HEADER = b"icn-import-incomplete v1"
 MAX_RECORD_BYTES = 64 * 1024
-MAX_FACT_COUNT = 4096                      # MAX_SEGMENT_FACTS, ADR-0089 §8 (provisional)
+U32_MAX = 2**32 - 1                        # fact-count is a canonical u32 >= 1, not bounded by policy
 IDENTITY_KEYS = ("segment-id", "subject", "fact-count")
 KEY = re.compile(r"[a-z0-9-]+")
 VALUE = re.compile(r"[\x21-\x7e]+")
 HEX32 = re.compile(r"[0-9a-f]{64}")
-COUNT = re.compile(r"[1-9][0-9]{0,3}")
+COUNT = re.compile(r"[1-9][0-9]{0,9}")
 
 
 class Unreadable(Exception):
@@ -75,7 +75,7 @@ def read(record: bytes):
     segment, subject, count = (v for _, v in fields[:3])
     if not HEX32.fullmatch(segment) or not HEX32.fullmatch(subject):
         raise Unreadable("bad hex")
-    if not COUNT.fullmatch(count) or int(count) > MAX_FACT_COUNT:
+    if not COUNT.fullmatch(count) or int(count) > U32_MAX:
         raise Unreadable("bad fact-count")
     return subject, segment, int(count)
 

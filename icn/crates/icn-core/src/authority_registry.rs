@@ -235,8 +235,9 @@ pub enum RegistryError {
         "refusing to start: an offline N1 authority import into this data directory did not \
          finish ({marker} names subject {subject}, segment {segment}). The authority store may \
          hold only part of that segment. `icnctl authority import --resume` is the command that \
-         will complete it, and it is not implemented yet; until it is, restore the data directory \
-         from a backup taken before the import. Do not remove the marker by hand",
+         will complete it, and it is not implemented yet; until it is, copy the whole data \
+         directory first, then restore it from a backup taken before the import (ADR-0088 §12). \
+         Do not remove the marker by hand",
         segment = hex::encode(.segment_id)
     )]
     ImportIncomplete {
@@ -252,11 +253,12 @@ pub enum RegistryError {
     ///
     /// Still a refusal: an unreadable marker is not an absent one.
     #[error(
-        "refusing to start: {marker} exists, so an offline N1 authority import into this data \
-         directory may not have finished, but it could not be read ({reason}). It is not treated \
-         as absent. `icnctl authority import --resume` is the command that will complete an \
-         import, and it is not implemented yet; until it is, restore the data directory from a \
-         backup taken before the import. Do not remove the marker by hand"
+        "refusing to start: something is at {marker}, so an offline N1 authority import into \
+         this data directory may not have finished, but it could not be read ({reason}). It is \
+         not treated as absent. If the cause is temporary (permissions, I/O), fix it and start \
+         again. Otherwise no import can be resumed from this marker: copy the whole data \
+         directory first, then restore it from a backup taken before the import (ADR-0088 §12). \
+         Do not remove the marker by hand"
     )]
     ImportMarkerUnreadable {
         /// The marker.

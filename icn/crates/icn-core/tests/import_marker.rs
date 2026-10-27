@@ -111,14 +111,14 @@ fn every_shared_vector_classifies_as_recorded() {
         assert_eq!(classify(&bytes), expected, "vector {name}");
         count += 1;
     }
-    // Not vacuous: the file holds 4 readable and 32 unreadable vectors.
-    assert_eq!(count, 36);
+    // Not vacuous: the file holds 6 readable and 33 unreadable vectors.
+    assert_eq!(count, 39);
     assert_eq!(
         VECTORS
             .lines()
             .filter(|l| l.contains("\tincomplete:"))
             .count(),
-        4
+        6
     );
 }
 
@@ -302,7 +302,7 @@ fn inspecting_never_changes_the_marker() {
     let dir = tempfile::tempdir().unwrap();
     let path = import_marker_path(dir.path());
     for bytes in [valid_record(), b"garbage".to_vec()] {
-        std::fs::write(&path, &bytes).unwrap();
+        std::fs::write(&path, bytes).unwrap();
         let before = fingerprint(&path);
         for _ in 0..3 {
             let _ = inspect_import_marker(dir.path());

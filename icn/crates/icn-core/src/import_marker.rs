@@ -18,6 +18,9 @@
 //! marker is never followed, never opened unless it is a regular file, never read past
 //! [`MAX_IMPORT_MARKER_BYTES`], and never modified or removed here.
 //!
+//! The guarantees above are Unix ones: elsewhere the marker is opened without `O_NOFOLLOW` or
+//! `O_NONBLOCK` and without the identity re-check. ICN nodes run on Unix.
+//!
 //! The import marker is separate from the restore marker
 //! ([`crate::restore_marker`]): it is not checked at data-directory lock acquisition (resume must
 //! take the lock), only when the authority registry opens.
@@ -43,7 +46,11 @@
 //!
 //! - `segment-id` — 64 lowercase hex: `SHA-256` of the canonical segment bytes (ADR-0089 §3).
 //! - `subject` — 64 lowercase hex: the Subject's `SubjectId` bytes.
-//! - `fact-count` — decimal, no sign, no leading zero, `1 ..= MAX_SEGMENT_FACTS`.
+//! - `fact-count` — canonical decimal `u32`, at least 1: no sign, no leading zero. It is not
+//!   bounded by the grammar: the per-import fact bound is provisional (ADR-0089 §8), and a
+//!   marker written under one bound must stay readable under another. Resume checks it against
+//!   the staged segment and applies the compiled bound as policy; nothing sizes an allocation
+//!   from it.
 //!
 //! Fields after the identity prefix carry the retention entry and bounds snapshot (ADR-0089 §6,
 //! §8). Their keys and encodings are **not yet specified**, because the retention file has no
@@ -60,7 +67,6 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use icn_identity::authority_log::SubjectId;
-use icn_identity::history_segment::MAX_SEGMENT_FACTS;
 
 /// File name of the import-incomplete marker, inside the data directory.
 pub const IMPORT_INCOMPLETE_FILE_NAME: &str = ".icn-import-incomplete";
@@ -111,7 +117,16 @@ pub enum ImportMarkerState {
 
 /// Inspect the marker for `root` without following it, blocking on it, or changing it.
 pub fn inspect_import_marker(root: &Path) -> ImportMarkerState {
-    let path = import_marker_path(root);
+    // Resolve the root first, as the restore marker's refusal path does: a root that cannot be
+    // resolved is not evidence that no marker is in it.
+    let path = match std::fs::canonicalize(root) {
+        Ok(real) => real.join(IMPORT_INCOMPLETE_FILE_NAME),
+        Err(e) => {
+            return ImportMarkerState::Unreadable(format!(
+                "the data directory could not be resolved: {e}"
+            ))
+        }
+    };
     let metadata = match std::fs::symlink_metadata(&path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return ImportMarkerState::Absent,
         Err(e) => return ImportMarkerState::Unreadable(format!("it could not be inspected: {e}")),
@@ -158,7 +173,10 @@ pub fn parse_import_marker(bytes: &[u8]) -> Result<ImportMarkerIdentity, String>
     match lines.next() {
         Some(IMPORT_MARKER_HEADER) => {}
         Some(other) if other.starts_with("icn-import-incomplete ") => {
-            return Err(format!("its version line {other:?} is not supported"))
+            return Err(format!(
+                "its version line {} is not supported",
+                excerpt(other)
+            ))
         }
         _ => return Err(format!("it does not start with `{IMPORT_MARKER_HEADER}`")),
     }
@@ -174,17 +192,17 @@ pub fn parse_import_marker(bytes: &[u8]) -> Result<ImportMarkerIdentity, String>
         }
         let (key, value) = line
             .split_once(' ')
-            .ok_or_else(|| format!("line {line:?} is not `key value`"))?;
+            .ok_or_else(|| format!("line {} is not `key value`", excerpt(line)))?;
         let key_ok = !key.is_empty()
             && key
                 .bytes()
                 .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
         let value_ok = !value.is_empty() && value.bytes().all(|b| (0x21..=0x7e).contains(&b));
         if !key_ok || !value_ok {
-            return Err(format!("line {line:?} is not `key value`"));
+            return Err(format!("line {} is not `key value`", excerpt(line)));
         }
         if !seen.insert(key) {
-            return Err(format!("`{key}` is recorded twice"));
+            return Err(format!("`{}` is recorded twice", excerpt(key)));
         }
         fields.push((key, value));
     }
@@ -192,7 +210,7 @@ pub fn parse_import_marker(bytes: &[u8]) -> Result<ImportMarkerIdentity, String>
     let mut identity = fields.iter();
     let mut next = |expected: &str| match identity.next() {
         Some((key, value)) if *key == expected => Ok(*value),
-        Some((key, _)) => Err(format!("expected `{expected}`, found `{key}`")),
+        Some((key, _)) => Err(format!("expected `{expected}`, found {}", excerpt(key))),
         None => Err(format!("`{expected}` is missing")),
     };
     let segment_id = hex32(next(IDENTITY_KEYS[0])?, IDENTITY_KEYS[0])?;
@@ -221,19 +239,25 @@ fn hex32(value: &str, key: &str) -> Result<[u8; 32], String> {
 }
 
 fn fact_count(value: &str) -> Result<u32, String> {
-    let canonical = (1..=4).contains(&value.len())
+    let canonical = (1..=10).contains(&value.len())
         && value.bytes().all(|b| b.is_ascii_digit())
         && !value.starts_with('0');
-    let count = if canonical {
-        value.parse::<u32>().ok()
-    } else {
-        None
-    };
-    match count {
-        Some(n) if n as usize <= MAX_SEGMENT_FACTS => Ok(n),
-        _ => Err(format!(
-            "`fact-count` {value:?} is not a decimal in 1..={MAX_SEGMENT_FACTS} without leading zeros"
+    match canonical.then(|| value.parse::<u32>().ok()).flatten() {
+        Some(n) => Ok(n),
+        None => Err(format!(
+            "`fact-count` {} is not a decimal u32 of at least 1 without leading zeros",
+            excerpt(value)
         )),
+    }
+}
+
+/// At most 64 characters of marker content, `Debug`-quoted, for a refusal reason: the content is
+/// whatever is at the marker's name, so a reason never echoes more than this of it.
+fn excerpt(text: &str) -> String {
+    const LIMIT: usize = 64;
+    match text.char_indices().nth(LIMIT) {
+        Some((cut, _)) => format!("{:?}…", &text[..cut]),
+        None => format!("{text:?}"),
     }
 }
 

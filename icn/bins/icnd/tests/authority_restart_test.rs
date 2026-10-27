@@ -479,29 +479,8 @@ fn a_start_refused_by_the_n2a_gate_leaves_no_receipt_from_the_previous_start() {
 
 // ── I: the import-incomplete marker (ADR-0089 §6, §7; refusal side only) ─────────────────────────
 
-/// Every regular file under `dir`, by relative path, with its bytes.
-fn tree(dir: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
-    let mut out = std::collections::BTreeMap::new();
-    let mut pending = vec![dir.to_path_buf()];
-    while let Some(next) = pending.pop() {
-        for entry in std::fs::read_dir(&next).unwrap() {
-            let path = entry.unwrap().path();
-            let kind = std::fs::symlink_metadata(&path).unwrap().file_type();
-            if kind.is_dir() {
-                pending.push(path);
-            } else if kind.is_file() {
-                out.insert(
-                    path.strip_prefix(dir).unwrap().to_path_buf(),
-                    std::fs::read(&path).unwrap(),
-                );
-            }
-        }
-    }
-    out
-}
-
 #[test]
-fn an_unfinished_import_stops_startup_and_keeps_its_evidence() {
+fn an_unfinished_import_stops_startup_keeps_the_marker_and_loses_no_fact() {
     let node = Node::init("n1r1-i");
     node.seed_offline();
     let mut daemon = node.start();
@@ -518,7 +497,6 @@ fn an_unfinished_import_stops_startup_and_keeps_its_evidence() {
         "a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d",
     );
     std::fs::write(&marker, &record).unwrap();
-    let store_before = tree(&node.store());
     let record_before = std::fs::read(init_record_path(node.dir())).unwrap();
 
     // Twice: a repeated start is refused the same way and clears nothing.
@@ -534,11 +512,10 @@ fn an_unfinished_import_stops_startup_and_keeps_its_evidence() {
             record.as_bytes(),
             "the marker is kept"
         );
-        assert_eq!(
-            tree(&node.store()),
-            store_before,
-            "every persisted fact is kept"
-        );
+        // The store's files are not compared byte for byte: the N2-A gate opens every sled root,
+        // `store/authority` included, before the registry refuses (ADR-0089 §7 keeps that order),
+        // and sled may write its own files on open. That no fact is lost is shown semantically by
+        // the positive control below.
         assert_eq!(
             std::fs::read(init_record_path(node.dir())).unwrap(),
             record_before,
@@ -560,8 +537,8 @@ fn an_unfinished_import_stops_startup_and_keeps_its_evidence() {
         "the marker is not a sled root:\n{gate:#}"
     );
 
-    // Positive control: once the operator has dealt with the marker, the node starts on exactly
-    // the facts it kept.
+    // Positive control (a test fixture, not an operator procedure): with the marker gone, the node
+    // starts on exactly the facts it had, so the refused starts lost none.
     std::fs::remove_file(&marker).unwrap();
     let _daemon = node.start();
     assert_decisions(&node.receipt());
