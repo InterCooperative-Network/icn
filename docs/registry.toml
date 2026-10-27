@@ -4823,12 +4823,14 @@ audiences = ["architects", "developers"]
 # is owner-only (0700) whatever the umask (§11). Decision status and implementation
 # status stay separate axes (ADR-0018 § 3): #2843 implements it, merged as 94cf94d13 on 2026-10-24.
 # AMENDED 2026-10-27 by ADR-0089 (fixture-only import; future contract for §6, §11, §12, not implemented).
+# DOC status is "living"; DECISION lifecycle is "amended". Per ADR-0018, doc status and decision
+# status are separate.
 category = "architecture"
 status = "living"
 truth_class = "normative"
-title = "ADR-0088: N1 Runtime Authority-Store Initialization and Recovery"
-description = "ACCEPTED 2026-10-24. The runtime boundary on top of ADR-0087: where icnd keeps the N1 authority store, the versioned initialization record and the store's instance row that let a start tell a fresh node from a lost or replaced store, the order and barriers of initialization, the fail-closed states, what cannot be detected (whole data-directory loss, rollback), manual recovery, the startup receipt as an owner-only local diagnostic rather than an authority certificate, and store/authority as the one store directory kept owner-only (0700) whatever the umask. Implemented by #2843, merged to main as 94cf94d13 on 2026-10-24. Amended 2026-10-27 by ADR-0089 (import-incomplete state, imported-fact exposure, import recovery), which is not implemented."
-last_updated = "2026-10-24"
+title = "ADR-0088: N1 Runtime Authority-Store Initialization and Recovery (decision amended by ADR-0089)"
+description = "ACCEPTED 2026-10-24; AMENDED 2026-10-27 by ADR-0089 (not implemented). The runtime boundary on top of ADR-0087: where icnd keeps the N1 authority store, the versioned initialization record and the store's instance row that let a start tell a fresh node from a lost or replaced store, the order and barriers of initialization, the fail-closed states, what cannot be detected (whole data-directory loss, rollback), manual recovery, the startup receipt as an owner-only local diagnostic rather than an authority certificate, and store/authority as the one store directory kept owner-only (0700) whatever the umask. Implemented by #2843, merged to main as 94cf94d13 on 2026-10-24. Amended 2026-10-27 by ADR-0089 (import-incomplete state, imported-fact exposure, import recovery), which is not implemented."
+last_updated = "2026-10-27"
 owner = "matt"
 audiences = ["architects", "developers", "operators"]
 

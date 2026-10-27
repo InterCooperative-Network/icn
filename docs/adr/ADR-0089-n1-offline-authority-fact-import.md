@@ -54,8 +54,8 @@ context nonce from a published fixture set) is an explicit **implementation revi
 `icnctl` slice. No other governance or institutional permission follows from this acceptance; the
 decisions in §13 and §14 stay open.
 
-**Review history.** Drafted and revised by an agent. Reviews were by independent review agents; no
-other human review is claimed. A FULL generation by two reviewers (identity and privacy; security
+**Review history.** Drafted and revised by an agent. Reviews of the text were by independent review
+agents; beyond the maintainer's acceptance decision, no human review is claimed. A FULL generation by two reviewers (identity and privacy; security
 and recovery) found six blockers, all fixed in one batch; a DELTA review found one new blocker in that
 batch (a sync relying on sled's close, which ADR-0088 §5 rejects), fixed by a targeted correction;
 targeted reviews of each later amendment (editorial wording, the symlink-safe durability walk)
@@ -190,7 +190,7 @@ relying party must treat incompleteness; any future consumer must address it in 
 ### 5. Opening the store offline
 
 `AuthorityRegistry::open` is the daemon's start: it may initialize a fresh history, and it always
-writes the startup receipt. An offline tool must do neither. A separate entry point is proposed,
+writes the startup receipt. An offline tool must do neither. A separate entry point is specified,
 `AuthorityRegistry::open_offline(data_dir, lock, access)` with `access` one of `Inspect`, `Import`
 or `Resume`:
 
@@ -349,7 +349,7 @@ gate, `AuthorityRegistry::open`. The marker fits that order without moving any s
 | `icn-store` N2-A gate | Unchanged. The marker and staged file are top-level regular files, never directories, so they are not discovered as sled roots. A test must show this. |
 | `icnd` main.rs | No ordering change. The startup error surfaces the new refusal and its recovery command. |
 | `icnctl` | New `authority import [--resume]` and `device-authority verify --node-store` (§10). Backup and restore carry the marker and staged file with the data directory, so a node restored from a mid-import backup refuses until resumed (intended). Reporting the marker in `verify-backup` is a follow-up. |
-| ADR-0088 | §6 gains the import-incomplete state; §11's exposure sentence changes (see "Effect on ADR-0088"). |
+| ADR-0088 | Amended (see "Effect on ADR-0088"): §6 gains the import-incomplete state; §11's exposure statement extends to imported facts once an importer exists; §12 gains import recovery. |
 
 ### 8. Retention: fixture Subjects only, with explicit context and scope
 
