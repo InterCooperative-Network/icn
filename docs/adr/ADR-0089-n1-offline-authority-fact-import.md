@@ -73,13 +73,13 @@ importantly, what it may not claim.
 | Cryptographic validity | key K signed these canonical bytes | `verify_strict` inside N1 admission | that K had any authority |
 | N1 admission | the body is canonical, in bounds, and verifies under its inline signer | `admissible` (ADR-0087 §5) | authority; that the history is complete |
 | Durable persistence | the record survived the store's durability barrier | `put_fact` Ok (ADR-0087 §4) | power-loss durability; that the node may keep it |
-| Retention authorization | this node is permitted to keep this Subject's facts, in this context | §8: an operator record made before import | anything about the Subject's authority; consent |
+| Retention record | the operator recorded a decision to keep this Subject's facts, for a stated context | §8: written before import | permission, consent, institutional authorization, or anything about the Subject's authority |
 | Completeness and freshness | the node holds every fact that exists, up to the Subject's real tip | **nothing** (§4) | — |
 | Derived authority | what `derive` concludes from the retained facts | `derive` / `derive_prefix` over the rehydrated store | that the node holds every fact that exists |
 | N4 relying-party enforcement | a device act is accepted at a relying-party-chosen position | `verify_device_act` / current admission (N4-A, N4-E) | that any effect is gated on it today |
 
-The import tool establishes admission, durable persistence and (by checking §8) that a retention
-record exists, for each fact it writes. It never evaluates, and never reports, completeness,
+The import tool establishes admission and durable persistence for each fact it writes, and checks
+that a retention record (§8) exists before writing any. It never evaluates, and never reports, completeness,
 derived authority or enforcement as a property of the import.
 
 ### 2. Scope of the producer
@@ -133,11 +133,14 @@ written):
    at `p - 1`. If `from == 0` the segment holds the inception, whose event id is `subject`.
 6. Facts ascend strictly by `event_id`; witnesses ascend strictly within a fact; every fact has at
    least one witness.
-7. Every fact passes N1 admission, and the segment as a whole admits into an empty in-memory store
-   (`admit`), all or nothing.
+7. Every **(body, witness) pair** passes N1 admission, and the segment as a whole admits into an
+   empty in-memory store (`admit`), all or nothing. A bad witness must be refused here, before
+   anything is written, not by `ingest` part-way through an import (where every resume would refuse
+   it again).
 
 **At import** (against the node's retained facts), one more rule: if `from > 0`, every fact at
-`from` must name in `prev_digest` a fact the node **already retains** at `from - 1`. A segment that
+`from` must name in `prev_digest` a fact the node **already retains for the same Subject** at
+`from - 1`. A segment that
 would leave an unanchored fragment is refused. Retaining facts that `derive` cannot reach would
 cost retention without any use.
 
@@ -170,13 +173,19 @@ writes the startup receipt. An offline tool must do neither. A separate entry po
 `AuthorityRegistry::open_offline(data_dir, lock, access)` with `access` one of `Inspect`, `Import`
 or `Resume`:
 
-- It requires the storage lock and refuses an incomplete restore, like `open`.
-- The caller has run the N2-A gate before it, matching ADR-0088 §7's order.
-- **Ownership and permissions** are checked before sled opens anything: the effective uid must own
-  the data directory and the authority store directory, and neither may grant group or other
-  permissions. Otherwise it refuses. sled has no read-only open and creates files as it runs; an
-  offline tool run by another account, or by root, would leave files the daemon's account may not
-  be able to open, wedging the node.
+- **Ownership and permissions are checked first, before the lock is taken and before the N2-A
+  gate runs**, because both create files: the lock acquisition can create the lock file, and the
+  gate opens every sled store and writes its own receipt. The tool refuses unless the effective uid
+  is not 0 and owns the data directory, `store/`, `store/authority` and the existing lock file;
+  neither the data directory nor `store/` is group- or other-writable; and `store/authority` grants
+  no group or other permissions (ADR-0088 §11 already keeps it 0700). The data directory may
+  otherwise follow the umask, as ADR-0088 §11 allows. sled has no read-only open and creates files
+  as it runs; an offline tool run by another account, or by root, would leave files the daemon's
+  account may not be able to open, wedging the node.
+- It then takes the storage lock **without creating it** (the data directory must already have been
+  initialized by `icnd`), runs the N2-A gate (ADR-0088 §7's order), and refuses an incomplete
+  restore, like `open`. `open_offline` repeats the ownership and permission checks immediately
+  before sled opens the store, to narrow the window between check and use.
 - It opens only an **initialized** store whose record and instance row agree. Every other ADR-0088
   §6 state (no record, missing store, replaced store, interrupted initialization) is refused. A new
   authority history is created by `icnd` only.
@@ -184,6 +193,8 @@ or `Resume`:
   `AuthorityRegistry::discard_receipt` before writing any fact, because once facts change that
   receipt misdescribes the store. `Inspect` leaves it alone.
 - `Inspect` and `Import` refuse while an import is incomplete (§6). `Resume` requires it.
+- "Writes no facts" is not "writes nothing": the N2-A gate writes its receipt, and sled may write
+  its own files, on every offline open, including `Inspect`.
 
 ### 6. Atomicity, interruption and resumption
 
@@ -200,37 +211,61 @@ resumable**:
 
 1. Decode the whole segment strictly, apply §3 and §8, and admit it in memory. Anything refused
    writes nothing.
-2. Write the segment bytes to the **staged file** (a regular, owner-only file in the data directory)
-   and `fsync` it. Only then write the **import-incomplete marker** atomically (synced temporary
-   file, rename), naming the segment id, Subject and fact count, and `fsync` the directory. A
-   durable marker therefore always has a durable staged copy behind it.
+2. Write the segment bytes to the **staged file** (a regular, owner-only file in the data directory),
+   `fsync` it, and `fsync` the directory, so the staged file's directory entry is durable too. Only
+   then write the **import-incomplete marker** (synced temporary file, then a rename that refuses to
+   replace an existing entry, such as `RENAME_NOREPLACE`, after checking under the lock that no
+   marker exists), and `fsync` the directory. The marker records the segment id, Subject, fact count,
+   and a **snapshot of the retention entry and bounds in force** when the import began. On storage
+   that honours `fsync`, a durable marker therefore always has a durable staged copy behind it; on
+   storage that does not, nothing here holds, as for the restore marker.
 3. Remove the startup receipt (§5).
 4. Write each fact through `ingest` (admission, durability barrier, publication), in ascending
    position order, then ascending `event_id`.
-5. After the last barrier, remove the marker and `fsync` the directory. Only then remove the staged
-   copy. A stop between the two leaves an orphan staged copy and no marker, which is harmless and is
-   removed by the next import.
+5. After the last barrier, make the store **fully durable** before touching the marker: the
+   per-fact barrier is sled's flush, which is process-crash safe but only best effort against power
+   loss (ADR-0087 §4, §9). Close the store so its files are `fsync`ed (or an equivalent full sync),
+   and only then remove the marker and `fsync` the directory. Otherwise a power loss could keep the
+   marker's removal while losing trailing facts, such as a `revoke`, and the daemon would start on
+   exactly the partial state the marker exists to expose. Only after the marker is gone remove the
+   staged copy. A stop between the two leaves an orphan staged copy and no marker, which is harmless
+   and is removed by the next import.
 
 **Existence is the safety property**, as for the restore marker: any entry at the marker's name
 refuses, and so does any error other than "not found" while looking. It is removed only by a
 completed import or resume. Nothing removes it on drop.
 
 Recovery is `icnctl authority import --resume`. It re-reads the staged copy (or the original file if
-the operator supplies it), checks its id against the marker, re-applies §3 and §8 (either may have
-changed), and writes the facts again. Duplicate writes are semantically idempotent (ADR-0087 §3), so
-resuming after any interruption point is safe. If §8 now refuses the Subject, resume refuses and the
-node stays refused: that conflict needs the operator.
+the operator supplies it), checks its id against the marker, re-applies §3, and writes the facts
+again. Duplicate writes are semantically idempotent (ADR-0087 §3), so resuming after any
+interruption point is safe.
+
+Resume evaluates retention and bounds against the **snapshot in the marker**, not the current
+retention file, and counts bounds over the **union of distinct records** (retained ∪ segment), so the
+facts the interrupted import already wrote are not counted twice. A withdrawal or a lowered bound
+made while an import is incomplete therefore cannot wedge the node: it takes effect for later
+imports, and the completing import's report states that retention changed after the import began.
+Completing the import writes the rest of a segment the operator had already decided to retain; it
+does not create a new retention decision. Retention edits are meant to be made when no import is
+incomplete, and tooling that edits the retention file should refuse while a marker exists.
 
 There is no "abandon" in this version. Facts already written cannot be removed (the store has no
 erasure path), so abandoning would leave exactly the stale partial history the marker exists to
 expose. Whether a governed abandon or erasure exists is a governance decision (§14).
 
-**Never wedged (an acceptance obligation, not a hope).** An implementation is acceptable only with a
-fault-injection suite that stops the import after staging, after the marker, after `k` of `n` facts
-(`k = 0, 1, n-1, n`), between the last barrier and the marker's removal, and between the marker's
+**Never wedged (an acceptance obligation, not a hope), for interruptions of the import process**
+(crash, kill, or power loss on storage that honours `fsync`), with the staged copy or the original
+file available. If both the staged copy and the original file are lost or corrupt, or the marker
+itself is unreadable, resume cannot proceed and the node stays refused; the documented operator
+procedures are to obtain the same segment again (matching `segment_id`) or to restore the data
+directory from a backup taken before the import (ADR-0088 §12). An implementation is acceptable only
+with a fault-injection suite that stops the import after staging, after the marker, after `k` of `n` facts
+(`k = 0, 1, n-1, n`), between the last barrier and the full store sync, between that sync and the
+marker's removal, and between the marker's
 removal and the staged copy's removal. In every case the daemon must refuse while the marker exists,
 `--resume` must complete, the final store must equal a clean import's, and no case may leave the node
-permanently refused.
+permanently refused. The suite also covers a withdrawal and a lowered bound made while the marker
+exists, and a resume near the per-Subject bound.
 
 ### 7. Reconciliation with daemon startup: what changes
 
@@ -239,7 +274,7 @@ gate, `AuthorityRegistry::open`. The marker fits that order without moving any s
 
 | Component | Change |
 |---|---|
-| `icn-core` `import_marker` (new) | Create, read and complete the marker and staged file. Modelled on `restore_marker`: existence refuses; durable create with `fsync` of file and directory; no removal on drop. |
+| `icn-core` `import_marker` (new) | Create, read and complete the marker and staged file. Modelled on `restore_marker` (existence refuses; `fsync` of file and directory; no removal on drop), but created by temp file plus a no-replace rename after an absence check under the lock, so it is never torn and never silently replaces an existing marker. |
 | `icn-core` `AuthorityRegistry::open` | After `refuse_incomplete_restore`, refuse `ImportIncomplete` while the marker exists. The daemon's start then fails closed, naming `icnctl authority import --resume`. |
 | `icn-core` `AuthorityRegistry::open_offline` (new) | §5. |
 | `icn-core` `RegistryError` | New `ImportIncomplete { marker, subject, segment_id }`. |
@@ -261,22 +296,39 @@ context) and §5.3 (the identifier is public to its context only).
   may keep. Each entry records the `subject`, the `context` it is retained for, the `basis` (a
   reference, never personal data), who added it, and when. A segment whose Subject has no entry is
   refused before anything is written.
-- **Fixture only (v1).** An entry's `basis` must begin `fixture:`. Any other basis is refused. No
-  real participant may be retained until §13 is met and a later revision of this ADR permits it.
+- **Fixture only (v1).** An entry's `basis` must begin `fixture:`. Any other basis is refused. The
+  prefix is the **operator's declaration**, not a technical control: anyone can type it in front of
+  a real Subject. What keeps real participants out is §13, which needs people, and the operator's
+  obligation not to mislabel. An implementation may add a content check, for example accepting only
+  Subjects whose inception carries a context nonce from a published fixture set (the N4 test vectors),
+  since a compliant real Subject cannot carry a fixture nonce. N4-A §9.3 already forbids promoting
+  fixture identities into anything real. No real participant may be retained until §13 is met and a
+  later revision of this ADR permits it.
 - **Context is recorded per Subject, never assumed per node.** A node may host several autonomous
   institutional domains, and a person may hold context-specific Subjects in overlapping communities,
   cooperatives, federations and other institutions. Until GEN (#2602) binds a Subject to a context
   structurally, `context` is the operator's recorded claim, not a verified fact. It is never used to
-  join or compare Subjects. A first implementation may support one context per store as an
+  join or compare Subjects. The label is not the only correlation path: authorize, revoke and
+  establishment facts carry Principal keys, which are correlatable across contexts by construction.
+  A node retaining Subjects from several contexts can link any of them that reuse a device key, and
+  the startup receipt already lists every retained Subject's keys in one file. Separation therefore
+  also depends on clients using one device Principal per (device, context) (N4-A §9.3), which a node
+  cannot verify. A first implementation may support one context per store as an
   implementation limit; that limit must not become an ICN substrate invariant.
 - **The retention file is the operator's record of a retention decision.** It is not the person's
   consent or the institution's authorization, and nothing may treat an entry as either.
 - **Provisional bounds**, checked before reading or allocating: segment file at most 1 MiB; at most
-  4,096 facts per import; at most 65,536 retained facts per Subject. Configuration may lower them,
-  never raise them. Values to be confirmed by testing.
+  4,096 facts per import; at most 16 witnesses per fact; at most 65,536 retained facts and 262,144
+  retained (fact, witness) records per Subject, counted over distinct records. Witness records are
+  bounded separately because a key holder can mint distinct valid signatures over the same body.
+  Configuration may lower these, never raise them. Values to be confirmed by testing.
 - **Withdrawal.** Removing an entry stops further imports for that Subject. It does **not** remove
   retained facts: the fact store has no deletion API, sled can keep deleted bytes, an account that
-  held an open descriptor keeps it (ADR-0088 §11), and backups keep their own copies.
+  held an open descriptor keeps it (ADR-0088 §11), and backups keep their own copies. A withdrawn
+  Subject's facts are still rehydrated at every daemon start and listed, with their keys, in the
+  startup receipt; still answered by `--node-store`; and still named in the retained import reports.
+  Imported facts carry no record of which import wrote them, so a later erasure could not attribute
+  facts to imports from the store alone.
 - **No new index.** Reports and the retention file name `SubjectId`s only. Nothing maps a legacy
   `Did` or any other identifier to a Subject.
 
@@ -286,23 +338,31 @@ An import never filters facts by what `derive` would conclude. If the retained f
 of retained and imported facts, contain admissible competing candidates at one position, all are
 kept, and `derive` reports the Subject as halted. The import report states the halt. Dropping a
 candidate would hide the duplicity that halting exists to expose. A segment that leads to a halted
-Subject is not an import failure.
+Subject is not an import failure. One exclusion is structural, not a filter: §3's linkage rule keeps
+admissible bodies whose predecessor is not in the segment (or, at `from`, not retained) out of a
+segment. `derive` could not select them, so no duplicity is hidden, but an N4-B bundle may carry such
+bodies and a segment may not.
 
 ### 10. `icnctl device-authority verify --node-store`
 
 An offline check of a device act, given as an N4-B `EvidenceBundle`, against the node's own retained
 facts. It uses `open_offline(Inspect)` under the same lock, refuses while an import is incomplete,
-writes no facts, and neither writes nor removes the startup receipt. It reports the historical
-answer (N4-A, at the act's position) and the current answer (N4-E, at the node's retained tip)
-separately, names the retained tip, and labels both "as of the facts this node retains". The bundle's
-own facts are not imported. sled may still write its own files when opened (§5).
+writes no facts, and neither writes nor removes the startup receipt (the N2-A gate still writes its
+receipt, and sled may write its own files, §5). It reports, separately: the historical verdict
+(N4-A, at the position the act binds), and the N4-E current-admission verdict over the node's
+retained facts, in N4-E's own vocabulary. N4-E evaluates at the retained frontier minus one and
+requires the act to bind exactly that position, so for an act bound to an earlier position the
+verdict is a refusal such as `StaleAct`, and a halted Subject gives `AuthorityHalted`. It names the
+retained tip and labels every answer "as of the facts this node retains"; it never calls the
+retained tip current. The bundle's own facts are not imported.
 
 ### 11. Import reports
 
 An import writes an owner-only **import report**, a different file name and format from the
 startup receipt and never called one: segment id, Subject, `from..=to`, facts and witnesses
-written, facts already present, the retained tip, and the `derive` view afterwards, labelled as a
-diagnostic exactly as ADR-0088 §10 labels the receipt. The last 8 reports are kept; older ones are
+written, facts already present, the retained tip, and a summary of the `derive` view afterwards
+(its state, such as active or halted, and counts of authority keys and devices; never the keys
+themselves), labelled as a diagnostic in the way ADR-0088 §10 labels the receipt. The last 8 reports are kept; older ones are
 removed by the next import. Reports and logs carry digests, counts and `SubjectId`s only, never fact
 bodies, keys or payloads.
 
@@ -311,11 +371,13 @@ bodies, keys or payloads.
 Every import report and every `--node-store` answer states, in fixed text:
 
 - Imported facts are admitted, not authorized. Authority is what `derive` concludes, at the point of
-  use.
+  use, over the facts held there.
 - A segment cannot prove it is complete or current (§4). The node holds only what it was given.
   There is no replication (N3).
 - Rolling the data directory back, or losing it entirely, cannot be detected (ADR-0088 §9).
-- Persistence survives a process crash. Surviving power loss is best effort (ADR-0087 §4, §9).
+- Persistence survives a process crash. Surviving power loss is best effort per fact (ADR-0087 §4,
+  §9); an import closes the store with a full sync before clearing its marker (§6), on storage that
+  honours `fsync`.
 - If the store was ever readable by another account, anything imported later is exposed to an open
   descriptor that account may still hold (ADR-0088 §11).
 
@@ -324,11 +386,14 @@ Every import report and every `--node-store` answer states, in fixed text:
 Before any fact about a real participant is retained:
 
 1. Maintainer acceptance of this ADR, and of a revision lifting §8's fixture-only rule.
-2. The institution's decision on whose facts a node may keep, in which context, on what basis, with
+2. The decision of the institution, or other context authority (IDENTITY_SEMANTICS §2.2 allows
+   non-institutional contexts), on whose facts a node may keep, in which context, on what basis, with
    what notice that retained facts cannot currently be erased, and who may run the import.
 3. A withdrawal and erasure procedure, or an explicit institutional decision to proceed without one.
-4. A custody decision for the real Subject and device keys that sign the facts. The producer of a
-   segment is the Subject's own client, never the node; hosting a store confers no authority.
+4. A custody decision for the real Subject and device keys that sign the facts. Facts are authored
+   only by the Subject's keys; assembling or carrying a segment (by the Subject's client, or later
+   by N3 relaying) is carriage, not authorship. The node never authors facts, and hosting a store
+   confers no authority.
 5. A security review of the import implementation before it runs against a real store.
 
 ### 14. Decisions still open
@@ -350,12 +415,19 @@ Before any fact about a real participant is retained:
 3. Retained facts cannot be erased. The fixture-only rule exists because of this.
 4. The retention file's semantics. They must never be read as consent or authority, by this or any
    later code.
+5. The on-disk names and formats of the marker, staged file, import report and retention file:
+   backup, restore and verify-backup handle data-directory entries by name.
+6. `segment_id` as an identity (SHA-256 over the canonical bytes).
+7. Imported facts carry no import provenance and reports rotate after 8, so a later withdrawal or
+   erasure procedure cannot tell which import wrote which fact. A provenance record would have to
+   be designed before real participants are retained.
 
 ## Effect on ADR-0088, if accepted
 
 - §11's "Today no runtime producer writes facts, so nothing is written after the tightening" stops
   being true for imported facts. The exposure statement would be updated to cover imports.
 - §6 gains one fail-closed state, import incomplete, which `open` refuses.
+- §12 (manual recovery) gains the import-incomplete state and its procedures (§6 here).
 - §10 is unchanged in substance: the startup receipt stays a daemon diagnostic. Offline tools that
   write facts remove it and never write one.
 
@@ -365,10 +437,13 @@ ADR-0087 is unchanged.
 
 - Data-directory lock held for the whole import; refused while `icnd` runs.
 - N2-A gate before open; incomplete-restore and incomplete-import refusals before any write.
-- Effective uid owns the data directory and store directory; no group or other permission bits;
-  checked before sled opens anything.
-- The input must be a regular file, not a link. Its size is checked against the bound before
-  reading, and decoding is strict, with no allocation beyond the input.
+- Ownership and permissions (§5) checked before the lock is taken and before the N2-A gate, and
+  again immediately before sled opens the store; never run as root.
+- The input is opened once with `O_NOFOLLOW | O_NONBLOCK`; the open descriptor must be a regular
+  file (`fstat`); it is read with a hard limit of the size bound plus one byte. Every count in the
+  encoding is checked against the bytes remaining before anything is allocated, and decoding is
+  strict. The retention file and the marker record are parsed with their own size bounds (64 KiB
+  each).
 - Whole-segment admission in memory before the marker. Per-fact admission, then barrier, then
   publication.
 - Marker, staged copy, import report and retention file are each created owner-only (0600) as
