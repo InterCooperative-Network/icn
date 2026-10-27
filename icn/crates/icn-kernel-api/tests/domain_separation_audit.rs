@@ -397,6 +397,8 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.gen.subject-context", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.gen.subject-context-ref", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.n1.authority-receipt.decisions.v1\0", Sha256, Raw, Production, &["icn/crates/icn-core/src/authority_registry.rs"]),
+    // `segment_id` hashes the segment; nothing signs it (ADR-0089 §3).
+    d(b"icn.n1.history-segment", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/history_segment.rs", "icn/crates/icn-identity/tests/reference/history_segment_reference.py"]),
     // One preimage, two uses: `act_id` hashes it and the device key signs it (N4-A §6, §6.2).
     d(b"icn.n4.device-act", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/device_authority.rs", "icn/crates/icn-identity/tests/reference/device_act_reference.py"]),
     d(b"icn.n4.device-act", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-identity/src/device_authority.rs"]),

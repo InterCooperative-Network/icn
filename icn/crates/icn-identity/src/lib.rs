@@ -29,6 +29,7 @@ pub mod device_channel_binding;
 pub mod device_enrollment;
 pub mod did_signer;
 pub mod evidence_bundle;
+pub mod history_segment;
 pub mod keybundle;
 pub mod keystore;
 pub mod keystore_backend;
