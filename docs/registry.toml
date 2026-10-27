@@ -4832,14 +4832,15 @@ owner = "matt"
 audiences = ["architects", "developers", "operators"]
 
 [docs."docs/adr/ADR-0089-n1-offline-authority-fact-import.md"]
-# PROPOSED 2026-10-24, not accepted and not implemented. Drafted by an agent; awaits the
-# maintainer's decision (ADR-0018). Would amend ADR-0088 §6 and §11 if accepted.
+# PROPOSED 2026-10-24, revised 2026-10-27 against main f29d04a2; not accepted and not
+# implemented. Drafted by an agent; awaits the maintainer's decision (ADR-0018). Would amend
+# ADR-0088 §6 and §11 if accepted.
 category = "architecture"
 status = "draft"
 truth_class = "draft"
 title = "ADR-0089: N1 Offline Authority-Fact Import and Node-Store Verification (proposed)"
-description = "PROPOSED. An offline, operator-run producer for N1 facts: icnctl authority import of one N4-B evidence bundle into a stopped node's store, and an offline device-authority check against the node's own retained facts. Separates cryptographic validity, N1 admission, durable persistence, retention authorization, derived authority and N4 enforcement; a fail-closed, resumable import-incomplete marker instead of a batch-atomic store; an explicit retention allowlist with bounds and no erasure claim; forks kept as evidence; no startup receipt from offline tools; no network, IPC or credentials. Lists the human and institutional decisions required before any real participant's facts are retained."
-last_updated = "2026-10-24"
+description = "PROPOSED. An offline, operator-run producer for N1 facts: icnctl authority import of one facts-only history segment (a canonical, contiguous, linked excerpt of one Subject's history; EvidenceBundle stays for act verification) into a stopped node's store, through a no-receipt offline open with ownership and permission checks, a fail-closed resumable import-incomplete marker, fixture-only retention with explicit context, provisional bounds, preserved forks, bounded owner-only import reports, and an offline device-authority check against the node's retained facts. A segment proves neither completeness nor freshness."
+last_updated = "2026-10-27"
 owner = "matt"
 audiences = ["architects", "developers", "operators"]
 
