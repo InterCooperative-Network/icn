@@ -971,8 +971,12 @@ fn a_real_signature_by_a_key_the_body_does_not_name_is_refused() {
     // A genuine Ed25519 signature over auth_b's exact preimage, by a key other than the signer
     // auth_b names inline. Structurally indistinguishable from a good witness; N1 refuses it.
     let (other, _) = stranger(0x66);
-    let misattributed =
-        WitnessSignature::from_bytes(other.sign(&f.auth_b.body.signature_preimage()).to_bytes());
+    let signature = other.sign(&f.auth_b.body.signature_preimage());
+    other
+        .verifying_key()
+        .verify_strict(&f.auth_b.body.signature_preimage(), &signature)
+        .expect("a genuine signature, under the key that made it");
+    let misattributed = WitnessSignature::from_bytes(signature.to_bytes());
     let seg = linear_with_witnesses(&f, &f.auth_b, BTreeSet::from([misattributed]));
     assert_eq!(
         seg.admit().unwrap_err(),
@@ -1023,10 +1027,11 @@ fn a_multi_witness_fact_is_refused_wherever_its_one_bad_witness_sorts() {
 }
 
 #[test]
-fn a_refusal_after_earlier_pairs_were_ingested_returns_no_segment_and_no_store() {
+fn a_refusal_of_the_last_fact_returns_only_the_refusal() {
     let f = fixture();
-    // Corrupt the fact that sorts last, so every other pair has already been ingested into the
-    // scratch store when admission refuses.
+    // Corrupt only the fact that sorts last; every other pair is admissible on its own. The test
+    // does not observe admit's internal order or scratch store. What it pins is that one bad pair
+    // anywhere, here at the end, yields the refusal naming that fact and nothing else.
     let linear = [&f.auth_a, &f.auth_b, &f.revoke_a];
     let last = *linear
         .iter()
@@ -1042,8 +1047,8 @@ fn a_refusal_after_earlier_pairs_were_ingested_returns_no_segment_and_no_store()
     }
     let seg = linear_with_witnesses(&f, last, BTreeSet::from([corrupt(last.signature)]));
 
-    // The only thing that comes back is the refusal naming the fact. There is no partially
-    // admitted segment or store to hand on: the Result has no such value.
+    // That nothing partially admitted escapes holds by type: on refusal the Result carries a
+    // SegmentError, which holds no segment and no store.
     let result: Result<AdmittedAuthorityHistorySegment, SegmentError> = seg.admit();
     assert_eq!(
         result,
