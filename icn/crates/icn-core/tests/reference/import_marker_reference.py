@@ -8,8 +8,8 @@ restore and verify-backup handle data-directory entries by name, so once shipped
 format are permanent (ADR-0089 "Irreversible commitments" #5). This file is a second reader of that
 record, written from the grammar in `src/import_marker.rs` alone. It shares no code with
 `icn-core`. It classifies every vector in `import_marker_vectors.txt` and compares the result with
-the expected classification recorded there, which the Rust test `tests/import_marker.rs` checks
-against the same file.
+the expected classification recorded there, which the Rust tests in
+`src/import_marker.rs` check against the same file.
 
 The format is PROPOSED, not frozen: the retention snapshot that follows `fact-count` is not yet
 specified (ADR-0089 §8's retention file has no format yet). This reader therefore applies the same

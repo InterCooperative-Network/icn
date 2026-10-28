@@ -767,9 +767,10 @@ fn without_a_marker_an_initialized_node_still_opens() {
     // Positive control for everything below: the same fixture opens when no marker exists.
     let dir = tempfile::tempdir().unwrap();
     let first = seeded(dir.path());
+    let absent = std::fs::symlink_metadata(icn_core::import_marker::import_marker_path(dir.path()));
     assert_eq!(
-        icn_core::import_marker::inspect_import_marker(dir.path()),
-        icn_core::import_marker::ImportMarkerState::Absent
+        absent.map(|_| ()).unwrap_err().kind(),
+        std::io::ErrorKind::NotFound
     );
     let (_, again) = open(dir.path()).unwrap();
     assert_eq!(again, first);

@@ -10,7 +10,7 @@ supersedes: []
 superseded_by: []
 amends: []
 amended_by: ["ADR-0089"]
-implementation_status: "implemented; #2843 merged to main as 94cf94d13 on 2026-10-24. Of the ADR-0089 amendment (accepted 2026-10-27), only the §6 import-incomplete refusal is implemented, by ADR-0089 PR2's refusal-only slice (this text lands with it); the importer, marker writer, imported-fact exposure and §12 import recovery are not"
+implementation_status: "implemented; #2843 merged to main as 94cf94d13 on 2026-10-24. The ADR-0089 amendment (accepted 2026-10-27) is not implemented"
 references:
   - "ADR-0087 (the library persistence contract this ADR builds on and does not change)"
   - "ADR-0018 (ADR lifecycle)"
