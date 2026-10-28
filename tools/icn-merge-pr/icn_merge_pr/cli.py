@@ -1,8 +1,9 @@
 """Strict command line. Unknown is a refusal, never a default.
 
 TWO FORMS, ONE OF WHICH MUTATES
-    icn-merge-pr check <PR>
+    icn-merge-pr check <PR> [--commit-title <title> --commit-body-file <path>]
     icn-merge-pr merge <PR> --authorize [--expected-head <full sha>]
+                            [--commit-title <title> --commit-body-file <path>]
 
 Evaluation is always available without mutating anything. Mutation requires `--authorize` to be
 written out; there is no configuration, environment variable or implicit mode that supplies it.
@@ -20,7 +21,7 @@ import json
 import re
 import sys
 
-from . import codes, provenance
+from . import codes, message, provenance
 from .errors import (ForbiddenOption, MergeToolError, NotInstalled, UntrustedTarget,
                      UsageError)
 from .ghclient import GhCli
@@ -29,9 +30,11 @@ from .run import Result, run
 USAGE = """icn-merge-pr — the trusted ordinary-merge primitive for ICN (icn#2651 stage B)
 
   icn-merge-pr check <PR>  [--repo OWNER/NAME]
+                           [--commit-title "<title>" --commit-body-file <path>]
   icn-merge-pr merge <PR>  --authorize [--repo OWNER/NAME]
                            [--expected-head <full 40-hex sha>]
                            [--strategy <policy exception> --reason "<why>"]
+                           [--commit-title "<title>" --commit-body-file <path>]
   icn-merge-pr provenance
 
 `check` evaluates and mutates nothing. `merge` re-reads every piece of evidence immediately
@@ -44,8 +47,15 @@ program merges whatever is at the top of the branch by then, which may be code n
 It is optional, because a caller who derives it from the live head at call time would gain
 nothing; the value is only meaningful when it comes from whatever established that the head was
 fit to merge. It has no privileged mode and
-cannot arm, enqueue or defer a merge. Results are JSON on stdout; a one-line summary goes to
-stderr.
+cannot arm, enqueue or defer a merge.
+
+`--commit-title` and `--commit-body-file` state the squash commit message instead of letting
+GitHub compose one from every commit on the branch. Both or neither; squash merges only; on
+`merge` they require --expected-head. On `check` they are a preview: the exact title and body
+that would be sent appear under `squash_message`. After a merge the commit is read back and
+`merge.commit_message.verified` says MATCH, MISMATCH or UNREADABLE.
+
+Results are JSON on stdout; a one-line summary goes to stderr.
 
 Exit 0 = READY or MERGED. Exit 2 = bad invocation. Exit 1 = refused OR MERGE_UNCONFIRMED, which
 are NOT the same thing: a refusal means nothing happened, while MERGE_UNCONFIRMED means a merge
@@ -75,7 +85,8 @@ COMMANDS = ("check", "merge", "provenance")
 # Full object ids only. Owned here, like every other shape this grammar accepts.
 _FULL_OID = re.compile(r"[0-9a-fA-F]{40}")
 
-_VALUE_OPTIONS = {"--repo", "--strategy", "--reason", "--expected-head"}
+_VALUE_OPTIONS = {"--repo", "--strategy", "--reason", "--expected-head", "--commit-title",
+                  "--commit-body-file"}
 _FLAG_OPTIONS = {"--authorize"}
 
 
@@ -89,6 +100,9 @@ class Invocation:
         self.strategy: str | None = None
         self.reason: str | None = None
         self.expected_head: str | None = None
+        self.commit_title: str | None = None
+        self.commit_body_file: str | None = None
+        self.squash_message: message.SquashMessage | None = None
 
 
 def parse(argv: list[str]) -> Invocation:
@@ -160,6 +174,10 @@ def parse(argv: list[str]) -> Invocation:
                 raise UsageError(
                     f"--expected-head must be a full 40-character Git object id, got {value!r}")
             inv.expected_head = value.lower()
+        elif option == "--commit-title":
+            inv.commit_title = message.validate_title(value)
+        elif option == "--commit-body-file":
+            inv.commit_body_file = value
 
     if inv.command == "check" and inv.authorize:
         raise UsageError("--authorize belongs to `merge`; `check` never mutates")
@@ -173,6 +191,20 @@ def parse(argv: list[str]) -> Invocation:
             f"`icn-merge-pr check {inv.number}` first.")
     if inv.reason is not None and inv.strategy is None:
         raise UsageError("--reason is only meaningful together with --strategy")
+    if (inv.commit_title is None) != (inv.commit_body_file is None):
+        # Half a message is not a message: GitHub would fill the other half from the branch's
+        # commits, which is exactly what stating one is meant to prevent.
+        raise UsageError("--commit-title and --commit-body-file are given together or not at all")
+    if inv.commit_title is not None:
+        if inv.strategy is not None and inv.strategy != "squash":
+            raise UsageError(f"an explicit squash message cannot be used with --strategy "
+                             f"{inv.strategy!r}; it applies only to a squash merge")
+        if inv.command == "merge" and inv.expected_head is None:
+            raise UsageError("--commit-title/--commit-body-file on `merge` require "
+                             "--expected-head: the message describes one reviewed head, and only "
+                             "that head may be merged under it")
+        inv.squash_message = message.SquashMessage(
+            inv.commit_title, message.read_body_file(inv.commit_body_file))
     return inv
 
 
@@ -227,6 +259,9 @@ def _require_trusted_runtime(inv: Invocation, owner: str, name: str) -> None:
 
 def _summary(result: Result) -> str:
     head = f"{result.outcome}  {result.owner}/{result.name}#{result.number}"
+    if result.squash_message is not None:
+        head += (f"\n  squash title: {result.squash_message['title']}"
+                 f"\n  squash message sha256: {result.squash_message['sha256']}")
     if not result.reasons:
         return head
     return head + "".join(f"\n  - [{r.code}] {r.detail}" for r in result.reasons)
@@ -272,7 +307,8 @@ def main(argv: list[str]) -> int:
         installed_commit = record.get("source_commit")
     result = run(GhCli(), owner, name, inv.number, authorize=inv.authorize,
                  requested_strategy=inv.strategy, exception_reason=inv.reason,
-                 installed_commit=installed_commit, expected_head=inv.expected_head)
+                 installed_commit=installed_commit, expected_head=inv.expected_head,
+                 squash_message=inv.squash_message)
     print(json.dumps(result.as_dict(), indent=2, sort_keys=True))
     print(_summary(result), file=sys.stderr)
     return codes.exit_code(result.outcome)

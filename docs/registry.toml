@@ -1302,6 +1302,50 @@ depends_on = [
   "docs/architecture/IDENTITY_SEMANTICS.md",
 ]
 
+[docs."docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md"]
+category = "architecture"
+status = "living"
+title = "Home runtime identity profile - decision record for the first personal-domain vertical slice"
+description = "PROPOSED decision record and consumption profile, not an identity model: which ICN primitives a person's Home runtime consumes for the human Subject, device Principals, bounded delegation, revocation and recovery, each classified PRODUCTION / LIB-TESTED / FIXTURE-ONLY / EXPERIMENTAL / DOC-ONLY / MISSING against the live checkout with its canonical owner; the external verification boundary status (library + canonical act bytes + vectors exist; the (N1 facts, act) container and stateless icnctl consumer are the named missing pieces); the GEN stance for personal and household contexts (new GEN context kinds proposed and routed to #2602; an Individual-owned InstitutionalDomain is rejected for this use because it extends the person-as-Entity debt and puts a registrar in human genesis); four contradictions settled against cited text (per-context device keys; the ContinuityRoot stays on the person's own client and a VM-hosted Home is a device Principal, never a custodian; N1 DeviceGrant versus ADR-0014 AuthorityGrant are different objects; Mutualware is ICN's public name, not a layer); and an implementable spec for a deployment track with every MISSING step marked and its forbidden substitute named (no bearer-token enrollment, no TLS root as identity, nothing identity-bearing stored on infrastructure). Fixture identities only; no deployment, enrollment ceremony, context kind, container or recovery protocol is claimed."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
+  "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md",
+  "icn/crates/icn-identity/src/device_authority.rs",
+]
+
+[docs."docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md"]
+category = "architecture"
+status = "living"
+title = "N4-A - relying-party evaluation of delegated device authority (derive_prefix, DeviceActV1)"
+description = "NORMATIVE CONTRACT for N4-A (first tranche of icn#2599; rung 5 of the #2694 convergence ladder): how a relying party decides whether one device-signed act is covered by a human Subject's delegation at one relying-party-chosen log position. Specifies derive_prefix - the existing N1 fold applied to the retained prefix through position E, which is what makes 'authorized at E' answerable after a later revoke - the canonical DeviceActV1 bytes under the icn.n4.device-act domain, the fail-closed verifier whose signature check and authority check are two separate steps, the refusal classes, the rule that the evaluation position is supplied by the relying party and merely echoed by the signer, and the mapping onto the act classes of HUMAN_IDENTITY_ARCHITECTURE.md section 9.3. States the external-consumer boundary: a stateless verifier over retained canonical N1 facts plus the act, and what a downstream deployment may rely on versus must not reimplement. Library, spec and tests only: no gateway route, no transport container, no persistence, no replication, no recovery, no session coupling, no attenuation beyond what N1 records, no household or personal context kind, no production wiring, and no claim about any real person's identity. Fixture identities only."
+last_updated = "2026-10-03"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-03"
+depends_on = [
+  "icn/crates/icn-identity/src/device_authority.rs",
+  "icn/crates/icn-identity/src/authority_log/derive.rs",
+  "icn/crates/icn-identity/tests/device_authority.rs",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
+]
+
 [docs."docs/architecture/GOVERNANCE_STATE_MACHINE.md"]
 category = "architecture"
 status = "living"
@@ -1343,7 +1387,7 @@ category = "architecture"
 status = "living"
 title = "Canonical Encoding"
 description = "Specification for deterministic serialization of ICN data structures"
-last_updated = "2026-03-10"
+last_updated = "2026-10-19"
 owner = "matt"
 audiences = ["developers", "architects"]
 
@@ -3410,7 +3454,7 @@ category = "guide"
 status = "living"
 title = "Backup and Recovery Guide"
 description = "Operator procedures for node backup and recovery"
-last_updated = "2026-03-10"
+last_updated = "2026-10-24"
 owner = "matt"
 audiences = ["operators"]
 
@@ -4760,6 +4804,49 @@ last_updated = "2026-09-15"
 owner = "matt"
 audiences = ["architects", "developers", "operators"]
 
+[docs."docs/adr/ADR-0087-n1-authority-fact-persistence-boundary.md"]
+# ACCEPTED 2026-10-23 by the maintainer with three documentation clarifications
+# applied in the text. Decision status and implementation status stay separate
+# axes (ADR-0018 § 3): the implementation merged with #2800 (b10f266d9); daemon
+# integration (N1-R1) is a separate concern this ADR does not decide.
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0087: N1 Authority-Fact Persistence Boundary"
+description = "ACCEPTED 2026-10-23. The N1-D persistence boundary between icn-identity and icn-core. Four public items: the AuthorityFactStore trait, the opaque PersistedFact record (key = event_id || signature, value = canonical body bytes), FactStoreError and rehydrate. Duplicate writes are semantically idempotent. put_fact Ok is the durability acknowledgment, behind a required DurableStore::sync_durable barrier: process-crash safe, best-effort against power loss with sled 0.34. put_fact does not validate admission; producers must, and rehydration re-validates every record and fails closed. Implemented by #2800; daemon integration is separate (N1-R1), and no runtime service produces facts or serves authority decisions."
+last_updated = "2026-10-24"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/adr/ADR-0088-n1-runtime-authority-store-initialization-and-recovery.md"]
+# ACCEPTED 2026-10-24 by the maintainer, with one change to the proposal: store/authority
+# is owner-only (0700) whatever the umask (§11). Decision status and implementation
+# status stay separate axes (ADR-0018 § 3): #2843 implements it, merged as 94cf94d13 on 2026-10-24.
+# AMENDED 2026-10-27 by ADR-0089 (fixture-only import; future contract for §6, §11, §12, not implemented).
+# DOC status is "living"; DECISION lifecycle is "amended". Per ADR-0018, doc status and decision
+# status are separate.
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0088: N1 Runtime Authority-Store Initialization and Recovery (decision amended by ADR-0089)"
+description = "ACCEPTED 2026-10-24; AMENDED 2026-10-27 by ADR-0089 (not implemented). The runtime boundary on top of ADR-0087: where icnd keeps the N1 authority store, the versioned initialization record and the store's instance row that let a start tell a fresh node from a lost or replaced store, the order and barriers of initialization, the fail-closed states, what cannot be detected (whole data-directory loss, rollback), manual recovery, the startup receipt as an owner-only local diagnostic rather than an authority certificate, and store/authority as the one store directory kept owner-only (0700) whatever the umask. Implemented by #2843, merged to main as 94cf94d13 on 2026-10-24. Amended 2026-10-27 by ADR-0089 (import-incomplete state, imported-fact exposure, import recovery), which is not implemented."
+last_updated = "2026-10-27"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+
+[docs."docs/adr/ADR-0089-n1-offline-authority-fact-import.md"]
+# ACCEPTED 2026-10-27 by the maintainer (ADR-0018), limited to the fixture-only offline
+# authority-import experiment; not implemented. Amends ADR-0088 (§6, §11, §12) as a future contract.
+# Real participants, credentials, network ingestion and authorization consumers are not approved.
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0089: N1 Offline Authority-Fact Import and Node-Store Verification"
+description = "ACCEPTED 2026-10-27, fixture-only; not implemented. The contract for an offline, operator-run, unprivileged producer of N1 facts for fixture Subjects: icnctl authority import of one facts-only history segment (a canonical, contiguous, linked excerpt of one Subject's history; EvidenceBundle stays for act verification) into a stopped node's store, through a no-receipt offline open with ownership and permission checks, a fail-closed resumable import-incomplete marker with a symlink-safe durability walk, fixture-only retention with explicit context, provisional fail-closed bounds, preserved forks, bounded owner-only import reports, and an offline device-authority check against the node's retained facts. Neither completeness nor freshness is established; no real participants, credentials, network ingestion or authorization consumers are approved."
+last_updated = "2026-10-27"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+
 [docs."docs/ci/GATE_RATCHET_PLAN.md"]
 category = "reference"
 status = "living"
@@ -4831,3 +4918,97 @@ freshness = "current"
 domain_tags = ["website", "truth", "claims"]
 recommended_action = "keep"
 last_reviewed = "2026-08-17"
+
+[docs."docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md"]
+category = "architecture"
+status = "living"
+title = "N4-B - the portable evidence bundle (EvidenceBundle, icn.n4.evidence-bundle) and the stateless icnctl relying party"
+description = "NORMATIVE CONTRACT for N4-B, the one canonical container for carrying the N1 evidence needed to evaluate one SignedDeviceAct at position E (N4A_DEVICE_AUTHORITY_EVALUATION.md section 9.2 items 2 and 3). A strict, deterministic, externally transportable byte container under the icn.n4.evidence-bundle domain carrying every retained N1 body for one Subject at or below the act's evaluation position E, every witness over each, and one canonical DeviceActV1 plus signature. States the scope rule and why it is exactly the derive_prefix input set; the fact layout as the N1-D record (event_id || signature -> canonical body) grouped by body with the digest stated explicitly; ordering by digest that carries no authority meaning; no bound beyond N1's and N4-A's own; the fail-closed decode table; re-admission of every pair through AuthorityStore::ingest; the three separate claims (decode, admit, verify) and what each proves; the thin verify_evidence_bundle composition that decides nothing of its own; summarize for inspection; the stateless icnctl device-authority verify|inspect verb (exit 0/1/2, refusal classes, what it must never do); an independently reproduced cross-implementation vector; and the 2026-10-04 convergence record that retired DeviceAuthorityBundleV1, its domain and MAX_BUNDLE_FACTS with no compatibility decoder. The container transports evidence and does not interpret authority. Every verification path returns a VerifiedDeviceAct, never bare evidence. Library (25 tests observed 2026-10-27), CLI-reachable (5 end-to-end tests), spec and reference only: no network protocol, no N3 replication, no persistence guarantee, no session format, no enrollment or recovery, no icnd, gateway or SDK surface, no institutional recognition, no claim about any real person's device. Fixture identities only."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "icn/crates/icn-identity/src/evidence_bundle.rs",
+  "icn/crates/icn-identity/tests/evidence_bundle.rs",
+  "icn/crates/icn-identity/tests/reference/evidence_bundle_reference.py",
+  "icn/bins/icnctl/src/device_authority.rs",
+  "icn/bins/icnctl/tests/device_authority_bundle_test.rs",
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md",
+]
+
+[docs."docs/architecture/N4C_DEVICE_ENROLLMENT_REQUEST.md"]
+category = "architecture"
+status = "living"
+title = "N4-C - the enrollment request, the attenuating approval, and the ceremony a client can implement"
+description = "NORMATIVE CONTRACT for N4-C (third tranche of icn#2599): the self-signed EnrollmentRequestV1 a new device presents before it holds any authority - the Subject it asks to join, its per-context Principal, the capabilities it asks for (never Recover), a human label and a nonce - which proves possession of the device key and nothing more; the approve_enrollment step on the person's authority edge that turns it into the N1 Authorize fact, refusing a request for another Subject, a grant wider than asked, an empty grant, Recover, or the establishment key as device; rejection as silence and expiry as the edge's policy; the eleven-step ceremony with each step's class; the contradictions it settles (per-context device keys; attenuation structural; recovery never delegated); and the per-phase contract a Home runtime may build to (first boot, enrollment, runtime, revocation, recovery, contexts, trust/transport). Library, spec and tests only: no transport, approval UI, pending-request persistence, fact delivery, rotation, replacement, recovery, context kind, or icnctl verb. Fixture identities only."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "icn/crates/icn-identity/src/device_enrollment.rs",
+  "icn/crates/icn-identity/tests/device_enrollment.rs",
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md",
+]
+
+[docs."docs/architecture/N4D_DEVICE_CHANNEL_BINDING.md"]
+category = "architecture"
+status = "living"
+title = "N4-D - binding a transport connection to a device Principal, by composition"
+description = "NORMATIVE CONTRACT for N4-D (icn#2599): how a Home connection says 'this connection is acting as device Principal K for Subject S' without trusting an address, a hostname, an OS or remote-desktop login, TLS certificate ownership or an enrollment request. No kernel primitive: a Present DeviceActV1 whose payload is the domain-separated ChannelBindingV1 (channel digest, nonce), admitted as a connection only through N4-E current admission at the relying party's own retained clean tip (admit_channel_binding), with the historical question at a chosen position kept separate (verify_channel_binding_at), then one equality against the channel it sees; both return the VerifiedDeviceAct. Why node DID-TLS BindingInfo is not reused for devices; what the channel digest means and what N4-D deliberately does not define about the transport; the verification order; refusal of an authorized device on the wrong channel, of unauthorized and revoked devices, of a Sign act carrying binding bytes and of a Present act with a non-binding payload; replay by challenge or channel-unique digest. Library and tests only (16 tests observed 2026-10-27): no transport profile, runtime, route or CLI calls it. Fixture identities only."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "icn/crates/icn-identity/src/device_channel_binding.rs",
+  "icn/crates/icn-identity/tests/device_channel_binding.rs",
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md",
+]
+
+[docs."docs/architecture/N4E_CURRENT_ADMISSION.md"]
+category = "architecture"
+status = "living"
+title = "N4-E - current device admission at the relying party's retained authority tip"
+description = "NORMATIVE CONTRACT for N4-E (icn#2599): the current-admission rule for class-2 device acts, as implemented in device_admission.rs. Distinguishes the historical N4-A question (is this act authorized at an explicitly chosen position E) from current admission (is this act acceptable against the position this relying party itself currently holds a clean authority prefix through): admission_position = frontier - 1 of the relying party's own retained facts, never read from the act, and the act must bind exactly it (StaleAct below, RelyingPartyBehind above) before N4-A runs unchanged. Refusal vocabulary (SubjectUnknown, AuthorityHalted, NoDelegationYet, StaleAct, RelyingPartyBehind, Act); what it deliberately does not claim (retained position is local evidence, not universal finality; a relying party behind a revocation admits at its old tip; no clock, no lease, no freshness guarantee; class-1 acts pin their own E); the eight pinned behaviours; composition with N4-B (a stateless bundle consumer makes no current admission; the icnctl verb takes --position from the operator) and N4-D (admit_channel_binding admits a live connection through this module; the historical question stays separate). Success is the VerifiedDeviceAct. Library and tests only (9 tests observed 2026-10-27): no runtime, route, transport profile or CLI calls it. Documents existing behaviour; introduces no semantics. Fixture identities only."
+last_updated = "2026-10-04"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-10-04"
+depends_on = [
+  "icn/crates/icn-identity/src/device_admission.rs",
+  "icn/crates/icn-identity/tests/device_admission.rs",
+  "docs/architecture/N4A_DEVICE_AUTHORITY_EVALUATION.md",
+  "docs/architecture/N4B_PORTABLE_EVIDENCE_BUNDLE.md",
+  "docs/architecture/N4D_DEVICE_CHANNEL_BINDING.md",
+  "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md",
+  "docs/architecture/HOME_RUNTIME_IDENTITY_PROFILE.md",
+]

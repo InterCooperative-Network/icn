@@ -3,13 +3,30 @@
 
 Claude Code launches this as the `icn-ops` MCP `command`. It resolves the ICN
 repo root via the sibling `icn-find-root` resolver — so it works regardless of
-Claude Code's launch directory — then execs:
+Claude Code's launch directory — then execs the package's own start script:
 
-    npm --prefix "$ICN_ROOT/ops/mcp" run start:stdio
+    npm --prefix "$ICN_ROOT/ops/mcp" run --silent start
+
+OPENING A SESSION NEVER COMPILES. This command runs whenever a session loads the
+plugin, against whatever root ICN_ROOT or the cwd names. That root can be another
+task's worktree, a checkout an MCP server is serving from, or a lane whose
+ops/mcp/dist is a symlink into the shared agent-runtime build cache. The previous
+`run start:stdio` ran tsc first, so starting a conversation rewrote whichever of
+those it landed on. That was observed on the dev VM: a live serving checkout's
+dist was rebuilt in place. Now:
+  - a built ops/mcp/dist/index.js is started as-is (no tsc);
+  - no build means a clear failure, not a build;
+  - ICN_OPS_MCP_BUILD_ON_START=1 restores compile-then-start, for a developer
+    who wants this checkout's OWN output rebuilt. It still refuses when dist is a
+    symlink, because that output is shared.
 
 Notes:
-  - Never points at ops/mcp/dist/index.js directly; it runs the npm script so
-    tsc + node run under one Node and postinstall keeps better-sqlite3 aligned.
+  - Never points at ops/mcp/dist/index.js directly; it runs the package's npm
+    scripts so node runs under the same Node npm resolves.
+  - Pins ICN_OPS_DB (unless already set) to <git common dir>/icn-ops.db, which is
+    the server's own one-registry-per-repository default. The server derives that
+    default from its executing file, and a symlinked dist executes from the cache,
+    outside any repository.
   - Uses exec(), so the npm/node MCP process inherits Claude Code's stdio pipes
     directly (Claude Code manages the process; the JSON-RPC stdio transport is
     preserved).
@@ -61,11 +78,141 @@ def main() -> None:
     if npm is None:
         fail("npm not found on PATH. Install Node.js/npm to run the icn-ops MCP server.")
 
-    # 4. Export ICN_ROOT and exec npm, preserving stdio. execvp does not return on success.
-    os.environ["ICN_ROOT"] = root
     prefix = os.path.join(root, "ops", "mcp")
-    os.execvp(npm, [npm, "--prefix", prefix, "run", "start:stdio"])
+    dist = os.path.join(prefix, "dist")
+    # The checkout's OWN output: false when dist, ops/mcp or ops resolves elsewhere (a shared build).
+    own_dist = os.path.realpath(dist) == os.path.join(os.path.realpath(root), "ops", "mcp", "dist")
+
+    # 4. Pin the registry to the repository's shared DB (see module docstring). Without a git common
+    #    dir the server falls back to a DB beside its executing file; for a build that executes
+    #    outside this checkout that would be a second, accidental registry, so refuse instead.
+    if not os.environ.get("ICN_OPS_DB", "").strip():
+        common = git_common_dir(root)
+        if common:
+            os.environ["ICN_OPS_DB"] = os.path.join(common, "icn-ops.db")
+        elif not own_dist:
+            fail(
+                f"cannot determine the shared registry for {root} (no git common dir) and the server "
+                f"would execute from {os.path.realpath(dist)}, outside it. Set ICN_OPS_DB explicitly."
+            )
+    os.environ["ICN_ROOT"] = root
+    note_root_mismatch(root)
+
+    # 5. Start without compiling, unless this checkout's own build was explicitly requested.
+    #    execvp preserves stdio and does not return on success.
+    if os.environ.get("ICN_OPS_MCP_BUILD_ON_START") == "1":
+        if not own_dist:
+            fail(
+                f"refusing to compile: {dist} resolves to {os.path.realpath(dist)}, outside this "
+                "checkout (a shared build). ICN_OPS_MCP_BUILD_ON_START only rebuilds a checkout's own dist."
+            )
+        serving = pids_executing(os.path.join(dist, "index.js"))
+        if serving:
+            fail(
+                f"refusing to compile: {dist} is being executed by running process(es) "
+                f"{', '.join(serving)}. Rebuild it only when nothing serves from it."
+            )
+        os.execvp(npm, [npm, "--prefix", prefix, "run", "--silent", "start:stdio"])
+        fail("exec of npm failed")  # pragma: no cover
+    if not os.path.isfile(os.path.join(dist, "index.js")):
+        fail(
+            f"no built server at {dist}/index.js. Opening a session never compiles. Build this "
+            f"checkout explicitly (npm --prefix {prefix} run build), or set "
+            "ICN_OPS_MCP_BUILD_ON_START=1 to compile it on start."
+        )
+    check_native_modules(dist)
+    os.execvp(npm, [npm, "--prefix", prefix, "run", "--silent", "start"])
     fail("exec of npm failed")  # pragma: no cover - only reached if execvp fails
+
+
+def check_native_modules(dist: str) -> None:
+    """Fail clearly if the build's native SQLite binding does not load under THIS node.
+
+    better-sqlite3 is compiled for one Node ABI. A build whose binding targets another Node would
+    otherwise die inside the server with an opaque stack trace. Resolution starts from the build's
+    real location, so a cache-linked dist checks the cache's own dependencies.
+    """
+    node = shutil.which("node")
+    if node is None:
+        fail("node not found on PATH. Install Node.js to run the icn-ops MCP server.")
+    proc = subprocess.run(
+        [node, "-e", "require('better-sqlite3')"],
+        cwd=os.path.realpath(dist),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if proc.returncode != 0:
+        lines = [ln.strip() for ln in proc.stderr.splitlines() if ln.strip()]
+        reason = next((ln for ln in lines if "NODE_MODULE_VERSION" in ln or "Cannot find module" in ln),
+                      lines[-1] if lines else "unknown error")
+        fail(
+            f"the build at {os.path.realpath(dist)} cannot load better-sqlite3 under {node}: {reason}. "
+            "Rebuild its dependencies for this Node (npm rebuild better-sqlite3 in that ops/mcp) "
+            "instead of starting an incompatible server."
+        )
+
+
+def pids_executing(entry: str) -> list[str]:
+    """Pids (Linux /proc) whose argv names this entry file. Empty where /proc is unavailable.
+
+    A relative argv entry is resolved against that process's own cwd: `npm run start` execs
+    `node dist/index.js` from ops/mcp, so the server this plugin starts names its entry relatively.
+    """
+    target = os.path.realpath(entry)
+    found = []
+    try:
+        pids = [p for p in os.listdir("/proc") if p.isdigit()]
+    except OSError:
+        return found
+    for pid in pids:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as fh:
+                args = [a.decode(errors="replace") for a in fh.read().split(b"\0") if a.endswith(b"index.js")]
+        except OSError:
+            continue
+        if not args:
+            continue
+        try:
+            cwd = os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            cwd = None
+        for a in args:
+            if not os.path.isabs(a):
+                if cwd is None:
+                    continue
+                a = os.path.join(cwd, a)
+            if os.path.realpath(a) == target:
+                found.append(pid)
+                break
+    return found
+
+
+def note_root_mismatch(root: str) -> None:
+    """Say on stderr (never stdout, which carries the protocol) when the code served is not the
+    session's own checkout, e.g. because an inherited ICN_ROOT points elsewhere."""
+    project = os.environ.get("CLAUDE_PROJECT_DIR", "").strip()
+    if not project:
+        return
+    top = subprocess.run(["git", "-C", project, "rev-parse", "--show-toplevel"],
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True).stdout.strip()
+    if top and os.path.realpath(top) != os.path.realpath(root):
+        sys.stderr.write(f"icn-ops-mcp: serving {root} (resolved root), not this session's project {top}\n")
+
+
+def git_common_dir(root: str) -> str | None:
+    """Absolute, resolved `git rev-parse --git-common-dir` for root, or None."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return os.path.realpath(out) if out else None
 
 
 if __name__ == "__main__":

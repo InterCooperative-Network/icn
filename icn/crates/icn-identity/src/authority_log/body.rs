@@ -180,12 +180,16 @@ impl PrincipalKey {
         Did::from_public_key(&self.0)
     }
 
-    fn encode(&self, w: &mut Writer) {
+    // Crate-visible so the N4 relying-party layer (`crate::device_authority`) frames a device
+    // principal with *this* tagged encoding rather than re-deriving it. The tag is what makes a
+    // `SubjectId` in a principal slot a decode error (I2); a second encoder would be a second
+    // place for that guarantee to drift.
+    pub(crate) fn encode(&self, w: &mut Writer) {
         w.u8(PRINCIPAL_TAG_ED25519);
         w.b32(&self.as_bytes());
     }
 
-    fn decode(r: &mut Reader<'_>, field: &'static str) -> Result<Self, CodecError> {
+    pub(crate) fn decode(r: &mut Reader<'_>, field: &'static str) -> Result<Self, CodecError> {
         let tag = r.u8(field)?;
         if tag != PRINCIPAL_TAG_ED25519 {
             return Err(CodecError::BadPrincipalTag(tag));
@@ -366,7 +370,7 @@ impl DeviceCapability {
         }
     }
 
-    fn from_tag(tag: u8) -> Result<Self, CodecError> {
+    pub(crate) fn from_tag(tag: u8) -> Result<Self, CodecError> {
         match tag {
             0x01 => Ok(DeviceCapability::Sign),
             0x02 => Ok(DeviceCapability::Encrypt),
@@ -397,14 +401,14 @@ impl CapabilitySet {
         self.0.contains(&cap)
     }
 
-    fn encode(&self, w: &mut Writer) {
+    pub(crate) fn encode(&self, w: &mut Writer) {
         w.u32(self.0.len() as u32);
         for cap in &self.0 {
             w.u8(cap.tag());
         }
     }
 
-    fn decode(r: &mut Reader<'_>, field: &'static str) -> Result<Self, CodecError> {
+    pub(crate) fn decode(r: &mut Reader<'_>, field: &'static str) -> Result<Self, CodecError> {
         let count = r.count(1, field)?;
         let mut set = BTreeSet::new();
         let mut previous: Option<u8> = None;

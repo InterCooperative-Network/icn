@@ -17,7 +17,7 @@ import shutil
 import subprocess
 from urllib.parse import quote
 
-from .errors import EvidenceUnavailable, GitHubRefused, TransportIndeterminate
+from .errors import EvidenceUnavailable, GitHubRefused, TransportIndeterminate, UsageError
 
 _TIMEOUT = 120
 # `gh` renders an HTTP status when GitHub actually answered. Its absence means the
@@ -130,6 +130,12 @@ query($owner:String!,$name:String!,$expr:String!){
 _OBJECT_OID = """
 query($owner:String!,$name:String!,$expr:String!){
   repository(owner:$owner,name:$name){ object(expression:$expr){ oid } }
+}
+"""
+
+_COMMIT_MESSAGE = """
+query($owner:String!,$name:String!,$expr:String!){
+  repository(owner:$owner,name:$name){ object(expression:$expr){ ... on Commit { oid message } } }
 }
 """
 
@@ -539,17 +545,27 @@ class GhCli:
     # -- the one mutation ----------------------------------------------------------------------
 
     def merge_pull_request(self, owner: str, name: str, number: int, *, sha: str,
-                           merge_method: str) -> dict:
+                           merge_method: str, commit_title: str | None = None,
+                           commit_message: str | None = None) -> dict:
         """ONE head-pinned ordinary merge. `sha` is the head GitHub must still see.
 
         The structured `merge_method` field is why this uses the merge API rather than a CLI
         flag: there is no string to interpolate, so there is no shape in which a policy value
         could become a command-line option.
+
+        `commit_title` and `commit_message`, when given, travel as two more fields of this same
+        request — both or neither, and as `-f` raw strings, so a value beginning with `@` is text
+        rather than a file for `gh` to read. Without them the request is exactly the one this
+        program has always sent.
         """
-        raw = self._run(
-            ["api", "--method", "PUT", f"repos/{owner}/{name}/pulls/{number}/merge",
-             "-f", f"sha={sha}", "-f", f"merge_method={merge_method}"],
-            on_failure=GitHubRefused)
+        if (commit_title is None) != (commit_message is None):
+            raise UsageError("a squash commit title and body are sent together or not at all")
+        argv = ["api", "--method", "PUT", f"repos/{owner}/{name}/pulls/{number}/merge",
+                "-f", f"sha={sha}", "-f", f"merge_method={merge_method}"]
+        if commit_title is not None:
+            argv += ["-f", f"commit_title={commit_title}",
+                     "-f", f"commit_message={commit_message}"]
+        raw = self._run(argv, on_failure=GitHubRefused)
         try:
             decoded = json.loads(raw)
         except ValueError:
@@ -559,6 +575,21 @@ class GhCli:
         # the caller raise AttributeError AFTER a mutation was dispatched — a crash exactly where
         # the program is supposed to report uncertainty.
         return decoded if isinstance(decoded, dict) else {}
+
+    def commit_message(self, owner: str, name: str, oid: str) -> str | None:
+        """The full message of commit `oid` as GitHub stores it, or None when it cannot be read.
+
+        Read-only, and asked only AFTER a confirmed merge: it proves what landed, it never decides
+        whether anything lands.
+        """
+        if not isinstance(oid, str) or not _GIT_OID.match(oid):
+            return None
+        repo = self._graphql(_COMMIT_MESSAGE, {"owner": owner, "name": name, "expr": oid})
+        obj = repo.get("object") if isinstance(repo, dict) else None
+        if not isinstance(obj, dict) or obj.get("oid") != oid:
+            return None
+        message = obj.get("message")
+        return message if isinstance(message, str) else None
 
     def pull_request_merge_state(self, owner: str, name: str, number: int) -> dict:
         repo = self._graphql(_PR_MERGE_STATE, {"owner": owner, "name": name, "number": number})

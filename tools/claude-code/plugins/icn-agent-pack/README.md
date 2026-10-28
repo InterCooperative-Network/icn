@@ -138,9 +138,18 @@ The *plugin's* `.mcp.json` is **wrapper-based and portable**:
 { "mcpServers": { "icn-ops": { "command": "${CLAUDE_PLUGIN_ROOT}/bin/icn-ops-mcp" } } }
 ```
 
-`bin/icn-ops-mcp` resolves the ICN repo root (via `bin/icn-find-root`), exports `ICN_ROOT`, then execs
-`npm --prefix "$ICN_ROOT/ops/mcp" run start:stdio` — so startup no longer depends on Claude Code's
-launch directory, and it never points at `ops/mcp/dist/index.js`.
+`bin/icn-ops-mcp` resolves the ICN repo root (via `bin/icn-find-root`), exports `ICN_ROOT`, pins
+`ICN_OPS_DB` to the repository's `<git common dir>/icn-ops.db` (unless set), then execs
+`npm --prefix "$ICN_ROOT/ops/mcp" run --silent start`. Startup therefore does not depend on Claude
+Code's launch directory, and it never points at `ops/mcp/dist/index.js` itself.
+
+**Opening a session never compiles.** The launcher runs whenever a session loads the plugin, against
+whatever root it resolves. That root can be another task's worktree, a checkout an MCP server is
+serving from, or a lane whose `ops/mcp/dist` is a symlink into the shared agent-runtime build. So it
+only starts an existing build. With no `ops/mcp/dist/index.js` it fails with instructions instead
+of building. `ICN_OPS_MCP_BUILD_ON_START=1` restores compile-then-start (`start:stdio`) for a
+checkout's own dist, and still refuses a symlinked (shared) one. Pinned by
+`scripts/check-claude-plugin-root-resolution.py` scenarios 10–14.
 
 `bin/icn-find-root` resolves the root in this order, accepting only a directory that contains both
 `ops/mcp/package.json` and `docs/STATE.md`:
