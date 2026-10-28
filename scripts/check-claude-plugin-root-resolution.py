@@ -6,6 +6,11 @@ branch against temporary fixtures — repo root, a subdirectory, a parent direct
 with ICN_ROOT, a path containing spaces, an invalid ICN_ROOT, ambiguous candidates,
 the git branch, and the no-root case.
 
+It also runs the plugin's `bin/icn-ops-mcp` launcher against fixture roots, with a
+fake `npm` on PATH, to pin its startup policy: opening a session never compiles,
+an explicit build compiles only a checkout's own (non-symlinked) dist, and the
+registry DB is pinned to the repository's git common dir.
+
 Dependency-free (standard library only). No network. Mutates nothing outside
 fresh temporary directories. Exits 0 if all scenarios behave as expected, else 1.
 
@@ -18,6 +23,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import subprocess
 import tempfile
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -131,6 +137,89 @@ def s_no_root() -> tuple[bool, str]:
         return (root is None and bool(err) and "Could not resolve ICN root" in err, f"root={root} err={err}")
 
 
+# --- launcher policy: bin/icn-ops-mcp -------------------------------------------------------
+
+LAUNCHER = FINDER.parent / "icn-ops-mcp"
+
+
+def run_launcher(t: Path, root: Path, extra_env: dict[str, str] | None = None):
+    """Run the real launcher with a fake npm that records argv/env instead of starting anything."""
+    fakebin = t / "fakebin"
+    fakebin.mkdir(exist_ok=True)
+    log = t / "npm.log"
+    npm = fakebin / "npm"
+    npm.write_text(
+        "#!/bin/sh\n"
+        f'printf "%s\\n" "ICN_OPS_DB=$ICN_OPS_DB" "ICN_ROOT=$ICN_ROOT" "$@" > "{log}"\n',
+        encoding="utf-8",
+    )
+    npm.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k not in ("ICN_ROOT", "ICN_OPS_DB", "ICN_OPS_MCP_BUILD_ON_START")}
+    env.update({"PATH": f"{fakebin}{os.pathsep}{env.get('PATH', '')}", "ICN_ROOT": str(root)})
+    env.update(extra_env or {})
+    proc = subprocess.run([sys.executable, str(LAUNCHER)], env=env, cwd=str(t),
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else None
+    return proc, calls
+
+
+def built(root: Path) -> Path:
+    (root / "ops" / "mcp" / "dist").mkdir(parents=True, exist_ok=True)
+    (root / "ops" / "mcp" / "dist" / "index.js").write_text("// built\n", encoding="utf-8")
+    return root
+
+
+def s_launch_starts_without_compiling() -> tuple[bool, str]:
+    with tempfile.TemporaryDirectory() as t:
+        r = built(make_root(Path(t) / "repo"))
+        proc, calls = run_launcher(Path(t), r)
+        ok = proc.returncode == 0 and calls is not None and calls[2:] == [
+            "--prefix", str(Path(real(r)) / "ops" / "mcp"), "run", "--silent", "start"]
+        return (ok and "start:stdio" not in calls and "build" not in calls, f"rc={proc.returncode} calls={calls}")
+
+
+def s_launch_without_build_refuses() -> tuple[bool, str]:
+    with tempfile.TemporaryDirectory() as t:
+        r = make_root(Path(t) / "repo")
+        proc, calls = run_launcher(Path(t), r)
+        return (proc.returncode != 0 and calls is None and "never compiles" in proc.stderr,
+                f"rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
+
+
+def s_launch_never_compiles_shared_dist() -> tuple[bool, str]:
+    # NEGATIVE BOUNDARY: a lane whose dist is a symlink into a shared build — even when the
+    # developer explicitly asks for build-on-start — must not compile.
+    with tempfile.TemporaryDirectory() as t:
+        shared = built(make_root(Path(t) / "shared-build"))
+        r = make_root(Path(t) / "lane")
+        (r / "ops" / "mcp" / "dist").symlink_to(shared / "ops" / "mcp" / "dist")
+        default_proc, default_calls = run_launcher(Path(t), r)
+        default_ok = default_calls is not None and "start:stdio" not in default_calls
+        (Path(t) / "npm.log").unlink(missing_ok=True)
+        proc, calls = run_launcher(Path(t), r, {"ICN_OPS_MCP_BUILD_ON_START": "1"})
+        return (default_ok and proc.returncode != 0 and calls is None and "shared" in proc.stderr,
+                f"default={default_calls} rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
+
+
+def s_launch_explicit_build_compiles_own_tree() -> tuple[bool, str]:
+    with tempfile.TemporaryDirectory() as t:
+        r = make_root(Path(t) / "repo")
+        proc, calls = run_launcher(Path(t), r, {"ICN_OPS_MCP_BUILD_ON_START": "1"})
+        return (proc.returncode == 0 and calls is not None and calls[-1] == "start:stdio", f"calls={calls}")
+
+
+def s_launch_pins_repository_db() -> tuple[bool, str]:
+    with tempfile.TemporaryDirectory() as t:
+        r = built(make_root(Path(t) / "repo"))
+        subprocess.run(["git", "init", "-q", str(r)], check=True)
+        _, calls = run_launcher(Path(t), r)
+        want = f"ICN_OPS_DB={Path(real(r)) / '.git' / 'icn-ops.db'}"
+        (Path(t) / "npm.log").unlink(missing_ok=True)
+        _, kept = run_launcher(Path(t), r, {"ICN_OPS_DB": "/explicit/db"})
+        return (calls is not None and calls[0] == want and kept is not None and kept[0] == "ICN_OPS_DB=/explicit/db",
+                f"default={calls and calls[0]} explicit={kept and kept[0]} want={want}")
+
+
 SCENARIOS = [
     ("1. from repo root", s_repo_root),
     ("2. from repo subdirectory", s_subdir),
@@ -141,6 +230,11 @@ SCENARIOS = [
     ("7. higher-level dir, unique ./icn layout (no ICN_ROOT)", s_higher_level_unique_layout),
     ("8. git toplevel branch", s_git_branch),
     ("9. no root found fails clearly", s_no_root),
+    ("10. launcher starts a built server without compiling", s_launch_starts_without_compiling),
+    ("11. launcher with no build fails instead of compiling", s_launch_without_build_refuses),
+    ("12. launcher never compiles into a shared (symlinked) dist", s_launch_never_compiles_shared_dist),
+    ("13. explicit build-on-start compiles the checkout's own dist", s_launch_explicit_build_compiles_own_tree),
+    ("14. launcher pins ICN_OPS_DB to the repo's git common dir", s_launch_pins_repository_db),
 ]
 
 
