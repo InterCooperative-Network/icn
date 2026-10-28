@@ -81,46 +81,15 @@ jobs:
           fi
           echo "All security gates passed."
 
+      # One open tracking issue, not a new one per run. The logic lives in a
+      # tested module because the inline version looked issues up by a label it
+      # never applied, so every failing run filed a duplicate (#2815 and
+      # predecessors). Test: node --test .github/scripts/test_security_audit_issue.js
       - name: Create issue on failure
         if: failure()
         uses: actions/github-script@v9
         with:
           script: |
-            const title = 'Weekly Security Audit Failed';
-            const body = `The weekly security audit has detected issues that need attention.
-
-            **Workflow Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
-
-            Please review the workflow logs and address any security advisories.
-
-            ---
-            _This issue was automatically created by the weekly security audit workflow._`;
-
-            // Check if an issue already exists
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'security-audit'
-            });
-
-            const existingIssue = issues.data.find(issue => issue.title === title);
-
-            if (existingIssue) {
-              // Add a comment to the existing issue
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: existingIssue.number,
-                body: `Another security audit failure detected.\n\n**Workflow Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
-              });
-            } else {
-              // Create a new issue
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: title,
-                body: body,
-                labels: ['priority:critical', 'type:impl']
-              });
-            }
+            const reportAuditFailure = require('./.github/scripts/security_audit_issue.js');
+            const result = await reportAuditFailure({ github, context });
+            core.info(`security audit tracking issue: ${JSON.stringify(result)}`);
