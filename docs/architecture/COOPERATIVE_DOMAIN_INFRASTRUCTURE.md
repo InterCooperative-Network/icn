@@ -108,7 +108,7 @@ Quick frame:
 | Short route | `icn.zone/n/nycn` | Human-friendly redirect |
 | Custom public domain | An institution's own DNS, e.g. NYCN's public site | Institution-owned; bound to the institutional domain via receipt |
 
-**`icn.zone` is the primary public ICN surface** for routing, identity, and short-link authority over ICN's own surface. Institutional domains rooted under it (e.g. `nycn.icn.zone`) are utility routes — not authority over the institution itself. Learning material at `learn.icn.zone` is teaching, not authority.
+**For routing, identity, and short links, `icn.zone` is the primary ICN surface.** It is not the primary *public* surface in any broader sense: per [ADR-0032](../adr/ADR-0032-website-truth-boundary.md), `intercooperative.network` is the canonical public truth boundary and `icn.zone` is utility routing, with no truth content of its own. Institutional domains rooted under it (e.g. `nycn.icn.zone`) are utility routes — not authority over the institution itself. Learning material at `learn.icn.zone` is teaching, not authority.
 
 Verification flow (planned):
 
