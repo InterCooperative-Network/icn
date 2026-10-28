@@ -27,7 +27,7 @@ For **agent-facing MCP tools** (`icn_ops_doctor`, environment report, command ca
 
 ## Install Dependencies
 
-The checked-in Claude config builds and starts the MCP server automatically, but dependencies must be installed once per checkout:
+The checked-in Claude config starts the MCP server automatically (building it first only if this checkout has no build), but dependencies must be installed once per checkout:
 
 ```bash
 cd ops/mcp
@@ -49,7 +49,7 @@ cd ops/mcp
 npm run build
 ```
 
-Both `./.mcp.json` and `./.cursor/mcp.json` use `npm --prefix ./ops/mcp run start:stdio`, which runs `tsc` then `node dist/index.js` under **one** `node` resolved for that `npm` invocation. After `npm ci` / `npm install`, `postinstall` runs `npm rebuild better-sqlite3` so native bindings match **that** Node.
+Both `./.mcp.json` and `./.cursor/mcp.json` use `npm --prefix ./ops/mcp run start:stdio`, which runs `ops/mcp/scripts/start-stdio.mjs` under **one** `node` resolved for that `npm` invocation. It starts an existing `dist/` as-is and compiles only when there is no build, or when `ICN_OPS_MCP_BUILD_ON_START=1` is set (after editing `ops/mcp` sources, run `npm run build` or set that variable). It never compiles into a symlinked (shared) `dist/` or one a running server executes, and compiler output goes to stderr, never the protocol stream. After `npm ci` / `npm install`, `postinstall` runs `npm rebuild better-sqlite3` so native bindings match **that** Node.
 
 **Node ABI:** `better-sqlite3` is native. If you install dependencies with Node 22 but the MCP host starts the server with Node 20 (or the reverse), the addon fails to load until you run `npm ci` or `npm rebuild better-sqlite3` using the same Node the host will use. The unified `npm … start:stdio` entrypoint does not remove that OS-level constraint; it only ensures `tsc` and `node dist/index.js` agree within a single spawn.
 

@@ -11,7 +11,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "start:stdio": "npm run --silent build && node dist/index.js",
+    "start:stdio": "node scripts/start-stdio.mjs",
     "postinstall": "npm rebuild better-sqlite3",
     "test": "vitest run",
     "test:watch": "vitest",
