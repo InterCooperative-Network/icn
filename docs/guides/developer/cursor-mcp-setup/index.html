@@ -69,7 +69,7 @@
 </li>
 </ul>
 <h2 id="install-dependencies">Install Dependencies</h2>
-<p>The checked-in Claude config builds and starts the MCP server automatically, but dependencies must be installed once per checkout:</p>
+<p>The checked-in Claude config starts the MCP server automatically (building it first only if this checkout has no build), but dependencies must be installed once per checkout:</p>
 <pre><code class="language-bash">cd ops/mcp
 npm ci
 </code></pre>
@@ -81,7 +81,7 @@ npm ci
 <pre><code class="language-bash">cd ops/mcp
 npm run build
 </code></pre>
-<p>Both <code>./.mcp.json</code> and <code>./.cursor/mcp.json</code> use <code>npm --prefix ./ops/mcp run start:stdio</code>, which runs <code>tsc</code> then <code>node dist/index.js</code> under <strong>one</strong> <code>node</code> resolved for that <code>npm</code> invocation. After <code>npm ci</code> / <code>npm install</code>, <code>postinstall</code> runs <code>npm rebuild better-sqlite3</code> so native bindings match <strong>that</strong> Node.</p>
+<p>Both <code>./.mcp.json</code> and <code>./.cursor/mcp.json</code> use <code>npm --prefix ./ops/mcp run start:stdio</code>, which runs <code>ops/mcp/scripts/start-stdio.mjs</code> under <strong>one</strong> <code>node</code> resolved for that <code>npm</code> invocation. It starts an existing <code>dist/</code> as-is and compiles only when there is no build, or when <code>ICN_OPS_MCP_BUILD_ON_START=1</code> is set (after editing <code>ops/mcp</code> sources, run <code>npm run build</code> or set that variable). It never compiles into a symlinked (shared) <code>dist/</code> or one a running server executes, and compiler output goes to stderr, never the protocol stream. After <code>npm ci</code> / <code>npm install</code>, <code>postinstall</code> runs <code>npm rebuild better-sqlite3</code> so native bindings match <strong>that</strong> Node.</p>
 <p><strong>Node ABI:</strong> <code>better-sqlite3</code> is native. If you install dependencies with Node 22 but the MCP host starts the server with Node 20 (or the reverse), the addon fails to load until you run <code>npm ci</code> or <code>npm rebuild better-sqlite3</code> using the same Node the host will use. The unified <code>npm … start:stdio</code> entrypoint does not remove that OS-level constraint; it only ensures <code>tsc</code> and <code>node dist/index.js</code> agree within a single spawn.</p>
 <p><strong>DevDependency noise:</strong> Vitest pulls Vite 7, which may print <code>EBADENGINE</code> on Node versions older than <strong>20.19</strong>; that warning is about the test runner stack, not the MCP runtime. Use Node <strong>20.19+</strong> or <strong>22.12+</strong> if you want a clean <code>npm ci</code> with no engine warnings.</p>
 <h2 id="validate-the-runtime">Validate The Runtime</h2>
