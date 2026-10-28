@@ -154,7 +154,11 @@ def check_native_modules(dist: str) -> None:
 
 
 def pids_executing(entry: str) -> list[str]:
-    """Pids (Linux /proc) whose argv names this entry file. Empty where /proc is unavailable."""
+    """Pids (Linux /proc) whose argv names this entry file. Empty where /proc is unavailable.
+
+    A relative argv entry is resolved against that process's own cwd: `npm run start` execs
+    `node dist/index.js` from ops/mcp, so the server this plugin starts names its entry relatively.
+    """
     target = os.path.realpath(entry)
     found = []
     try:
@@ -164,11 +168,23 @@ def pids_executing(entry: str) -> list[str]:
     for pid in pids:
         try:
             with open(f"/proc/{pid}/cmdline", "rb") as fh:
-                args = fh.read().split(b"\0")
+                args = [a.decode(errors="replace") for a in fh.read().split(b"\0") if a.endswith(b"index.js")]
         except OSError:
             continue
-        if any(a.endswith(b"index.js") and os.path.realpath(a.decode(errors="replace")) == target for a in args):
-            found.append(pid)
+        if not args:
+            continue
+        try:
+            cwd = os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            cwd = None
+        for a in args:
+            if not os.path.isabs(a):
+                if cwd is None:
+                    continue
+                a = os.path.join(cwd, a)
+            if os.path.realpath(a) == target:
+                found.append(pid)
+                break
     return found
 
 

@@ -257,6 +257,21 @@ def s_launch_explicit_build_refuses_served_dist() -> tuple[bool, str]:
                 f"rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
 
 
+def s_launch_explicit_build_refuses_relative_served_dist() -> tuple[bool, str]:
+    # `npm run start` execs `node dist/index.js` from ops/mcp: the argv is relative to the server's cwd.
+    with tempfile.TemporaryDirectory() as t:
+        r = built(make_root(Path(t) / "repo"))
+        server = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "dist/index.js"],
+                                  cwd=r / "ops" / "mcp")
+        try:
+            proc, calls = run_launcher(Path(t), r, {"ICN_OPS_MCP_BUILD_ON_START": "1", "ICN_OPS_DB": "/x.db"})
+        finally:
+            server.kill()
+            server.wait()
+        return (proc.returncode != 0 and calls is None and str(server.pid) in proc.stderr,
+                f"rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
+
+
 def s_launch_refuses_incompatible_native_module() -> tuple[bool, str]:
     with tempfile.TemporaryDirectory() as t:
         r = built(make_root(Path(t) / "repo"))
@@ -307,6 +322,7 @@ SCENARIOS = [
     ("17. launcher refuses an incompatible native module (ABI)", s_launch_refuses_incompatible_native_module),
     ("18. no git common dir + external build -> refuse, no second DB", s_launch_refuses_second_registry),
     ("19. root/project mismatch is reported on stderr, stdout stays clean", s_launch_names_root_mismatch_on_stderr),
+    ("20. explicit build refuses a dist served via a cwd-relative argv", s_launch_explicit_build_refuses_relative_served_dist),
 ]
 
 
