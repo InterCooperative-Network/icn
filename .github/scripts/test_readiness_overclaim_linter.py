@@ -351,7 +351,7 @@ class TestScanConfig(unittest.TestCase):
     """--config loading: no-config default, override semantics, malformed input."""
 
     def test_no_config_returns_hardcoded_defaults(self):
-        scan_dirs, exclude_dirs = linter.load_scan_config(None)
+        scan_dirs, exclude_dirs, _manifest = linter.load_scan_config(None)
         self.assertEqual(scan_dirs, linter.SCAN_DIRS)
         self.assertEqual(exclude_dirs, linter.EXCLUDE_DIRS)
 
@@ -370,14 +370,14 @@ class TestScanConfig(unittest.TestCase):
 
     def test_config_replaces_scan_dirs_wholesale(self):
         path = self._write_config({"scan_dirs": ["docs/deployment", "website"]})
-        scan_dirs, exclude_dirs = linter.load_scan_config(path)
+        scan_dirs, exclude_dirs, _manifest = linter.load_scan_config(path)
         self.assertEqual(scan_dirs, ["docs/deployment", "website"])
         # exclude_dirs key omitted -> stays at the hardcoded default.
         self.assertEqual(exclude_dirs, linter.EXCLUDE_DIRS)
 
     def test_config_replaces_exclude_dirs_wholesale(self):
         path = self._write_config({"exclude_dirs": ["only-this"]})
-        scan_dirs, exclude_dirs = linter.load_scan_config(path)
+        scan_dirs, exclude_dirs, _manifest = linter.load_scan_config(path)
         self.assertEqual(scan_dirs, linter.SCAN_DIRS)
         self.assertEqual(exclude_dirs, {"only-this"})
 
@@ -592,6 +592,715 @@ class TestHistoricalProofArtifact(unittest.TestCase):
         # to the very file the marker is embedded in.
         self.assertNotEqual(attrs.get("evidence"), "docs/deployment/" + self.HISTORICAL_NAME)
         self.assertTrue(attrs.get("evidence", "").startswith("http"))
+
+
+# ── Rendered-text normalisation: HTML comments are not public claims ─────────
+
+
+class TestHtmlCommentStripping(unittest.TestCase):
+    def test_offsets_and_line_count_preserved(self):
+        """Blanking must keep every column offset, or the column-based guards
+        (_clause_around, _framing_segment, _phrase_is_quoted) silently misfire."""
+        lines = ["abc <!-- hidden --> def", "plain"]
+        out = linter.strip_html_comments(lines)
+        self.assertEqual(len(out), len(lines))
+        for a, b in zip(lines, out):
+            self.assertEqual(len(a), len(b))
+        self.assertTrue(out[0].startswith("abc "))
+        self.assertTrue(out[0].endswith(" def"))
+        self.assertNotIn("hidden", out[0])
+
+    def test_claim_inside_comment_is_not_flagged(self):
+        self.assertEqual(linter.scan_lines("docs/x.md", ["<!-- ICN is production-ready -->"]), [])
+
+    def test_claim_inside_multiline_comment_is_not_flagged(self):
+        lines = ["<!--", "**Status:** PRODUCTION READY", "-->"]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    def test_unterminated_comment_swallows_rest_of_file(self):
+        lines = ["<!-- oops", "ICN is production-ready."]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    def test_claim_after_a_closed_comment_on_same_line_still_flags(self):
+        v = linter.scan_lines("docs/x.md", ["<!-- note --> ICN is production-ready."])
+        self.assertEqual(len(v), 1)
+
+    def test_comments_are_not_stripped_inside_a_fence(self):
+        """strip_html_comments leaves fenced content alone (there a comment is
+        displayed literally). Whether it is SCANNED is decided separately, by the
+        fenced-code rule — see TestFencedCode."""
+        lines = ["```", "<!-- ICN is production-ready -->", "```"]
+        self.assertEqual(linter.strip_html_comments(lines), lines)
+
+    def test_comments_are_not_stripped_inside_a_tilde_fence(self):
+        lines = ["~~~", "<!-- ICN is production-ready -->", "~~~"]
+        self.assertEqual(linter.strip_html_comments(lines), lines)
+
+    def test_real_state_md_sync_note_is_not_a_public_claim(self):
+        """docs/STATE.md's comment-embedded sync notes were 23 of the 95 baseline
+        findings when the linter read raw bytes."""
+        path = os.path.join(REPO_ROOT, "docs", "STATE.md")
+        if not os.path.isfile(path):
+            self.skipTest("docs/STATE.md not present")
+        with open(path, encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+        self.assertEqual(linter.scan_lines("docs/STATE.md", lines), [])
+
+
+# ── Inline negating lead-in ──────────────────────────────────────────────────
+
+
+class TestInlineNegationScope(unittest.TestCase):
+    def test_inline_enumeration_after_does_not_claim_is_exempt(self):
+        line = "This sync explicitly does NOT claim: a lifecycle; live federation; Phase 2 completion."
+        self.assertEqual(linter.scan_lines("docs/x.md", [line]), [])
+
+    def test_bold_leadin_is_exempt(self):
+        line = "**Does not claim:** a lifecycle; live federation."
+        self.assertEqual(linter.scan_lines("docs/x.md", [line]), [])
+
+    def test_scope_ends_at_the_sentence_boundary(self):
+        """A later sentence is a separate assertion and must still flag."""
+        line = "This does not claim: a; b. ICN is production-ready."
+        self.assertEqual(len(linter.scan_lines("docs/x.md", [line])), 1)
+
+    def test_revoking_leadin_does_not_exempt(self):
+        """Words between the framing and the ":" can invert the meaning."""
+        line = "Nonclaims no longer apply: ICN is production-ready."
+        self.assertEqual(len(linter.scan_lines("docs/x.md", [line])), 1)
+
+    def test_leadin_does_not_reach_the_next_line(self):
+        lines = ["We do not claim:", "ICN is production-ready."]
+        self.assertEqual(len(linter.scan_lines("docs/x.md", lines)), 1)
+
+    def test_bare_claim_unaffected(self):
+        self.assertEqual(len(linter.scan_lines("docs/x.md", ["ICN is production-ready."])), 1)
+
+
+# ── Manifest loading: fails closed ──────────────────────────────────────────
+
+
+class TestLoadManifest(unittest.TestCase):
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._tmp = self._tmpdir.name
+        os.makedirs(os.path.join(self._tmp, "docs"))
+        for name in ("a.md", "b.md"):
+            with open(os.path.join(self._tmp, "docs", name), "w") as f:
+                f.write("# ok\n")
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def _manifest(self, payload, name="m.json"):
+        path = os.path.join(self._tmp, name)
+        with open(path, "w") as f:
+            json.dump(payload, f)
+        return name
+
+    def test_valid_manifest_returns_sorted_pairs(self):
+        rel = self._manifest({"files": [
+            {"path": "docs/b.md", "bannered": True},
+            {"path": "docs/a.md", "bannered": False},
+        ]})
+        self.assertEqual(
+            linter.load_manifest(self._tmp, rel),
+            [("docs/a.md", False), ("docs/b.md", True)],
+        )
+
+    def test_bannered_defaults_to_false(self):
+        rel = self._manifest({"files": [{"path": "docs/a.md"}]})
+        self.assertEqual(linter.load_manifest(self._tmp, rel), [("docs/a.md", False)])
+
+    def test_absent_manifest_fails_closed(self):
+        """The manifest is a build artifact: absent means generation did not run,
+        and a gate that then scanned nothing would report a false success."""
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, "nope.json")
+
+    def test_malformed_json_fails_closed(self):
+        path = os.path.join(self._tmp, "bad.json")
+        with open(path, "w") as f:
+            f.write("{not json")
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, "bad.json")
+
+    def test_missing_files_key_fails_closed(self):
+        rel = self._manifest({"count": 0})
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, rel)
+
+    def test_empty_files_list_fails_closed(self):
+        rel = self._manifest({"files": []})
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, rel)
+
+    def test_nonexistent_path_fails_closed(self):
+        rel = self._manifest({"files": [{"path": "docs/gone.md"}]})
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, rel)
+
+    def test_absolute_path_rejected(self):
+        rel = self._manifest({"files": [{"path": "/etc/passwd"}]})
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, rel)
+
+    def test_parent_escape_rejected(self):
+        rel = self._manifest({"files": [{"path": "../outside.md"}]})
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, rel)
+
+    def test_unnormalised_path_rejected(self):
+        rel = self._manifest({"files": [{"path": "docs/./a.md"}]})
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, rel)
+
+    def test_non_bool_bannered_rejected(self):
+        rel = self._manifest({"files": [{"path": "docs/a.md", "bannered": "yes"}]})
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, rel)
+
+    def test_duplicate_path_is_deduplicated(self):
+        rel = self._manifest({"files": [
+            {"path": "docs/a.md", "bannered": True},
+            {"path": "docs/a.md", "bannered": True},
+        ]})
+        self.assertEqual(linter.load_manifest(self._tmp, rel), [("docs/a.md", True)])
+
+    def test_conflicting_duplicate_fails_closed(self):
+        rel = self._manifest({"files": [
+            {"path": "docs/a.md", "bannered": True},
+            {"path": "docs/a.md", "bannered": False},
+        ]})
+        with self.assertRaises(ValueError):
+            linter.load_manifest(self._tmp, rel)
+
+    def test_config_exposes_scan_manifest(self):
+        path = os.path.join(self._tmp, "cfg.json")
+        with open(path, "w") as f:
+            json.dump({"scan_dirs": ["docs"], "scan_manifest": "m.json"}, f)
+        _dirs, _excl, manifest = linter.load_scan_config(path)
+        self.assertEqual(manifest, "m.json")
+
+    def test_config_without_scan_manifest_is_none(self):
+        path = os.path.join(self._tmp, "cfg2.json")
+        with open(path, "w") as f:
+            json.dump({"scan_dirs": ["docs"]}, f)
+        _dirs, _excl, manifest = linter.load_scan_config(path)
+        self.assertIsNone(manifest)
+
+    def test_non_string_scan_manifest_rejected(self):
+        path = os.path.join(self._tmp, "cfg3.json")
+        with open(path, "w") as f:
+            json.dump({"scan_manifest": ["a"]}, f)
+        with self.assertRaises(ValueError):
+            linter.load_scan_config(path)
+
+    def test_default_config_reports_no_manifest(self):
+        self.assertIsNone(linter.load_scan_config(None)[2])
+
+
+# ── Manifest scope + archive banner equivalence in run_lint ─────────────────
+
+
+class TestRunLintManifest(unittest.TestCase):
+    OVERCLAIM = "**Status:** PRODUCTION READY"
+    # Filename is dated/status-named so is_historical_doc() recognises it.
+    HIST = "PROJECT_STATUS_2025-12-06.md"
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._tmp = self._tmpdir.name
+        os.makedirs(os.path.join(self._tmp, "docs"))
+        os.makedirs(os.path.join(self._tmp, "website"))
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def _write(self, rel, text):
+        path = os.path.join(self._tmp, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write(text)
+
+    def test_manifest_file_outside_scan_dirs_is_scanned(self):
+        """The whole point: docs/ is not a scan_dir, but a published doc is linted."""
+        self._write("docs/pub.md", self.OVERCLAIM + "\n")
+        result = linter.run_lint(
+            self._tmp, scan_dirs=["website"], exclude_dirs=set(),
+            manifest_entries=[("docs/pub.md", False)],
+        )
+        self.assertEqual([v.file for v in result.violations], ["docs/pub.md"])
+
+    def test_unpublished_sibling_is_not_scanned(self):
+        self._write("docs/pub.md", "# clean\n")
+        self._write("docs/withheld.md", self.OVERCLAIM + "\n")
+        result = linter.run_lint(
+            self._tmp, scan_dirs=[], exclude_dirs=set(),
+            manifest_entries=[("docs/pub.md", False)],
+        )
+        self.assertEqual(result.violations, [])
+        self.assertEqual(result.files_scanned, 1)
+
+    def test_bannered_true_exempts_affirmative_overclaim(self):
+        """Equivalent to a source banner: the published rendering carries one."""
+        self._write("docs/arch.md", self.OVERCLAIM + "\n")
+        result = linter.run_lint(
+            self._tmp, scan_dirs=[], exclude_dirs=set(),
+            manifest_entries=[("docs/arch.md", True)],
+        )
+        self.assertEqual(result.violations, [])
+        self.assertEqual(result.files_exempt, ["docs/arch.md"])
+
+    def test_bannered_false_does_not_exempt(self):
+        self._write("docs/arch.md", self.OVERCLAIM + "\n")
+        result = linter.run_lint(
+            self._tmp, scan_dirs=[], exclude_dirs=set(),
+            manifest_entries=[("docs/arch.md", False)],
+        )
+        self.assertEqual(len(result.violations), 1)
+
+    def test_bannered_does_NOT_suppress_historical_liveness(self):
+        """The category exists so a banner cannot launder "exercised once" into
+        "still live". A manifest banner must not buy what a source banner cannot."""
+        self._write("docs/" + self.HIST, "# Status\n- 3 nodes operational\n")
+        result = linter.run_lint(
+            self._tmp, scan_dirs=[], exclude_dirs=set(),
+            manifest_entries=[("docs/" + self.HIST, True)],
+        )
+        self.assertEqual([v.rule for v in result.violations], ["unmarked-historical-liveness"])
+        # A file with findings is not "exempt", even though it is bannered.
+        self.assertEqual(result.files_exempt, [])
+
+    def test_valid_claim_class_marker_still_exempts_bannered_file(self):
+        self._write(
+            "docs/" + self.HIST,
+            "# Status\n<!-- claim-class: historical-proof ref=abc123 date=2025-12-06 "
+            "evidence=https://example.invalid/1 -->\n- 3 nodes operational\n",
+        )
+        result = linter.run_lint(
+            self._tmp, scan_dirs=[], exclude_dirs=set(),
+            manifest_entries=[("docs/" + self.HIST, True)],
+        )
+        self.assertEqual(result.violations, [])
+
+    def test_path_in_both_scan_dir_and_manifest_is_scanned_once(self):
+        self._write("website/page.md", self.OVERCLAIM + "\n")
+        result = linter.run_lint(
+            self._tmp, scan_dirs=["website"], exclude_dirs=set(),
+            manifest_entries=[("website/page.md", False)],
+        )
+        self.assertEqual(result.files_scanned, 1)
+        self.assertEqual(len(result.violations), 1)
+
+    def test_manifest_bannered_wins_over_plain_walk(self):
+        """A walked file carries no banner metadata; the manifest's does apply."""
+        self._write("website/page.md", self.OVERCLAIM + "\n")
+        result = linter.run_lint(
+            self._tmp, scan_dirs=["website"], exclude_dirs=set(),
+            manifest_entries=[("website/page.md", True)],
+        )
+        self.assertEqual(result.violations, [])
+        self.assertEqual(result.files_scanned, 1)
+
+    def test_no_manifest_keeps_directory_only_behaviour(self):
+        self._write("website/page.md", self.OVERCLAIM + "\n")
+        result = linter.run_lint(self._tmp, scan_dirs=["website"], exclude_dirs=set())
+        self.assertEqual(len(result.violations), 1)
+
+
+class TestWebsiteConfigWiring(unittest.TestCase):
+    CONFIG = os.path.join(REPO_ROOT, ".github", "claim-lint-website.json")
+
+    def test_website_config_declares_the_published_docs_manifest(self):
+        """Guards the wiring itself: if the config loses scan_manifest, every
+        republished docs page silently leaves the claim gate again."""
+        if not os.path.isfile(self.CONFIG):
+            self.skipTest("website claim-lint config not present")
+        dirs, _excl, manifest = linter.load_scan_config(self.CONFIG)
+        self.assertIn("website", dirs)
+        self.assertEqual(manifest, "website/src/data/published-docs.generated.json")
+
+
+# ── Family A: nonclaim heading vocabulary ────────────────────────────────────
+
+
+class TestScopeBoundaryHeadings(unittest.TestCase):
+    """A section naming itself as work NOT done here enumerates red lines."""
+
+    def _scan(self, heading, body):
+        return linter.scan_lines("docs/x.md", [heading, "", body])
+
+    def test_deferred_work_heading(self):
+        self.assertEqual(
+            self._scan(
+                "## 13. Deferred work (explicitly out of scope of this contract)",
+                "- Production / pilot / NYCN activation / live federation / Phase-2 work.",
+            ),
+            [],
+        )
+
+    def test_out_of_scope_heading(self):
+        self.assertEqual(self._scan("## Out of scope", "- live federation"), [])
+
+    def test_not_in_scope_heading(self):
+        self.assertEqual(self._scan("## Not in scope", "- live federation"), [])
+
+    def test_claims_this_doctrine_does_not_make_heading(self):
+        self.assertEqual(
+            self._scan("## Claims this doctrine does not make", "live federation · pilot"),
+            [],
+        )
+
+    def test_not_yet_done_heading(self):
+        self.assertEqual(
+            self._scan("## 6. What stays explicitly not-yet-done", "- Live federation;"),
+            [],
+        )
+
+    # ── adversarial ──
+
+    def test_section_exemption_ends_at_the_next_heading(self):
+        """The laundering route to close: an out-of-scope section must not exempt
+        the rest of the document."""
+        v = linter.scan_lines("docs/x.md", [
+            "## Out of scope",
+            "- live federation",
+            "## Status",
+            "ICN is production-ready.",
+        ])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 4)
+
+    def test_future_work_heading_is_NOT_nonclaim_framing(self):
+        """"Future work"/"Roadmap" sections DO make forward-looking assertions of
+        their own, so they are deliberately absent from the vocabulary."""
+        self.assertEqual(len(self._scan("## Future work", "ICN is production-ready.")), 1)
+
+    def test_roadmap_heading_is_NOT_nonclaim_framing(self):
+        self.assertEqual(len(self._scan("## Roadmap", "ICN is production-ready.")), 1)
+
+    def test_scope_word_inside_ordinary_heading_does_not_exempt(self):
+        self.assertEqual(
+            len(self._scan("## Deployment scope", "ICN is production-ready.")), 1
+        )
+
+
+# ── Family B: label/value semantics across ":" ───────────────────────────────
+
+
+class TestLabelValuePairs(unittest.TestCase):
+    def test_qualifier_label_before_colon(self):
+        self.assertEqual(
+            linter.scan_lines("docs/x.md", ["**Target:** Production-ready Q1 2026"]), []
+        )
+
+    def test_qualifier_label_variants(self):
+        for label in ("Goal", "Milestone", "Objective", "Planned", "ETA"):
+            with self.subTest(label=label):
+                self.assertEqual(
+                    linter.scan_lines("docs/x.md", [label + ": production-ready"]), []
+                )
+
+    def test_not_yet_status_marker_qualifies_its_row(self):
+        """Covered by the ❌ status marker in NEGATION_RE (same precedent as 🟡),
+        not by the label/value machinery — the "general availability" pattern
+        matches only a prefix, so span comparison was the wrong mechanism."""
+        self.assertEqual(
+            linter.scan_lines(
+                "docs/x.md",
+                ["- \u274c **General Availability**: not yet in this snapshot"],
+            ),
+            [],
+        )
+
+    def test_pending_status_marker_qualifies_its_clause(self):
+        self.assertEqual(
+            linter.scan_lines("docs/x.md", ["\u23f3 live federation is pending"]), []
+        )
+
+    def test_status_marker_in_another_table_cell_does_NOT_exempt(self):
+        """"|" is a clause delimiter on purpose: one cell must not excuse another."""
+        self.assertEqual(
+            len(linter.scan_lines(
+                "docs/x.md", ["| Phase 2 | \u23f3 | ICN is production-ready |"])), 1
+        )
+
+    def test_status_marker_does_not_reach_a_later_clause(self):
+        """A marker in an earlier clause must not excuse a separate assertion."""
+        self.assertEqual(
+            len(linter.scan_lines(
+                "docs/x.md", ["\u274c not shipped; ICN is production-ready."])), 1
+        )
+
+    def test_neither_is_a_negator(self):
+        self.assertEqual(
+            linter.scan_lines(
+                "docs/x.md",
+                ["- Neither proof claims production reachability or live federation;"],
+            ),
+            [],
+        )
+
+    def test_may_not_claim_leadin(self):
+        self.assertEqual(
+            linter.scan_lines(
+                "docs/x.md", ["**It may not claim:** production-ready, pilot-ready,"]
+            ),
+            [],
+        )
+
+    def test_cannot_claim_leadin(self):
+        self.assertEqual(
+            linter.scan_lines("docs/x.md", ["It cannot claim: live federation, pilot."]), []
+        )
+
+    # ── adversarial ──
+
+    def test_revoking_label_does_not_launder(self):
+        """The case that broke the first draft of this rule: the label carries a
+        negation WORD but asserts something."""
+        v = linter.scan_lines("docs/x.md", ["Nonclaims no longer apply: ICN is production-ready."])
+        self.assertEqual(len(v), 1)
+
+    def test_plain_status_label_does_not_exempt(self):
+        self.assertEqual(
+            len(linter.scan_lines("docs/x.md", ["Status: ICN is production-ready."])), 1
+        )
+
+    def test_clause_label_cannot_be_excused_by_its_value(self):
+        """A full assertion before the colon is not a bare label, so a negation in
+        the value must not excuse it."""
+        self.assertEqual(
+            len(linter.scan_lines("docs/x.md", ["ICN is production-ready: not a drill."])), 1
+        )
+
+    def test_negation_does_not_cross_a_sentence_boundary(self):
+        self.assertEqual(
+            len(linter.scan_lines("docs/x.md", ["Target: later. ICN is production-ready."])), 1
+        )
+
+    def test_negation_does_not_cross_a_semicolon(self):
+        self.assertEqual(
+            len(linter.scan_lines(
+                "docs/x.md", ["Target: Q1 2026; ICN is production-ready."])), 1
+        )
+
+    def test_only_one_colon_boundary_is_crossed(self):
+        """A qualifier two colons away must not reach the claim."""
+        self.assertEqual(
+            len(linter.scan_lines("docs/x.md", ["Target: scope: ICN is production-ready."])), 1
+        )
+
+
+# ── Family C: fenced code samples ────────────────────────────────────────────
+
+
+class TestFencedCode(unittest.TestCase):
+    def test_config_sample_is_not_a_claim(self):
+        lines = ["```toml", 'backend = "age"  # Software keystore (production-ready)', "```"]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    def test_tilde_fence_also_exempt(self):
+        lines = ["~~~", "STATUS: PRODUCTION READY", "~~~"]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    def test_fenced_liveness_path_is_not_a_liveness_claim(self):
+        """"/etc/letsencrypt/live/..." is a path, not a live endpoint."""
+        lines = ["```nginx", "ssl_certificate /etc/letsencrypt/live/api.example.org/f.pem;", "```"]
+        self.assertEqual(
+            linter.scan_historical_liveness("docs/PROJECT_STATUS_2025-12-06.md", lines), []
+        )
+
+    # ── adversarial ──
+
+    def test_claim_after_the_fence_closes_still_flags(self):
+        lines = ["```", "sample = 1", "```", "ICN is production-ready."]
+        v = linter.scan_lines("docs/x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 4)
+
+    def test_claim_before_the_fence_opens_still_flags(self):
+        v = linter.scan_lines("docs/x.md", ["ICN is production-ready.", "```", "x", "```"])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 1)
+
+    def test_unclosed_fence_does_not_silently_exempt_a_later_claim(self):
+        """An unclosed fence swallows the rest of the file. Documented, and the
+        reason this is acceptable: the site renders it as code too, so the claim
+        is not presented as prose either. Asserted so the behaviour is explicit
+        rather than accidental."""
+        lines = ["```", "ICN is production-ready."]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    def test_heading_inside_a_fence_does_not_reset_nonclaim_state(self):
+        """A "#" comment in a shell fence must not parse as a markdown heading and
+        end an out-of-scope section."""
+        lines = [
+            "## Out of scope",
+            "```bash",
+            "# Status",
+            "```",
+            "- live federation",
+        ]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+
+# ── Negated sentences that wrap across lines ─────────────────────────────────
+
+
+class TestNegatedContinuation(unittest.TestCase):
+    def test_dangling_negator_covers_the_wrapped_sentence(self):
+        lines = [
+            "`proposed` — this record states the decision for review. It does not",
+            "adopt itself, authorize a production deployment, or certify any profile as",
+            "production-ready.",
+        ]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    def test_wrapped_red_line_list(self):
+        lines = [
+            "**It may not claim:** production-ready, pilot-ready, organizer-approved,",
+            "accessibility-complete, live federation, real institutional deployment, formal",
+            "NYCN pilot, production trusted issuance.",
+        ]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    def test_never_be_used_to_claim_leadin_wraps(self):
+        lines = [
+            "**What this document must never be used to claim:** production readiness, pilot",
+            "readiness, organizer approval, accessibility completion (#2041 is open",
+            "gate), live federation, or that any item exists. When this document and",
+        ]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    def test_not_built_leadin_wraps(self):
+        lines = [
+            "Future lanes with no issue gate yet, **not built**: multi-person / two-member",
+            "action flow, QR node-claim ceremony, signed /",
+            "immutable image, partner-distributable image, live federation.",
+        ]
+        self.assertEqual(linter.scan_lines("docs/x.md", lines), [])
+
+    # ── adversarial ──
+
+    def test_scope_stops_at_the_sentence_terminator_on_a_continuation_line(self):
+        """The laundering route to close: a real claim AFTER the negated sentence
+        ends, on the very line that ends it."""
+        lines = [
+            "**It may not claim:** production-ready, pilot-ready,",
+            "organizer-approved. ICN is production-ready.",
+        ]
+        v = linter.scan_lines("docs/x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 2)
+
+    def test_blank_line_ends_the_continuation(self):
+        lines = ["This record does not", "", "ICN is production-ready."]
+        v = linter.scan_lines("docs/x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 3)
+
+    def test_heading_ends_the_continuation(self):
+        lines = ["This record does not", "## Status", "ICN is production-ready."]
+        v = linter.scan_lines("docs/x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 3)
+
+    def test_fence_ends_the_continuation(self):
+        lines = ["This record does not", "```", "x", "```", "ICN is production-ready."]
+        v = linter.scan_lines("docs/x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 5)
+
+    def test_continuation_does_not_run_past_a_finished_sentence(self):
+        """An ordinary paragraph after a finished negated sentence is unprotected."""
+        lines = [
+            "It does not",
+            "certify any profile.",
+            "ICN is production-ready.",
+        ]
+        v = linter.scan_lines("docs/x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 3)
+
+    def test_leadin_ending_at_its_colon_still_requires_bullets(self):
+        """A lead-in that hands off to the next line does NOT open a continuation;
+        the avoid-list machine governs, and it requires bullets."""
+        v = linter.scan_lines("docs/x.md", ["We do not claim:", "ICN is production-ready."])
+        self.assertEqual(len(v), 1)
+
+    def test_plain_prose_is_unaffected(self):
+        self.assertEqual(
+            len(linter.scan_lines("docs/x.md", ["ICN is production-ready today."])), 1
+        )
+
+
+# ── Allowlist integrity ──────────────────────────────────────────────────────
+
+
+class TestAllowlistIntegrity(unittest.TestCase):
+    """ALLOWLIST is keyed "relpath:line", so an edit above an entry silently
+    retargets it. A stale entry is worse than none: it suppresses nothing the
+    author intended and quietly excuses whatever moved into that line."""
+
+    def test_every_entry_points_at_a_real_red_line_phrase(self):
+        for key, reason in linter.ALLOWLIST.items():
+            with self.subTest(entry=key):
+                rel, _, lineno = key.rpartition(":")
+                path = os.path.join(REPO_ROOT, rel)
+                if not os.path.isfile(path):
+                    self.skipTest(rel + " not present")
+                with open(path, encoding="utf-8", errors="replace") as f:
+                    lines = f.read().splitlines()
+                n = int(lineno)
+                self.assertLessEqual(n, len(lines), msg=key + " is past end of file")
+                line = lines[n - 1]
+                self.assertTrue(
+                    any(pat.search(line) for pat, _rule in linter.OVERCLAIM_PATTERNS),
+                    msg=key + " no longer contains a red-line phrase: " + repr(line[:90]),
+                )
+
+    def test_every_entry_has_a_documented_reason(self):
+        for key, reason in linter.ALLOWLIST.items():
+            with self.subTest(entry=key):
+                self.assertGreater(
+                    len(reason.strip()), 40, msg=key + " needs a real justification"
+                )
+
+
+class TestContinuationBreadthLimits(unittest.TestCase):
+    """Guards on how much a wrapped negated sentence is allowed to excuse."""
+
+    def test_copula_negation_does_not_open_a_continuation(self):
+        """"is not" at end of line is ordinary prose, not a red-line framing."""
+        v = linter.scan_lines("docs/x.md", ["The gateway is not", "production-ready."])
+        self.assertEqual(len(v), 1)
+
+    def test_colon_on_a_continuation_line_ends_the_reach(self):
+        v = linter.scan_lines(
+            "docs/x.md", ["This does not", "a drill: ICN is production-ready."]
+        )
+        self.assertEqual(len(v), 1)
+
+    def test_does_not_still_opens_a_continuation(self):
+        self.assertEqual(
+            linter.scan_lines(
+                "docs/x.md",
+                ["It does not", "certify any profile as", "production-ready."],
+            ),
+            [],
+        )
+
+    def test_red_line_modals_still_open_a_continuation(self):
+        for modal in ("must not", "may not", "cannot", "never"):
+            with self.subTest(modal=modal):
+                self.assertEqual(
+                    linter.scan_lines(
+                        "docs/x.md", ["This document " + modal, "claim production-ready status."]
+                    ),
+                    [],
+                )
 
 
 if __name__ == "__main__":
