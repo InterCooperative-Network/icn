@@ -213,7 +213,9 @@ def s_launch_explicit_build_compiles_own_tree() -> tuple[bool, str]:
     with tempfile.TemporaryDirectory() as t:
         r = make_root(Path(t) / "repo")
         proc, calls = run_launcher(Path(t), r, {"ICN_OPS_MCP_BUILD_ON_START": "1"})
-        return (proc.returncode == 0 and calls is not None and calls[-1] == "start:stdio", f"calls={calls}")
+        # --silent: npm's "> pkg script" banner would otherwise land on the MCP protocol stdout.
+        return (proc.returncode == 0 and calls is not None and calls[-3:] == ["run", "--silent", "start:stdio"],
+                f"calls={calls}")
 
 
 def s_launch_pins_repository_db() -> tuple[bool, str]:

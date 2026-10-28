@@ -112,7 +112,7 @@ def main() -> None:
                 f"refusing to compile: {dist} is being executed by running process(es) "
                 f"{', '.join(serving)}. Rebuild it only when nothing serves from it."
             )
-        os.execvp(npm, [npm, "--prefix", prefix, "run", "start:stdio"])
+        os.execvp(npm, [npm, "--prefix", prefix, "run", "--silent", "start:stdio"])
         fail("exec of npm failed")  # pragma: no cover
     if not os.path.isfile(os.path.join(dist, "index.js")):
         fail(
