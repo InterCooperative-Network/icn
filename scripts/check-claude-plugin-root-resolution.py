@@ -154,7 +154,14 @@ def run_launcher(t: Path, root: Path, extra_env: dict[str, str] | None = None):
         encoding="utf-8",
     )
     npm.chmod(0o755)
-    env = {k: v for k, v in os.environ.items() if k not in ("ICN_ROOT", "ICN_OPS_DB", "ICN_OPS_MCP_BUILD_ON_START")}
+    node = fakebin / "node"   # the native-module check: passes unless FAKE_NODE_FAIL is set
+    node.write_text(
+        '#!/bin/sh\n[ -n "$FAKE_NODE_FAIL" ] && { echo "Error: was compiled against NODE_MODULE_VERSION 115" >&2; exit 1; }\nexit 0\n',
+        encoding="utf-8",
+    )
+    node.chmod(0o755)
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("ICN_ROOT", "ICN_OPS_DB", "ICN_OPS_MCP_BUILD_ON_START", "CLAUDE_PROJECT_DIR", "FAKE_NODE_FAIL")}
     env.update({"PATH": f"{fakebin}{os.pathsep}{env.get('PATH', '')}", "ICN_ROOT": str(root)})
     env.update(extra_env or {})
     proc = subprocess.run([sys.executable, str(LAUNCHER)], env=env, cwd=str(t),
@@ -193,10 +200,11 @@ def s_launch_never_compiles_shared_dist() -> tuple[bool, str]:
         shared = built(make_root(Path(t) / "shared-build"))
         r = make_root(Path(t) / "lane")
         (r / "ops" / "mcp" / "dist").symlink_to(shared / "ops" / "mcp" / "dist")
-        default_proc, default_calls = run_launcher(Path(t), r)
+        db = {"ICN_OPS_DB": str(Path(t) / "registry.db")}   # no git here; see scenario 18
+        default_proc, default_calls = run_launcher(Path(t), r, db)
         default_ok = default_calls is not None and "start:stdio" not in default_calls
         (Path(t) / "npm.log").unlink(missing_ok=True)
-        proc, calls = run_launcher(Path(t), r, {"ICN_OPS_MCP_BUILD_ON_START": "1"})
+        proc, calls = run_launcher(Path(t), r, {"ICN_OPS_MCP_BUILD_ON_START": "1", **db})
         return (default_ok and proc.returncode != 0 and calls is None and "shared" in proc.stderr,
                 f"default={default_calls} rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
 
@@ -220,6 +228,65 @@ def s_launch_pins_repository_db() -> tuple[bool, str]:
                 f"default={calls and calls[0]} explicit={kept and kept[0]} want={want}")
 
 
+def s_launch_explicit_build_refuses_indirect_shared() -> tuple[bool, str]:
+    # ops/mcp itself is a symlink: dist is not a link, but it is still someone else's output.
+    with tempfile.TemporaryDirectory() as t:
+        shared = built(make_root(Path(t) / "shared"))
+        r = Path(t) / "lane"
+        (r / "ops").mkdir(parents=True)
+        (r / "docs").mkdir()
+        (r / "docs" / "STATE.md").write_text("# s\n", encoding="utf-8")
+        (r / "ops" / "mcp").symlink_to(shared / "ops" / "mcp")
+        proc, calls = run_launcher(Path(t), r, {"ICN_OPS_MCP_BUILD_ON_START": "1", "ICN_OPS_DB": "/x.db"})
+        return (proc.returncode != 0 and calls is None and "outside this checkout" in proc.stderr,
+                f"rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
+
+
+def s_launch_explicit_build_refuses_served_dist() -> tuple[bool, str]:
+    # A checkout an MCP server is executing from (a live serving slot) is never rebuilt in place.
+    with tempfile.TemporaryDirectory() as t:
+        r = built(make_root(Path(t) / "repo"))
+        entry = r / "ops" / "mcp" / "dist" / "index.js"
+        server = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", str(entry)])
+        try:
+            proc, calls = run_launcher(Path(t), r, {"ICN_OPS_MCP_BUILD_ON_START": "1", "ICN_OPS_DB": "/x.db"})
+        finally:
+            server.kill()
+            server.wait()
+        return (proc.returncode != 0 and calls is None and str(server.pid) in proc.stderr,
+                f"rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
+
+
+def s_launch_refuses_incompatible_native_module() -> tuple[bool, str]:
+    with tempfile.TemporaryDirectory() as t:
+        r = built(make_root(Path(t) / "repo"))
+        proc, calls = run_launcher(Path(t), r, {"FAKE_NODE_FAIL": "1", "ICN_OPS_DB": "/x.db"})
+        return (proc.returncode != 0 and calls is None and "NODE_MODULE_VERSION" in proc.stderr,
+                f"rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
+
+
+def s_launch_refuses_second_registry() -> tuple[bool, str]:
+    # No git common dir AND the build executes outside the checkout: the server's own fallback
+    # would be a DB beside the shared build, a second registry. Refuse instead.
+    with tempfile.TemporaryDirectory() as t:
+        shared = built(make_root(Path(t) / "shared"))
+        r = make_root(Path(t) / "lane")
+        (r / "ops" / "mcp" / "dist").symlink_to(shared / "ops" / "mcp" / "dist")
+        proc, calls = run_launcher(Path(t), r)
+        return (proc.returncode != 0 and calls is None and "ICN_OPS_DB" in proc.stderr,
+                f"rc={proc.returncode} calls={calls} err={proc.stderr.strip()}")
+
+
+def s_launch_names_root_mismatch_on_stderr() -> tuple[bool, str]:
+    with tempfile.TemporaryDirectory() as t:
+        r = built(make_root(Path(t) / "repo"))
+        project = Path(t) / "project"
+        subprocess.run(["git", "init", "-q", str(project)], check=True)
+        proc, calls = run_launcher(Path(t), r, {"CLAUDE_PROJECT_DIR": str(project), "ICN_OPS_DB": "/x.db"})
+        return (calls is not None and "not this session's project" in proc.stderr and proc.stdout == "",
+                f"stdout={proc.stdout!r} err={proc.stderr.strip()}")
+
+
 SCENARIOS = [
     ("1. from repo root", s_repo_root),
     ("2. from repo subdirectory", s_subdir),
@@ -235,6 +302,11 @@ SCENARIOS = [
     ("12. launcher never compiles into a shared (symlinked) dist", s_launch_never_compiles_shared_dist),
     ("13. explicit build-on-start compiles the checkout's own dist", s_launch_explicit_build_compiles_own_tree),
     ("14. launcher pins ICN_OPS_DB to the repo's git common dir", s_launch_pins_repository_db),
+    ("15. explicit build refuses output shared via a symlinked parent", s_launch_explicit_build_refuses_indirect_shared),
+    ("16. explicit build refuses a dist a running server executes", s_launch_explicit_build_refuses_served_dist),
+    ("17. launcher refuses an incompatible native module (ABI)", s_launch_refuses_incompatible_native_module),
+    ("18. no git common dir + external build -> refuse, no second DB", s_launch_refuses_second_registry),
+    ("19. root/project mismatch is reported on stderr, stdout stays clean", s_launch_names_root_mismatch_on_stderr),
 ]
 
 
