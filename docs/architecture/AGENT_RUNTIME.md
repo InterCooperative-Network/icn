@@ -544,3 +544,85 @@ seam, so this layer relies on the positive path instead: a supported primitive, 
 startup context. The attempt is preserved on `ops/agent-wait-guard`.
 
 Every wait is bounded. Indefinite blocking is available only behind an explicit flag.
+
+## 10. Registry snapshot export
+
+`ops/mcp/src/state/snapshot-export.ts` (CLI: `ops/mcp/src/cli/snapshot-export.ts`,
+`npm run snapshot:export`) produces a **consistent, offline-readable copy of an existing session
+registry**, so an external observer (Project Conductor is the first) can read session state
+without opening the live database.
+
+```
+node dist/cli/snapshot-export.js --source <registry.db> --dest <snapshot.db> [--busy-timeout-ms N]
+```
+
+**Authority.** ICN keeps session identity, authorization and lifecycle (§2, §5). A snapshot is an
+*observation* of that state at an instant. It is not a second registry, never flows back, and
+confers no authority on whoever holds it. A consumer that treats it as live state is wrong by
+construction: a snapshot is stale the moment it is taken.
+
+**What it does**
+
+- **Names its source.** `--source` is required. There is no env var, no git-derived default and
+  no "current registry" — §2.6's resolver would silently pick the live shared database, which is
+  the opposite of what this tool is for.
+- **Never creates or migrates the source.** It checks the SQLite header *before* opening
+  anything (SQLite treats an empty file as a fresh database), opens read-only with
+  `fileMustExist`, and never goes through `initDb`. A missing, empty, non-SQLite, non-registry,
+  or wrong-schema (not exactly v`LATEST_SCHEMA_VERSION`) source is refused.
+- **Takes the snapshot with one `VACUUM INTO` on the read-only connection.** SQLite runs it in a
+  single read transaction, so every table reflects one committed point: committed-but-
+  uncheckpointed WAL frames are included, uncommitted and rolled-back work is not, and
+  concurrent writers are neither blocked nor seen half-way. A raw file copy gives none of this.
+  The online-backup API was rejected because a write between its steps restarts it, so its
+  consistency depends on step sizing rather than on a transaction. `immutable=1` is never used.
+- **Verifies the copy** (`integrity_check`, `foreign_key_check` across sessions/file_claims, schema
+  version, `journal_mode = delete` so reading it creates no sidecars) and discards it on any
+  failure.
+- **Publishes without overwriting.** Temp files (`.<name>.<pid>.<rand>.partial`, `0600`) live
+  beside the destination; both final names are created with `link(2)`, which fails with `EEXIST`
+  instead of replacing. The destination directory must already exist; it is never created. The
+  destination may not be the source or its `-wal`/`-shm`/`-journal`.
+- **Cleans up.** Any failure removes this attempt's temp files, and a published db whose sidecar
+  could not be published is withdrawn.
+
+**Output pair.** `<dest>` (the SQLite file) and `<dest>.meta.json`
+(`icn-ops-registry-snapshot-meta/v1`). The sidecar is the commit marker and is published *last*:
+a consumer **must** require the sidecar and recompute `snapshot.sha256` before trusting the pair.
+A `<dest>` without a matching sidecar is incomplete (possible only after a hard kill between the
+two publishes).
+
+The sidecar keeps these apart, on purpose:
+
+| Block | Meaning |
+|---|---|
+| `source` | which database was read: given path, realpath, dev/ino, size/mtime *at start* (not bound to the snapshot instant), journal mode, schema version |
+| `acquisition` | method (`sqlite-vacuum-into`), start/finish time, busy timeout |
+| `snapshot` | the published file: bytes, sha256, page size/count, schema version |
+| `consistency` | checks run on the **copy**, with per-table row counts. Internal consistency only |
+| `host` | `claimed.hostname` is self-asserted; `authenticated` is `null` and `authenticity` is `"none"`. Nothing establishes host identity or evidence authenticity today |
+| `producer` | exporter name/version, node, better-sqlite3, SQLite version, supported schema |
+
+**Limits — stated, not hidden**
+
+1. **Reading a WAL source can leave `<src>-wal` / `<src>-shm` beside it.** A read-only connection
+   still attaches the wal-index, and cannot remove it on close. This is locking metadata, not
+   registry content (the main file's bytes and the logical content are unchanged — pinned by a
+   test), but it is not "touches nothing on disk". If the source directory is not writable and no
+   `-shm` exists, the open fails and is reported as `SOURCE_UNREADABLE`.
+2. **Full-database copy.** `mailbox`, `events`, `watchers_process`, `health_cache` and
+   `decision_index` come along with `sessions` and `file_claims`. `mailbox.payload` carries
+   inter-agent message bodies, and `sessions` carries `transcript_path`/`task_description`.
+   Scoping the export to the observation tables is an open decision for the owner of the
+   consumer contract, not something this exporter has chosen.
+3. **Schema pin.** Exactly the current schema version is accepted; a newer or older registry is
+   refused rather than exported in a shape the consumer was not built for.
+4. **No authenticity.** A hash binds the sidecar to the file, not either to a host or a person.
+   Do not read the sidecar as an attestation.
+5. **Compatibility with Conductor is not established here.** The Conductor contract
+   (`conductor-icn-observation/v1`) lives in a separate repository that was not available to this
+   change. Nothing in this exporter names or depends on it; filenames and sidecar field names
+   are ICN-side choices pending that contract.
+6. **Fixture-verified only.** Behaviour was tested against throwaway databases, including a
+   separate process committing multi-table transactions. It has not been run against the live
+   shared registry.
