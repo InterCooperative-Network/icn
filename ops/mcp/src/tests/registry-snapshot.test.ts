@@ -33,7 +33,12 @@ import {
   SNAPSHOT_META_FORMAT,
   SnapshotError,
   type SnapshotErrorCode,
+  type SnapshotOptions,
 } from "../state/snapshot-export.js";
+
+// This file pins the FULL profile (the original contract). The observation profile and the
+// adversarial cases live in registry-snapshot-observation/-hardening.test.ts.
+const exportFull = (o: Omit<SnapshotOptions, "profile">) => exportRegistrySnapshot({ profile: "full", ...o });
 
 let dir: string;
 beforeEach(() => {
@@ -106,7 +111,7 @@ describe("happy path and output contract", () => {
     w.close();
 
     const dest = join(dir, "out.db");
-    const r = exportRegistrySnapshot({ source: src, dest });
+    const r = exportFull({ source: src, dest });
 
     expect(r.dest).toBe(dest);
     expect(r.meta_path).toBe(`${dest}.meta.json`);
@@ -123,7 +128,7 @@ describe("happy path and output contract", () => {
     const src = makeRegistry();
     const dest = join(dir, "out.db");
     const before = listing(dir);
-    exportRegistrySnapshot({ source: src, dest });
+    exportFull({ source: src, dest });
 
     expect(listing(dir)).toEqual([...before, "out.db", "out.db.meta.json"].sort());
     expect(statSync(dest).mode & 0o777).toBe(0o600);
@@ -136,7 +141,7 @@ describe("happy path and output contract", () => {
     addSession(w, "s1", ["a.ts"]);
     w.close();
     const dest = join(dir, "out.db");
-    exportRegistrySnapshot({ source: src, dest });
+    exportFull({ source: src, dest });
 
     const h = sha256(dest);
     const d1 = logicalDump(dest);
@@ -156,7 +161,7 @@ describe("happy path and output contract", () => {
     addSession(w, "s1", ["a.ts"]);
     w.close();
     const dest = join(dir, "out.db");
-    const { meta } = exportRegistrySnapshot({ source: src, dest });
+    const { meta } = exportFull({ source: src, dest });
     const onDisk = JSON.parse(readFileSync(`${dest}.meta.json`, "utf-8"));
     expect(onDisk).toEqual(meta);
 
@@ -191,7 +196,7 @@ describe("happy path and output contract", () => {
     process.env["ICN_OPS_DB"] = makeRegistry("env.db");
     try {
       expectRefusal("SOURCE_MISSING", () =>
-        exportRegistrySnapshot({ source: "", dest: join(dir, "out.db") })
+        exportFull({ source: "", dest: join(dir, "out.db") })
       );
     } finally {
       if (prev === undefined) delete process.env["ICN_OPS_DB"];
@@ -211,7 +216,7 @@ describe("what reading a WAL source leaves behind", () => {
     const mainBefore = sha256(src);
     const dumpBefore = logicalDump(src);
     // logicalDump itself opened the source read-only; clear its sidecars' effect on the count.
-    exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") });
+    exportFull({ source: src, dest: join(dir, "out.db") });
 
     // Locking metadata for a reader of a WAL database. Not registry content; documented limit.
     const extra = readdirSync(dir).filter((n) => n.startsWith("registry.db") && n !== "registry.db");
@@ -241,7 +246,7 @@ describe("WAL and transaction semantics", () => {
     rawDb.close();
 
     const dest = join(dir, "out.db");
-    exportRegistrySnapshot({ source: src, dest });
+    exportFull({ source: src, dest });
     const snap = new Database(dest, { readonly: true });
     expect(snap.prepare("SELECT id FROM sessions").all()).toEqual([{ id: "wal-only" }]);
     expect((snap.prepare("SELECT COUNT(*) c FROM file_claims").get() as { c: number }).c).toBe(1);
@@ -260,7 +265,7 @@ describe("WAL and transaction semantics", () => {
     addSession(w, "pending", ["p1.ts", "p2.ts"]);
 
     const d1 = join(dir, "during.db");
-    exportRegistrySnapshot({ source: src, dest: d1 });
+    exportFull({ source: src, dest: d1 });
     const during = new Database(d1, { readonly: true });
     expect(during.prepare("SELECT id FROM sessions ORDER BY id").all()).toEqual([{ id: "base" }]);
     expect((during.prepare("SELECT COUNT(*) c FROM file_claims").get() as { c: number }).c).toBe(1);
@@ -268,7 +273,7 @@ describe("WAL and transaction semantics", () => {
 
     w.exec("COMMIT");
     const d2 = join(dir, "after.db");
-    exportRegistrySnapshot({ source: src, dest: d2 });
+    exportFull({ source: src, dest: d2 });
     const after = new Database(d2, { readonly: true });
     expect(after.prepare("SELECT id FROM sessions ORDER BY id").all()).toEqual([
       { id: "base" },
@@ -285,7 +290,7 @@ describe("WAL and transaction semantics", () => {
     w2.exec("ROLLBACK");
     w2.close();
     const d3 = join(dir, "rolledback.db");
-    exportRegistrySnapshot({ source: src, dest: d3 });
+    exportFull({ source: src, dest: d3 });
     expect(logicalDump(d3)).toBe(logicalDump(d2));
   });
 
@@ -326,7 +331,7 @@ describe("WAL and transaction semantics", () => {
       const counts: number[] = [];
       for (let i = 0; i < 25; i++) {
         const dest = join(dir, `snap-${i}.db`);
-        exportRegistrySnapshot({ source: src, dest });
+        exportFull({ source: src, dest });
         const snap = new Database(dest, { readonly: true });
         const n = (t: string) =>
           (snap.prepare(`SELECT COUNT(*) c FROM ${t}`).get() as { c: number }).c;
@@ -354,7 +359,7 @@ describe("WAL and transaction semantics", () => {
     const beforeDump = logicalDump(src);
     const beforeFiles = listing(dir);
 
-    exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") });
+    exportFull({ source: src, dest: join(dir, "out.db") });
 
     expect(logicalDump(src)).toBe(beforeDump);
     // Only the two published files are new; the source gained no stray files of its own.
@@ -368,7 +373,7 @@ describe("source refusal — fail closed, create nothing", () => {
     const src = join(missingDir, "icn-ops.db");
     const before = listing(dir);
     expectRefusal("SOURCE_MISSING", () =>
-      exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") })
+      exportFull({ source: src, dest: join(dir, "out.db") })
     );
     expect(existsSync(src)).toBe(false);
     expect(existsSync(missingDir)).toBe(false);
@@ -379,7 +384,7 @@ describe("source refusal — fail closed, create nothing", () => {
     const d = join(dir, "adir");
     mkdirSync(d);
     expectRefusal("SOURCE_NOT_FILE", () =>
-      exportRegistrySnapshot({ source: d, dest: join(dir, "out.db") })
+      exportFull({ source: d, dest: join(dir, "out.db") })
     );
   });
 
@@ -391,7 +396,7 @@ describe("source refusal — fail closed, create nothing", () => {
     writeFileSync(src, bytes);
     const before = sha256(src);
     expectRefusal("SOURCE_NOT_SQLITE", () =>
-      exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") })
+      exportFull({ source: src, dest: join(dir, "out.db") })
     );
     expect(sha256(src)).toBe(before);
     expect(listing(dir)).toEqual(["bogus.db"]);
@@ -403,7 +408,7 @@ describe("source refusal — fail closed, create nothing", () => {
     o.exec("CREATE TABLE foo (a); INSERT INTO foo VALUES (1);");
     o.close();
     expectRefusal("NOT_A_REGISTRY", () =>
-      exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") })
+      exportFull({ source: src, dest: join(dir, "out.db") })
     );
     expect(listing(dir)).toEqual(["other.db"]);
   });
@@ -417,7 +422,7 @@ describe("source refusal — fail closed, create nothing", () => {
     mutate(w);
     w.close();
     const e = expectRefusal("UNSUPPORTED_SCHEMA", () =>
-      exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") })
+      exportFull({ source: src, dest: join(dir, "out.db") })
     );
     expect(e.message).toContain(String(LATEST_SCHEMA_VERSION));
     expect(existsSync(join(dir, "out.db"))).toBe(false);
@@ -438,7 +443,7 @@ describe("source refusal — fail closed, create nothing", () => {
     const before = listing(dir);
     let err: unknown;
     try {
-      exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") });
+      exportFull({ source: src, dest: join(dir, "out.db") });
     } catch (e) {
       err = e;
     }
@@ -457,7 +462,7 @@ describe("source refusal — fail closed, create nothing", () => {
     const before = listing(dir);
     let err: unknown;
     try {
-      exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") });
+      exportFull({ source: src, dest: join(dir, "out.db") });
     } catch (e) {
       err = e;
     }
@@ -469,7 +474,7 @@ describe("source refusal — fail closed, create nothing", () => {
     const src = makeRegistry();
     chmodSync(src, 0o000);
     const e = expectRefusal("SOURCE_UNREADABLE", () =>
-      exportRegistrySnapshot({ source: src, dest: join(dir, "out.db") })
+      exportFull({ source: src, dest: join(dir, "out.db") })
     );
     expect(e.message).not.toMatch(/missing|does not exist/i);
     chmodSync(src, 0o600);
@@ -486,7 +491,7 @@ describe("source refusal — fail closed, create nothing", () => {
 
     const t0 = Date.now();
     expectRefusal("SOURCE_LOCKED", () =>
-      exportRegistrySnapshot({ source: src, dest: join(dir, "out.db"), busyTimeoutMs: 100 })
+      exportFull({ source: src, dest: join(dir, "out.db"), busyTimeoutMs: 100 })
     );
     expect(Date.now() - t0).toBeLessThan(5_000);
     j.exec("ROLLBACK");
@@ -500,7 +505,7 @@ describe("destination refusal — no overwrite, no side effects", () => {
     const src = makeRegistry();
     const dest = join(dir, "out.db");
     writeFileSync(dest, "precious");
-    expectRefusal("DEST_EXISTS", () => exportRegistrySnapshot({ source: src, dest }));
+    expectRefusal("DEST_EXISTS", () => exportFull({ source: src, dest }));
     expect(readFileSync(dest, "utf-8")).toBe("precious");
     expect(existsSync(`${dest}.meta.json`)).toBe(false);
   });
@@ -509,7 +514,7 @@ describe("destination refusal — no overwrite, no side effects", () => {
     const src = makeRegistry();
     const dest = join(dir, "out.db");
     writeFileSync(`${dest}.meta.json`, "{}");
-    expectRefusal("DEST_EXISTS", () => exportRegistrySnapshot({ source: src, dest }));
+    expectRefusal("DEST_EXISTS", () => exportFull({ source: src, dest }));
     expect(existsSync(dest)).toBe(false);
   });
 
@@ -517,19 +522,19 @@ describe("destination refusal — no overwrite, no side effects", () => {
     const src = makeRegistry();
     const link = join(dir, "link.db");
     symlinkSync(join(dir, "elsewhere.db"), link);
-    expectRefusal("DEST_EXISTS", () => exportRegistrySnapshot({ source: src, dest: link }));
+    expectRefusal("DEST_EXISTS", () => exportFull({ source: src, dest: link }));
     expect(existsSync(join(dir, "elsewhere.db"))).toBe(false);
 
     const d = join(dir, "adir");
     mkdirSync(d);
-    expectRefusal("DEST_EXISTS", () => exportRegistrySnapshot({ source: src, dest: d }));
+    expectRefusal("DEST_EXISTS", () => exportFull({ source: src, dest: d }));
   });
 
   it("refuses a destination that collides with the source or its WAL/SHM/journal files", () => {
     const src = makeRegistry();
     const before = sha256(src);
     for (const dest of [src, `${src}-wal`, `${src}-shm`, `${src}-journal`]) {
-      expectRefusal("DEST_UNSAFE", () => exportRegistrySnapshot({ source: src, dest }));
+      expectRefusal("DEST_UNSAFE", () => exportFull({ source: src, dest }));
     }
     expect(sha256(src)).toBe(before);
   });
@@ -541,7 +546,7 @@ describe("destination refusal — no overwrite, no side effects", () => {
     // `alias` exists (it is a link), so it is refused either as existing or as the source.
     let code: string | undefined;
     try {
-      exportRegistrySnapshot({ source: src, dest: alias });
+      exportFull({ source: src, dest: alias });
     } catch (e) {
       code = (e as SnapshotError).code;
     }
@@ -552,7 +557,7 @@ describe("destination refusal — no overwrite, no side effects", () => {
     const src = makeRegistry();
     const parent = join(dir, "not-here");
     expectRefusal("DEST_PARENT_MISSING", () =>
-      exportRegistrySnapshot({ source: src, dest: join(parent, "out.db") })
+      exportFull({ source: src, dest: join(parent, "out.db") })
     );
     expect(existsSync(parent)).toBe(false);
   });
@@ -562,7 +567,7 @@ describe("destination refusal — no overwrite, no side effects", () => {
     const f = join(dir, "afile");
     writeFileSync(f, "x");
     expectRefusal("DEST_PARENT_MISSING", () =>
-      exportRegistrySnapshot({ source: src, dest: join(f, "out.db") })
+      exportFull({ source: src, dest: join(f, "out.db") })
     );
   });
 
@@ -573,7 +578,7 @@ describe("destination refusal — no overwrite, no side effects", () => {
     chmodSync(ro, 0o500);
     let err: unknown;
     try {
-      exportRegistrySnapshot({ source: src, dest: join(ro, "out.db") });
+      exportFull({ source: src, dest: join(ro, "out.db") });
     } catch (e) {
       err = e;
     }
@@ -596,7 +601,7 @@ describe("interruption and cleanup", () => {
         partials: readdirSync(dir).filter((n) => n.endsWith(".partial")).length,
       });
     };
-    exportRegistrySnapshot({
+    exportFull({
       source: src,
       dest,
       hooks: { afterCopy: probe("afterCopy"), afterVerify: probe("afterVerify") },
@@ -619,7 +624,7 @@ describe("interruption and cleanup", () => {
       const before = listing(dir);
       let err: unknown;
       try {
-        exportRegistrySnapshot({
+        exportFull({
           source: src,
           dest,
           hooks: {
@@ -642,7 +647,7 @@ describe("interruption and cleanup", () => {
     const dest = join(dir, "out.db");
     const before = listing(dir);
     expectRefusal("SNAPSHOT_VERIFY_FAILED", () =>
-      exportRegistrySnapshot({
+      exportFull({
         source: src,
         dest,
         hooks: {
@@ -662,7 +667,7 @@ describe("interruption and cleanup", () => {
     const src = makeRegistry();
     const dest = join(dir, "out.db");
     expectRefusal("DEST_EXISTS", () =>
-      exportRegistrySnapshot({
+      exportFull({
         source: src,
         dest,
         hooks: { afterVerify: () => writeFileSync(dest, "raced-in") },
@@ -677,7 +682,7 @@ describe("interruption and cleanup", () => {
     const dest = join(dir, "out.db");
     const meta = `${dest}.meta.json`;
     expectRefusal("DEST_EXISTS", () =>
-      exportRegistrySnapshot({
+      exportFull({
         source: src,
         dest,
         hooks: { afterPublishDb: () => writeFileSync(meta, "raced-in") },
@@ -691,7 +696,7 @@ describe("interruption and cleanup", () => {
     const src = makeRegistry();
     const dest = join(dir, "out.db");
     expect(() =>
-      exportRegistrySnapshot({
+      exportFull({
         source: src,
         dest,
         hooks: {
@@ -701,7 +706,7 @@ describe("interruption and cleanup", () => {
         },
       })
     ).toThrow("boom");
-    const r = exportRegistrySnapshot({ source: src, dest });
+    const r = exportFull({ source: src, dest });
     expect(r.meta.snapshot.sha256).toBe(sha256(dest));
   });
 });
