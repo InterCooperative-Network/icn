@@ -87,31 +87,34 @@ export const DIGEST_PREFIX = "sha256:";
 export const WITHHELD_PATH_PREFIX = "withheld:";
 const DIGEST_RE = /^sha256:[0-9a-f]{64}$/;
 const WITHHELD_PATH_RE = /^withheld:[0-9a-f]{16}$/;
-/** Bound on any free-text-capable verbatim column. Real values are short identifiers. */
-const MAX_VERBATIM_BYTES = 256;
 const MAX_ROWS = 2_000_000;
 
 const hex = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 
 export const digestOf = (v: unknown): string => `${DIGEST_PREFIX}${hex(String(v))}`;
 
+/** One path segment. Deliberately narrow: no ':' (drive letters, URI schemes), no '~', no '\\', no spaces. */
+const SAFE_SEGMENT = /^[A-Za-z0-9._@+=,-]+$/;
+/** Verbatim identifier text: letters/digits and a few joiners. No '/', so it can never be a path. */
+const SAFE_VERBATIM = /^[\p{L}\p{N}._:@+ -]{1,256}$/u;
+
 /**
  * May this file-claim path be shown to an external observer as written?
  *
- * Only a plain repo-relative path qualifies. Claims are free text supplied by an agent, so they
- * can be absolute (`/home/<user>/...`), home-relative, parent-escaping, or hold control
- * characters. A repo-relative path IS the occupancy fact the observer wants; it is therefore
- * disclosed, and the doc says so.
+ * A POSITIVE allowlist, not a list of known-bad shapes: claims are free text supplied by an
+ * agent, and every "reject absolute / ~ / .. / drive letter" rule leaves some spelling that
+ * still parses as a path elsewhere (`file:///x`, `a:b/c`). Only plain repo-relative paths made
+ * of conservative segments qualify. Anything else — including legitimate paths with spaces or
+ * non-ASCII — is TOKENISED, not dropped, so the failure direction is safe: the occupancy fact
+ * survives and only the spelling is withheld. A repo-relative path IS the occupancy fact the
+ * observer wants, so it is disclosed, and the doc says so.
  */
 export function isDisclosablePath(p: string): boolean {
   if (p.length === 0 || Buffer.byteLength(p, "utf8") > 512) return false;
-  if (/[\u0000-\u001f\u007f\\]/.test(p)) return false;
-  if (p.startsWith("/") || p.startsWith("~") || /^[A-Za-z]:/.test(p)) return false;
-  return !p.split("/").includes("..");
+  return p.split("/").every((seg) => seg !== ".." && SAFE_SEGMENT.test(seg));
 }
 
-const looksLikePathOrJunk = (s: string): boolean =>
-  Buffer.byteLength(s, "utf8") > MAX_VERBATIM_BYTES || /[\u0000-\u001f\u007f]/.test(s) || s.startsWith("/") || s.startsWith("~");
+const isSafeVerbatim = (s: string): boolean => SAFE_VERBATIM.test(s);
 
 export interface ProjectionCounts {
   schema_version: number;
@@ -259,7 +262,7 @@ export function checkObservationInvariants(db: Database.Database): string[] {
   const textual = P.sessions.verbatim.filter((c) => !["agent_pid", "progress_count"].includes(c));
   for (const c of textual) {
     for (const r of db.prepare(`SELECT ${c} AS v FROM sessions WHERE ${c} IS NOT NULL`).all() as Array<{ v: unknown }>) {
-      if (typeof r.v !== "string" || looksLikePathOrJunk(r.v)) {
+      if (typeof r.v !== "string" || !isSafeVerbatim(r.v)) {
         problems.push(`sessions.${c} holds a path-like, oversized or non-text value; refusing to disclose it`);
         break;
       }

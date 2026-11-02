@@ -588,7 +588,7 @@ is classified, so a later migration cannot widen the disclosure by accident.
 | `sessions`: `id`, `repo`, `worktree_name`, `worktree_generation`, `provider_session_id`, `parent_session_id`, `provider`, `agent_pid`, `host`, `started_at`, `last_heartbeat`, `last_progress`, `progress_count` | verbatim | session identity, lane association, activation/lifecycle, liveness. `host` is a *claim*; `agent_pid` is correlation only (§4) |
 | `sessions.repo_id`, `sessions.worktree_id` | `sha256:<hex>` of the original | **these columns are filesystem paths** (the absolute git common dir and git dir). The digest is a stable join key without the layout. It is pseudonymisation, not secrecy |
 | `sessions`: `worktree`, `worktree_path`, `branch_at_registration`, `head_at_registration`, `task_description`, `task_ref`, `pr_ref`, `transcript_path`, `current_activity` | `NULL` (withheld) | free-form agent text, absolute paths, and branch names (an unpushed branch name can disclose unreleased work) |
-| `file_claims.file_path` | repo-relative path as written; otherwise `withheld:<16 hex>` | claims are agent-supplied free text and may be absolute, `~`-relative, `..`-escaping or contain control characters. The row is kept (dropping it would turn "claimed" into "not claimed"); the token is salted per export, so equal paths still collide *within* a snapshot |
+| `file_claims.file_path` | shown only if every `/`-separated segment matches `[A-Za-z0-9._@+=,-]+` (and none is `..`); otherwise `withheld:<16 hex>` | claims are agent-supplied free text. This is a **positive allowlist**: any spelling that merely looks relative (`file:///x`, `a:b/c`, `~/x`, backslashes, spaces, non-ASCII) is tokenised. Safe direction: a legitimate path with a space is tokenised, not leaked. The row is kept (dropping it would turn "claimed" into "not claimed"); the token is salted per export, so equal paths still collide *within* a snapshot |
 | `mailbox`, `events`, `watchers_process`, `health_cache`, `decision_index` | **table absent** | message bodies and event payloads are free-form; `watchers_process.label` and `health_cache` hold command labels and service endpoints. Absent, not empty: an empty `mailbox` would read as "looked, found no messages" |
 
 Reader rules that follow, and are also written into the sidecar's `disclosure` block: **a `NULL`
@@ -646,7 +646,7 @@ The sidecar keeps these apart, on purpose:
 
 | Block | Meaning |
 |---|---|
-| `source` | which database was read. `full`: path, realpath, dev/ino. `observation`: only an opaque `identity_sha256`; no path, device or inode |
+| `source` | which database was read. `full`: path, realpath, dev/ino. `observation`: no path, device, inode **or derived identity** — a hash of guessable filesystem metadata is a confirmable fingerprint, so none is provided |
 | `acquisition` | method, start/finish time, busy timeout |
 | `snapshot` | the published file: bytes, sha256, page size/count, schema version |
 | `consistency` | checks run on the **copy**, with per-table row counts. Internal consistency only |
@@ -716,8 +716,7 @@ not send real session ids or a real registry):
    confirmable by that someone. It removes layout from the file; it is not a secret.
 7. **No authenticity.** See §10.3.
 8. **A path-like value in a verbatim column refuses the whole `observation` export.** `host`,
-   `repo`, `worktree_name` and the other verbatim text columns must be short, control-character
-   free and not start with `/` or `~`; otherwise the export fails as `SNAPSHOT_VERIFY_FAILED`
+   `repo`, `worktree_name` and the other verbatim text columns must match `[\p{L}\p{N}._:@+ -]{1,256}` — in particular contain no `/`, so they can never be a path; otherwise the export fails as `SNAPSHOT_VERIFY_FAILED`
    (naming the column, never the value) rather than disclosing it or silently altering it. The
    remedy is to correct the registry row, or to use `full` inside the trust boundary.
 9. **Fixture-verified only.** Tested against throwaway databases, including a separate process

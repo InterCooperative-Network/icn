@@ -210,8 +210,12 @@ export interface FullMeta extends MetaCommon {
 
 export interface ObservationMeta extends MetaCommon {
   profile: "observation";
-  /** No path, device or inode: an opaque, stable identity only. */
-  source: SourceCommon & { identity_sha256: string };
+  /**
+   * No path, device or inode, and deliberately NO derived source identity either: a hash of
+   * guessable filesystem metadata is a confirmable fingerprint, not an opaque id, and nothing
+   * needs one.
+   */
+  source: SourceCommon;
   disclosure: {
     classification: "least-privilege-observation";
     policy: typeof OBSERVATION_POLICY.name;
@@ -709,10 +713,7 @@ export function exportRegistrySnapshot(opts: SnapshotOptions): SnapshotResult {
       meta = {
         ...common,
         profile: "observation",
-        source: {
-          identity_sha256: createHash("sha256").update(`${st.dev}:${st.ino}:${sourceReal}`).digest("hex"),
-          ...sourceCommon,
-        },
+        source: sourceCommon,
         disclosure: {
           classification: "least-privilege-observation",
           policy: P.name,

@@ -208,6 +208,70 @@ describe("file claims: occupancy survives, unsafe paths do not", () => {
   });
 });
 
+describe("path spellings that only LOOK relative are tokenised (positive allowlist)", () => {
+  it.each([
+    ["a URI scheme", "file:///etc/shadow"],
+    ["a drive-letter prefix", "C:/Users/someone/key"],
+    ["a colon in a segment", "a:b/c"],
+    ["a backslash path", "dir\\file"],
+    ["home-relative", "~/x"],
+    ["a mid-path parent escape", "ok/../../etc/passwd"],
+    ["a leading slash", "/etc/passwd"],
+    ["a double slash", "a//b"],
+    ["a trailing slash", "dir/"],
+    ["an embedded newline", "a\nb"],
+    ["a space (conservative: tokenised, not dropped)", "docs/my file.md"],
+    ["an over-long path", `${"a/".repeat(300)}z`],
+  ])("%s", (_n, claimed) => {
+    const src = makeRegistry(dir);
+    const w = initDb(src);
+    addSession(w, "s1", [claimed]);
+    w.close();
+    const dest = join(dir, "o.db");
+    observe({ source: src, dest });
+    const [r] = rows(dest, "SELECT file_path FROM file_claims");
+    expect(String(r!["file_path"])).toMatch(/^withheld:[0-9a-f]{16}$/);
+    expect(canariesInFile(dest, [claimed])).toEqual([]);
+  });
+
+  it.each(["icn/crates/icn-core/src/lib.rs", "docs/a-b_c.d/e+f=g,h@i.md", "./local/file.ts", "Cargo.lock"])(
+    "an ordinary repo-relative path is still shown: %s",
+    (ok) => {
+      const src = makeRegistry(dir);
+      const w = initDb(src);
+      addSession(w, "s1", [ok]);
+      w.close();
+      const dest = join(dir, "o.db");
+      observe({ source: src, dest });
+      expect(rows(dest, "SELECT file_path FROM file_claims")).toEqual([{ file_path: ok }]);
+    }
+  );
+
+  it.each([
+    ["a slash anywhere in host", "UPDATE sessions SET host = 'box/../../etc'"],
+    ["a URI in repo", "UPDATE sessions SET repo = 'https://example.invalid/x'"],
+    ["a backslash in worktree_name", "UPDATE sessions SET worktree_name = 'a\\b'"],
+    ["an embedded path in provider", "UPDATE sessions SET provider = 'claude /home/x'"],
+  ])("verbatim columns reject %s", (_n, sql) => {
+    const src = makeSensitiveRegistry(dir);
+    const w = new Database(src);
+    w.exec(sql);
+    w.close();
+    expectRefusal("SNAPSHOT_VERIFY_FAILED", () => observe({ source: src, dest: join(dir, "o.db") }));
+  });
+
+  it("accepts the identifier shapes the registry really produces, including non-ASCII lane names", () => {
+    const src = makeSensitiveRegistry(dir);
+    const w = new Database(src);
+    w.exec("UPDATE sessions SET worktree_name = 'espace-de-travail-été'");
+    w.close();
+    observe({ source: src, dest: join(dir, "o.db") });
+    expect(rows(join(dir, "o.db"), "SELECT DISTINCT worktree_name FROM sessions")).toEqual([
+      { worktree_name: "espace-de-travail-été" },
+    ]);
+  });
+});
+
 describe("the observation sidecar", () => {
   it("does not disclose the source path or home directory", () => {
     const src = makeSensitiveRegistry(dir);
@@ -220,16 +284,16 @@ describe("the observation sidecar", () => {
     expect(text).not.toContain("realpath");
   });
 
-  it("carries a stable opaque source identity, plus the null/absence rules a reader needs", () => {
+  it("carries no source identity at all — not a path, not a hash of one — plus the null/absence rules a reader needs", () => {
     const a = makeSensitiveRegistry(dir, "a.db");
-    const b = makeSensitiveRegistry(dir, "b.db");
     const m1 = observe({ source: a, dest: join(dir, "1.db") }).meta;
-    const m2 = observe({ source: a, dest: join(dir, "2.db") }).meta;
-    const m3 = observe({ source: b, dest: join(dir, "3.db") }).meta;
-    if (m1.profile !== "observation" || m2.profile !== "observation" || m3.profile !== "observation") throw new Error("profile");
-    expect(m1.source.identity_sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(m2.source.identity_sha256).toBe(m1.source.identity_sha256);
-    expect(m3.source.identity_sha256).not.toBe(m1.source.identity_sha256);
+    if (m1.profile !== "observation") throw new Error("profile");
+    // A hash of dev:ino:realpath is a confirmable fingerprint of guessable metadata, not an
+    // opaque id; nothing needs one, so there is none.
+    expect(Object.keys(m1.source).sort()).toEqual(
+      ["journal_mode", "mtime_ms_at_start", "schema_version_max", "size_bytes_at_start", "user_version"].sort()
+    );
+    expect(JSON.stringify(m1)).not.toMatch(/identity_sha256/);
     expect(m1.disclosure.null_semantics).toMatch(/WITHHELD/);
     expect(m1.disclosure.absent_table_semantics).toMatch(/not (an )?(evidence|observation)/i);
     expect(m1.disclosure.tables_withheld).toEqual([...OBSERVATION_POLICY.withheldTables]);
