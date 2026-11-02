@@ -79,31 +79,35 @@ export const DEFAULT_BUSY_TIMEOUT_MS = 5000;
 export const DEFAULT_MAX_SOURCE_BYTES = 512 * 1024 * 1024;
 export const DEFAULT_RESERVE_FREE_BYTES = 64 * 1024 * 1024;
 /** Upper bound on a sidecar a verifier will read. Real ones are ~2 KiB. */
-const MAX_SIDECAR_BYTES = 1024 * 1024;
-const MAX_BUSY_TIMEOUT_MS = 10 * 60 * 1000;
+export const MAX_SIDECAR_BYTES = 1024 * 1024;
+export const MAX_BUSY_TIMEOUT_MS = 10 * 60 * 1000;
 
 const SQLITE_MAGIC = "SQLite format 3\0";
 /** Tables the snapshot contract needs; a database without them is not an ops registry. */
 const REQUIRED_TABLES = ["schema_version", "sessions", "file_claims"] as const;
 
-export type SnapshotErrorCode =
-  | "INVALID_OPTION"
-  | "SOURCE_MISSING"
-  | "SOURCE_NOT_FILE"
-  | "SOURCE_NOT_SQLITE"
-  | "SOURCE_UNREADABLE"
-  | "SOURCE_LOCKED"
-  | "SOURCE_CORRUPT"
-  | "SOURCE_CHANGED"
-  | "SOURCE_TOO_LARGE"
-  | "NOT_A_REGISTRY"
-  | "UNSUPPORTED_SCHEMA"
-  | "INSUFFICIENT_SPACE"
-  | "DEST_PARENT_MISSING"
-  | "DEST_EXISTS"
-  | "DEST_UNSAFE"
-  | "SNAPSHOT_VERIFY_FAILED"
-  | "PUBLISH_FAILED";
+/** Every refusal code the exporter can raise. The type below derives from this list. */
+export const SNAPSHOT_ERROR_CODES = [
+  "INVALID_OPTION",
+  "SOURCE_MISSING",
+  "SOURCE_NOT_FILE",
+  "SOURCE_NOT_SQLITE",
+  "SOURCE_UNREADABLE",
+  "SOURCE_LOCKED",
+  "SOURCE_CORRUPT",
+  "SOURCE_CHANGED",
+  "SOURCE_TOO_LARGE",
+  "NOT_A_REGISTRY",
+  "UNSUPPORTED_SCHEMA",
+  "INSUFFICIENT_SPACE",
+  "DEST_PARENT_MISSING",
+  "DEST_EXISTS",
+  "DEST_UNSAFE",
+  "SNAPSHOT_VERIFY_FAILED",
+  "PUBLISH_FAILED",
+] as const;
+
+export type SnapshotErrorCode = (typeof SNAPSHOT_ERROR_CODES)[number];
 
 export class SnapshotError extends Error {
   // Explicit field, not a constructor parameter property: the hard-kill tests run this file
@@ -926,10 +930,27 @@ export function verifySnapshotPair(destArg: string): PairVerdict {
     problems.push("sha256 does not match the snapshot file");
   }
   if (snap["bytes"] !== statSync(dest).size) problems.push("byte length does not match the snapshot file");
+  // The sidecar must agree with ITSELF about which disclosure policy it describes. A mislabelled
+  // pair (observation label over a full-profile body, or a policy string from another version)
+  // is exactly what a consumer selecting a profile explicitly needs us to refuse.
+  if (profile !== null) {
+    const disc = meta["disclosure"] as Record<string, unknown> | undefined;
+    const wantClass = profile === "full" ? "restricted-full-fidelity" : "least-privilege-observation";
+    const wantPolicy = profile === "full" ? "full-v1" : OBSERVATION_POLICY.name;
+    if (disc?.["classification"] !== wantClass) {
+      problems.push(`disclosure.classification is ${JSON.stringify(disc?.["classification"])}, expected ${wantClass} for profile ${profile}`);
+    }
+    if (disc?.["policy"] !== wantPolicy) {
+      problems.push(`disclosure.policy is ${JSON.stringify(disc?.["policy"])}, expected ${wantPolicy} for profile ${profile}`);
+    }
+  }
   if (problems.length || profile === null) return bail();
 
   try {
     const v = verifyCopy(dest, profile);
+    if (snap["schema_version_max"] !== v.schema_version_max) {
+      problems.push("sidecar schema_version_max does not match the snapshot");
+    }
     const claimed = (meta["consistency"] as { table_row_counts?: unknown } | undefined)?.table_row_counts;
     if (JSON.stringify(claimed) !== JSON.stringify(v.table_row_counts)) {
       problems.push("sidecar row counts do not match the snapshot");

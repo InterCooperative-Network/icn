@@ -85,18 +85,33 @@ export const REQUIRED_COLUMNS: Readonly<Record<string, readonly string[]>> = {
 
 export const DIGEST_PREFIX = "sha256:";
 export const WITHHELD_PATH_PREFIX = "withheld:";
-const DIGEST_RE = /^sha256:[0-9a-f]{64}$/;
-const WITHHELD_PATH_RE = /^withheld:[0-9a-f]{16}$/;
-const MAX_ROWS = 2_000_000;
+export const DIGEST_RE = /^sha256:[0-9a-f]{64}$/;
+export const WITHHELD_PATH_RE = /^withheld:[0-9a-f]{16}$/;
+export const MAX_ROWS = 2_000_000;
+/** Longest claim path (bytes) shown as written. */
+export const MAX_PATH_BYTES = 512;
 
 const hex = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 
 export const digestOf = (v: unknown): string => `${DIGEST_PREFIX}${hex(String(v))}`;
 
+/**
+ * The token that stands in for a withheld claim path:
+ * `withheld:` + first 16 hex of SHA-256( salt || 0x00 || UTF-8(path) ).
+ *
+ * The salt is random PER EXPORT and is never written anywhere, so a token can be compared only
+ * with other tokens in the same snapshot. It cannot be recomputed, or confirmed against a
+ * guessed path, by anyone holding just the snapshot. Exported so the formula has a published
+ * test vector; the production call site is below.
+ */
+export function claimToken(salt: Uint8Array, rawPath: string): string {
+  return `${WITHHELD_PATH_PREFIX}${createHash("sha256").update(salt).update("\0").update(rawPath, "utf8").digest("hex").slice(0, 16)}`;
+}
+
 /** One path segment. Deliberately narrow: no ':' (drive letters, URI schemes), no '~', no '\\', no spaces. */
-const SAFE_SEGMENT = /^[A-Za-z0-9._@+=,-]+$/;
+export const SAFE_SEGMENT = /^[A-Za-z0-9._@+=,-]+$/;
 /** Verbatim identifier text: letters/digits and a few joiners. No '/', so it can never be a path. */
-const SAFE_VERBATIM = /^[\p{L}\p{N}._:@+ -]{1,256}$/u;
+export const SAFE_VERBATIM = /^[\p{L}\p{N}._:@+ -]{1,256}$/u;
 
 /**
  * May this file-claim path be shown to an external observer as written?
@@ -110,7 +125,7 @@ const SAFE_VERBATIM = /^[\p{L}\p{N}._:@+ -]{1,256}$/u;
  * observer wants, so it is disclosed, and the doc says so.
  */
 export function isDisclosablePath(p: string): boolean {
-  if (p.length === 0 || Buffer.byteLength(p, "utf8") > 512) return false;
+  if (p.length === 0 || Buffer.byteLength(p, "utf8") > MAX_PATH_BYTES) return false;
   return p.split("/").every((seg) => seg !== ".." && SAFE_SEGMENT.test(seg));
 }
 
@@ -198,7 +213,7 @@ export function projectObservation(
         // Keep the row: dropping it would turn "claimed, name withheld" into "not claimed". A
         // per-export salt makes equal paths equal within THIS snapshot (conflicts stay
         // visible) while tokens are not comparable across snapshots or reversible by lookup.
-        shown = `${WITHHELD_PATH_PREFIX}${createHash("sha256").update(salt).update("\0").update(raw, "utf8").digest("hex").slice(0, 16)}`;
+        shown = claimToken(salt, raw);
         withheldPaths++;
       }
       insertClaim.run(shown, r["session_id"], r["claimed_at"]);

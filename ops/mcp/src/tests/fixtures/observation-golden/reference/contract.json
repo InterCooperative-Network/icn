@@ -1,0 +1,791 @@
+{
+  "contract_version": "icn-observation-producer-contract/v1",
+  "scope": "Producer contract of ICN's RESTRICTED OBSERVATION registry snapshot. Not the full recovery profile, which is a different disclosure policy and must never be substituted for it.",
+  "derived_from": [
+    "ops/mcp/src/state/snapshot-profile.ts",
+    "ops/mcp/src/state/snapshot-export.ts",
+    "ops/mcp/src/state/db.ts",
+    "ops/mcp/src/cli/snapshot-export.ts",
+    "the generated observation.db and its sidecar (types, header, field paths)"
+  ],
+  "profile": {
+    "selector": {
+      "sidecar_field": "profile",
+      "value": "observation",
+      "all_profiles": [
+        "full",
+        "observation"
+      ]
+    },
+    "policy": {
+      "sidecar_field": "disclosure.policy",
+      "value": "observation-v1"
+    },
+    "sidecar_format": {
+      "sidecar_field": "format",
+      "value": "icn-ops-registry-snapshot-meta/v1"
+    },
+    "registry_schema_version": 5,
+    "matching_rule": "A reader must require ALL of profile, disclosure.policy, format and schema version to equal what it was built for. A new policy is a new value, never a silent change to this one."
+  },
+  "completeness": {
+    "marker": {
+      "filename_rule": "<snapshot file name> + '.meta.json', in the same directory",
+      "required": true
+    },
+    "publication_order": "snapshot file first, sidecar last",
+    "consequence": "A snapshot without its sidecar is INCOMPLETE (a hard kill between the two publishes leaves exactly that). It is not corrupt and not empty; it must be treated as 'no observation'.",
+    "checksum": {
+      "algorithm": "sha256",
+      "field": "snapshot.sha256",
+      "covers": "every byte of the snapshot file",
+      "does_not_cover": "the sidecar itself",
+      "also_bound": [
+        "snapshot.bytes",
+        "snapshot.file (basename)",
+        "consistency.table_row_counts"
+      ],
+      "is_authenticity": false
+    },
+    "reference_check": "snapshot-export --verify <snapshot>  (library: verifySnapshotPair)",
+    "sidecar_max_bytes": 1048576
+  },
+  "sidecar": {
+    "file_suffix": ".meta.json",
+    "encoding": "UTF-8 JSON object",
+    "fields": [
+      {
+        "path": "format",
+        "type": "string"
+      },
+      {
+        "path": "acquisition.method",
+        "type": "string"
+      },
+      {
+        "path": "acquisition.started_at",
+        "type": "string"
+      },
+      {
+        "path": "acquisition.finished_at",
+        "type": "string"
+      },
+      {
+        "path": "acquisition.busy_timeout_ms",
+        "type": "number"
+      },
+      {
+        "path": "snapshot.file",
+        "type": "string"
+      },
+      {
+        "path": "snapshot.bytes",
+        "type": "number"
+      },
+      {
+        "path": "snapshot.sha256",
+        "type": "string"
+      },
+      {
+        "path": "snapshot.page_size",
+        "type": "number"
+      },
+      {
+        "path": "snapshot.page_count",
+        "type": "number"
+      },
+      {
+        "path": "snapshot.journal_mode",
+        "type": "string"
+      },
+      {
+        "path": "snapshot.schema_version_max",
+        "type": "number"
+      },
+      {
+        "path": "consistency.integrity_check",
+        "type": "string"
+      },
+      {
+        "path": "consistency.foreign_key_violations",
+        "type": "number"
+      },
+      {
+        "path": "consistency.table_row_counts.file_claims",
+        "type": "number"
+      },
+      {
+        "path": "consistency.table_row_counts.schema_version",
+        "type": "number"
+      },
+      {
+        "path": "consistency.table_row_counts.sessions",
+        "type": "number"
+      },
+      {
+        "path": "consistency.note",
+        "type": "string"
+      },
+      {
+        "path": "host.claimed.hostname",
+        "type": "string"
+      },
+      {
+        "path": "host.authenticated",
+        "type": "null"
+      },
+      {
+        "path": "host.authenticity",
+        "type": "string"
+      },
+      {
+        "path": "producer.name",
+        "type": "string"
+      },
+      {
+        "path": "producer.version",
+        "type": "string"
+      },
+      {
+        "path": "producer.node",
+        "type": "string"
+      },
+      {
+        "path": "producer.better_sqlite3",
+        "type": "string"
+      },
+      {
+        "path": "producer.sqlite_version",
+        "type": "string"
+      },
+      {
+        "path": "producer.supported_schema_version",
+        "type": "number"
+      },
+      {
+        "path": "profile",
+        "type": "string"
+      },
+      {
+        "path": "source.size_bytes_at_start",
+        "type": "number"
+      },
+      {
+        "path": "source.mtime_ms_at_start",
+        "type": "number"
+      },
+      {
+        "path": "source.journal_mode",
+        "type": "string"
+      },
+      {
+        "path": "source.schema_version_max",
+        "type": "number"
+      },
+      {
+        "path": "source.user_version",
+        "type": "number"
+      },
+      {
+        "path": "disclosure.classification",
+        "type": "string"
+      },
+      {
+        "path": "disclosure.policy",
+        "type": "string"
+      },
+      {
+        "path": "disclosure.tables_included",
+        "type": "array"
+      },
+      {
+        "path": "disclosure.tables_withheld",
+        "type": "array"
+      },
+      {
+        "path": "disclosure.sessions.verbatim_columns",
+        "type": "array"
+      },
+      {
+        "path": "disclosure.sessions.digested_columns",
+        "type": "array"
+      },
+      {
+        "path": "disclosure.sessions.digest_transform",
+        "type": "string"
+      },
+      {
+        "path": "disclosure.sessions.withheld_columns",
+        "type": "array"
+      },
+      {
+        "path": "disclosure.file_claims.path_policy",
+        "type": "string"
+      },
+      {
+        "path": "disclosure.file_claims.withheld_path_encoding",
+        "type": "string"
+      },
+      {
+        "path": "disclosure.file_claims.rows_with_withheld_path",
+        "type": "number"
+      },
+      {
+        "path": "disclosure.null_semantics",
+        "type": "string"
+      },
+      {
+        "path": "disclosure.absent_table_semantics",
+        "type": "string"
+      },
+      {
+        "path": "disclosure.transfer",
+        "type": "string"
+      }
+    ],
+    "environment_dependent_fields": [
+      "acquisition.started_at",
+      "acquisition.finished_at",
+      "source.mtime_ms_at_start",
+      "source.size_bytes_at_start",
+      "producer.version",
+      "producer.node",
+      "producer.better_sqlite3",
+      "producer.sqlite_version",
+      "snapshot.sha256",
+      "snapshot.bytes"
+    ],
+    "absent_by_design": [
+      "source.path_given",
+      "source.realpath",
+      "source.dev",
+      "source.ino",
+      "source.identity_sha256 (removed: a hash of guessable path metadata is a fingerprint, not an opaque id)"
+    ],
+    "host": {
+      "claimed": "host.claimed.hostname is a SELF-ASSERTED string from the producing process",
+      "authenticated": "host.authenticated is null and host.authenticity is 'none': nothing attests the producer"
+    }
+  },
+  "database": {
+    "header": {
+      "magic": "SQLite format 3\\0",
+      "page_size": 4096,
+      "file_format_write_version": 1,
+      "file_format_read_version": 1,
+      "journal_mode": "delete (versions 1/1: no -wal/-shm sidecar files exist or are created by reading)",
+      "text_encoding": "UTF-8",
+      "application_id": 0,
+      "user_version": 0,
+      "raw_header_hex_bytes_16_to_24": "1000010100402020"
+    },
+    "tables_present": [
+      "file_claims",
+      "schema_version",
+      "sessions"
+    ],
+    "tables_absent_by_design": [
+      "decision_index",
+      "events",
+      "health_cache",
+      "mailbox",
+      "watchers_process"
+    ],
+    "absent_table_semantics": "An absent table means NOT EXPORTED. It is never evidence that the table holds no rows, and a reader must not synthesise an empty one.",
+    "columns": {
+      "schema_version": [
+        {
+          "name": "version",
+          "declared_type": "INTEGER",
+          "not_null_in_schema": false,
+          "primary_key_position": 1,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "never"
+        },
+        {
+          "name": "applied_at",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": "datetime('now')",
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        }
+      ],
+      "sessions": [
+        {
+          "name": "id",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 1,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "never"
+        },
+        {
+          "name": "repo",
+          "declared_type": "TEXT",
+          "not_null_in_schema": true,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "never"
+        },
+        {
+          "name": "worktree",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "task_description",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "started_at",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": "datetime('now')",
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "last_heartbeat",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": "datetime('now')",
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "repo_id",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "digest",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "worktree_id",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "digest",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "worktree_path",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "worktree_name",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "provider_session_id",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "branch_at_registration",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "head_at_registration",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "task_ref",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "pr_ref",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "parent_session_id",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "provider",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "transcript_path",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "agent_pid",
+          "declared_type": "INTEGER",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "host",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "current_activity",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "withheld",
+          "null_in_export": "always"
+        },
+        {
+          "name": "last_progress",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        },
+        {
+          "name": "progress_count",
+          "declared_type": "INTEGER",
+          "not_null_in_schema": true,
+          "primary_key_position": 0,
+          "default": "0",
+          "disposition": "verbatim",
+          "null_in_export": "never"
+        },
+        {
+          "name": "worktree_generation",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        }
+      ],
+      "file_claims": [
+        {
+          "name": "file_path",
+          "declared_type": "TEXT",
+          "not_null_in_schema": true,
+          "primary_key_position": 1,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "never"
+        },
+        {
+          "name": "session_id",
+          "declared_type": "TEXT",
+          "not_null_in_schema": true,
+          "primary_key_position": 2,
+          "default": null,
+          "disposition": "verbatim",
+          "null_in_export": "never"
+        },
+        {
+          "name": "claimed_at",
+          "declared_type": "TEXT",
+          "not_null_in_schema": false,
+          "primary_key_position": 0,
+          "default": "datetime('now')",
+          "disposition": "verbatim",
+          "null_in_export": "when the source value was NULL"
+        }
+      ]
+    },
+    "indexes": [
+      {
+        "name": "idx_sessions_parent",
+        "table": "sessions",
+        "sql": "CREATE INDEX idx_sessions_parent ON sessions(parent_session_id)"
+      },
+      {
+        "name": "idx_sessions_provider_session",
+        "table": "sessions",
+        "sql": "CREATE UNIQUE INDEX idx_sessions_provider_session\n        ON sessions(provider_session_id) WHERE provider_session_id IS NOT NULL"
+      },
+      {
+        "name": "idx_sessions_worktree_id",
+        "table": "sessions",
+        "sql": "CREATE INDEX idx_sessions_worktree_id ON sessions(worktree_id)"
+      }
+    ],
+    "no_other_objects": "only tables and indexes: no views, triggers or virtual tables",
+    "schema_version_rows": "copied from the source: one row per ladder step 1..5",
+    "timestamps": "TEXT 'YYYY-MM-DD HH:MM:SS', UTC, as written by SQLite datetime('now')"
+  },
+  "null_rules": {
+    "withheld": "A NULL in a column whose disposition is 'withheld' means WITHHELD. It never means absent, none or unknown-to-ICN.",
+    "digest": "NULL stays NULL. A non-NULL value becomes 'sha256:<64 hex>'. No value is ever invented.",
+    "verbatim": "NULL only where the source had NULL; semantics are the registry's own.",
+    "repo_id": "NOT 'NOT NULL': it was added in schema v3 as a nullable TEXT, and registration stores NULL when lane discovery fails or the row predates v3. The export preserves NULL as NULL; it never fabricates a digest and never exposes the original path. Non-null source values ALWAYS export as a valid digest.",
+    "worktree_generation": "NULL means the generation is unknown (a pre-v5 row), not 'none'.",
+    "provider_session_id": "NULL means the harness conversation id is unknown for that activation."
+  },
+  "identifiers": {
+    "digest": {
+      "applies_to": [
+        "repo_id",
+        "worktree_id"
+      ],
+      "algorithm": "SHA-256",
+      "input": "the UTF-8 bytes of the stored column value, exactly as stored (no normalisation, no trailing newline)",
+      "output": "'sha256:' + lowercase hex",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "keyed": false,
+      "secret": false,
+      "authenticated": false,
+      "unguessable": false,
+      "recomputable_without_private_inputs": false,
+      "recomputable_from_the_raw_value": true,
+      "note": "UNKEYED. Anyone who knows or can enumerate the raw value can recompute it, and can therefore CONFIRM a guess. It removes filesystem layout from the file; it is pseudonymisation, not secrecy and not authentication. Stored values are the canonical git paths ICN produced on the registering host (repo_id = git common dir, worktree_id = git dir), so equality needs the same canonical string."
+    },
+    "claim_path_token": {
+      "applies_to": [
+        "file_claims.file_path (only when the path is not disclosable)"
+      ],
+      "formula": "'withheld:' + first 16 lowercase hex of SHA-256( salt || 0x00 || UTF-8(path) )",
+      "pattern": "^withheld:[0-9a-f]{16}$",
+      "salt": "16 random bytes, fresh for every export, never written anywhere",
+      "stability_scope": "within ONE snapshot only: equal paths share a token, tokens are not comparable across snapshots",
+      "recomputable_from_snapshot": false,
+      "conflict_semantics": "Two rows with the same token are claims on the same withheld path. The ROW is always kept; a withheld path never turns a claim into a non-claim."
+    },
+    "disclosable_claim_path": {
+      "rule": "every '/'-separated segment matches SAFE_SEGMENT and none is '..'; total length <= max_bytes",
+      "segment_pattern": "^[A-Za-z0-9._@+=,-]+$",
+      "max_bytes": 512,
+      "otherwise": "replaced by a token; conservative: spaces and non-ASCII are tokenised"
+    },
+    "verbatim_text": {
+      "applies_to": [
+        "id",
+        "repo",
+        "worktree_name",
+        "worktree_generation",
+        "provider_session_id",
+        "parent_session_id",
+        "provider",
+        "host",
+        "started_at",
+        "last_heartbeat",
+        "last_progress"
+      ],
+      "pattern": "^[\\p{L}\\p{N}._:@+ -]{1,256}$",
+      "flags": "u",
+      "on_violation": "the producer REFUSES the export (SNAPSHOT_VERIFY_FAILED); it never alters the value"
+    },
+    "numeric_verbatim": [
+      "agent_pid",
+      "progress_count"
+    ]
+  },
+  "field_policy": {
+    "sessions": {
+      "verbatim": [
+        "id",
+        "repo",
+        "worktree_name",
+        "worktree_generation",
+        "provider_session_id",
+        "parent_session_id",
+        "provider",
+        "agent_pid",
+        "host",
+        "started_at",
+        "last_heartbeat",
+        "last_progress",
+        "progress_count"
+      ],
+      "digested": [
+        "repo_id",
+        "worktree_id"
+      ],
+      "withheld": [
+        "worktree",
+        "worktree_path",
+        "branch_at_registration",
+        "head_at_registration",
+        "task_description",
+        "task_ref",
+        "pr_ref",
+        "transcript_path",
+        "current_activity"
+      ]
+    },
+    "required_source_columns": {
+      "schema_version": [
+        "version",
+        "applied_at"
+      ],
+      "sessions": [
+        "id",
+        "repo",
+        "worktree_name",
+        "worktree_generation",
+        "provider_session_id",
+        "parent_session_id",
+        "provider",
+        "agent_pid",
+        "host",
+        "started_at",
+        "last_heartbeat",
+        "last_progress",
+        "progress_count",
+        "repo_id",
+        "worktree_id",
+        "worktree",
+        "worktree_path",
+        "branch_at_registration",
+        "head_at_registration",
+        "task_description",
+        "task_ref",
+        "pr_ref",
+        "transcript_path",
+        "current_activity"
+      ],
+      "file_claims": [
+        "file_path",
+        "session_id",
+        "claimed_at"
+      ]
+    },
+    "unclassified_columns": "never exported (allowlist). A new source column is withheld until classified.",
+    "file_claims": [
+      "file_path",
+      "session_id",
+      "claimed_at"
+    ]
+  },
+  "consistency": {
+    "boundary": "one read transaction on a read-only connection to the source",
+    "includes": "committed-but-uncheckpointed WAL frames",
+    "excludes": "uncommitted and rolled-back work",
+    "atomic_across_tables": true,
+    "row_counts_cross_checked_against_source_in_same_transaction": true,
+    "evidence_scope": "internal consistency of the COPY; not authenticity, not equality with any instant beyond SQLite's guarantee"
+  },
+  "failure_semantics": {
+    "refusal_writes_nothing": true,
+    "exit_codes": {
+      "exported_or_verified": 0,
+      "refused_or_not_verified": 1,
+      "usage": 2
+    },
+    "error_codes": [
+      "INVALID_OPTION",
+      "SOURCE_MISSING",
+      "SOURCE_NOT_FILE",
+      "SOURCE_NOT_SQLITE",
+      "SOURCE_UNREADABLE",
+      "SOURCE_LOCKED",
+      "SOURCE_CORRUPT",
+      "SOURCE_CHANGED",
+      "SOURCE_TOO_LARGE",
+      "NOT_A_REGISTRY",
+      "UNSUPPORTED_SCHEMA",
+      "INSUFFICIENT_SPACE",
+      "DEST_PARENT_MISSING",
+      "DEST_EXISTS",
+      "DEST_UNSAFE",
+      "SNAPSHOT_VERIFY_FAILED",
+      "PUBLISH_FAILED"
+    ],
+    "stderr_on_refusal": "one JSON line {ok:false, code, message}",
+    "stdout_on_verify": "one JSON line {ok, profile, problems[]}",
+    "hard_kill_leaves": [
+      "owner-only '.<name>.<pid>.<rand>.partial' temp files (an observation partial holds only allowlisted data)",
+      "possibly a snapshot with no sidecar (incomplete; detected by --verify)"
+    ],
+    "retry_never_overwrites": "an existing snapshot or sidecar is refused as DEST_EXISTS"
+  },
+  "limits": {
+    "max_source_bytes_default": 536870912,
+    "max_source_counts": "main file + WAL",
+    "reserve_free_bytes_default": 67108864,
+    "max_rows_total": 2000000,
+    "busy_timeout_ms": {
+      "default": 5000,
+      "max": 600000
+    },
+    "sidecar_max_bytes": 1048576,
+    "file_mode": "0600"
+  },
+  "reader_obligations": [
+    "Select the observation profile explicitly; never accept 'whatever profile the sidecar names'.",
+    "Require the sidecar and verify sha256, byte length and row counts before opening the database.",
+    "Open read-only. The file is in delete journal mode, so reading creates no sidecar files.",
+    "Match profile, disclosure.policy, format and schema version exactly; refuse on any difference.",
+    "Treat NULL in a withheld column as WITHHELD and an absent table as NOT EXPORTED.",
+    "Look lanes up by digest of an out-of-band raw worktree id; never expect a raw path in the file.",
+    "Never present host.claimed.hostname or any sidecar field as authenticated."
+  ]
+}

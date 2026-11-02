@@ -1,0 +1,195 @@
+{
+  "note": "Every value here is fictional or fixed. 'recomputable' vectors can be reproduced from the input shown with nothing private. The fixture's own claim tokens are NOT recomputable (their salt was discarded); they are covered by 'claim_token_formula' (a published salt) and by the structural facts below.",
+  "privacy_canaries": [
+    "GOLDEN-CANARY",
+    "/synthetic/golden-root",
+    "/synthetic/golden-root/repos/icn-golden.git",
+    "/synthetic/golden-root/repos/icn-golden.git/worktrees/lane-alpha",
+    "/synthetic/golden-root/repos/icn-golden.git/worktrees/lane-beta"
+  ],
+  "synthetic_inputs": {
+    "root": "/synthetic/golden-root",
+    "repoId": "/synthetic/golden-root/repos/icn-golden.git",
+    "laneAlpha": "/synthetic/golden-root/repos/icn-golden.git/worktrees/lane-alpha",
+    "laneBeta": "/synthetic/golden-root/repos/icn-golden.git/worktrees/lane-beta",
+    "generationAlpha": "00000000-0000-4000-8000-0000000000a1",
+    "generationBeta": "00000000-0000-4000-8000-0000000000b1",
+    "conversationAlpha1": "5d1c2a4e-0000-4000-8000-00000000c0a1",
+    "conversationAlpha3": "5d1c2a4e-0000-4000-8000-00000000c0a3",
+    "conversationBeta1": "5d1c2a4e-0000-4000-8000-00000000c0b1",
+    "claimedHost": "golden-fixture-host"
+  },
+  "digest_vectors": [
+    {
+      "column": "repo_id",
+      "raw": "/synthetic/golden-root/repos/icn-golden.git",
+      "digest": "sha256:9154223820c838e1e605e14b99ca760b6b19ea96eac9d2d53e2364737c21ea42",
+      "recomputable": true
+    },
+    {
+      "column": "worktree_id",
+      "raw": "/synthetic/golden-root/repos/icn-golden.git/worktrees/lane-alpha",
+      "digest": "sha256:5e7dfa6ddf675d380bf46149b4663cc771937fd3c6f6c17ab70e1c87120d8326",
+      "recomputable": true
+    },
+    {
+      "column": "worktree_id",
+      "raw": "/synthetic/golden-root/repos/icn-golden.git/worktrees/lane-beta",
+      "digest": "sha256:288eedd18a70da9dd57da3b3e4db2a162cb98c46867d7a13cdc260b172e29e6f",
+      "recomputable": true
+    },
+    {
+      "column": "(any)",
+      "raw": "",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recomputable": true,
+      "note": "empty string is non-NULL, so it digests"
+    }
+  ],
+  "claim_token_formula": {
+    "salt_hex": "000102030405060708090a0b0c0d0e0f",
+    "note": "A TEST salt, only to pin the formula. Real exports use a random, unrecorded salt.",
+    "vectors": [
+      {
+        "path": "/synthetic/golden-root/GOLDEN-CANARY-secret.key",
+        "token": "withheld:ad50ca122aa5a7d9"
+      },
+      {
+        "path": "~/GOLDEN-CANARY-tilde-claim",
+        "token": "withheld:20901a0db89b7648"
+      },
+      {
+        "path": "docs/golden/with space.md",
+        "token": "withheld:1445cdc31e478e61"
+      }
+    ]
+  },
+  "claim_path_disclosure": [
+    {
+      "path": "icn/crates/golden-core/src/lib.rs",
+      "disclosed_as_written": true
+    },
+    {
+      "path": "docs/golden/notes.md",
+      "disclosed_as_written": true
+    },
+    {
+      "path": "docs/golden/with space.md",
+      "disclosed_as_written": false
+    },
+    {
+      "path": "/synthetic/golden-root/GOLDEN-CANARY-secret.key",
+      "disclosed_as_written": false
+    },
+    {
+      "path": "~/GOLDEN-CANARY-tilde-claim",
+      "disclosed_as_written": false
+    },
+    {
+      "path": "file:///etc/hosts",
+      "disclosed_as_written": false
+    },
+    {
+      "path": "a:b/c",
+      "disclosed_as_written": false
+    },
+    {
+      "path": "ok/../../etc/passwd",
+      "disclosed_as_written": false
+    },
+    {
+      "path": "./local/file.ts",
+      "disclosed_as_written": true
+    },
+    {
+      "path": "Cargo.lock",
+      "disclosed_as_written": true
+    },
+    {
+      "path": "dir/",
+      "disclosed_as_written": false
+    },
+    {
+      "path": "a//b",
+      "disclosed_as_written": false
+    }
+  ],
+  "verbatim_text_acceptance": [
+    {
+      "value": "icn-golden",
+      "accepted": true
+    },
+    {
+      "value": "lane-alpha",
+      "accepted": true
+    },
+    {
+      "value": "golden-fixture-host",
+      "accepted": true
+    },
+    {
+      "value": "2026-01-01 10:00:00",
+      "accepted": true
+    },
+    {
+      "value": "espace-été",
+      "accepted": true
+    },
+    {
+      "value": "box/../x",
+      "accepted": false
+    },
+    {
+      "value": "https://x.invalid/y",
+      "accepted": false
+    },
+    {
+      "value": "a\\b",
+      "accepted": false
+    },
+    {
+      "value": "",
+      "accepted": false
+    }
+  ],
+  "fixture_facts": {
+    "lane_alpha_sessions": [
+      "sess-alpha-1",
+      "sess-alpha-2",
+      "sess-alpha-3"
+    ],
+    "lane_beta_sessions": [
+      "sess-beta-1"
+    ],
+    "legacy_sessions": [
+      "sess-legacy-1"
+    ],
+    "sessions_with_null_conversation": [
+      "sess-alpha-2",
+      "sess-legacy-1"
+    ],
+    "sessions_with_null_generation": [
+      "sess-alpha-3",
+      "sess-legacy-1"
+    ],
+    "claims_cleartext_conflicts": [
+      {
+        "file_path": "icn/crates/golden-core/src/lib.rs",
+        "sessions": [
+          "sess-alpha-1",
+          "sess-beta-1"
+        ]
+      }
+    ],
+    "claims_withheld_token_groups": [
+      {
+        "sessions": [
+          "sess-alpha-1",
+          "sess-beta-1"
+        ]
+      }
+    ],
+    "claims_total": 7,
+    "claims_withheld": 4
+  }
+}

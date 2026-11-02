@@ -635,7 +635,7 @@ claims. Repo-relative paths *are* the occupancy fact an observer wants, so they 
 The database is published first and the sidecar last, so a **hard kill between the two leaves a
 database with no sidecar** (reproduced with a real `SIGKILL`). That file is *incomplete*, not
 corrupt. Run `snapshot-export --verify <dest>` (library: `verifySnapshotPair`) before reading: it
-requires the sidecar, a known format and profile, a matching `sha256`/byte length/row counts, a
+requires the sidecar, a known format and profile, `disclosure.classification` and `disclosure.policy` that agree with that profile, a matching `sha256`/byte length/schema version/row counts, a
 clean integrity and foreign-key check, and — for `observation` — the profile invariants (exact
 table set, withheld columns `NULL`, digests well-formed, no raw absolute path). A retry never
 "repairs" a lone database; it is refused as `DEST_EXISTS`. Stale `*.partial` files from a killed
@@ -680,6 +680,14 @@ not about what Conductor accepts.
 | Version / migration | `producer.supported_schema_version`; future schema refused | UNVERIFIED — behaviour on a v6 snapshot |
 | Snapshot consistency under writers | **VERIFIED** ICN-side (§10.2 tests, separate-process writer) | UNVERIFIED — reported acquisition tests not inspected |
 
+**Reported Conductor-side findings** (relayed by the Conductor team; *not* inspected here): its
+legacy reader matches lanes on raw absolute git-dir paths, does not recognise the `.meta.json`
+marker, and its envelope requires raw path identities, so against an `observation` snapshot it can
+report `available` with zero sessions. That is a Conductor fail-closed defect, handled there. The
+planned separate versioned reader (explicit profile, mandatory marker, exact policy match,
+digest-only lane lookup, conversation correlation, UNKNOWN for unmapped relations, fail-closed
+validation) asks for nothing ICN does not already provide: see the golden fixture below.
+
 **Open questions for the Conductor owner** (answers are small and contain no registry data; do
 not send real session ids or a real registry):
 
@@ -722,3 +730,48 @@ not send real session ids or a real registry):
 9. **Fixture-verified only.** Tested against throwaway databases, including a separate process
    committing multi-table transactions and a real `SIGKILL`. It has not been run against the live
    shared registry.
+
+### 10.6 Golden observation fixture
+
+`ops/mcp/src/tests/fixtures/observation-golden/` holds a **fully synthetic** observation snapshot
+produced by the real exporter from a WAL-backed fictional registry, so a consumer can write
+compatibility tests with no ICN data and no connection to ICN. Generate with
+`node --experimental-strip-types --no-warnings --import ./src/tests/fixtures/ts-resolve-register.mjs src/tests/fixtures/observation-golden/generate.ts <empty-dir>`
+(from `ops/mcp`, Node >= 22.6, no build, nothing written under `dist`):
+
+| Path | Role |
+|---|---|
+| `reference/contract.json` | machine-readable producer contract, **derived** from source and from the generated fixture (types, header, field paths, limits, error codes, reader obligations) — committed |
+| `reference/test-vectors.json` | digest, token-formula, path-disclosure and verbatim-text vectors, plus structural fixture facts — committed |
+| `HANDOFF.md` | self-contained description for the consumer's session |
+| `generate.ts`, `contract.ts` | the generator and the derivation |
+
+The database and its sidecar are **generated, not committed**: the repository ignores `*.db`
+(`.gitignore`), no database is tracked anywhere in the tree, and a committed sidecar whose
+`sha256` named an absent file would mislead. `observation-golden-fixture.test.ts` generates the
+pair in a temp directory on every run and compares it with `reference/`. Committing the database
+would need an explicit decision to carve an exception to that rule; it was not made here.
+
+The fixture exercises: several activations in one lane; a second lane that must not be selected; a
+present, a `NULL` and a pre-identity conversation id; a present and a missing worktree generation;
+a cross-lane conflict on a disclosable path and on a withheld path; a path that is shown and paths
+that are withheld; and every withheld field, table and path carrying a synthetic canary that tests
+prove is absent from every byte of the database and sidecar.
+
+**Reproducibility, stated exactly.** `contract.json` and `test-vectors.json` regenerate
+byte-identically. The database and sidecar do **not**: each export draws a fresh random salt for
+withheld-path tokens (deliberately — tokens must not be recomputable) and the sidecar records
+generation-time fields and tool versions. The pair is still internally consistent, and its logical
+content, with token values replaced by first-appearance labels, is identical on every run; tests
+regenerate in a child process and compare on exactly that basis. Regenerating is only needed when
+the exporter's contract changes.
+
+**What can be recomputed without private inputs:** the `sha256:` digest of any raw value you hold;
+the token formula given a published test salt. **What cannot:** the fixture's own claim tokens, and
+anything about a real ICN host. Digests are unkeyed — confirmable by anyone who can enumerate the
+raw value — and are never to be described as secret, authenticated or unguessable.
+
+**Note on `repo_id`.** It is nullable in the registry schema (added in v3 without `NOT NULL`);
+`repo` is the non-null column. The export preserves `NULL` as `NULL` and otherwise always emits a
+well-formed digest; it never invents a value and never emits the original path.
+
