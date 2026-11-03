@@ -238,6 +238,40 @@ describe("B. the consumer refuses any pair whose columns are not exactly the obs
     expect(v.problems.join(" ")).toMatch(re);
   });
 
+  // The schema TEXT (sqlite_master.sql) is free text too: matching object NAMES is not enough.
+  it.each([
+    [
+      "an index EXPRESSION carrying a path (same name as a real index)",
+      (db: Database.Database) =>
+        db.exec(
+          "DROP INDEX idx_sessions_parent; CREATE INDEX idx_sessions_parent ON sessions (parent_session_id || '/home/CANARYUSER/private-key')"
+        ),
+    ],
+    [
+      "a partial-index PREDICATE carrying a path",
+      (db: Database.Database) =>
+        db.exec(
+          "DROP INDEX idx_sessions_parent; CREATE INDEX idx_sessions_parent ON sessions (parent_session_id) WHERE host <> '/home/CANARYUSER/predicate'"
+        ),
+    ],
+    [
+      "a column DEFAULT in a table's CREATE statement (columns and rows unchanged)",
+      (db: Database.Database) =>
+        db.exec(
+          "CREATE TABLE fc2 (file_path TEXT NOT NULL, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, claimed_at TEXT DEFAULT '/home/CANARYUSER/default-canary', PRIMARY KEY (file_path, session_id));" +
+            "INSERT INTO fc2 SELECT file_path, session_id, claimed_at FROM file_claims;" +
+            "DROP TABLE file_claims; ALTER TABLE fc2 RENAME TO file_claims;"
+        ),
+    ],
+  ])("%s is refused (definitions, not just names, must match observation-v1)", (_n, mutate) => {
+    const good = exportPair("observation", benignSource());
+    const dest = tamperedCopy(good, mutate as (db: Database.Database) => void);
+    const v = verifySnapshotPair(dest, { expectProfile: "observation" });
+    expect(v.ok).toBe(false);
+    expect(v.problems.join(" ")).toMatch(/definition differs from observation-v1/);
+    expect(v.problems.join(" ")).not.toContain("CANARYUSER"); // names the object, never the text
+  });
+
   it("checkObservationInvariants alone (it is exported for consumers) also refuses lookalike names", () => {
     // verifySnapshotPair's shape check overlaps with this one; test the function directly so
     // neither layer can quietly rely on the other.

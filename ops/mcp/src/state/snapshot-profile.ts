@@ -308,24 +308,32 @@ export function projectObservation(
   }
 }
 
-let referenceIndexes: ReadonlySet<string> | null = null;
+let referenceObjects: ReadonlyMap<string, { type: string; sql: string | null }> | null = null;
 /**
- * The indexes an observation file may contain: exactly those the production migration ladder
- * creates on the three kept tables. Derived from `migrate()` itself, so it cannot drift from
- * what ICN really builds; a schema bump that adds an index updates it automatically.
+ * The schema objects an observation file may contain, with their exact definitions: what the
+ * production migration ladder creates for the three kept tables. Derived from `migrate()` itself
+ * (the producer builds its output the same way), so it cannot drift from what ICN really builds.
+ *
+ * `sqlite_master.sql` is free text the writer controls - an index expression, a partial-index
+ * predicate, a column DEFAULT or a comment can all carry data that no row check ever sees - so a
+ * matching NAME is not enough; the definition must match too.
  */
-function observationIndexNames(): ReadonlySet<string> {
-  if (referenceIndexes) return referenceIndexes;
+function observationSchema(): ReadonlyMap<string, { type: string; sql: string | null }> {
+  if (referenceObjects) return referenceObjects;
   const m = new Database(":memory:");
   try {
     m.transaction(() => migrate(m)).immediate();
     for (const t of OBSERVATION_POLICY.withheldTables) m.exec(`DROP TABLE "${t}"`);
-    referenceIndexes = new Set(
+    referenceObjects = new Map(
       (
-        m.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND substr(name, 1, 7) != 'sqlite_'").all() as Array<{ name: string }>
-      ).map((r) => r.name)
+        m.prepare("SELECT type, name, sql FROM sqlite_master WHERE substr(name, 1, 7) != 'sqlite_'").all() as Array<{
+          type: string;
+          name: string;
+          sql: string | null;
+        }>
+      ).map((r) => [r.name, { type: r.type, sql: r.sql }])
     );
-    return referenceIndexes;
+    return referenceObjects;
   } finally {
     m.close();
   }
@@ -344,19 +352,29 @@ export function checkObservationInvariants(db: Database.Database): string[] {
     // NOT `LIKE 'sqlite_%'`: in LIKE, `_` matches any one character, so a table called
     // `sqliteXleak` would be skipped as if SQLite owned it. SQLite refuses to let a user create
     // an object whose name really starts with `sqlite_`, so an exact prefix test is correct.
-    .prepare("SELECT type, name FROM sqlite_master WHERE substr(name, 1, 7) != 'sqlite_'")
-    .all() as Array<{ type: string; name: string }>;
+    .prepare("SELECT type, name, sql FROM sqlite_master WHERE substr(name, 1, 7) != 'sqlite_'")
+    .all() as Array<{ type: string; name: string; sql: string | null }>;
   const tables = objects.filter((o) => o.type === "table").map((o) => o.name);
   for (const t of tables) {
     if (!(P.tables as readonly string[]).includes(t)) problems.push(`observation file contains unexpected table "${t}"`);
   }
   for (const t of P.tables) if (!tables.includes(t)) problems.push(`observation file lacks table "${t}"`);
-  const allowedIndexes = observationIndexNames();
+  const reference = observationSchema();
+  // Kept apart: a changed definition does not make the column-level reads below meaningless, so
+  // they still run and the caller sees every reason, not only the first.
+  const definitionProblems: string[] = [];
   for (const o of objects) {
-    if (o.type === "index") {
+    if (o.type !== "table" && o.type !== "index") {
+      problems.push(`observation file contains a ${o.type} "${o.name}"`);
+      continue;
+    }
+    const want = reference.get(o.name);
+    if (o.type === "index" && (!want || want.type !== "index")) {
       // Index names are free text too: allow only those the production ladder creates.
-      if (!allowedIndexes.has(o.name)) problems.push(`observation file contains an unexpected index "${o.name}"`);
-    } else if (o.type !== "table") problems.push(`observation file contains a ${o.type} "${o.name}"`);
+      problems.push(`observation file contains an unexpected index "${o.name}"`);
+    } else if (want && want.type === o.type && want.sql !== o.sql) {
+      definitionProblems.push(`observation file: ${o.type} "${o.name}" definition differs from observation-v1`);
+    }
   }
   if (problems.length) return problems; // shape is wrong; column-level checks would only add noise
 
@@ -370,7 +388,7 @@ export function checkObservationInvariants(db: Database.Database): string[] {
     for (const c of have) if (!want.has(c)) problems.push(`${t} has unclassified column "${c}"`);
     for (const c of want) if (!have.includes(c)) problems.push(`${t} lacks column "${c}"`);
   }
-  if (problems.length) return problems; // a wrong layout makes the per-column reads below meaningless
+  if (problems.length) return [...problems, ...definitionProblems]; // a wrong layout makes the per-column reads below meaningless
 
   for (const c of P.sessions.withheld) {
     const n = (db.prepare(`SELECT COUNT(*) AS c FROM sessions WHERE ${c} IS NOT NULL`).get() as { c: number }).c;
@@ -406,5 +424,5 @@ export function checkObservationInvariants(db: Database.Database): string[] {
       break;
     }
   }
-  return problems;
+  return [...problems, ...definitionProblems];
 }

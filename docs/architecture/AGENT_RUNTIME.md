@@ -645,8 +645,11 @@ requires the sidecar, a known format and profile, `disclosure.classification` an
 clean integrity and foreign-key check, and — for `observation` — the profile invariants: the exact
 table set; **the exact column set of all three tables** (`schema_version`, `sessions`,
 `file_claims`; generated columns included, so neither an extra nor a missing column passes, whatever
-the sidecar says); withheld columns `NULL`; digests well-formed; every copied value inside its
-column's rule (identifier text, timestamp shape, integer); and no raw absolute path. A retry never
+the sidecar says); **the exact definition of every table and index** (compared with what the
+production migration ladder creates, because `sqlite_master.sql` is free text — an index
+expression, a partial-index predicate or a column `DEFAULT` can carry data no row check sees);
+withheld columns `NULL`; digests well-formed; every copied value inside its column's rule
+(identifier text, timestamp shape, integer); and no raw absolute path. A retry never
 "repairs" a lone database; it is refused as `DEST_EXISTS`.
 
 `verifySnapshotPair` always returns a verdict. A directory, FIFO, link or unreadable file in place of
@@ -754,7 +757,10 @@ not send real session ids or a real registry):
    CLI; do not call it from the MCP server's event loop on a large registry.
 6. **Pseudonymised identity is guessable.** `sha256:` of a path someone can enumerate is
    confirmable by that someone. It removes layout from the file; it is not a secret.
-7. **No authenticity.** See §10.3.
+7. **No authenticity.** See §10.3. The pair check also validates only what SQLite exposes (schema
+   text and rows). It cannot attest the unreferenced bytes of a file forged by someone who writes
+   both files (free pages, page slack). The producer builds a fresh file and so leaves none; a
+   consumer that must not trust the producer cannot rely on this check alone.
 8. **An unsafe value in a copied column refuses the whole `observation` export.** `host`, `repo`,
    `worktree_name` and the other verbatim text columns must match `[\p{L}\p{N}._:@+ -]{1,256}` — in
    particular contain no `/`, so they can never be a path. The time columns (`started_at`,
