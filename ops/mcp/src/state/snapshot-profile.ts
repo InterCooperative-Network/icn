@@ -110,7 +110,12 @@ export function claimToken(salt: Uint8Array, rawPath: string): string {
 
 /** One path segment. Deliberately narrow: no ':' (drive letters, URI schemes), no '~', no '\\', no spaces. */
 export const SAFE_SEGMENT = /^[A-Za-z0-9._@+=,-]+$/;
-/** Verbatim identifier text: letters/digits and a few joiners. No '/', so it can never be a path. */
+/**
+ * Verbatim identifier text: letters/digits and a few joiners. No '/', so it can never be a path or URL.
+ * This is an ALPHABET, not a grammar: it keeps out paths, URLs, quoting and punctuation, but not
+ * words. It is sound because these columns hold identifiers by production contract (UUIDs,
+ * hostnames, repo and lane names); it cannot promise anything about prose a writer chose to put there.
+ */
 export const SAFE_VERBATIM = /^[\p{L}\p{N}._:@+ -]{1,256}$/u;
 
 /**
@@ -211,7 +216,7 @@ export function projectObservation(
   outPath: string,
   fail: (message: string) => never,
   /** A value that may not be disclosed. Called BEFORE the value is passed to any INSERT. */
-  reject: (message: string) => never = fail
+  reject: (message: string) => never
 ): ProjectionResult {
   const out = new Database(outPath);
   try {
@@ -303,6 +308,29 @@ export function projectObservation(
   }
 }
 
+let referenceIndexes: ReadonlySet<string> | null = null;
+/**
+ * The indexes an observation file may contain: exactly those the production migration ladder
+ * creates on the three kept tables. Derived from `migrate()` itself, so it cannot drift from
+ * what ICN really builds; a schema bump that adds an index updates it automatically.
+ */
+function observationIndexNames(): ReadonlySet<string> {
+  if (referenceIndexes) return referenceIndexes;
+  const m = new Database(":memory:");
+  try {
+    m.transaction(() => migrate(m)).immediate();
+    for (const t of OBSERVATION_POLICY.withheldTables) m.exec(`DROP TABLE "${t}"`);
+    referenceIndexes = new Set(
+      (
+        m.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND substr(name, 1, 7) != 'sqlite_'").all() as Array<{ name: string }>
+      ).map((r) => r.name)
+    );
+    return referenceIndexes;
+  } finally {
+    m.close();
+  }
+}
+
 /**
  * Invariants an observation file must satisfy. Run by the producer on its own output AND by any
  * consumer-side verifier, so a mislabelled or tampered file is caught the same way both times.
@@ -313,15 +341,22 @@ export function checkObservationInvariants(db: Database.Database): string[] {
   const P = OBSERVATION_POLICY;
 
   const objects = db
-    .prepare("SELECT type, name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'")
+    // NOT `LIKE 'sqlite_%'`: in LIKE, `_` matches any one character, so a table called
+    // `sqliteXleak` would be skipped as if SQLite owned it. SQLite refuses to let a user create
+    // an object whose name really starts with `sqlite_`, so an exact prefix test is correct.
+    .prepare("SELECT type, name FROM sqlite_master WHERE substr(name, 1, 7) != 'sqlite_'")
     .all() as Array<{ type: string; name: string }>;
   const tables = objects.filter((o) => o.type === "table").map((o) => o.name);
   for (const t of tables) {
     if (!(P.tables as readonly string[]).includes(t)) problems.push(`observation file contains unexpected table "${t}"`);
   }
   for (const t of P.tables) if (!tables.includes(t)) problems.push(`observation file lacks table "${t}"`);
+  const allowedIndexes = observationIndexNames();
   for (const o of objects) {
-    if (o.type !== "table" && o.type !== "index") problems.push(`observation file contains a ${o.type} "${o.name}"`);
+    if (o.type === "index") {
+      // Index names are free text too: allow only those the production ladder creates.
+      if (!allowedIndexes.has(o.name)) problems.push(`observation file contains an unexpected index "${o.name}"`);
+    } else if (o.type !== "table") problems.push(`observation file contains a ${o.type} "${o.name}"`);
   }
   if (problems.length) return problems; // shape is wrong; column-level checks would only add noise
 

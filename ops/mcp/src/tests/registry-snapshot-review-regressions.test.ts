@@ -16,7 +16,7 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { exportRegistrySnapshot, verifySnapshotPair, type SnapshotProfile } from "../state/snapshot-export.js";
 import { initDb } from "../state/db.js";
-import { OBSERVATION_POLICY, observationValueProblem } from "../state/snapshot-profile.js";
+import { OBSERVATION_POLICY, checkObservationInvariants, observationValueProblem } from "../state/snapshot-profile.js";
 import { addSession, expectRefusal, makeRegistry, removeDir, sha256File, tempDir } from "./fixtures/snapshot-helpers.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -222,6 +222,57 @@ describe("B. the consumer refuses any pair whose columns are not exactly the obs
       const v = verifySnapshotPair(dest);
       expect(v.ok, t).toBe(false);
       expect(v.problems.join(" "), t).toMatch(new RegExp(`${t} lacks column.*${col}`));
+    }
+  });
+
+  it.each([
+    ["a table named sqlite + one character (LIKE's '_' wildcard)", "CREATE TABLE sqliteXleak (v TEXT); INSERT INTO sqliteXleak VALUES ('/home/CANARYUSER/secret')", /unexpected table "sqliteXleak"/],
+    ["an index with a free-form name", 'CREATE INDEX "/home/CANARYUSER/idx-canary" ON file_claims (claimed_at)', /unexpected index "\/home\/CANARYUSER\/idx-canary"/],
+    ["a view named sqlite + one character", "CREATE VIEW sqliteXview AS SELECT 1 AS v", /sqliteXview/],
+    ["a trigger named sqlite + one character", "CREATE TRIGGER sqliteXtrg AFTER INSERT ON file_claims BEGIN SELECT 1; END", /sqliteXtrg/],
+  ])("%s is refused", (_n, sql, re) => {
+    const good = exportPair("observation", benignSource());
+    const dest = tamperedCopy(good, (db) => db.exec(sql));
+    const v = verifySnapshotPair(dest);
+    expect(v.ok).toBe(false);
+    expect(v.problems.join(" ")).toMatch(re);
+  });
+
+  it("checkObservationInvariants alone (it is exported for consumers) also refuses lookalike names", () => {
+    // verifySnapshotPair's shape check overlaps with this one; test the function directly so
+    // neither layer can quietly rely on the other.
+    const good = exportPair("observation", benignSource());
+    for (const sql of ["CREATE TABLE sqliteXleak (v TEXT)", 'CREATE INDEX "/home/CANARYUSER/i" ON file_claims (claimed_at)']) {
+      const dest = tamperedCopy(good, (db) => db.exec(sql));
+      const db = new Database(dest, { readonly: true });
+      try {
+        expect(checkObservationInvariants(db).length, sql).toBeGreaterThan(0);
+      } finally {
+        db.close();
+      }
+    }
+  });
+
+  it("SQLite's own sqlite_* objects are still tolerated (the control for the cases above)", () => {
+    const good = exportPair("observation", benignSource());
+    const dest = tamperedCopy(good, (db) => db.exec("ANALYZE")); // creates sqlite_stat1
+    expect(verifySnapshotPair(dest).ok).toBe(true);
+  });
+
+  it("a SOURCE registry with a lookalike-named view is refused, not exported", () => {
+    const src = benignSource();
+    const db = new Database(src);
+    db.exec("CREATE VIEW sqliteXview AS SELECT 1 AS v");
+    db.close();
+    for (const profile of ["full", "observation"] as const) {
+      let refused = false;
+      try {
+        exportRegistrySnapshot({ profile, source: src, dest: join(out, `${profile}.db`) });
+      } catch (e) {
+        refused = (e as Error).name === "SnapshotError";
+      }
+      expect(refused, profile).toBe(true);
+      expect(existsSync(join(out, `${profile}.db`))).toBe(false);
     }
   });
 

@@ -763,7 +763,10 @@ not send real session ids or a real registry):
    `progress_count` and `schema_version.version` must be numbers. Otherwise the export fails as
    `SNAPSHOT_VERIFY_FAILED` (naming the column, never the value) — before the value is written —
    rather than disclosing it or silently altering it. The remedy is to correct the registry row, or
-   to use `full` inside the trust boundary.
+   to use `full` inside the trust boundary. The text rule is an *alphabet*, not a grammar: it keeps
+   out paths, URLs and punctuation, not words, and is sound because these columns hold identifiers
+   by production contract (UUIDs, hostnames, repo and lane names). `file_claims.file_path` is
+   handled separately (§10.2): shown only if repo-relative, otherwise tokenised.
 9. **Fixture-verified only.** Tested against throwaway databases, including a separate process
    committing multi-table transactions and a real `SIGKILL`. It has not been run against the live
    shared registry.

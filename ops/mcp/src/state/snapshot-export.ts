@@ -443,7 +443,7 @@ function schemaVersions(db: Database.Database): number[] {
  */
 function assertRegistryShape(db: Database.Database, label: string): number {
   const objects = db
-    .prepare("SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'")
+    .prepare("SELECT type, name, sql FROM sqlite_master WHERE substr(name, 1, 7) != 'sqlite_'")
     .all() as Array<{ type: string; name: string; sql: string | null }>;
   for (const o of objects) {
     const virtual = o.type === "table" && /^\s*CREATE\s+VIRTUAL\b/i.test(o.sql ?? "");
@@ -839,7 +839,7 @@ function verifyCopy(path: string, profile: SnapshotProfile): CopyVerdict {
 
     const counts: Record<string, number> = {};
     const tables = (
-      db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as Array<{
+      db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND substr(name, 1, 7) != 'sqlite_' ORDER BY name").all() as Array<{
         name: string;
       }>
     ).map((t) => t.name);
