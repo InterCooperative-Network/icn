@@ -775,3 +775,36 @@ raw value — and are never to be described as secret, authenticated or unguessa
 `repo` is the non-null column. The export preserves `NULL` as `NULL` and otherwise always emits a
 well-formed digest; it never invents a value and never emits the original path.
 
+### 10.7 Continuity across exports (what ICN does over time)
+
+`ops/mcp/src/tests/fixtures/observation-series/` holds a series of five **real consecutive exporter
+outputs** (registry A x4, registry B x1) built by driving ICN's own `registerSession`,
+`recordHeartbeat`, `recordProgress` and `releaseSession`, plus an offline verifier and a
+deterministic package builder. Same producer contract as §10.6; only *time* is new. Nothing is
+edited after export. What is controlled (a virtual `Date`, re-stamped touched rows, a counter for
+`randomUUID`, fictional hosts, a mirrored claim rule) is listed in its `HANDOFF.md`, and the mirror
+is pinned to the real `claim_files` handler by `observation-series-semantics.test.ts`.
+
+Answers, from executable source and the tests that pin them:
+
+| Question | Answer |
+|---|---|
+| May `provider`, `provider_session_id`, `host`, `parent_session_id`, `repo`, `started_at` change for an existing session id? | **No.** Set only in the `INSERT` (`session-runtime.ts` register). A resume leaves them untouched. |
+| May the lane (`repo_id`, `worktree_id`, `worktree_name`) or `worktree_generation` change for an existing id? | **Yes, only** through `registerSession` re-registering a **known `provider_session_id`**: a *lane move* overwrites the lane columns **and** the generation together; a lane recreated at the same path overwrites **only** the generation (to `NULL` if it cannot be minted). A session with no conversation id never dedupes, so its lane never changes. |
+| Does release/retire delete the row, change a state, or keep history? | `releaseSession` **deletes the row and its claims**. There is **no lifecycle-state column** and no "retire" in the registry. Stale rows are **never** reaped. History lives only in `ops/state/session-log.jsonl`, outside the registry and every export. A re-registered conversation becomes a **new** activation. |
+| Is the acquisition start time monotonic? | **No.** `acquisition.started_at` is a sampled `new Date()`; nothing compares it with a prior export. Row stamps are SQLite `datetime('now')` at one-second resolution. Only `progress_count` is monotonic, and only within one row. |
+| Is there a stable registry-instance identifier? | **No.** No registry id, `user_version` 0, `application_id` 0. The sidecar carries no source identity. The only registry-scoped value is `schema_version.applied_at`: differing stamps prove "different registries"; equal stamps prove nothing (a restored copy keeps them). |
+
+Consequences a reader must honour (machine-readable as `rules` in `reference/series-contract.json`):
+sameness of registry is asserted out of band, never derived; a later `started_at` is not
+authenticated freshness and may even regress (the series includes an unchanged re-export taken
+with the clock stepped back); `NULL` identities are unknown and never equal; claim tokens are
+per-export and must never be compared across snapshots; **absence of a row is not evidence that a
+session ended**, and a stale row is not an ended session; the TTL (default 30 min,
+`ICN_SESSION_TTL_MINUTES`, minimum 5) is not in the snapshot, so staleness is UNKNOWN without an
+agreed value. Two holders of one file can coexist when the first was stale at claim time.
+
+`python3 -I verify_series.py` (standard library) recomputes every per-export fact and every
+pairwise verdict from the databases and compares them with the contract, so the producer-side
+model is not its own witness.
+
