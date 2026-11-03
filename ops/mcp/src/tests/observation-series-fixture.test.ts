@@ -544,3 +544,37 @@ suite("the package: independent verification, tampering and incomplete exports",
     expect(readFileSync(join(d, readdirSync(d)[0]!, "MANIFEST.json"), "utf-8")).toBe("precious");
   });
 });
+
+// Review of PR #2856: the verifier opened databases through a hand-built `file:` URI.
+suite("the offline verifier opens databases by an encoded URI", () => {
+  it.each(["dir with # and ? and spaces", "plain-dir", "100% sure", "a#b"])(
+    "verifies a package unpacked into %j, and creates no stray database",
+    (name) => {
+      const parent = join(tmp, `uri-${sha(name).slice(0, 8)}`);
+      mkdirSync(parent);
+      const dir = join(parent, name);
+      cpSync(pkgDir, dir, { recursive: true });
+      const before = readdirSync(parent);
+      const r = py([join(dir, "verify_series.py")], { cwd: dir });
+      const failed = r.stdout.split("\n").filter((l) => l.startsWith("FAIL"));
+      expect(failed, r.stdout.slice(-600)).toEqual([]);
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout).toMatch(/SERIES VERIFIED/);
+      // A '#' or '?' used to truncate the URI, drop mode=ro, and create `<parent>/dir with ` as an
+      // empty database. Nothing may appear next to the package.
+      expect(readdirSync(parent)).toEqual(before);
+    }
+  );
+
+  it("a path that does not exist is never created by the verifier", () => {
+    const parent = join(tmp, "uri-missing");
+    mkdirSync(parent);
+    const dir = join(parent, "pkg #1");
+    cpSync(pkgDir, dir, { recursive: true });
+    rmSync(join(dir, "snapshots/A1.db"));
+    const r = py([join(dir, "verify_series.py")], { cwd: dir });
+    expect(r.status).not.toBe(0);
+    expect(existsSync(join(dir, "snapshots/A1.db"))).toBe(false); // mode=ro: not recreated
+    expect(readdirSync(parent)).toEqual(["pkg #1"]);
+  });
+});

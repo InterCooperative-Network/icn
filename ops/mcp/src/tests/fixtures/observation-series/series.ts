@@ -238,7 +238,7 @@ try {
   const sb = register(A, "s-b", { lane: lane("lane-alpha", G.alpha1), pid: 41002 }); // NULL conversation id
   at(3);
   const se = register(A, "s-e", { conv: CONV.c5, lane: lane("lane-alpha", G.alpha1), pid: 41005 });
-  const sl = register(A, "s-l", { pid: null }); // no identity at all: NULL repo_id/worktree_id/generation/conversation
+  register(A, "s-l", { pid: null }); // no identity at all: NULL repo_id/worktree_id/generation/conversation
   for (const m of [4, 6, 8]) {
     at(m);
     progress(A, "s-a", sa);

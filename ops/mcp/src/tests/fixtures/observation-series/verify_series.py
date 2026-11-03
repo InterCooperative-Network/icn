@@ -29,6 +29,17 @@ import sqlite3
 import stat
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+
+def read_bytes(path):
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def read_text(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
 
 args = sys.argv[1:]
 extra_absent = []
@@ -71,7 +82,7 @@ def sha(path):
 
 
 p = lambda rel: os.path.join(ROOT, *rel.split("/"))
-jload = lambda rel: json.load(open(p(rel), encoding="utf-8"))
+jload = lambda rel: json.loads(read_text(p(rel)))
 
 
 def walk():
@@ -96,7 +107,7 @@ if failures:
     sys.exit(1)
 
 sums = {}
-for line in open(p("SHA256SUMS"), encoding="utf-8").read().splitlines():
+for line in read_text(p("SHA256SUMS")).splitlines():
     m = re.fullmatch(r"([0-9a-f]{64})  (\S+)", line)
     check("SHA256SUMS: line well-formed", bool(m), line) if not m else sums.__setitem__(m.group(2), m.group(1))
 check("SHA256SUMS: covers every file except itself", set(sums) == EXPECTED_FILES - {"SHA256SUMS"})
@@ -122,14 +133,16 @@ canaries = ["SERIES-CANARY", "/synthetic/series-root", "/home/", "/tmp/", "icn-d
 D = {}  # label -> dict of facts derived HERE
 for lab in LABELS:
     dbp, mp = p(f"snapshots/{lab}.db"), p(f"snapshots/{lab}.db.meta.json")
-    meta = json.load(open(mp, encoding="utf-8"))
+    meta = json.loads(read_text(mp))
     pre = f"{lab}:"
     check(f"{pre} sidecar tuple (format/profile/policy/schema)", meta.get("format") == FORMAT and meta.get("profile") == "observation" and meta.get("disclosure", {}).get("policy") == POLICY and meta.get("snapshot", {}).get("schema_version_max") == 5)
     check(f"{pre} sidecar names its file and binds length + SHA-256 of the database", meta["snapshot"]["file"] == f"{lab}.db" and meta["snapshot"]["bytes"] == os.path.getsize(dbp) and meta["snapshot"]["sha256"] == sha(dbp))
     check(f"{pre} host is a claim, unauthenticated; no source path/identity", meta["host"]["authenticated"] is None and meta["host"]["authenticity"] == "none" and not any(k in meta["source"] for k in ("path_given", "realpath", "dev", "ino", "identity_sha256")))
-    hdr = open(dbp, "rb").read(100)
+    hdr = read_bytes(dbp)[:100]
     check(f"{pre} SQLite header: magic, 4096 pages, rollback-journal 1/1, UTF-8", hdr[:16] == b"SQLite format 3\x00" and int.from_bytes(hdr[16:18], "big") == 4096 and hdr[18] == 1 and hdr[19] == 1 and int.from_bytes(hdr[56:60], "big") == 1)
-    db = sqlite3.connect(f"file:{dbp}?mode=ro", uri=True)
+    # Percent-encode the path: a raw '#' or '?' in a directory name would end the URI path early,
+    # drop mode=ro, and make SQLite CREATE an unintended database next to the package.
+    db = sqlite3.connect(Path(dbp).resolve().as_uri() + "?mode=ro", uri=True)
     db.row_factory = sqlite3.Row
     q = lambda sql, *a: db.execute(sql, a).fetchall()
     check(f"{pre} integrity + foreign keys + delete journal", q("PRAGMA integrity_check")[0][0] == "ok" and q("PRAGMA foreign_key_check") == [] and q("PRAGMA journal_mode")[0][0] == "delete")
@@ -146,7 +159,7 @@ for lab in LABELS:
     claims = [(r["session_id"], r["file_path"]) for r in q("SELECT session_id, file_path FROM file_claims")]
     check(f"{pre} claim paths are repo-relative-safe or withheld tokens", all(re.fullmatch(r"withheld:[0-9a-f]{16}", fp) or (all(re.fullmatch(r"[A-Za-z0-9._@+=,-]+", s) and s != ".." for s in fp.split("/"))) for _, fp in claims))
     check(f"{pre} sidecar row counts equal the database", meta["consistency"]["table_row_counts"] == {t: q(f"SELECT COUNT(*) FROM {t}")[0][0] for t in tables})
-    blob = open(dbp, "rb").read() + open(mp, "rb").read()
+    blob = read_bytes(dbp) + read_bytes(mp)
     check(f"{pre} no canary, raw synthetic path, or non-fixture host/path in database or sidecar", not [c for c in canaries if c.encode() in blob], str([c for c in canaries if c.encode() in blob]))
     convs = [r["provider_session_id"] for r in q("SELECT provider_session_id FROM sessions WHERE provider_session_id IS NOT NULL")]
     check(f"{pre} a conversation id appears on at most one row (R10)", len(convs) == len(set(convs)))
@@ -289,7 +302,7 @@ secret_res = [r"-----BEGIN [A-Z ]*PRIVATE KEY-----", r"\bAKIA[0-9A-Z]{16}\b", r"
               r"\b10\.8\.\d{1,3}\.\d{1,3}\b", r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\."]
 hits = []
 for rel in ("reference/series-contract.json", "reference/contract.json", "reference/test-vectors.json", "HANDOFF-SERIES.md", "MANIFEST.json"):
-    text = open(p(rel), encoding="utf-8").read()
+    text = read_text(p(rel))
     hits += [(rel, rx) for rx in secret_res if re.search(rx, text)]
     hits += [(rel, n) for n in ["/home/", "/tmp/"] + extra_absent if n in text]
 check("text files: no credential shape, private IP or non-fixture path", not hits, str(hits))

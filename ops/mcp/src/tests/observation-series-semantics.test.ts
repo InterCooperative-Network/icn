@@ -6,7 +6,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { initDb } from "../state/db.js";
 import * as rt from "../runtime/session-runtime.js";
 import { registerSessionTools } from "../tools/sessions.js";
@@ -96,6 +96,21 @@ describe("what ICN's real runtime does NOT allow (so the fixture does not fake i
 
 // ───────────────────────────────────────────────────────────────────────────────
 describe("the generator's claim mirror is pinned to the REAL claim_files handler", () => {
+  // The real handler reads ICN_SESSION_TTL_MINUTES from the environment at call time. The ages
+  // below (5 and 45 minutes) only mean "live" and "stale" under the default 30-minute TTL, so pin
+  // it here and restore whatever the caller had - the tests must not depend on, or leak into,
+  // the ambient environment.
+  const TTL_VAR = "ICN_SESSION_TTL_MINUTES";
+  let savedTtl: string | undefined;
+  beforeEach(() => {
+    savedTtl = process.env[TTL_VAR];
+    process.env[TTL_VAR] = "30";
+  });
+  afterEach(() => {
+    if (savedTtl === undefined) delete process.env[TTL_VAR];
+    else process.env[TTL_VAR] = savedTtl;
+  });
+
   async function realClaims(setup: (db: ReturnType<typeof initDb>) => string[]) {
     const db = initDb(":memory:");
     const server = new McpServer({ name: "icn-ops-test", version: "0.0.0" });
@@ -126,7 +141,7 @@ describe("the generator's claim mirror is pinned to the REAL claim_files handler
     const mirrorDb = initDb(":memory:");
     const [mh, mo] = mk(mirrorDb, age as number);
     const r = await call(real.client, real.sids[1]!, ["f.rs"]);
-    const m = mirrorClaim(mirrorDb, mo!, ["f.rs"], null, rt.ttlMinutes({} as NodeJS.ProcessEnv));
+    const m = mirrorClaim(mirrorDb, mo!, ["f.rs"], null, rt.ttlMinutes());
     expect({ claimed: r.claimed, conflicts: r.conflicts }).toEqual(expected);
     expect({ claimed: m.claimed, conflicts: m.conflicts }).toEqual(expected);
     const holders = (d: ReturnType<typeof initDb>) => (d.prepare("SELECT COUNT(*) AS n FROM file_claims WHERE file_path = 'f.rs'").get() as { n: number }).n;
@@ -150,7 +165,7 @@ describe("the generator's claim mirror is pinned to the REAL claim_files handler
     const mdb = initDb(":memory:");
     const s = rt.registerSession(mdb, { repo: "r" }).session_id;
     mdb.prepare("INSERT INTO file_claims (file_path, session_id, claimed_at) VALUES ('f.rs', ?, '2000-01-01 00:00:00')").run(s);
-    mirrorClaim(mdb, s, ["f.rs"], null, 30);
+    mirrorClaim(mdb, s, ["f.rs"], null, rt.ttlMinutes());
     expect((mdb.prepare("SELECT claimed_at FROM file_claims").get() as { claimed_at: string }).claimed_at > "2000-01-01 00:00:00").toBe(true);
     real.db.close();
     mdb.close();
