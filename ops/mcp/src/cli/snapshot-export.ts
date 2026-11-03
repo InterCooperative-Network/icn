@@ -3,7 +3,7 @@
 //
 //   snapshot-export --profile <full|observation> --source <registry.db> --dest <snapshot.db>
 //                   [--busy-timeout-ms N] [--max-source-bytes N]
-//   snapshot-export --verify <snapshot.db>
+//   snapshot-export --verify <snapshot.db> [--expect-profile <full|observation>]
 //
 // --profile, --source and --dest are all required. There is no default source (this tool must
 // not guess which registry to read, and never creates or migrates one) and no default profile
@@ -13,13 +13,16 @@
 //
 // Exit codes: 0 exported / verified · 1 refused or NOT verified (one JSON line on stderr for an
 // export refusal; the verdict on stdout for --verify) · 2 usage.
+//
+// A consumer of an external observation should always pass `--expect-profile observation`:
+// without it, a valid `full` pair (mailbox bodies, transcript paths) verifies as ok.
 
 import { exportRegistrySnapshot, SnapshotError, verifySnapshotPair } from "../state/snapshot-export.js";
 
 const USAGE =
   "usage: snapshot-export --profile <full|observation> --source <registry.db> --dest <snapshot.db> " +
   "[--busy-timeout-ms N] [--max-source-bytes N]\n" +
-  "       snapshot-export --verify <snapshot.db>\n";
+  "       snapshot-export --verify <snapshot.db> [--expect-profile <full|observation>]\n";
 
 function usage(msg?: string): never {
   if (msg) process.stderr.write(`snapshot-export: ${msg}\n`);
@@ -27,7 +30,7 @@ function usage(msg?: string): never {
   process.exit(2);
 }
 
-const FLAGS = ["--profile", "--source", "--dest", "--busy-timeout-ms", "--max-source-bytes", "--verify"];
+const FLAGS = ["--profile", "--source", "--dest", "--busy-timeout-ms", "--max-source-bytes", "--verify", "--expect-profile"];
 
 function parse(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -52,12 +55,16 @@ function intFlag(args: Record<string, string>, flag: string): number | undefined
 const args = parse(process.argv.slice(2));
 
 if (args["--verify"] !== undefined) {
-  if (Object.keys(args).length !== 1) usage("--verify takes no other option");
-  const v = verifySnapshotPair(args["--verify"]);
+  const extra = Object.keys(args).filter((k) => k !== "--verify" && k !== "--expect-profile");
+  if (extra.length) usage("--verify takes no option other than --expect-profile");
+  const expect = args["--expect-profile"];
+  if (expect !== undefined && expect !== "full" && expect !== "observation") usage("--expect-profile must be 'full' or 'observation'");
+  const v = verifySnapshotPair(args["--verify"], expect ? { expectProfile: expect } : {});
   process.stdout.write(JSON.stringify(v) + "\n");
   process.exit(v.ok ? 0 : 1);
 }
 
+if (args["--expect-profile"] !== undefined) usage("--expect-profile applies only to --verify");
 const profile = args["--profile"];
 if (profile !== "full" && profile !== "observation") usage("--profile must be 'full' or 'observation'; there is no default");
 if (!args["--source"]) usage("--source is required");

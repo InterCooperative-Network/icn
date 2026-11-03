@@ -131,6 +131,59 @@ export function isDisclosablePath(p: string): boolean {
 
 const isSafeVerbatim = (s: string): boolean => SAFE_VERBATIM.test(s);
 
+/**
+ * A timestamp as ICN writes it (SQLite `datetime('now')`: `YYYY-MM-DD HH:MM:SS`) or as ISO-8601
+ * (`T` separator, optional fraction and `Z`). Anything else in a time column is free text, and
+ * free text is exactly what the observation profile exists to keep out.
+ */
+export const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z?$/;
+
+/** Which kind of value a copied (non-digested) observation column may hold. */
+type ValueKind = "text" | "timestamp" | "integer";
+const COLUMN_KIND: Readonly<Record<string, Readonly<Record<string, ValueKind>>>> = {
+  schema_version: { version: "integer", applied_at: "timestamp" },
+  sessions: {
+    id: "text",
+    repo: "text",
+    worktree_name: "text",
+    worktree_generation: "text",
+    provider_session_id: "text",
+    parent_session_id: "text",
+    provider: "text",
+    agent_pid: "integer",
+    host: "text",
+    started_at: "timestamp",
+    last_heartbeat: "timestamp",
+    last_progress: "timestamp",
+    progress_count: "integer",
+  },
+  file_claims: { session_id: "text", claimed_at: "timestamp" },
+};
+
+/**
+ * The ONE value rule for a copied observation column, shared by the producer (before a value is
+ * written) and by every consumer-side check, so the two can never disagree. NULL is allowed
+ * everywhere: it is "not recorded", never a value. Returns a reason, or null when the value may
+ * be disclosed. The reason never contains the value itself.
+ */
+export function observationValueProblem(table: string, column: string, v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const kind = COLUMN_KIND[table]?.[column];
+  if (kind === undefined) return `${table}.${column} is not a copied observation column`;
+  switch (kind) {
+    case "integer":
+      return typeof v === "number" && Number.isFinite(v) ? null : `${table}.${column} holds a non-numeric value`;
+    case "timestamp":
+      return typeof v === "string" && TIMESTAMP_RE.test(v)
+        ? null
+        : `${table}.${column} holds a value that is not a timestamp; refusing to disclose it`;
+    case "text":
+      return typeof v === "string" && isSafeVerbatim(v)
+        ? null
+        : `${table}.${column} holds a path-like, oversized or non-text value; refusing to disclose it`;
+  }
+}
+
 export interface ProjectionCounts {
   schema_version: number;
   sessions: number;
@@ -156,7 +209,9 @@ export interface ProjectionResult {
 export function projectObservation(
   src: Database.Database,
   outPath: string,
-  fail: (message: string) => never
+  fail: (message: string) => never,
+  /** A value that may not be disclosed. Called BEFORE the value is passed to any INSERT. */
+  reject: (message: string) => never = fail
 ): ProjectionResult {
   const out = new Database(outPath);
   try {
@@ -187,6 +242,10 @@ export function projectObservation(
       Record<string, unknown>
     >) {
       spend();
+      for (const c of OBSERVATION_POLICY.schema_version.columns) {
+        const why = observationValueProblem("schema_version", c, r[c]);
+        if (why) reject(why);
+      }
       insertVersion.run(r["version"], r["applied_at"]);
       written.schema_version++;
     }
@@ -198,6 +257,10 @@ export function projectObservation(
         const v = r[c];
         if (v === null || v === undefined) return null;
         if ((P.digested as readonly string[]).includes(c)) return digestOf(v);
+        // Validated BEFORE the INSERT: a value that may not be disclosed must never reach the
+        // output file, including the `.partial` a hard kill leaves behind.
+        const why = observationValueProblem("sessions", c, v);
+        if (why) reject(why);
         return v;
       });
       insertSession.run(...(vals as never[]));
@@ -207,6 +270,10 @@ export function projectObservation(
       .prepare("SELECT file_path, session_id, claimed_at FROM file_claims ORDER BY rowid")
       .iterate() as Iterable<Record<string, unknown>>) {
       spend();
+      for (const c of ["session_id", "claimed_at"]) {
+        const why = observationValueProblem("file_claims", c, r[c]);
+        if (why) reject(why);
+      }
       const raw = String(r["file_path"]);
       let shown = raw;
       if (!isDisclosablePath(raw)) {
@@ -258,9 +325,17 @@ export function checkObservationInvariants(db: Database.Database): string[] {
   }
   if (problems.length) return problems; // shape is wrong; column-level checks would only add noise
 
-  const cols = (t: string) => (db.prepare(`PRAGMA table_info(${t})`).all() as Array<{ name: string }>).map((c) => c.name);
-  const known = new Set<string>(REQUIRED_COLUMNS["sessions"]);
-  for (const c of cols("sessions")) if (!known.has(c)) problems.push(`sessions has unclassified column "${c}"`);
+  // EXACT layout for every observation table, not only `sessions`. table_xinfo (unlike
+  // table_info) also lists generated columns, so a hidden/virtual column cannot slip past.
+  const cols = (t: string) =>
+    (db.prepare(`PRAGMA table_xinfo(${t})`).all() as Array<{ name: string }>).map((c) => c.name);
+  for (const t of P.tables) {
+    const have = cols(t);
+    const want = new Set<string>(REQUIRED_COLUMNS[t]);
+    for (const c of have) if (!want.has(c)) problems.push(`${t} has unclassified column "${c}"`);
+    for (const c of want) if (!have.includes(c)) problems.push(`${t} lacks column "${c}"`);
+  }
+  if (problems.length) return problems; // a wrong layout makes the per-column reads below meaningless
 
   for (const c of P.sessions.withheld) {
     const n = (db.prepare(`SELECT COUNT(*) AS c FROM sessions WHERE ${c} IS NOT NULL`).get() as { c: number }).c;
@@ -274,20 +349,19 @@ export function checkObservationInvariants(db: Database.Database): string[] {
       }
     }
   }
-  const textual = P.sessions.verbatim.filter((c) => !["agent_pid", "progress_count"].includes(c));
-  for (const c of textual) {
-    for (const r of db.prepare(`SELECT ${c} AS v FROM sessions WHERE ${c} IS NOT NULL`).all() as Array<{ v: unknown }>) {
-      if (typeof r.v !== "string" || !isSafeVerbatim(r.v)) {
-        problems.push(`sessions.${c} holds a path-like, oversized or non-text value; refusing to disclose it`);
-        break;
-      }
-    }
-  }
-  for (const c of ["agent_pid", "progress_count"]) {
-    for (const r of db.prepare(`SELECT ${c} AS v FROM sessions WHERE ${c} IS NOT NULL`).all() as Array<{ v: unknown }>) {
-      if (typeof r.v !== "number") {
-        problems.push(`sessions.${c} holds a non-numeric value`);
-        break;
+  const valueCols: Array<[string, readonly string[]]> = [
+    ["schema_version", P.schema_version.columns],
+    ["sessions", P.sessions.verbatim],
+    ["file_claims", ["session_id", "claimed_at"]],
+  ];
+  for (const [t, columns] of valueCols) {
+    for (const c of columns) {
+      for (const r of db.prepare(`SELECT ${c} AS v FROM ${t} WHERE ${c} IS NOT NULL`).all() as Array<{ v: unknown }>) {
+        const why = observationValueProblem(t, c, r.v);
+        if (why) {
+          problems.push(why);
+          break; // one finding per column is enough; never list (or echo) every offending row
+        }
       }
     }
   }

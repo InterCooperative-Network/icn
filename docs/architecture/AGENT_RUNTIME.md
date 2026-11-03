@@ -581,6 +581,12 @@ free pages, not in a `.partial` left by a hard kill. Only allowlisted columns ar
 Anything not named in the policy is not exported, and a test fails until every new column or table
 is classified, so a later migration cannot widen the disclosure by accident.
 
+A column that *is* copied is not trusted either: every copied value is checked against the column's
+rule (identifier alphabet, timestamp shape, or integer) **before** it is passed to the `INSERT`. A
+value that fails aborts the export as `SNAPSHOT_VERIFY_FAILED` while nothing unsafe has been
+written, so the guarantee above holds for a completed file and for a `.partial` alike. The same
+rules are re-checked on the finished file by the producer and by `--verify`.
+
 **Field classification (observation profile)**
 
 | Data | Observation | Why |
@@ -636,11 +642,28 @@ The database is published first and the sidecar last, so a **hard kill between t
 database with no sidecar** (reproduced with a real `SIGKILL`). That file is *incomplete*, not
 corrupt. Run `snapshot-export --verify <dest>` (library: `verifySnapshotPair`) before reading: it
 requires the sidecar, a known format and profile, `disclosure.classification` and `disclosure.policy` that agree with that profile, a matching `sha256`/byte length/schema version/row counts, a
-clean integrity and foreign-key check, and — for `observation` — the profile invariants (exact
-table set, withheld columns `NULL`, digests well-formed, no raw absolute path). A retry never
-"repairs" a lone database; it is refused as `DEST_EXISTS`. Stale `*.partial` files from a killed
-run are left in place (the pid in the name is not proof of death) and are owner-only; an
-`observation` partial holds only allowlisted data, a `full` partial holds a full-fidelity copy.
+clean integrity and foreign-key check, and — for `observation` — the profile invariants: the exact
+table set; **the exact column set of all three tables** (`schema_version`, `sessions`,
+`file_claims`; generated columns included, so neither an extra nor a missing column passes, whatever
+the sidecar says); withheld columns `NULL`; digests well-formed; every copied value inside its
+column's rule (identifier text, timestamp shape, integer); and no raw absolute path. A retry never
+"repairs" a lone database; it is refused as `DEST_EXISTS`.
+
+`verifySnapshotPair` always returns a verdict. A directory, FIFO, link or unreadable file in place of
+either file is a problem in the verdict; it is decided by `lstat` *before* anything is opened, so a
+FIFO cannot make it block.
+
+**A consumer must check the declared profile.** A valid `full` pair is a valid pair: it verifies
+`ok: true` with `profile: "full"` and contains mailbox bodies and transcript paths. A consumer of an
+external observation therefore calls `verifySnapshotPair(dest, { expectProfile: "observation" })` or
+`snapshot-export --verify <dest> --expect-profile observation`, which refuses any other profile.
+The option is additive: omitting it keeps the earlier behaviour.
+
+Stale `*.partial` files from a killed run are left in place (the pid in the name is not proof of
+death) and are owner-only. An `observation` partial contains only values that already passed the
+disclosure rules (§10.2), because they are checked before they are written; a `full` partial holds a
+full-fidelity copy. A hard kill still leaves a file that is not a snapshot: it has no final name and
+no sidecar.
 
 The sidecar keeps these apart, on purpose:
 
@@ -656,6 +679,15 @@ The sidecar keeps these apart, on purpose:
 
 The hash is **integrity** evidence: anyone who can write both files can write a matching pair.
 Nothing here is signed, and nothing authenticates the producing host.
+
+**Why `source.size_bytes_at_start` and `source.mtime_ms_at_start` stay in the `observation`
+sidecar.** They are recency evidence for the reader (how large the registry was and when it was last
+written when it was read), cited by the staleness row of §10.4. They are not an identity: no path,
+device or inode accompanies them, both change on every write, and §10.7 R1 still says sameness is
+never derivable from an export. A reader who already holds the registry file can `stat` it, but then
+they can read it; the values tell a reader without the file nothing it could confirm. They are
+informational and not covered by the database hash. If a deployment does not want them, the
+decision is to drop the fields in a new sidecar version, not to replace them with an identifier.
 
 ### 10.4 Consumer compatibility (Project Conductor)
 
@@ -723,10 +755,15 @@ not send real session ids or a real registry):
 6. **Pseudonymised identity is guessable.** `sha256:` of a path someone can enumerate is
    confirmable by that someone. It removes layout from the file; it is not a secret.
 7. **No authenticity.** See §10.3.
-8. **A path-like value in a verbatim column refuses the whole `observation` export.** `host`,
-   `repo`, `worktree_name` and the other verbatim text columns must match `[\p{L}\p{N}._:@+ -]{1,256}` — in particular contain no `/`, so they can never be a path; otherwise the export fails as `SNAPSHOT_VERIFY_FAILED`
-   (naming the column, never the value) rather than disclosing it or silently altering it. The
-   remedy is to correct the registry row, or to use `full` inside the trust boundary.
+8. **An unsafe value in a copied column refuses the whole `observation` export.** `host`, `repo`,
+   `worktree_name` and the other verbatim text columns must match `[\p{L}\p{N}._:@+ -]{1,256}` — in
+   particular contain no `/`, so they can never be a path. The time columns (`started_at`,
+   `last_heartbeat`, `last_progress`, `file_claims.claimed_at`, `schema_version.applied_at`) must be
+   timestamps (`YYYY-MM-DD HH:MM:SS`, or ISO-8601 with `T`, optional fraction and `Z`); `agent_pid`,
+   `progress_count` and `schema_version.version` must be numbers. Otherwise the export fails as
+   `SNAPSHOT_VERIFY_FAILED` (naming the column, never the value) — before the value is written —
+   rather than disclosing it or silently altering it. The remedy is to correct the registry row, or
+   to use `full` inside the trust boundary.
 9. **Fixture-verified only.** Tested against throwaway databases, including a separate process
    committing multi-table transactions and a real `SIGKILL`. It has not been run against the live
    shared registry.

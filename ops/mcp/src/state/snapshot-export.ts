@@ -603,9 +603,18 @@ export function exportRegistrySnapshot(opts: SnapshotOptions): SnapshotResult {
             schema_version_max: max,
             user_version: Number(src.pragma("user_version", { simple: true })),
           };
-          projection = projectObservation(src, tmpDb, (m) => {
-            throw new SnapshotError("SOURCE_TOO_LARGE", m);
-          });
+          projection = projectObservation(
+            src,
+            tmpDb,
+            (m) => {
+              throw new SnapshotError("SOURCE_TOO_LARGE", m);
+            },
+            // Same classification the post-copy check always used, but raised BEFORE the value
+            // is written, so it never reaches the output file or a `.partial`.
+            (m) => {
+              throw new SnapshotError("SNAPSHOT_VERIFY_FAILED", `the copy was discarded: ${m}`);
+            }
+          );
         } finally {
           try {
             src.exec("ROLLBACK"); // read-only: nothing to commit, and ROLLBACK releases the snapshot
@@ -869,30 +878,85 @@ export interface PairVerdict {
   problems: string[];
 }
 
+export interface VerifyPairOptions {
+  /**
+   * Refuse a pair whose declared profile differs. A consumer that expects the restricted
+   * `observation` profile should always pass this: without it a perfectly valid `full` pair
+   * (mailbox bodies, transcript paths) is reported `ok: true` with `profile: "full"`.
+   */
+  expectProfile?: SnapshotProfile;
+}
+
+/** lstat that never follows a link: true only for a plain regular file. */
+function isPlainFile(p: string): boolean {
+  try {
+    return lstatSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Is `<dest>` + `<dest>.meta.json` a complete, untampered snapshot pair? This is the check a
  * consumer must make before reading, and the one the tests use to prove that a hard kill leaves
- * debris that cannot pass for a snapshot. Never throws: every failure is a problem.
+ * debris that cannot pass for a snapshot. Never throws and never blocks on a special file: every
+ * failure, including an unreadable file, a directory, a FIFO or a link in either position, is a
+ * problem in the returned verdict.
  *
  * It establishes INTEGRITY (the pair is complete, hash-bound, and obeys its profile). It does
  * not establish authenticity: anyone who can write both files can write a matching pair.
  */
-export function verifySnapshotPair(destArg: string): PairVerdict {
+export function verifySnapshotPair(destArg: string, options: VerifyPairOptions = {}): PairVerdict {
   const problems: string[] = [];
-  let profile: SnapshotProfile | null = null;
-  const bail = (): PairVerdict => ({ ok: false, profile, problems });
+  const state: { profile: SnapshotProfile | null } = { profile: null };
+  const bail = (): PairVerdict => ({ ok: false, profile: state.profile, problems });
+  try {
+    return verifyPairUnguarded(destArg, options, problems, state, bail);
+  } catch (e) {
+    // Backstop for anything unforeseen (a file replaced mid-check, EIO, EACCES): a verdict, not a throw.
+    problems.push(`the pair could not be verified (${errCode(e) ?? (e as Error).message})`);
+    return bail();
+  }
+}
 
+function verifyPairUnguarded(
+  destArg: string,
+  options: VerifyPairOptions,
+  problems: string[],
+  state: { profile: SnapshotProfile | null },
+  bail: () => PairVerdict
+): PairVerdict {
   const dest = resolve(destArg);
   const metaPath = `${dest}.meta.json`;
 
+  // Decide what each path IS before opening anything: opening a FIFO blocks, and reading a
+  // directory throws. Neither is a snapshot, so neither is ever opened.
   try {
-    if (!lstatSync(dest).isFile()) problems.push("snapshot is not a regular file");
+    lstatSync(dest);
   } catch (e) {
     problems.push(`snapshot file is not readable (${errCode(e) ?? e})`);
     return bail();
   }
+  if (!isPlainFile(dest)) {
+    problems.push("snapshot is not a regular file");
+    return bail();
+  }
 
   let meta: Record<string, unknown>;
+  try {
+    lstatSync(metaPath);
+  } catch (e) {
+    problems.push(
+      errCode(e) === "ENOENT"
+        ? "sidecar is missing: this snapshot is incomplete or was interrupted"
+        : `sidecar is unreadable or not JSON (${errCode(e) ?? (e as Error).message})`
+    );
+    return bail();
+  }
+  if (!isPlainFile(metaPath)) {
+    problems.push("sidecar is not a regular file");
+    return bail();
+  }
   try {
     const size = statSync(metaPath).size;
     if (size > MAX_SIDECAR_BYTES) {
@@ -906,17 +970,18 @@ export function verifySnapshotPair(destArg: string): PairVerdict {
     }
     meta = parsed as Record<string, unknown>;
   } catch (e) {
-    problems.push(
-      errCode(e) === "ENOENT"
-        ? "sidecar is missing: this snapshot is incomplete or was interrupted"
-        : `sidecar is unreadable or not JSON (${errCode(e) ?? (e as Error).message})`
-    );
+    problems.push(`sidecar is unreadable or not JSON (${errCode(e) ?? (e as Error).message})`);
     return bail();
   }
 
   if (meta["format"] !== SNAPSHOT_META_FORMAT) problems.push(`unknown sidecar format ${JSON.stringify(meta["format"])}`);
-  if (SNAPSHOT_PROFILES.includes(meta["profile"] as SnapshotProfile)) profile = meta["profile"] as SnapshotProfile;
-  else problems.push("sidecar names no known profile");
+  if (SNAPSHOT_PROFILES.includes(meta["profile"] as SnapshotProfile)) {
+    state.profile = meta["profile"] as SnapshotProfile;
+  } else problems.push("sidecar names no known profile");
+  const profile = state.profile;
+  if (options.expectProfile !== undefined && profile !== null && profile !== options.expectProfile) {
+    problems.push(`the pair declares profile ${profile} but expected profile ${options.expectProfile}`);
+  }
 
   const snap = meta["snapshot"] as Record<string, unknown> | undefined;
   if (!snap || typeof snap !== "object") {
@@ -924,12 +989,21 @@ export function verifySnapshotPair(destArg: string): PairVerdict {
     return bail();
   }
   if (snap["file"] !== basename(dest)) problems.push("sidecar describes a different file name");
+  let digest: string | null = null;
+  let length: number | null = null;
+  try {
+    digest = sha256File(dest);
+    length = statSync(dest).size;
+  } catch (e) {
+    problems.push(`snapshot file could not be read for hashing (${errCode(e) ?? (e as Error).message})`);
+    return bail();
+  }
   if (typeof snap["sha256"] !== "string" || !/^[0-9a-f]{64}$/.test(snap["sha256"])) {
     problems.push("sidecar sha256 is not a 64-hex digest");
-  } else if (snap["sha256"] !== sha256File(dest)) {
+  } else if (snap["sha256"] !== digest) {
     problems.push("sha256 does not match the snapshot file");
   }
-  if (snap["bytes"] !== statSync(dest).size) problems.push("byte length does not match the snapshot file");
+  if (snap["bytes"] !== length) problems.push("byte length does not match the snapshot file");
   // The sidecar must agree with ITSELF about which disclosure policy it describes. A mislabelled
   // pair (observation label over a full-profile body, or a policy string from another version)
   // is exactly what a consumer selecting a profile explicitly needs us to refuse.
