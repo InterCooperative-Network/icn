@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { buildEnvironmentReport } from "./environment-report.js";
 import { buildStateIndex } from "./state-index.js";
+import { describeSourceRevision } from "./source-revision.js";
 import { runCommand } from "../utils/commands.js";
 
 export type DoctorCheck = {
@@ -32,6 +33,55 @@ export const MAIN_STALE_ERROR_COMMITS = 25;
  * that a rebase is genuinely overdue.
  */
 export const FEATURE_BASE_STALE_WARN_COMMITS = 50;
+
+/**
+ * Classify how trustworthy a checkout's working tree is for serving orientation.
+ *
+ * This is the sibling of classifyTreeFreshness and deliberately mirrors its rules, because the
+ * two answer halves of one question: can what is read from this tree be trusted? Freshness asks
+ * "is it the right revision"; cleanliness asks "is it only that revision".
+ *
+ * `porcelainLines` of null means the probe could not run — that is "unknown", never "fine".
+ */
+export function classifyTreeCleanliness(
+  branch: string | null,
+  porcelainLines: number | null
+): { severity: DoctorCheck["severity"]; message: string; detail?: string; repair?: string } {
+  if (porcelainLines === null) {
+    // `warn`, not `ok`, for exactly the reason the freshness check gives one function below:
+    // the report folds only severity, so "ok" here renders the whole environment healthy on the
+    // strength of a check that did not run. An unrun check is missing evidence, not a pass.
+    return {
+      severity: "warn",
+      message:
+        "Git porcelain unavailable; worktree cleanliness is UNVERIFIED (not confirmed clean).",
+      repair: "git status --porcelain  # find out why the probe failed, then re-run doctor",
+    };
+  }
+  if (porcelainLines === 0) {
+    return { severity: "ok", message: "Worktree clean." };
+  }
+  if (branch === "main") {
+    // A checkout on main is the one serving canonical docs and ops/state. Uncommitted edits
+    // there mean readers are being handed content that exists in no commit at all — strictly
+    // worse than being behind, because it is unreviewable rather than merely old. The same
+    // main-versus-feature asymmetry the freshness check already applies.
+    return {
+      severity: "error",
+      message: `Checkout is on main with ${porcelainLines} uncommitted path(s) — canonical docs and ops/state served from here do not match any commit.`,
+      detail:
+        "Treat anything read from this tree as unverified: it is neither origin/main nor any reviewed revision.",
+      repair: "git status  # commit, stash, or restore before serving orientation from this tree",
+    };
+  }
+  // On a feature branch or a detached checkout, uncommitted edits are the work in progress.
+  const what =
+    branch === null || branch === "HEAD" ? "Detached checkout" : "Feature branch";
+  return {
+    severity: "warn",
+    message: `${what} has ${porcelainLines} uncommitted path(s) (expected during active work).`,
+  };
+}
 
 /**
  * Classify how stale a checkout is relative to origin/main.
@@ -241,27 +291,29 @@ export async function buildDoctorReport(repoRoot: string): Promise<DoctorReport>
     checks.push({ id: "gh", severity: "ok", message: "gh CLI available." });
   }
 
-  if (env.git.porcelainLines === null) {
-    checks.push({
-      id: "dirty_tree",
-      severity: "ok",
-      message: "Git porcelain unavailable; dirty-tree check skipped.",
-    });
-  } else if (env.git.porcelainLines > 0) {
-    checks.push({
-      id: "dirty_tree",
-      severity: "warn",
-      message: `Dirty worktree: ${env.git.dirtySummary}`,
-    });
-    suggested.push("git status — commit or stash before switching tasks if required by workflow.");
-    top = maxSeverity(top, "warn");
-  } else {
-    checks.push({
-      id: "dirty_tree",
-      severity: "ok",
-      message: "Worktree clean.",
-    });
-  }
+  // The cleanliness verdict is fed by the HARDENED probe, not by buildEnvironmentReport's plain
+  // `git status --porcelain`. That plain probe honours the inspected repository's own settings,
+  // so `status.showUntrackedFiles=no` or a redirected `core.worktree` makes it report zero lines
+  // for a tree that is not clean — and a classifier cannot be more trustworthy than the
+  // measurement it is handed. describeSourceRevision pins --work-tree, forces
+  // --untracked-files=normal, sanitises the environment, and returns null rather than a number
+  // when it could not establish the answer, which is the "unknown" this classifier already
+  // treats as not-healthy.
+  //
+  // Deliberately not duplicating the hardening here: one hardened probe feeding every
+  // orientation verdict is the point, and a second copy would be a second thing to get wrong.
+  const source = await describeSourceRevision(repoRoot);
+  const cleanliness = classifyTreeCleanliness(env.git.branch, source.dirty_paths);
+  // `env.git.dirtySummary` is "dirty (N paths)" rather than a file list, so appending it would
+  // only restate the count this message already carries.
+  checks.push({
+    id: "dirty_tree",
+    severity: cleanliness.severity,
+    message: cleanliness.message,
+    ...(cleanliness.detail ? { detail: cleanliness.detail } : {}),
+  });
+  if (cleanliness.repair) suggested.push(cleanliness.repair);
+  top = maxSeverity(top, cleanliness.severity);
 
   // Tree freshness. `dirty_tree` above answers "are there uncommitted edits?",
   // which is trivially "no" for a checkout nobody has touched in weeks — so a
