@@ -109,6 +109,22 @@ that snapshot only; "released" is an inference valid under an out-of-band same-r
 * **No registry identity, no monotonic clock, no TTL in the data.**
 * Equal digests / conversation ids across registries are **coincidence** (unkeyed digests of path strings that two hosts can share).
 
+## Known test-contract limitation: registry B's stamp postdates B1
+
+Registry B's fictional `schema_version.applied_at` (`2026-01-02 09:30:00`) is later than B1's own acquisition time
+(`2026-01-01T10:30:00Z`). A real registry cannot have migrated after an export of it was taken, so this is an artefact of how the
+fixture picks distinct stamps, not a producer defect: the stamp's only job here is to differ from registry A's, which refutes
+sameness (R1). It is deliberately kept, because the golden references and the committed contract are pinned to it. Consumers
+must not treat the ordering of `applied_at` against `acquisition.started_at` as meaningful evidence in either direction.
+
+## Independent consumer verification (limits stated)
+
+Project Conductor reported (external, not reproduced by ICN) that its separately developed consumer, at its branch
+`recovery/20261101-hardening` HEAD `3d56e66`, verified the real exports A1, A2, A3, A4 and B1 offline (its suite: 805 passed,
+9 skipped), after fixing three consumer-side defects (E1–E3). No producer defect was identified. This shows the contract is
+implementable by an independent reader. It does not establish producer authenticity, registry identity, clock ordering or
+the behaviour of any live registry.
+
 ## Using it offline
 
 ```
