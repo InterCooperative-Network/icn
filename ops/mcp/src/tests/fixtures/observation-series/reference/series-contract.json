@@ -1,0 +1,985 @@
+{
+  "contract_version": "icn-observation-series-contract/v1",
+  "synthetic": true,
+  "scope": "A series of REAL consecutive outputs of ICN's restricted observation exporter, taken from disposable synthetic registries whose state was driven through ICN's own lifecycle code. No database or sidecar here was edited after export.",
+  "tuple": {
+    "profile": "observation",
+    "policy": "observation-v1",
+    "format": "icn-ops-registry-snapshot-meta/v1",
+    "registry_schema_version": 5
+  },
+  "clock": "Acquisition times and registry row timestamps come from a generator-controlled VIRTUAL clock (the exporter and ICN's lifecycle functions run unmodified; only Date and the claimed hostname are substituted, and rows touched by an operation are re-stamped with the virtual instant). They are internally coherent but are NOT wall-clock time at generation.",
+  "ttl": {
+    "default_minutes": 30,
+    "minimum_minutes": 5,
+    "override_env": "ICN_SESSION_TTL_MINUTES",
+    "recorded_in_snapshot": false,
+    "note": "Liveness/staleness is a consumer judgement against a TTL the snapshot does not carry. Without an agreed TTL, staleness is UNKNOWN."
+  },
+  "registries": {
+    "A": {
+      "claimed_host": "series-host-a",
+      "schema_version_applied_at": "2026-01-01 08:00:00"
+    },
+    "B": {
+      "claimed_host": "series-host-b",
+      "schema_version_applied_at": "2026-01-02 09:30:00"
+    }
+  },
+  "session_labels": {
+    "A": {
+      "s-a": "00000000-0000-4000-8000-000000000001",
+      "s-b": "00000000-0000-4000-8000-000000000002",
+      "s-e": "00000000-0000-4000-8000-000000000003",
+      "s-l": "00000000-0000-4000-8000-000000000004",
+      "s-c": "00000000-0000-4000-8000-000000000005",
+      "s-d": "00000000-0000-4000-8000-000000000008"
+    },
+    "B": {
+      "b-1": "00000000-0000-4000-8000-000000000006",
+      "b-2": "00000000-0000-4000-8000-000000000007"
+    }
+  },
+  "operations": [
+    {
+      "t_min": 1,
+      "registry": "A",
+      "op": "register_session",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001",
+      "created": true,
+      "deduplicated": false,
+      "lane_changed": null
+    },
+    {
+      "t_min": 2,
+      "registry": "A",
+      "op": "register_session",
+      "as": "s-b",
+      "session_id": "00000000-0000-4000-8000-000000000002",
+      "created": true,
+      "deduplicated": false,
+      "lane_changed": null
+    },
+    {
+      "t_min": 3,
+      "registry": "A",
+      "op": "register_session",
+      "as": "s-e",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "created": true,
+      "deduplicated": false,
+      "lane_changed": null
+    },
+    {
+      "t_min": 3,
+      "registry": "A",
+      "op": "register_session",
+      "as": "s-l",
+      "session_id": "00000000-0000-4000-8000-000000000004",
+      "created": true,
+      "deduplicated": false,
+      "lane_changed": null
+    },
+    {
+      "t_min": 4,
+      "registry": "A",
+      "op": "session_progress",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "t_min": 6,
+      "registry": "A",
+      "op": "session_progress",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "t_min": 8,
+      "registry": "A",
+      "op": "session_progress",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "t_min": 5,
+      "registry": "A",
+      "op": "heartbeat",
+      "as": "s-b",
+      "session_id": "00000000-0000-4000-8000-000000000002"
+    },
+    {
+      "t_min": 6,
+      "registry": "A",
+      "op": "claim_files",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001",
+      "claimed": [
+        "icn/crates/series-core/src/lib.rs"
+      ],
+      "refused_because_holder_is_live": []
+    },
+    {
+      "t_min": 6,
+      "registry": "A",
+      "op": "claim_files",
+      "as": "s-b",
+      "session_id": "00000000-0000-4000-8000-000000000002",
+      "claimed": [
+        "docs/series/notes.md",
+        "<withheld-path>"
+      ],
+      "refused_because_holder_is_live": []
+    },
+    {
+      "t_min": 9,
+      "registry": "A",
+      "op": "heartbeat",
+      "as": "s-e",
+      "session_id": "00000000-0000-4000-8000-000000000003"
+    },
+    {
+      "t_min": 12,
+      "registry": "A",
+      "op": "register_session",
+      "as": "s-c",
+      "session_id": "00000000-0000-4000-8000-000000000005",
+      "created": true,
+      "deduplicated": false,
+      "lane_changed": null
+    },
+    {
+      "t_min": 15,
+      "registry": "A",
+      "op": "claim_files",
+      "as": "s-c",
+      "session_id": "00000000-0000-4000-8000-000000000005",
+      "claimed": [
+        "icn/crates/series-core/src/other.rs"
+      ],
+      "refused_because_holder_is_live": []
+    },
+    {
+      "t_min": 16,
+      "registry": "A",
+      "op": "session_progress",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "t_min": 18,
+      "registry": "A",
+      "op": "session_progress",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "t_min": 20,
+      "registry": "A",
+      "op": "heartbeat",
+      "as": "s-e",
+      "session_id": "00000000-0000-4000-8000-000000000003"
+    },
+    {
+      "t_min": 26,
+      "registry": "B",
+      "op": "register_session",
+      "as": "b-1",
+      "session_id": "00000000-0000-4000-8000-000000000006",
+      "created": true,
+      "deduplicated": false,
+      "lane_changed": null
+    },
+    {
+      "t_min": 27,
+      "registry": "B",
+      "op": "register_session",
+      "as": "b-2",
+      "session_id": "00000000-0000-4000-8000-000000000007",
+      "created": true,
+      "deduplicated": false,
+      "lane_changed": null
+    },
+    {
+      "t_min": 28,
+      "registry": "B",
+      "op": "claim_files",
+      "as": "b-1",
+      "session_id": "00000000-0000-4000-8000-000000000006",
+      "claimed": [
+        "icn/crates/series-core/src/lib.rs"
+      ],
+      "refused_because_holder_is_live": []
+    },
+    {
+      "t_min": 28,
+      "registry": "B",
+      "op": "claim_files",
+      "as": "b-2",
+      "session_id": "00000000-0000-4000-8000-000000000007",
+      "claimed": [
+        "<withheld-path>"
+      ],
+      "refused_because_holder_is_live": []
+    },
+    {
+      "t_min": 29,
+      "registry": "B",
+      "op": "session_progress",
+      "as": "b-1",
+      "session_id": "00000000-0000-4000-8000-000000000006"
+    },
+    {
+      "t_min": 45,
+      "registry": "A",
+      "op": "heartbeat",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "t_min": 50,
+      "registry": "A",
+      "op": "release_session",
+      "as": "s-c",
+      "session_id": "00000000-0000-4000-8000-000000000005",
+      "released": true,
+      "dropped_file_claims": 1
+    },
+    {
+      "t_min": 52,
+      "registry": "A",
+      "op": "register_session",
+      "as": "s-d",
+      "session_id": "00000000-0000-4000-8000-000000000008",
+      "created": true,
+      "deduplicated": false,
+      "lane_changed": null
+    },
+    {
+      "t_min": 54,
+      "registry": "A",
+      "op": "claim_files",
+      "as": "s-d",
+      "session_id": "00000000-0000-4000-8000-000000000008",
+      "claimed": [],
+      "refused_because_holder_is_live": [
+        "icn/crates/series-core/src/lib.rs"
+      ]
+    },
+    {
+      "t_min": 55,
+      "registry": "A",
+      "op": "claim_files",
+      "as": "s-d",
+      "session_id": "00000000-0000-4000-8000-000000000008",
+      "claimed": [
+        "docs/series/notes.md",
+        "<withheld-path>"
+      ],
+      "refused_because_holder_is_live": []
+    },
+    {
+      "t_min": 58,
+      "registry": "A",
+      "op": "register_session",
+      "as": "s-e",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "created": false,
+      "deduplicated": true,
+      "lane_changed": {
+        "from": "/synthetic/series-root/repos/icn-series.git/worktrees/lane-alpha",
+        "to": "/synthetic/series-root/repos/icn-series.git/worktrees/lane-beta"
+      }
+    },
+    {
+      "t_min": 62,
+      "registry": "A",
+      "op": "register_session",
+      "as": "s-a",
+      "session_id": "00000000-0000-4000-8000-000000000001",
+      "created": false,
+      "deduplicated": true,
+      "lane_changed": null
+    },
+    {
+      "t_min": 68,
+      "registry": "A",
+      "op": "session_progress",
+      "as": "s-d",
+      "session_id": "00000000-0000-4000-8000-000000000008"
+    }
+  ],
+  "release_history": {
+    "lines_in_session_log": 1,
+    "released_ids": [
+      "00000000-0000-4000-8000-000000000005"
+    ],
+    "note": "History of a release lives in ops/state/session-log.jsonl OUTSIDE the registry. It is never exported, and the generator did not ship it."
+  },
+  "claim_semantics_evidence": {
+    "refused_when_holder_is_live": "s-d claiming lib.rs while s-a (age 25 min < TTL) held it was refused; see operations",
+    "granted_when_holder_is_stale": "s-d claiming notes.md and a withheld path while s-b (age 50 min >= TTL) held them was granted, so both rows coexist",
+    "removal": "no tool removes a single claim; claims leave the registry only when their session is released"
+  },
+  "exports": [
+    {
+      "label": "A1",
+      "registry": "A",
+      "claimed_host": "series-host-a",
+      "acquisition": {
+        "started_at": "2026-01-01T10:10:00.000Z",
+        "finished_at": "2026-01-01T10:10:01.500Z"
+      },
+      "schema_version_applied_at": [
+        [
+          1,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          2,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          3,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          4,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          5,
+          "2026-01-01 08:00:00"
+        ]
+      ],
+      "counts": {
+        "sessions": 4,
+        "file_claims": 3,
+        "withheld_claim_rows": 1
+      },
+      "session_ids": [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003",
+        "00000000-0000-4000-8000-000000000004"
+      ],
+      "heartbeat_age_minutes_at_acquisition": {
+        "00000000-0000-4000-8000-000000000001": 2,
+        "00000000-0000-4000-8000-000000000002": 5,
+        "00000000-0000-4000-8000-000000000003": 1,
+        "00000000-0000-4000-8000-000000000004": 7
+      },
+      "cleartext_claims": [
+        {
+          "path": "docs/series/notes.md",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000002"
+          ]
+        },
+        {
+          "path": "icn/crates/series-core/src/lib.rs",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000001"
+          ]
+        }
+      ],
+      "withheld_claim_groups": [
+        [
+          "00000000-0000-4000-8000-000000000002"
+        ]
+      ],
+      "row_timestamps_after_acquisition": []
+    },
+    {
+      "label": "A2",
+      "registry": "A",
+      "claimed_host": "series-host-a",
+      "acquisition": {
+        "started_at": "2026-01-01T10:25:00.000Z",
+        "finished_at": "2026-01-01T10:25:01.500Z"
+      },
+      "schema_version_applied_at": [
+        [
+          1,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          2,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          3,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          4,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          5,
+          "2026-01-01 08:00:00"
+        ]
+      ],
+      "counts": {
+        "sessions": 5,
+        "file_claims": 4,
+        "withheld_claim_rows": 1
+      },
+      "session_ids": [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003",
+        "00000000-0000-4000-8000-000000000004",
+        "00000000-0000-4000-8000-000000000005"
+      ],
+      "heartbeat_age_minutes_at_acquisition": {
+        "00000000-0000-4000-8000-000000000001": 7,
+        "00000000-0000-4000-8000-000000000002": 20,
+        "00000000-0000-4000-8000-000000000003": 5,
+        "00000000-0000-4000-8000-000000000004": 22,
+        "00000000-0000-4000-8000-000000000005": 13
+      },
+      "cleartext_claims": [
+        {
+          "path": "docs/series/notes.md",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000002"
+          ]
+        },
+        {
+          "path": "icn/crates/series-core/src/lib.rs",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000001"
+          ]
+        },
+        {
+          "path": "icn/crates/series-core/src/other.rs",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000005"
+          ]
+        }
+      ],
+      "withheld_claim_groups": [
+        [
+          "00000000-0000-4000-8000-000000000002"
+        ]
+      ],
+      "row_timestamps_after_acquisition": []
+    },
+    {
+      "label": "B1",
+      "registry": "B",
+      "claimed_host": "series-host-b",
+      "acquisition": {
+        "started_at": "2026-01-01T10:30:00.000Z",
+        "finished_at": "2026-01-01T10:30:01.500Z"
+      },
+      "schema_version_applied_at": [
+        [
+          1,
+          "2026-01-02 09:30:00"
+        ],
+        [
+          2,
+          "2026-01-02 09:30:00"
+        ],
+        [
+          3,
+          "2026-01-02 09:30:00"
+        ],
+        [
+          4,
+          "2026-01-02 09:30:00"
+        ],
+        [
+          5,
+          "2026-01-02 09:30:00"
+        ]
+      ],
+      "counts": {
+        "sessions": 2,
+        "file_claims": 2,
+        "withheld_claim_rows": 1
+      },
+      "session_ids": [
+        "00000000-0000-4000-8000-000000000006",
+        "00000000-0000-4000-8000-000000000007"
+      ],
+      "heartbeat_age_minutes_at_acquisition": {
+        "00000000-0000-4000-8000-000000000006": 1,
+        "00000000-0000-4000-8000-000000000007": 3
+      },
+      "cleartext_claims": [
+        {
+          "path": "icn/crates/series-core/src/lib.rs",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000006"
+          ]
+        }
+      ],
+      "withheld_claim_groups": [
+        [
+          "00000000-0000-4000-8000-000000000007"
+        ]
+      ],
+      "row_timestamps_after_acquisition": []
+    },
+    {
+      "label": "A3",
+      "registry": "A",
+      "claimed_host": "series-host-a",
+      "acquisition": {
+        "started_at": "2026-01-01T11:10:00.000Z",
+        "finished_at": "2026-01-01T11:10:01.500Z"
+      },
+      "schema_version_applied_at": [
+        [
+          1,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          2,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          3,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          4,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          5,
+          "2026-01-01 08:00:00"
+        ]
+      ],
+      "counts": {
+        "sessions": 5,
+        "file_claims": 5,
+        "withheld_claim_rows": 2
+      },
+      "session_ids": [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003",
+        "00000000-0000-4000-8000-000000000004",
+        "00000000-0000-4000-8000-000000000008"
+      ],
+      "heartbeat_age_minutes_at_acquisition": {
+        "00000000-0000-4000-8000-000000000001": 8,
+        "00000000-0000-4000-8000-000000000002": 65,
+        "00000000-0000-4000-8000-000000000003": 12,
+        "00000000-0000-4000-8000-000000000004": 67,
+        "00000000-0000-4000-8000-000000000008": 2
+      },
+      "cleartext_claims": [
+        {
+          "path": "docs/series/notes.md",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000002",
+            "00000000-0000-4000-8000-000000000008"
+          ]
+        },
+        {
+          "path": "icn/crates/series-core/src/lib.rs",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000001"
+          ]
+        }
+      ],
+      "withheld_claim_groups": [
+        [
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000008"
+        ]
+      ],
+      "row_timestamps_after_acquisition": []
+    },
+    {
+      "label": "A4",
+      "registry": "A",
+      "claimed_host": "series-host-a",
+      "acquisition": {
+        "started_at": "2026-01-01T10:50:00.000Z",
+        "finished_at": "2026-01-01T10:50:01.500Z"
+      },
+      "schema_version_applied_at": [
+        [
+          1,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          2,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          3,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          4,
+          "2026-01-01 08:00:00"
+        ],
+        [
+          5,
+          "2026-01-01 08:00:00"
+        ]
+      ],
+      "counts": {
+        "sessions": 5,
+        "file_claims": 5,
+        "withheld_claim_rows": 2
+      },
+      "session_ids": [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003",
+        "00000000-0000-4000-8000-000000000004",
+        "00000000-0000-4000-8000-000000000008"
+      ],
+      "heartbeat_age_minutes_at_acquisition": {
+        "00000000-0000-4000-8000-000000000001": -12,
+        "00000000-0000-4000-8000-000000000002": 45,
+        "00000000-0000-4000-8000-000000000003": -8,
+        "00000000-0000-4000-8000-000000000004": 47,
+        "00000000-0000-4000-8000-000000000008": -18
+      },
+      "cleartext_claims": [
+        {
+          "path": "docs/series/notes.md",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000002",
+            "00000000-0000-4000-8000-000000000008"
+          ]
+        },
+        {
+          "path": "icn/crates/series-core/src/lib.rs",
+          "sessions": [
+            "00000000-0000-4000-8000-000000000001"
+          ]
+        }
+      ],
+      "withheld_claim_groups": [
+        [
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000008"
+        ]
+      ],
+      "row_timestamps_after_acquisition": [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000003",
+        "00000000-0000-4000-8000-000000000008"
+      ]
+    }
+  ],
+  "pairs": [
+    {
+      "from": "A1",
+      "to": "A2",
+      "verdict": "comparable_if_same_registry_asserted",
+      "reasons": [],
+      "same_applied_at_stamps": true,
+      "sessions": {
+        "newly_present": [
+          "00000000-0000-4000-8000-000000000005"
+        ],
+        "absent_in_later_export": [],
+        "changed": {
+          "00000000-0000-4000-8000-000000000001": {
+            "last_heartbeat": [
+              "2026-01-01 10:08:00",
+              "2026-01-01 10:18:00"
+            ],
+            "last_progress": [
+              "2026-01-01 10:08:00",
+              "2026-01-01 10:18:00"
+            ],
+            "progress_count": [
+              3,
+              5
+            ]
+          },
+          "00000000-0000-4000-8000-000000000003": {
+            "last_heartbeat": [
+              "2026-01-01 10:09:00",
+              "2026-01-01 10:20:00"
+            ]
+          }
+        },
+        "unchanged": [
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000004"
+        ]
+      },
+      "claims": {
+        "cleartext_added": [
+          {
+            "path": "icn/crates/series-core/src/other.rs",
+            "session_id": "00000000-0000-4000-8000-000000000005"
+          }
+        ],
+        "cleartext_removed": [],
+        "withheld": "not_comparable_across_exports"
+      },
+      "anomalies": [],
+      "absence_meaning": "ROW ABSENT. In ICN the only deletion path is releaseSession, but nothing in either export states that the two are the same registry, in what order they were taken, or that no restore/rotation happened. 'Released' may be inferred only under an out-of-band same-registry assertion; otherwise absence is not evidence of the session's end.",
+      "shared_with_other_registry": null
+    },
+    {
+      "from": "A2",
+      "to": "A3",
+      "verdict": "comparable_if_same_registry_asserted",
+      "reasons": [],
+      "same_applied_at_stamps": true,
+      "sessions": {
+        "newly_present": [
+          "00000000-0000-4000-8000-000000000008"
+        ],
+        "absent_in_later_export": [
+          "00000000-0000-4000-8000-000000000005"
+        ],
+        "changed": {
+          "00000000-0000-4000-8000-000000000001": {
+            "worktree_generation": [
+              "00000000-0000-4000-8000-0000000000a1",
+              "00000000-0000-4000-8000-0000000000a2"
+            ],
+            "last_heartbeat": [
+              "2026-01-01 10:18:00",
+              "2026-01-01 11:02:00"
+            ]
+          },
+          "00000000-0000-4000-8000-000000000003": {
+            "worktree_id": [
+              "sha256:0639437ad4cdead0535efc509d938b2cb17eb6afe40fe02617cd529d10982f43",
+              "sha256:1f1eac527f1406eb2f27e53d1c19110d03313ee55aad4411d1a16a5a71a9c1c7"
+            ],
+            "worktree_name": [
+              "lane-alpha",
+              "lane-beta"
+            ],
+            "worktree_generation": [
+              "00000000-0000-4000-8000-0000000000a1",
+              "00000000-0000-4000-8000-0000000000b1"
+            ],
+            "last_heartbeat": [
+              "2026-01-01 10:20:00",
+              "2026-01-01 10:58:00"
+            ]
+          }
+        },
+        "unchanged": [
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000004"
+        ]
+      },
+      "claims": {
+        "cleartext_added": [
+          {
+            "path": "docs/series/notes.md",
+            "session_id": "00000000-0000-4000-8000-000000000008"
+          }
+        ],
+        "cleartext_removed": [
+          {
+            "path": "icn/crates/series-core/src/other.rs",
+            "session_id": "00000000-0000-4000-8000-000000000005"
+          }
+        ],
+        "withheld": "not_comparable_across_exports"
+      },
+      "anomalies": [],
+      "absence_meaning": "ROW ABSENT. In ICN the only deletion path is releaseSession, but nothing in either export states that the two are the same registry, in what order they were taken, or that no restore/rotation happened. 'Released' may be inferred only under an out-of-band same-registry assertion; otherwise absence is not evidence of the session's end.",
+      "shared_with_other_registry": null
+    },
+    {
+      "from": "A3",
+      "to": "A4",
+      "verdict": "refused_not_later",
+      "reasons": [
+        "acquisition.started_at is not later (2026-01-01T10:50:00.000Z <= 2026-01-01T11:10:00.000Z): the clock is sampled, not monotonic, so order is unestablished"
+      ],
+      "same_applied_at_stamps": true,
+      "sessions": {
+        "newly_present": [],
+        "absent_in_later_export": [],
+        "changed": {},
+        "unchanged": [
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000003",
+          "00000000-0000-4000-8000-000000000004",
+          "00000000-0000-4000-8000-000000000008"
+        ]
+      },
+      "claims": {
+        "cleartext_added": [],
+        "cleartext_removed": [],
+        "withheld": "not_comparable_across_exports"
+      },
+      "anomalies": [],
+      "absence_meaning": "ROW ABSENT. In ICN the only deletion path is releaseSession, but nothing in either export states that the two are the same registry, in what order they were taken, or that no restore/rotation happened. 'Released' may be inferred only under an out-of-band same-registry assertion; otherwise absence is not evidence of the session's end.",
+      "shared_with_other_registry": null
+    },
+    {
+      "from": "A2",
+      "to": "B1",
+      "verdict": "refused_different_registry",
+      "reasons": [
+        "schema_version.applied_at differs: these cannot be exports of one continuous registry (stamps are written once per registry)"
+      ],
+      "same_applied_at_stamps": false,
+      "sessions": {
+        "newly_present": [
+          "00000000-0000-4000-8000-000000000006",
+          "00000000-0000-4000-8000-000000000007"
+        ],
+        "absent_in_later_export": [
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000003",
+          "00000000-0000-4000-8000-000000000004",
+          "00000000-0000-4000-8000-000000000005"
+        ],
+        "changed": {},
+        "unchanged": []
+      },
+      "claims": {
+        "cleartext_added": [
+          {
+            "path": "icn/crates/series-core/src/lib.rs",
+            "session_id": "00000000-0000-4000-8000-000000000006"
+          }
+        ],
+        "cleartext_removed": [
+          {
+            "path": "docs/series/notes.md",
+            "session_id": "00000000-0000-4000-8000-000000000002"
+          },
+          {
+            "path": "icn/crates/series-core/src/lib.rs",
+            "session_id": "00000000-0000-4000-8000-000000000001"
+          },
+          {
+            "path": "icn/crates/series-core/src/other.rs",
+            "session_id": "00000000-0000-4000-8000-000000000005"
+          }
+        ],
+        "withheld": "not_comparable_across_exports"
+      },
+      "anomalies": [],
+      "absence_meaning": "ROW ABSENT. In ICN the only deletion path is releaseSession, but nothing in either export states that the two are the same registry, in what order they were taken, or that no restore/rotation happened. 'Released' may be inferred only under an out-of-band same-registry assertion; otherwise absence is not evidence of the session's end.",
+      "shared_with_other_registry": {
+        "conversation_ids": [
+          "5d1c2a4e-0000-4000-8000-0000000051c1"
+        ],
+        "lane_digests": [
+          "sha256:0639437ad4cdead0535efc509d938b2cb17eb6afe40fe02617cd529d10982f43"
+        ],
+        "note": "Equal values here are COINCIDENCE of unkeyed digests / conversation ids across hosts, never identity."
+      }
+    },
+    {
+      "from": "B1",
+      "to": "A3",
+      "verdict": "refused_different_registry",
+      "reasons": [
+        "schema_version.applied_at differs: these cannot be exports of one continuous registry (stamps are written once per registry)"
+      ],
+      "same_applied_at_stamps": false,
+      "sessions": {
+        "newly_present": [
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000003",
+          "00000000-0000-4000-8000-000000000004",
+          "00000000-0000-4000-8000-000000000008"
+        ],
+        "absent_in_later_export": [
+          "00000000-0000-4000-8000-000000000006",
+          "00000000-0000-4000-8000-000000000007"
+        ],
+        "changed": {},
+        "unchanged": []
+      },
+      "claims": {
+        "cleartext_added": [
+          {
+            "path": "docs/series/notes.md",
+            "session_id": "00000000-0000-4000-8000-000000000002"
+          },
+          {
+            "path": "docs/series/notes.md",
+            "session_id": "00000000-0000-4000-8000-000000000008"
+          },
+          {
+            "path": "icn/crates/series-core/src/lib.rs",
+            "session_id": "00000000-0000-4000-8000-000000000001"
+          }
+        ],
+        "cleartext_removed": [
+          {
+            "path": "icn/crates/series-core/src/lib.rs",
+            "session_id": "00000000-0000-4000-8000-000000000006"
+          }
+        ],
+        "withheld": "not_comparable_across_exports"
+      },
+      "anomalies": [],
+      "absence_meaning": "ROW ABSENT. In ICN the only deletion path is releaseSession, but nothing in either export states that the two are the same registry, in what order they were taken, or that no restore/rotation happened. 'Released' may be inferred only under an out-of-band same-registry assertion; otherwise absence is not evidence of the session's end.",
+      "shared_with_other_registry": {
+        "conversation_ids": [
+          "5d1c2a4e-0000-4000-8000-0000000051c1"
+        ],
+        "lane_digests": [
+          "sha256:0639437ad4cdead0535efc509d938b2cb17eb6afe40fe02617cd529d10982f43"
+        ],
+        "note": "Equal values here are COINCIDENCE of unkeyed digests / conversation ids across hosts, never identity."
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "R1",
+      "rule": "Registry sameness is never derivable from a snapshot. Differing schema_version.applied_at proves 'different'; equal stamps prove nothing. Same-registry must be asserted out of band."
+    },
+    {
+      "id": "R2",
+      "rule": "A later acquisition.started_at is not authenticated freshness. Refuse an export as 'newer' unless its started_at is strictly later; flag any row timestamp after the export's own started_at."
+    },
+    {
+      "id": "R3",
+      "rule": "NULL repo_id / worktree_id / worktree_generation / provider_session_id are UNKNOWN. Never equal to each other, never equal to a value."
+    },
+    {
+      "id": "R4",
+      "rule": "withheld:<hex> tokens carry a per-export random salt. Equality is meaningful only within one snapshot; never compare token values across snapshots."
+    },
+    {
+      "id": "R5",
+      "rule": "For one session id: repo, provider, provider_session_id, parent_session_id, host, started_at never change. A change means different registry or corruption: refuse."
+    },
+    {
+      "id": "R6",
+      "rule": "Lane fields (repo_id, worktree_id, worktree_name, worktree_generation) may change on an existing id, only through re-registration of a known conversation: a lane move changes them together; a recreated lane at the same path changes only worktree_generation."
+    },
+    {
+      "id": "R7",
+      "rule": "progress_count never decreases for one id. A new id (release + re-register) restarts at 0."
+    },
+    {
+      "id": "R8",
+      "rule": "A session absent from a later export of the same registry has had its row deleted (release). Absence is not staleness, and 'ended' must not be concluded from absence alone."
+    },
+    {
+      "id": "R9",
+      "rule": "A stale row is not an ended session: ICN never reaps stale rows. Only an explicit release removes them."
+    },
+    {
+      "id": "R10",
+      "rule": "A conversation id appears on at most one row within one export. Across exports of one registry it may map to a NEW session id after release."
+    }
+  ]
+}
