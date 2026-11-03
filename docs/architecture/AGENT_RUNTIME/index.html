@@ -732,6 +732,450 @@ inputs — failing open. Static analysis of arbitrary shell is not a solvable pr
 seam, so this layer relies on the positive path instead: a supported primitive, named in the
 startup context. The attempt is preserved on <code>ops/agent-wait-guard</code>.</p>
 <p>Every wait is bounded. Indefinite blocking is available only behind an explicit flag.</p>
+<h2 id="10-registry-snapshot-export">10. Registry snapshot export</h2>
+<p><code>ops/mcp/src/state/snapshot-export.ts</code> (CLI: <code>ops/mcp/src/cli/snapshot-export.ts</code>,
+<code>npm run snapshot:export</code>) produces a <strong>consistent, offline-readable copy of an existing session
+registry</strong>, so an external observer (Project Conductor is the first) can read session state
+without opening the live database. The disclosure policy lives in one file,
+<code>ops/mcp/src/state/snapshot-profile.ts</code>.</p>
+<pre><code>snapshot-export --profile &lt;full|observation&gt; --source &lt;registry.db&gt; --dest &lt;snapshot.db&gt;
+snapshot-export --verify &lt;snapshot.db&gt;          # consumer-side completeness/integrity check
+</code></pre>
+<p><strong>Authority.</strong> ICN keeps session identity, authorization and lifecycle (§2, §5). A snapshot is an
+<em>observation</em> of that state at an instant. It is not a second registry, never flows back, and
+confers no authority on whoever holds it. A consumer that treats it as live state is wrong by
+construction: a snapshot is stale the moment it is taken.</p>
+<h3 id="101-two-profiles-two-disclosure-decisions">10.1 Two profiles, two disclosure decisions</h3>
+<p><code>--profile</code> is <strong>required</strong>; there is no default, so an omitted flag cannot make the disclosure
+decision for the caller.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>full</code></th>
+<th><code>observation</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Purpose</td>
+<td>recovery and diagnostics <strong>inside the ICN trust boundary</strong></td>
+<td>least-privilege input for an <strong>external</strong> read-only observer</td>
+</tr>
+<tr>
+<td>How made</td>
+<td>one <code>VACUUM INTO</code> (byte-faithful)</td>
+<td>an allowlisted projection <strong>built</strong> from one read transaction</td>
+</tr>
+<tr>
+<td>Contains</td>
+<td>everything, including mailbox bodies, event payloads, free-form agent text, transcript/worktree paths, health cache</td>
+<td><code>schema_version</code>, <code>sessions</code> (see below), <code>file_claims</code></td>
+</tr>
+<tr>
+<td>Transfer</td>
+<td>do not send to an external consumer</td>
+<td>intended for one</td>
+</tr>
+</tbody></table>
+<p>The observation file is <strong>built, not redacted</strong>: rows are streamed from the source&#39;s read
+transaction into a fresh file, so withheld data never reaches disk — not in the output, not in
+free pages, not in a <code>.partial</code> left by a hard kill. Only allowlisted columns are ever <code>SELECT</code>ed.
+Anything not named in the policy is not exported, and a test fails until every new column or table
+is classified, so a later migration cannot widen the disclosure by accident.</p>
+<p>A column that <em>is</em> copied is not trusted either: every copied value is checked against the column&#39;s
+rule (identifier alphabet, timestamp shape, or integer) <strong>before</strong> it is passed to the <code>INSERT</code>. A
+value that fails aborts the export as <code>SNAPSHOT_VERIFY_FAILED</code> while nothing unsafe has been
+written, so the guarantee above holds for a completed file and for a <code>.partial</code> alike. The same
+rules are re-checked on the finished file by the producer and by <code>--verify</code>.</p>
+<p><strong>Field classification (observation profile)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Observation</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sessions</code>: <code>id</code>, <code>repo</code>, <code>worktree_name</code>, <code>worktree_generation</code>, <code>provider_session_id</code>, <code>parent_session_id</code>, <code>provider</code>, <code>agent_pid</code>, <code>host</code>, <code>started_at</code>, <code>last_heartbeat</code>, <code>last_progress</code>, <code>progress_count</code></td>
+<td>verbatim</td>
+<td>session identity, lane association, activation/lifecycle, liveness. <code>host</code> is a <em>claim</em>; <code>agent_pid</code> is correlation only (§4)</td>
+</tr>
+<tr>
+<td><code>sessions.repo_id</code>, <code>sessions.worktree_id</code></td>
+<td><code>sha256:&lt;hex&gt;</code> of the original</td>
+<td><strong>these columns are filesystem paths</strong> (the absolute git common dir and git dir). The digest is a stable join key without the layout. It is pseudonymisation, not secrecy</td>
+</tr>
+<tr>
+<td><code>sessions</code>: <code>worktree</code>, <code>worktree_path</code>, <code>branch_at_registration</code>, <code>head_at_registration</code>, <code>task_description</code>, <code>task_ref</code>, <code>pr_ref</code>, <code>transcript_path</code>, <code>current_activity</code></td>
+<td><code>NULL</code> (withheld)</td>
+<td>free-form agent text, absolute paths, and branch names (an unpushed branch name can disclose unreleased work)</td>
+</tr>
+<tr>
+<td><code>file_claims.file_path</code></td>
+<td>shown only if every <code>/</code>-separated segment matches <code>[A-Za-z0-9._@+=,-]+</code> (and none is <code>..</code>); otherwise <code>withheld:&lt;16 hex&gt;</code></td>
+<td>claims are agent-supplied free text. This is a <strong>positive allowlist</strong>: any spelling that merely looks relative (<code>file:///x</code>, <code>a:b/c</code>, <code>~/x</code>, backslashes, spaces, non-ASCII) is tokenised. Safe direction: a legitimate path with a space is tokenised, not leaked. The row is kept (dropping it would turn &quot;claimed&quot; into &quot;not claimed&quot;); the token is salted per export, so equal paths still collide <em>within</em> a snapshot</td>
+</tr>
+<tr>
+<td><code>mailbox</code>, <code>events</code>, <code>watchers_process</code>, <code>health_cache</code>, <code>decision_index</code></td>
+<td><strong>table absent</strong></td>
+<td>message bodies and event payloads are free-form; <code>watchers_process.label</code> and <code>health_cache</code> hold command labels and service endpoints. Absent, not empty: an empty <code>mailbox</code> would read as &quot;looked, found no messages&quot;</td>
+</tr>
+</tbody></table>
+<p>Reader rules that follow, and are also written into the sidecar&#39;s <code>disclosure</code> block: <strong>a <code>NULL</code>
+in a withheld column means WITHHELD</strong> (never absent, none, or unknown-to-ICN), and <strong>an absent
+table is not evidence that it holds no rows</strong>.</p>
+<p>What the observation file still discloses, stated plainly: session ids, the provider conversation
+id, claimed host names, lane names, process ids, timestamps, and repo-relative file paths of
+claims. Repo-relative paths <em>are</em> the occupancy fact an observer wants, so they are not hidden.</p>
+<h3 id="102-what-it-does">10.2 What it does</h3>
+<ul>
+<li><strong>Names its source.</strong> <code>--source</code> is required. There is no env var, no git-derived default and
+no &quot;current registry&quot; — §2.6&#39;s resolver would silently pick the live shared database.</li>
+<li><strong>Never creates or migrates the source.</strong> It checks the SQLite header <em>before</em> opening anything
+(SQLite treats an empty file as a fresh database), opens read-only with <code>fileMustExist</code>, and
+never goes through <code>initDb</code>.</li>
+<li><strong>Checks the registry is what its stamp says.</strong> Exactly schema v<code>LATEST_SCHEMA_VERSION</code>; every
+column the contract depends on present (a version row is not a schema); and <strong>only tables and
+indexes</strong> — a view, trigger or virtual table is code the consumer would inherit, and is refused.
+<code>trusted_schema</code> is turned off on every connection.</li>
+<li><strong>Takes the snapshot in one read transaction</strong> (§ above). In WAL mode that includes
+committed-but-uncheckpointed frames and excludes anything uncommitted; concurrent writers are
+neither blocked nor seen half-way. The online-backup API was rejected (a write between its
+steps restarts it); <code>immutable=1</code> is never used (false for a live registry).</li>
+<li><strong>Verifies the copy</strong> (<code>integrity_check</code>, <code>foreign_key_check</code>, schema, <code>journal_mode = delete</code>
+so reading it creates no sidecars) and, for <code>observation</code>, the profile invariants and a
+row-count cross-check against counts taken <em>in the same source transaction</em>. Any failure
+discards the copy.</li>
+<li><strong>Refuses a source that changed under it.</strong> The path must still name the same device/inode
+before the open and after the copy (<code>SOURCE_CHANGED</code>).</li>
+<li><strong>Is bounded.</strong> Source main file <strong>plus WAL</strong> over <code>--max-source-bytes</code> (default 512 MiB), or too
+little free space on the destination filesystem, is refused before anything is written.</li>
+<li><strong>Publishes without overwriting.</strong> Temp files (<code>.&lt;name&gt;.&lt;pid&gt;.&lt;rand&gt;.partial</code>, <code>0600</code>, created
+<code>O_EXCL</code>) live beside the destination; both final names are created with <code>link(2)</code>, which fails
+with <code>EEXIST</code> instead of replacing. The destination directory must already exist and is never
+created. The destination may not be the source or its <code>-wal</code>/<code>-shm</code>/<code>-journal</code>.</li>
+<li><strong>Cleans up.</strong> A failure removes this attempt&#39;s temp files, and a published db whose sidecar
+could not be published is withdrawn.</li>
+</ul>
+<h3 id="103-output-pair-and-completeness">10.3 Output pair and completeness</h3>
+<p><code>&lt;dest&gt;</code> (SQLite) and <code>&lt;dest&gt;.meta.json</code> (<code>icn-ops-registry-snapshot-meta/v1</code>, <code>profile</code>-tagged).
+The database is published first and the sidecar last, so a <strong>hard kill between the two leaves a
+database with no sidecar</strong> (reproduced with a real <code>SIGKILL</code>). That file is <em>incomplete</em>, not
+corrupt. Run <code>snapshot-export --verify &lt;dest&gt;</code> (library: <code>verifySnapshotPair</code>) before reading: it
+requires the sidecar, a known format and profile, <code>disclosure.classification</code> and <code>disclosure.policy</code> that agree with that profile, a matching <code>sha256</code>/byte length/schema version/row counts, a
+clean integrity and foreign-key check, and — for <code>observation</code> — the profile invariants: the exact
+table set; <strong>the exact column set of all three tables</strong> (<code>schema_version</code>, <code>sessions</code>,
+<code>file_claims</code>; generated columns included, so neither an extra nor a missing column passes, whatever
+the sidecar says); <strong>the exact definition of every table and index</strong> (compared with what the
+production migration ladder creates, because <code>sqlite_master.sql</code> is free text — an index
+expression, a partial-index predicate or a column <code>DEFAULT</code> can carry data no row check sees);
+no <code>sqlite_*</code> object other than the kept tables&#39; autoindexes (<code>sqlite_stat1</code> rows are free text);
+withheld columns <code>NULL</code>; digests well-formed; every copied value inside its column&#39;s rule
+(identifier text, timestamp shape, integer); and no raw absolute path.</p>
+<p>The definition check compares with the schema <strong>this build</strong> creates, so it is coupled to the
+build: if a later ICN build changes the DDL text of the kept tables or their indexes without
+changing the policy name, an older archived pair is refused as &quot;definition differs&quot;, and the
+policy name (<code>observation-v1</code>) must be bumped with such a change. A retry never
+&quot;repairs&quot; a lone database; it is refused as <code>DEST_EXISTS</code>.</p>
+<p><code>verifySnapshotPair</code> always returns a verdict. A directory, FIFO, link or unreadable file in place of
+either file is a problem in the verdict; it is decided by <code>lstat</code> <em>before</em> anything is opened, so a
+FIFO cannot make it block.</p>
+<p><strong>A consumer must check the declared profile.</strong> A valid <code>full</code> pair is a valid pair: it verifies
+<code>ok: true</code> with <code>profile: &quot;full&quot;</code> and contains mailbox bodies and transcript paths. A consumer of an
+external observation therefore calls <code>verifySnapshotPair(dest, { expectProfile: &quot;observation&quot; })</code> or
+<code>snapshot-export --verify &lt;dest&gt; --expect-profile observation</code>, which refuses any other profile.
+The option is additive: omitting it keeps the earlier behaviour.</p>
+<p>Stale <code>*.partial</code> files from a killed run are left in place (the pid in the name is not proof of
+death) and are owner-only. An <code>observation</code> partial contains only values that already passed the
+disclosure rules (§10.2), because they are checked before they are written; a <code>full</code> partial holds a
+full-fidelity copy. A hard kill still leaves a file that is not a snapshot: it has no final name and
+no sidecar.</p>
+<p>The sidecar keeps these apart, on purpose:</p>
+<table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>source</code></td>
+<td>which database was read. <code>full</code>: path, realpath, dev/ino. <code>observation</code>: no path, device, inode <strong>or derived identity</strong> — a hash of guessable filesystem metadata is a confirmable fingerprint, so none is provided</td>
+</tr>
+<tr>
+<td><code>acquisition</code></td>
+<td>method, start/finish time, busy timeout</td>
+</tr>
+<tr>
+<td><code>snapshot</code></td>
+<td>the published file: bytes, sha256, page size/count, schema version</td>
+</tr>
+<tr>
+<td><code>consistency</code></td>
+<td>checks run on the <strong>copy</strong>, with per-table row counts. Internal consistency only</td>
+</tr>
+<tr>
+<td><code>disclosure</code></td>
+<td>profile classification and, for <code>observation</code>, exactly what was included, digested and withheld</td>
+</tr>
+<tr>
+<td><code>host</code></td>
+<td><code>claimed.hostname</code> is self-asserted; <code>authenticated</code> is <code>null</code> and <code>authenticity</code> is <code>&quot;none&quot;</code></td>
+</tr>
+<tr>
+<td><code>producer</code></td>
+<td>exporter name/version, node, better-sqlite3, SQLite version, supported schema</td>
+</tr>
+</tbody></table>
+<p>The hash is <strong>integrity</strong> evidence: anyone who can write both files can write a matching pair.
+Nothing here is signed, and nothing authenticates the producing host.</p>
+<p><strong>Why <code>source.size_bytes_at_start</code> and <code>source.mtime_ms_at_start</code> stay in the <code>observation</code>
+sidecar.</strong> They are recency evidence for the reader (how large the registry was and when it was last
+written when it was read), cited by the staleness row of §10.4. They are not an identity: no path,
+device or inode accompanies them, both change on every write, and §10.7 R1 still says sameness is
+never derivable from an export. A reader who already holds the registry file can <code>stat</code> it, but then
+they can read it; the values tell a reader without the file nothing it could confirm. They are
+informational and not covered by the database hash. If a deployment does not want them, the
+decision is to drop the fields in a new sidecar version, not to replace them with an identifier.</p>
+<h3 id="104-consumer-compatibility-project-conductor">10.4 Consumer compatibility (Project Conductor)</h3>
+<p>Conductor&#39;s reader contract (<code>conductor-icn-observation/v1</code>, <code>icn_snapshot.py</code>, <code>icn_contract.py</code>,
+<code>docs/integration/icn-read-only-v1.md</code>) lives in a separate repository that was <strong>not available
+to the author of this section</strong>. Nothing in this tree references it; ICN contains no Conductor
+fixtures. Every row below marked UNVERIFIED is therefore a statement about what ICN produces,
+not about what Conductor accepts.</p>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>ICN side</th>
+<th>Conductor side</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Schema version</td>
+<td>exactly v5; any other is refused, never migrated</td>
+<td>UNVERIFIED (reported to use synthetic v5 fixtures; not inspected)</td>
+</tr>
+<tr>
+<td>Table names</td>
+<td><code>observation</code>: <code>schema_version</code>, <code>sessions</code>, <code>file_claims</code>. <code>full</code>: also <code>events</code>, <code>mailbox</code>, <code>watchers_process</code>, <code>health_cache</code>, <code>decision_index</code></td>
+<td>UNVERIFIED — does the reader require any table the observation profile omits?</td>
+</tr>
+<tr>
+<td>Required columns</td>
+<td>all 24 <code>sessions</code> columns exist in both profiles; withheld ones are <code>NULL</code> in <code>observation</code></td>
+<td>UNVERIFIED — does it read a withheld column, and does it treat <code>NULL</code> as absent?</td>
+</tr>
+<tr>
+<td>Identity values</td>
+<td><code>repo_id</code>/<code>worktree_id</code> are <code>sha256:&lt;hex&gt;</code> in <code>observation</code></td>
+<td><strong>DECISION NEEDED</strong> — if Conductor correlates to ICN&#39;s live tooling by raw <code>worktree_id</code>, the digest breaks that join</td>
+</tr>
+<tr>
+<td>Completeness marker</td>
+<td><code>&lt;dest&gt;.meta.json</code> published last; <code>--verify</code></td>
+<td>UNVERIFIED — marker name, and whether it expects one at all</td>
+</tr>
+<tr>
+<td>Sidecar format / checksum</td>
+<td>ICN-defined <code>icn-ops-registry-snapshot-meta/v1</code>; whole-file sha256</td>
+<td>UNVERIFIED — field names and hash scope are ICN choices pending the contract</td>
+</tr>
+<tr>
+<td>Missing / unavailable source</td>
+<td>typed refusal (<code>SOURCE_MISSING</code>, <code>SOURCE_LOCKED</code>, …), exit 1, nothing written</td>
+<td>UNVERIFIED mapping to UNKNOWN</td>
+</tr>
+<tr>
+<td>Stale evidence</td>
+<td><code>acquisition.finished_at</code>; <code>source.mtime_ms_at_start</code> (informational, not snapshot-bound); per-row <code>last_heartbeat</code></td>
+<td>UNVERIFIED — staleness threshold and which timestamp it trusts</td>
+</tr>
+<tr>
+<td>Privacy boundary</td>
+<td><strong>VERIFIED</strong> ICN-side by raw-byte scans (<code>registry-snapshot-observation.test.ts</code>)</td>
+<td>UNVERIFIED — is the allowlist sufficient, or too wide?</td>
+</tr>
+<tr>
+<td>Authenticity vs claimed host</td>
+<td><code>host.authenticated = null</code>; no attestation</td>
+<td>UNVERIFIED — must not present <code>host.claimed</code> as identity</td>
+</tr>
+<tr>
+<td>Version / migration</td>
+<td><code>producer.supported_schema_version</code>; future schema refused</td>
+<td>UNVERIFIED — behaviour on a v6 snapshot</td>
+</tr>
+<tr>
+<td>Snapshot consistency under writers</td>
+<td><strong>VERIFIED</strong> ICN-side (§10.2 tests, separate-process writer)</td>
+<td>UNVERIFIED — reported acquisition tests not inspected</td>
+</tr>
+</tbody></table>
+<p><strong>Reported Conductor-side findings</strong> (relayed by the Conductor team; <em>not</em> inspected here): its
+legacy reader matches lanes on raw absolute git-dir paths, does not recognise the <code>.meta.json</code>
+marker, and its envelope requires raw path identities, so against an <code>observation</code> snapshot it can
+report <code>available</code> with zero sessions. That is a Conductor fail-closed defect, handled there. The
+planned separate versioned reader (explicit profile, mandatory marker, exact policy match,
+digest-only lane lookup, conversation correlation, UNKNOWN for unmapped relations, fail-closed
+validation) asks for nothing ICN does not already provide: see the golden fixture below.</p>
+<p><strong>Open questions for the Conductor owner</strong> (answers are small and contain no registry data; do
+not send real session ids or a real registry):</p>
+<ol>
+<li>The full text of <code>docs/integration/icn-read-only-v1.md</code>.</li>
+<li>The exact SQL (or column list) the reader runs against <code>sessions</code>, <code>file_claims</code> and
+<code>schema_version</code>; and every other table or <code>PRAGMA</code> it touches.</li>
+<li>For each column it reads: required or optional, and what it does with <code>NULL</code>.</li>
+<li>Which column is the ICN/Conductor session correlation key (<code>id</code>, <code>provider_session_id</code>, a
+lane id?) and whether it compares <code>worktree_id</code> to a raw git directory path.</li>
+<li>How it recognises a <em>complete</em> snapshot: a sidecar? its name, format and hash scope?</li>
+<li>The output of <code>.schema</code> and <code>PRAGMA user_version;</code> on one synthetic fixture database (schema
+only, no rows).</li>
+<li>How it maps &quot;source missing / locked / older schema / newer schema&quot; to its UNKNOWN state.</li>
+</ol>
+<h3 id="105-limits--stated-not-hidden">10.5 Limits — stated, not hidden</h3>
+<ol>
+<li><strong>Reading a WAL source can leave <code>&lt;src&gt;-wal</code> / <code>&lt;src&gt;-shm</code> beside it.</strong> A read-only connection
+still attaches the wal-index and cannot remove it on close. Locking metadata, not registry
+content (the main file&#39;s bytes and logical content are unchanged — pinned by a test), but not
+&quot;touches nothing on disk&quot;. If the directory is not writable and no <code>-shm</code> exists the open fails
+as <code>SOURCE_UNREADABLE</code>.</li>
+<li><strong>Source identity is checked by name, not by descriptor.</strong> better-sqlite3 exposes no fd, so
+there is a window between the identity check and the open. It is narrowed (checked before the
+open and after the copy, fail-closed) but not eliminated; an attacker who can rotate the
+registry file can already do worse.</li>
+<li><strong><code>link(2)</code> needs a filesystem that supports hard links</strong> in the destination directory; where
+it does not, publication fails closed (<code>PUBLISH_FAILED</code>) rather than falling back to a
+replacing rename.</li>
+<li><strong>Hard kill leaves debris.</strong> <code>*.partial</code> files (owner-only) and, between the two publishes, a
+lone database. Both are detected; neither is auto-cleaned.</li>
+<li><strong>The export blocks the process</strong> for its duration (SQLite&#39;s copy is synchronous). Fine for a
+CLI; do not call it from the MCP server&#39;s event loop on a large registry.</li>
+<li><strong>Pseudonymised identity is guessable.</strong> <code>sha256:</code> of a path someone can enumerate is
+confirmable by that someone. It removes layout from the file; it is not a secret.</li>
+<li><strong>No authenticity.</strong> See §10.3. The pair check also validates only what SQLite exposes (schema
+text and rows). It cannot attest the unreferenced bytes of a file forged by someone who writes
+both files (free pages, page slack). The producer builds a fresh file and so leaves none; a
+consumer that must not trust the producer cannot rely on this check alone.</li>
+<li><strong>An unsafe value in a copied column refuses the whole <code>observation</code> export.</strong> <code>host</code>, <code>repo</code>,
+<code>worktree_name</code> and the other verbatim text columns must match <code>[\p{L}\p{N}._:@+ -]{1,256}</code> — in
+particular contain no <code>/</code>, so they can never be a path. The time columns (<code>started_at</code>,
+<code>last_heartbeat</code>, <code>last_progress</code>, <code>file_claims.claimed_at</code>, <code>schema_version.applied_at</code>) must be
+timestamps (<code>YYYY-MM-DD HH:MM:SS</code>, or ISO-8601 with <code>T</code>, optional fraction and <code>Z</code>); <code>agent_pid</code>,
+<code>progress_count</code> and <code>schema_version.version</code> must be numbers. Otherwise the export fails as
+<code>SNAPSHOT_VERIFY_FAILED</code> (naming the column, never the value) — before the value is written —
+rather than disclosing it or silently altering it. The remedy is to correct the registry row, or
+to use <code>full</code> inside the trust boundary. The text rule is an <em>alphabet</em>, not a grammar: it keeps
+out paths, URLs and punctuation, not words, and is sound because these columns hold identifiers
+by production contract (UUIDs, hostnames, repo and lane names). <code>file_claims.file_path</code> is
+handled separately (§10.2): shown only if repo-relative, otherwise tokenised.</li>
+<li><strong>Fixture-verified only.</strong> Tested against throwaway databases, including a separate process
+committing multi-table transactions and a real <code>SIGKILL</code>. It has not been run against the live
+shared registry.</li>
+</ol>
+<h3 id="106-golden-observation-fixture">10.6 Golden observation fixture</h3>
+<p><code>ops/mcp/src/tests/fixtures/observation-golden/</code> holds a <strong>fully synthetic</strong> observation snapshot
+produced by the real exporter from a WAL-backed fictional registry, so a consumer can write
+compatibility tests with no ICN data and no connection to ICN. Generate with
+<code>node --experimental-strip-types --no-warnings --import ./src/tests/fixtures/ts-resolve-register.mjs src/tests/fixtures/observation-golden/generate.ts &lt;empty-dir&gt;</code>
+(from <code>ops/mcp</code>, Node &gt;= 22.6, no build, nothing written under <code>dist</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>reference/contract.json</code></td>
+<td>machine-readable producer contract, <strong>derived</strong> from source and from the generated fixture (types, header, field paths, limits, error codes, reader obligations) — committed</td>
+</tr>
+<tr>
+<td><code>reference/test-vectors.json</code></td>
+<td>digest, token-formula, path-disclosure and verbatim-text vectors, plus structural fixture facts — committed</td>
+</tr>
+<tr>
+<td><code>HANDOFF.md</code></td>
+<td>self-contained description for the consumer&#39;s session</td>
+</tr>
+<tr>
+<td><code>generate.ts</code>, <code>contract.ts</code></td>
+<td>the generator and the derivation</td>
+</tr>
+</tbody></table>
+<p>The database and its sidecar are <strong>generated, not committed</strong>: the repository ignores <code>*.db</code>
+(<code>.gitignore</code>), no database is tracked anywhere in the tree, and a committed sidecar whose
+<code>sha256</code> named an absent file would mislead. <code>observation-golden-fixture.test.ts</code> generates the
+pair in a temp directory on every run and compares it with <code>reference/</code>. Committing the database
+would need an explicit decision to carve an exception to that rule; it was not made here.</p>
+<p>The fixture exercises: several activations in one lane; a second lane that must not be selected; a
+present, a <code>NULL</code> and a pre-identity conversation id; a present and a missing worktree generation;
+a cross-lane conflict on a disclosable path and on a withheld path; a path that is shown and paths
+that are withheld; and every withheld field, table and path carrying a synthetic canary that tests
+prove is absent from every byte of the database and sidecar.</p>
+<p><strong>Reproducibility, stated exactly.</strong> <code>contract.json</code> and <code>test-vectors.json</code> regenerate
+byte-identically. The database and sidecar do <strong>not</strong>: each export draws a fresh random salt for
+withheld-path tokens (deliberately — tokens must not be recomputable) and the sidecar records
+generation-time fields and tool versions. The pair is still internally consistent, and its logical
+content, with token values replaced by first-appearance labels, is identical on every run; tests
+regenerate in a child process and compare on exactly that basis. Regenerating is only needed when
+the exporter&#39;s contract changes.</p>
+<p><strong>What can be recomputed without private inputs:</strong> the <code>sha256:</code> digest of any raw value you hold;
+the token formula given a published test salt. <strong>What cannot:</strong> the fixture&#39;s own claim tokens, and
+anything about a real ICN host. Digests are unkeyed — confirmable by anyone who can enumerate the
+raw value — and are never to be described as secret, authenticated or unguessable.</p>
+<p><strong>Note on <code>repo_id</code>.</strong> It is nullable in the registry schema (added in v3 without <code>NOT NULL</code>);
+<code>repo</code> is the non-null column. The export preserves <code>NULL</code> as <code>NULL</code> and otherwise always emits a
+well-formed digest; it never invents a value and never emits the original path.</p>
+<h3 id="107-continuity-across-exports-what-icn-does-over-time">10.7 Continuity across exports (what ICN does over time)</h3>
+<p><code>ops/mcp/src/tests/fixtures/observation-series/</code> holds a series of five <strong>real consecutive exporter
+outputs</strong> (registry A x4, registry B x1) built by driving ICN&#39;s own <code>registerSession</code>,
+<code>recordHeartbeat</code>, <code>recordProgress</code> and <code>releaseSession</code>, plus an offline verifier and a
+deterministic package builder. Same producer contract as §10.6; only <em>time</em> is new. Nothing is
+edited after export. What is controlled (a virtual <code>Date</code>, re-stamped touched rows, a counter for
+<code>randomUUID</code>, fictional hosts, a mirrored claim rule) is listed in its <code>HANDOFF.md</code>, and the mirror
+is pinned to the real <code>claim_files</code> handler by <code>observation-series-semantics.test.ts</code>.</p>
+<p>Answers, from executable source and the tests that pin them:</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>May <code>provider</code>, <code>provider_session_id</code>, <code>host</code>, <code>parent_session_id</code>, <code>repo</code>, <code>started_at</code> change for an existing session id?</td>
+<td><strong>No.</strong> Set only in the <code>INSERT</code> (<code>session-runtime.ts</code> register). A resume leaves them untouched.</td>
+</tr>
+<tr>
+<td>May the lane (<code>repo_id</code>, <code>worktree_id</code>, <code>worktree_name</code>) or <code>worktree_generation</code> change for an existing id?</td>
+<td><strong>Yes, only</strong> through <code>registerSession</code> re-registering a <strong>known <code>provider_session_id</code></strong>: a <em>lane move</em> overwrites the lane columns <strong>and</strong> the generation together; a lane recreated at the same path overwrites <strong>only</strong> the generation (to <code>NULL</code> if it cannot be minted). A session with no conversation id never dedupes, so its lane never changes.</td>
+</tr>
+<tr>
+<td>Does release/retire delete the row, change a state, or keep history?</td>
+<td><code>releaseSession</code> <strong>deletes the row and its claims</strong>. There is <strong>no lifecycle-state column</strong> and no &quot;retire&quot; in the registry. Stale rows are <strong>never</strong> reaped. History lives only in <code>ops/state/session-log.jsonl</code>, outside the registry and every export. A re-registered conversation becomes a <strong>new</strong> activation.</td>
+</tr>
+<tr>
+<td>Is the acquisition start time monotonic?</td>
+<td><strong>No.</strong> <code>acquisition.started_at</code> is a sampled <code>new Date()</code>; nothing compares it with a prior export. Row stamps are SQLite <code>datetime(&#39;now&#39;)</code> at one-second resolution. Only <code>progress_count</code> is monotonic, and only within one row.</td>
+</tr>
+<tr>
+<td>Is there a stable registry-instance identifier?</td>
+<td><strong>No.</strong> No registry id, <code>user_version</code> 0, <code>application_id</code> 0. The sidecar carries no source identity. The only registry-scoped value is <code>schema_version.applied_at</code>: differing stamps prove &quot;different registries&quot;; equal stamps prove nothing (a restored copy keeps them).</td>
+</tr>
+</tbody></table>
+<p>Consequences a reader must honour (machine-readable as <code>rules</code> in <code>reference/series-contract.json</code>):
+sameness of registry is asserted out of band, never derived; a later <code>started_at</code> is not
+authenticated freshness and may even regress (the series includes an unchanged re-export taken
+with the clock stepped back); <code>NULL</code> identities are unknown and never equal; claim tokens are
+per-export and must never be compared across snapshots; <strong>absence of a row is not evidence that a
+session ended</strong>, and a stale row is not an ended session; the TTL (default 30 min,
+<code>ICN_SESSION_TTL_MINUTES</code>, minimum 5) is not in the snapshot, so staleness is UNKNOWN without an
+agreed value. Two holders of one file can coexist when the first was stale at claim time.</p>
+<p><code>python3 -I verify_series.py</code> (standard library) recomputes every per-export fact and every
+pairwise verdict from the databases and compares them with the contract, so the producer-side
+model is not its own witness.</p>
 </article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/AGENT_RUNTIME.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub ↗
 </a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
