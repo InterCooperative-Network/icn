@@ -648,8 +648,14 @@ table set; **the exact column set of all three tables** (`schema_version`, `sess
 the sidecar says); **the exact definition of every table and index** (compared with what the
 production migration ladder creates, because `sqlite_master.sql` is free text — an index
 expression, a partial-index predicate or a column `DEFAULT` can carry data no row check sees);
+no `sqlite_*` object other than the kept tables' autoindexes (`sqlite_stat1` rows are free text);
 withheld columns `NULL`; digests well-formed; every copied value inside its column's rule
-(identifier text, timestamp shape, integer); and no raw absolute path. A retry never
+(identifier text, timestamp shape, integer); and no raw absolute path.
+
+The definition check compares with the schema **this build** creates, so it is coupled to the
+build: if a later ICN build changes the DDL text of the kept tables or their indexes without
+changing the policy name, an older archived pair is refused as "definition differs", and the
+policy name (`observation-v1`) must be bumped with such a change. A retry never
 "repairs" a lone database; it is refused as `DEST_EXISTS`.
 
 `verifySnapshotPair` always returns a verdict. A directory, FIFO, link or unreadable file in place of

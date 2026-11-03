@@ -287,10 +287,29 @@ describe("B. the consumer refuses any pair whose columns are not exactly the obs
     }
   });
 
-  it("SQLite's own sqlite_* objects are still tolerated (the control for the cases above)", () => {
+  it("the producer's own sqlite_autoindex_* objects are tolerated (the control for the internal-object rule)", () => {
     const good = exportPair("observation", benignSource());
-    const dest = tamperedCopy(good, (db) => db.exec("ANALYZE")); // creates sqlite_stat1
-    expect(verifySnapshotPair(dest).ok).toBe(true);
+    const db = new Database(good, { readonly: true });
+    const internal = (db.prepare("SELECT name FROM sqlite_master WHERE substr(name, 1, 7) = 'sqlite_'").all() as Array<{ name: string }>).map((r) => r.name);
+    db.close();
+    expect(internal.length).toBeGreaterThan(0); // not vacuous: there ARE internal objects, and the pair verifies
+    expect(internal.every((n) => n.startsWith("sqlite_autoindex_"))).toBe(true);
+    expect(verifySnapshotPair(good, { expectProfile: "observation" }).ok).toBe(true);
+  });
+
+  it.each([
+    ["ANALYZE alone (sqlite_stat1 exists)", (db: Database.Database) => db.exec("ANALYZE")],
+    [
+      "sqlite_stat1 rows carrying free text",
+      (db: Database.Database) => db.exec("ANALYZE; INSERT INTO sqlite_stat1 (tbl, idx, stat) VALUES ('/home/CANARYUSER/stat-canary', 'x', 'free text')"),
+    ],
+  ])("%s is refused: the producer never emits sqlite_stat*, and its rows are free text", (_n, mutate) => {
+    const good = exportPair("observation", benignSource());
+    const dest = tamperedCopy(good, mutate as (db: Database.Database) => void);
+    const v = verifySnapshotPair(dest, { expectProfile: "observation" });
+    expect(v.ok).toBe(false);
+    expect(v.problems.join(" ")).toMatch(/unexpected internal object "sqlite_stat1"/);
+    expect(v.problems.join(" ")).not.toContain("CANARYUSER");
   });
 
   it("a SOURCE registry with a lookalike-named view is refused, not exported", () => {

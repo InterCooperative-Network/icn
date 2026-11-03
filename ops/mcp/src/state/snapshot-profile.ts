@@ -309,6 +309,7 @@ export function projectObservation(
 }
 
 let referenceObjects: ReadonlyMap<string, { type: string; sql: string | null }> | null = null;
+let referenceInternal: ReadonlySet<string> | null = null;
 /**
  * The schema objects an observation file may contain, with their exact definitions: what the
  * production migration ladder creates for the three kept tables. Derived from `migrate()` itself
@@ -332,6 +333,9 @@ function observationSchema(): ReadonlyMap<string, { type: string; sql: string | 
           sql: string | null;
         }>
       ).map((r) => [r.name, { type: r.type, sql: r.sql }])
+    );
+    referenceInternal = new Set(
+      (m.prepare("SELECT name FROM sqlite_master WHERE substr(name, 1, 7) = 'sqlite_'").all() as Array<{ name: string }>).map((r) => r.name)
     );
     return referenceObjects;
   } finally {
@@ -373,8 +377,19 @@ export function checkObservationInvariants(db: Database.Database): string[] {
       // Index names are free text too: allow only those the production ladder creates.
       problems.push(`observation file contains an unexpected index "${o.name}"`);
     } else if (want && want.type === o.type && want.sql !== o.sql) {
-      definitionProblems.push(`observation file: ${o.type} "${o.name}" definition differs from observation-v1`);
+      definitionProblems.push(
+        `observation file: ${o.type} "${o.name}" definition differs from observation-v1 as this build defines it`
+      );
     }
+  }
+  // SQLite's own `sqlite_*` objects are not schema, but they can hold rows (sqlite_stat1.stat is
+  // free text after an ANALYZE, sqlite_sequence.name is a name). The producer emits only the
+  // autoindexes of the kept tables, so anything else is refused rather than read.
+  const internalAllowed = referenceInternal ?? new Set<string>();
+  for (const o of db
+    .prepare("SELECT type, name FROM sqlite_master WHERE substr(name, 1, 7) = 'sqlite_'")
+    .all() as Array<{ type: string; name: string }>) {
+    if (!internalAllowed.has(o.name)) problems.push(`observation file contains an unexpected internal object "${o.name}"`);
   }
   if (problems.length) return problems; // shape is wrong; column-level checks would only add noise
 
