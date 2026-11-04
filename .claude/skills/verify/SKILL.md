@@ -7,7 +7,7 @@ allowed-tools: "Bash, Read, Grep, Glob"
 truth_contract:
   canonical_sources:
     - ops/state/truth/policy.json       # validation_ladder
-    - ops/state/config/repo-map.json    # workspace root (rust commands run from icn/icn/)
+    - ops/state/config/repo-map.json    # workspace root (rust commands run from icn/)
   live_load_required:
     - "git diff --name-only origin/main...HEAD"
   examples_only: []

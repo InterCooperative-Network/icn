@@ -91,7 +91,7 @@ icnctl federation ping --from alpha --to beta 2>/dev/null || echo "Federation no
 **Step 9: ops/mcp State**
 
 ```
-ssh icn-dev "cd ~/projects/icn/ops/mcp && git status --short"
+ssh icn-dev "cd \"\$(git rev-parse --show-toplevel)/ops/mcp\" && git status --short"
 ```
 
 Flag if uncommitted changes (blocks session tracking and decision audit trail).

@@ -107,7 +107,7 @@ A parameter at a lower scope overrides the parent, but only if the parent scope 
 ## Verification
 
 ```bash
-cd icn/icn
+cd "$(git rev-parse --show-toplevel)/icn"
 cargo fmt --all --check
 cargo clippy -p icn-ccl -p icn-governance -p icn-community -p icn-coop -p icn-entity --all-targets -- -D warnings
 cargo test -p icn-ccl --lib
