@@ -36,20 +36,12 @@
 import Layout from '../layouts/Layout.astro';
 import FragmentationFigure from '../components/FragmentationFigure.astro';
 import PublicLoop from '../components/PublicLoop.astro';
-import MaturityBadge from '../components/MaturityBadge.astro';
 import EvidenceBadge from '../components/EvidenceBadge.astro';
 import Icon from '../components/Icon.astro';
-import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectState';
 
-// The homepage states the shape of the maturity picture, never a per-subsystem
-// claim — those belong on /whats-real-now, where each one carries its evidence
-// class and its recorded gaps. Deriving even this summary from the generated
-// data means the homepage cannot drift into a rosier account than the
-// maturity page gives.
-const strongest = subsystemsInBand('strong');
-const weakest = subsystemsInBand('notyet');
-
-
+// The homepage deliberately carries no subsystem counts or maturity figures.
+// /whats-real-now owns the verified maturity account (PUBLIC_SITE_IA.md §3);
+// a second summary here would be a competing one that could drift from it.
 const PARTICIPATION = [
   {
     icon: 'execution' as const,
@@ -305,45 +297,23 @@ const PARTICIPATION = [
         <span class="eyebrow">Current state</span>
         <h2>What is actually built, and how we know.</h2>
         <p class="sublede">
-          ICN's subsystems are at very different stages, and the project
+          ICN is under active development. Its subsystems are at very different stages, and the project
           publishes that unevenness rather than averaging it into a
           reassuring summary. Two labels travel with every claim: how far along
           it is, and what kind of evidence sits behind it.
         </p>
       </header>
 
-      <div class="state-summary">
-        <div class="state-figure">
-          <span class="state-figure-value">{strongest.length} of {projectState.subsystems.length}</span>
-          <span class="state-figure-label">
-            subsystems were in the <MaturityBadge band="strong" /> band at the last review
-          </span>
-          <p>
-            {strongest.map((s) => s.name).join(', ')}.
-          </p>
-        </div>
-
-        <div class="state-figure">
-          <span class="state-figure-value">{weakest.length}</span>
-          <span class="state-figure-label">
-            still <MaturityBadge band="notyet" />
-          </span>
-          <p>
-            {weakest.length > 0
-              ? `${weakest.map((s) => s.name).join(', ')} — scaffolding exists, the capability does not.`
-              : 'No subsystem is currently in this band.'}
-          </p>
-        </div>
-
-        <div class="state-figure">
-          <span class="state-figure-value state-figure-date">{projectState.newestVerified}</span>
-          <span class="state-figure-label">last subsystem review</span>
-          <p>
-            That review has not been repeated since. Later changes have landed,
-            but a change landing is not a re-assessment, so treat the counts here
-            as a dated snapshot. What's real now keeps the two apart.
-          </p>
-        </div>
+      <div class="state-pointer">
+        <p>
+          The dated, per-subsystem account lives on one page. It says when each
+          part was last checked against its source, separates that from the
+          changes merged since, and lists what each part is still missing. A
+          change landing in the repository is not a re-assessment.
+        </p>
+        <p>
+          <a href="/whats-real-now" class="link-arrow">What's real now, with dates and recorded gaps</a>
+        </p>
       </div>
 
       <div class="callout callout-caution state-callout">
@@ -354,9 +324,6 @@ const PARTICIPATION = [
           against prepared data — several are. Evidence labels like
           <EvidenceBadge evidence="fixture-backed" label="Fixture-backed" /> exist
           precisely so that distinction survives contact with a homepage.
-        </p>
-        <p>
-          <a href="/whats-real-now" class="link-arrow">The full per-subsystem account, with recorded gaps</a>
         </p>
       </div>
     </div>
@@ -644,46 +611,12 @@ const PARTICIPATION = [
 
   /* ─── 7 · State ────────────────────────────────────────────────────────── */
 
-  .state-summary {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--space-xl);
+  .state-pointer {
+    max-width: var(--measure-wide);
   }
 
-  .state-figure {
-    min-width: 0;
-    padding-top: var(--space-lg);
-    border-top: 2px solid var(--border-default);
-  }
-
-  .state-figure-value {
-    display: block;
-    font-family: var(--font-heading);
-    font-size: var(--text-3xl);
-    font-weight: 700;
-    color: var(--text-heading);
-    line-height: 1.1;
-  }
-
-  .state-figure-date {
-    font-family: var(--font-mono);
-    font-size: var(--text-2xl);
-  }
-
-  .state-figure-label {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4em;
-    align-items: baseline;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    margin: var(--space-xs) 0 var(--space-sm);
-  }
-
-  .state-figure p {
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-    line-height: 1.65;
+  .state-pointer p {
+    margin-bottom: var(--space-md);
   }
 
   .state-callout {
@@ -765,10 +698,6 @@ const PARTICIPATION = [
     .story-cols {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--space-4xl);
-    }
-    .state-summary {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: var(--space-2xl);
     }
     .deeper-grid,
     .part-grid {

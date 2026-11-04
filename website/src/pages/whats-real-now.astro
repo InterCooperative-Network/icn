@@ -60,7 +60,7 @@ const freshness = describeFreshness({
   verified: { oldest: projectState.oldestVerified, newest: projectState.newestVerified },
   proseReviewed: PROSE_REVIEWED,
   entries: buildLog.entries,
-  today: new Date().toISOString().slice(0, 10),
+  builtOn: new Date().toISOString().slice(0, 10),
 });
 
 // The legend lists only the evidence classes that actually appear below —
@@ -130,9 +130,11 @@ const evidenceLegend = evidenceClassesInUse();
               {freshness.verificationUniform
                 ? ' Every row in the table carries this date.'
                 : ` Rows range from ${freshness.verifiedOldest} to ${freshness.verifiedNewest}.`}
-              That was {freshness.verificationAgeDays} days before this page was
-              built. The written framing was last re-read on
+              The written framing was last re-read on
               <time datetime={freshness.proseReviewed}>{freshness.proseReviewed}</time>.
+              This page was built on
+              <time datetime={freshness.builtOn}>{freshness.builtOn}</time>;
+              nothing here is refreshed after that date.
             </dd>
           </div>
           <div class="wrn-fresh-row">
@@ -158,6 +160,16 @@ const evidenceLegend = evidenceClassesInUse();
               standing assessment and not a verdict on today's code.
             </dd>
           </div>
+          <div class="wrn-fresh-row">
+            <dt>Operating today</dt>
+            <dd>
+              <strong>Nothing, as far as this page can say.</strong>
+              ICN has no production deployment claim and no live federation.
+              Tests and fixtures show that code behaves as designed against
+              prepared data. They do not show that an institution has run it,
+              and none of the dates above is a readiness date.
+            </dd>
+          </div>
         </dl>
 
         <div class="callout callout-note">
@@ -167,8 +179,7 @@ const evidenceLegend = evidenceClassesInUse();
             only tidy tooling. Any of these can land without making a subsystem
             more finished, and some change what the subsystem's gaps are. Until
             the subsystem is re-checked, read a recent change as "something
-            moved here", never as "this is now ready". Nothing in the project
-            has been run in ordinary use by an institution either way.
+            moved here", never as "this is now ready".
           </p>
         </div>
       </div>

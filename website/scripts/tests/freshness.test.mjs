@@ -18,11 +18,7 @@ import path from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import {
-  daysBetween,
-  describeFreshness,
-  entriesAfter,
-} from "../../src/lib/freshness.ts";
+import { describeFreshness, entriesAfter } from "../../src/lib/freshness.ts";
 
 const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -34,7 +30,7 @@ const verified = { oldest: "2026-08-14", newest: "2026-08-14" };
 const base = {
   verified,
   proseReviewed: "2026-08-17",
-  today: "2026-11-04",
+  builtOn: "2026-11-04",
 };
 
 describe("a stale verification date stays visible", () => {
@@ -50,16 +46,23 @@ describe("a stale verification date stays visible", () => {
     assert.equal(f.verifiedOldest, "2026-08-14");
   });
 
-  test("the age is measured from the verification date to the build date", () => {
+  test("the build date is carried as an absolute date, never as an age", () => {
     const f = describeFreshness({ ...base, entries: [] });
-    assert.equal(f.verificationAgeDays, 82);
-    assert.equal(daysBetween("2026-08-14", "2026-08-14"), 0);
+    assert.equal(f.builtOn, "2026-11-04");
+    for (const key of Object.keys(f)) {
+      assert.ok(!/age|days|elapsed/i.test(key), `elapsed-time field: ${key}`);
+    }
+    assert.ok(
+      !/days/i.test(
+        read("src/lib/freshness.ts").replace(/^\s*(\/\/|\*|\/\*).*$/gm, ""),
+      ),
+    );
   });
 
-  test("with no entries at all, the old date and its age are still reported", () => {
+  test("with no entries at all, the old date is still reported", () => {
     const f = describeFreshness({ ...base, entries: [] });
     assert.equal(f.selectedAfterVerification.length, 0);
-    assert.equal(f.verificationAgeDays, 82);
+    assert.equal(f.verifiedNewest, "2026-08-14");
   });
 
   test("uniform vs. spread verification dates are distinguished", () => {
@@ -174,6 +177,11 @@ describe("pages cannot turn a merged change into a maturity claim", () => {
     assert.match(wrn, /freshness\.verifiedNewest/);
   });
 
+  test("/whats-real-now separates tested from operating", () => {
+    assert.match(wrn, /Operating today/);
+    assert.match(wrn, /no production deployment claim and no live federation/);
+  });
+
   test("/whats-real-now labels the log as a selection, not a total", () => {
     assert.match(
       wrn,
@@ -207,5 +215,120 @@ describe("pages cannot turn a merged change into a maturity claim", () => {
   test("/for-cooperatives does not derive a change count from the capped log", () => {
     const coop = read("src/pages/for-cooperatives.astro");
     assert.ok(!/build-log\.generated/.test(coop));
+  });
+});
+
+// ─── One readiness account ───────────────────────────────────────────────────
+//
+// /whats-real-now owns the verified maturity account (PUBLIC_SITE_IA.md §3).
+// The homepage and /for-cooperatives link to it; they must not keep a
+// competing subsystem count or band summary. These assertions run against the
+// BUILT HTML as well as the source, because a source check alone passes while
+// a stale dist/ still serves the old text. The built-output tests fail, rather
+// than pass, when dist/ is older than the sources it was built from.
+
+const COMPETING = [
+  /\b\d+\s+of\s+\d+\s+subsystems?\b/i,
+  /\bsubsystems?\s+(were|are)\s+in\s+the\b/i,
+  /strongest\s+maturity\s+band/i,
+  /in\s+the\s+weakest/i,
+];
+
+function newestMtime(dir, exts) {
+  let newest = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) newest = Math.max(newest, newestMtime(p, exts));
+    else if (exts.some((e) => entry.name.endsWith(e)))
+      newest = Math.max(newest, fs.statSync(p).mtimeMs);
+  }
+  return newest;
+}
+
+function builtText(rel) {
+  const html = read(path.join("dist", rel));
+  return html
+    .replace(/<(script|style)[\s\S]*?<\/\1>/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+describe("the homepage and /for-cooperatives keep no competing readiness summary", () => {
+  const home = read("src/pages/index.astro");
+  const coop = read("src/pages/for-cooperatives.astro");
+
+  test("neither page source reads subsystem counts or bands", () => {
+    for (const [name, src] of [
+      ["index", home],
+      ["for-cooperatives", coop],
+    ]) {
+      assert.ok(
+        !/subsystemsInBand|projectState|project-state\.generated/.test(src),
+        `${name} reads project state`,
+      );
+      assert.ok(!/MaturityBadge/.test(src), `${name} renders a maturity badge`);
+    }
+  });
+
+  test("both still send the reader to /whats-real-now", () => {
+    assert.match(home, /href="\/whats-real-now"/);
+    assert.match(coop, /href="\/whats-real-now"/);
+  });
+
+  test("neither page is an empty redirect: both keep substantial explanation", () => {
+    assert.ok(home.length > 8000, "homepage lost its explanation");
+    assert.match(coop, /What would your cooperative need to change\?/);
+    assert.match(coop, /What is missing\?/);
+  });
+
+  test("dist/ is not older than the sources it must reflect", (t) => {
+    if (!fs.existsSync(path.join(root, "dist/index.html"))) {
+      t.skip("no dist/; run `npm run build` first");
+      return;
+    }
+    const built = Math.min(
+      fs.statSync(path.join(root, "dist/index.html")).mtimeMs,
+      fs.statSync(path.join(root, "dist/for-cooperatives/index.html")).mtimeMs,
+      fs.statSync(path.join(root, "dist/whats-real-now/index.html")).mtimeMs,
+    );
+    const sources = newestMtime(path.join(root, "src"), [
+      ".astro",
+      ".ts",
+      ".css",
+    ]);
+    assert.ok(
+      built >= sources,
+      "dist/ is older than src/ — run `npm run build` before trusting built-output tests",
+    );
+  });
+
+  for (const [name, rel] of [
+    ["homepage", "index.html"],
+    ["/for-cooperatives", "for-cooperatives/index.html"],
+  ]) {
+    test(`built ${name} carries no competing subsystem count or band summary`, (t) => {
+      if (!fs.existsSync(path.join(root, "dist", rel))) {
+        t.skip("no dist/; run `npm run build` first");
+        return;
+      }
+      const text = builtText(rel);
+      for (const re of COMPETING)
+        assert.ok(!re.test(text), `${name} matches ${re}`);
+      assert.match(text, /What's real now/);
+    });
+  }
+
+  test("built /whats-real-now still carries the dated account and no elapsed-days figure", (t) => {
+    if (!fs.existsSync(path.join(root, "dist/whats-real-now/index.html"))) {
+      t.skip("no dist/; run `npm run build` first");
+      return;
+    }
+    const text = builtText("whats-real-now/index.html");
+    assert.match(text, /Checked, changed, and not yet re-checked/);
+    assert.match(text, /2026-08-14/);
+    assert.ok(
+      !/\b\d+\s+days\s+before\b/.test(text),
+      "elapsed-days figure is back",
+    );
   });
 });

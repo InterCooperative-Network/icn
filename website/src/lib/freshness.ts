@@ -32,15 +32,19 @@ export interface FreshnessInput {
   proseReviewed: string;
   /** The selected log entries, in any order. Not modified. */
   entries: readonly DatedEntry[];
-  /** The build date (ISO). Passed in so the result is deterministic. */
-  today: string;
+  /**
+   * The date this page was built (ISO), carried through as an absolute date.
+   * It is never turned into an elapsed-days figure: that number is only true
+   * on the day of the build and would quietly age between deployments.
+   */
+  builtOn: string;
 }
 
 export interface Freshness {
   verifiedNewest: string;
   verifiedOldest: string;
-  /** Whole days from the NEWEST subsystem verification to the build date. */
-  verificationAgeDays: number;
+  /** Absolute date this page was built. Not an age. */
+  builtOn: string;
   proseReviewed: string;
   /** True when no subsystem row has been verified after the oldest date. */
   verificationUniform: boolean;
@@ -70,11 +74,6 @@ function parseIso(value: string): number {
   return ms;
 }
 
-/** Whole days from `from` to `to`. Negative when `to` is earlier. */
-export function daysBetween(from: string, to: string): number {
-  return Math.round((parseIso(to) - parseIso(from)) / 86_400_000);
-}
-
 /**
  * Entries dated strictly after `date`. ISO dates compare correctly as
  * strings, but both sides are validated first so a malformed date fails the
@@ -92,8 +91,9 @@ export function entriesAfter<T extends DatedEntry>(
 }
 
 export function describeFreshness(input: FreshnessInput): Freshness {
-  const { verified, proseReviewed, entries, today } = input;
+  const { verified, proseReviewed, entries, builtOn } = input;
   parseIso(proseReviewed);
+  parseIso(builtOn);
 
   const after = entriesAfter(entries, verified.newest);
   const areas = new Set<string>();
@@ -104,7 +104,7 @@ export function describeFreshness(input: FreshnessInput): Freshness {
   return {
     verifiedNewest: verified.newest,
     verifiedOldest: verified.oldest,
-    verificationAgeDays: daysBetween(verified.newest, today),
+    builtOn,
     proseReviewed,
     verificationUniform: verified.oldest === verified.newest,
     selectedAfterVerification: after,

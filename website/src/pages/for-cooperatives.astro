@@ -13,20 +13,15 @@
 // and answers each against what exists today. It never describes a pilot,
 // a signup, or a product to join, because none exists.
 //
-// Claim discipline (ADR-0032): capability statements here are derived from the
-// generated project-state projection, with their review date attached, rather
-// than asserted in prose. The AdoptionPath figure carries its own readiness
-// axis; it is deliberately not the subsystem maturity taxonomy.
+// Claim discipline (ADR-0032): this page carries no subsystem counts or
+// maturity figures. /whats-real-now owns the verified maturity account and
+// this page links to it rather than keeping a competing summary. The
+// AdoptionPath figure carries its own readiness axis; it is deliberately not
+// the subsystem maturity taxonomy.
 
 import Layout from '../layouts/Layout.astro';
 import AdoptionPath from '../components/AdoptionPath.astro';
 import ReadingLadder from '../components/ReadingLadder.astro';
-import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectState';
-
-const strongest = subsystemsInBand('strong');
-const notYet = subsystemsInBand('notyet');
-const total = projectState.subsystems.length;
-const reviewed = projectState.newestVerified;
 ---
 
 <Layout
@@ -108,19 +103,12 @@ const reviewed = projectState.newestVerified;
         <li>No announced institutional pilot. Nothing on this site should be read as one.</li>
       </ul>
 
-      <div class="callout callout-caution coop-state">
-        <span class="callout-label">The subsystem picture, with its date</span>
-        <p>
-          At the last per-subsystem review ({reviewed}), {strongest.length} of
-          the {total} subsystems were in the strongest maturity band and
-          {notYet.length === 0 ? 'none were' : `${notYet.length} ${notYet.length === 1 ? 'was' : 'were'}`} in
-          the weakest. That review has not been repeated since, so treat the
-          count as a dated snapshot, not a current guarantee. Even the strongest
-          band means "exercised by tests or fixtures in this repository", not
-          "proven in a working institution".
-          <a href="/whats-real-now">See each claim with its evidence</a>.
-        </p>
-      </div>
+      <p class="coop-state">
+        For how far along each part of the system is, and when that was last
+        checked against its source, use one page, <a href="/whats-real-now">What's
+        real now</a>. It keeps what was checked separate from what has merged
+        since. A recent change is not evidence that a part is ready.
+      </p>
 
       <h2 id="q-test">What can you test without joining a production system?</h2>
       <p>
