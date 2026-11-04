@@ -42,6 +42,7 @@ import EvidenceBadge from '../components/EvidenceBadge.astro';
 import ReadingLadder from '../components/ReadingLadder.astro';
 import { PROJECT_STATE as projectState, evidenceClassesInUse } from '../lib/projectState';
 import buildLog from '../data/build-log.generated.json';
+import { describeFreshness } from '../lib/freshness';
 
 /**
  * Editorial review date for the prose on this page. This is NOT the data
@@ -51,6 +52,16 @@ import buildLog from '../data/build-log.generated.json';
 const PROSE_REVIEWED = '2026-08-17';
 
 const subsystems = projectState.subsystems;
+
+// Relates the two date signals (verification vs. the selected change log).
+// The build date is the only clock; the log is a bounded selection, so
+// nothing below derives a total from it. See src/lib/freshness.ts.
+const freshness = describeFreshness({
+  verified: { oldest: projectState.oldestVerified, newest: projectState.newestVerified },
+  proseReviewed: PROSE_REVIEWED,
+  entries: buildLog.entries,
+  today: new Date().toISOString().slice(0, 10),
+});
 
 // The legend lists only the evidence classes that actually appear below —
 // a legend explaining classes the reader will never encounter is noise.
@@ -93,6 +104,72 @@ const evidenceLegend = evidenceClassesInUse();
               The written framing on this page, re-read against the data above.
             </span>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ VERIFIED / CHANGED / REASSESS ═════════════════════════════════════ -->
+  <section class="section section-alt wrn-fresh" aria-labelledby="wrn-fresh-h">
+    <div class="container">
+      <div class="wrn-fresh-inner">
+        <h2 id="wrn-fresh-h">Checked, changed, and not yet re-checked</h2>
+        <p class="sublede">
+          Code keeps landing in the repository. The assessments in the table
+          below only move when someone re-reads a subsystem against its source.
+          These are different events, and this page keeps them apart.
+        </p>
+
+        <dl class="wrn-fresh-list">
+          <div class="wrn-fresh-row">
+            <dt>Last checked</dt>
+            <dd>
+              <strong>
+                Subsystem evidence, <time datetime={freshness.verifiedNewest}>{freshness.verifiedNewest}</time>.
+              </strong>
+              {freshness.verificationUniform
+                ? ' Every row in the table carries this date.'
+                : ` Rows range from ${freshness.verifiedOldest} to ${freshness.verifiedNewest}.`}
+              That was {freshness.verificationAgeDays} days before this page was
+              built. The written framing was last re-read on
+              <time datetime={freshness.proseReviewed}>{freshness.proseReviewed}</time>.
+            </dd>
+          </div>
+          <div class="wrn-fresh-row">
+            <dt>Changed since</dt>
+            <dd>
+              <strong>Some changes have landed after that check.</strong>
+              The list further down shows a selection of them{freshness.selectedAfterVerification.length > 0
+                ? `, touching these areas: ${freshness.areasTouched.join(', ')}`
+                : ''}.
+              It is a selection, not a complete list, and it has no total:
+              only reviewed, merged changes of certain kinds are shown, drawn
+              from the most recent {buildLog.scanned} commits and capped at a
+              fixed number of entries.
+            </dd>
+          </div>
+          <div class="wrn-fresh-row">
+            <dt>Not yet re-checked</dt>
+            <dd>
+              <strong>The maturity assessment for every subsystem.</strong>
+              Re-checking means reading the subsystem's current source, tests,
+              and recorded gaps again. That is separate, maintainer-owned work
+              that has not been done since the date above, so the table is the
+              standing assessment and not a verdict on today's code.
+            </dd>
+          </div>
+        </dl>
+
+        <div class="callout callout-note">
+          <span class="callout-label">Why a merged change is not a readiness change</span>
+          <p>
+            A change can add a capability, fix a defect, record a decision, or
+            only tidy tooling. Any of these can land without making a subsystem
+            more finished, and some change what the subsystem's gaps are. Until
+            the subsystem is re-checked, read a recent change as "something
+            moved here", never as "this is now ready". Nothing in the project
+            has been run in ordinary use by an institution either way.
+          </p>
         </div>
       </div>
     </div>
@@ -257,7 +334,12 @@ const evidenceLegend = evidenceClassesInUse();
         {buildLog.entries.map((entry) => (
           <li class="wrn-log-item">
             <time datetime={entry.date} class="wrn-log-date">{entry.date}</time>
-            <span class="wrn-log-class">{entry.class.label}</span>
+            <span class="wrn-log-meta">
+              <span class="wrn-log-class">{entry.class.label}</span>
+              {entry.date > freshness.verifiedNewest && (
+                <span class="wrn-log-after">After the {freshness.verifiedNewest} subsystem check</span>
+              )}
+            </span>
             <span class="wrn-log-body">
               <span class="wrn-log-desc">{entry.description}</span>
               <a class="wrn-log-link" href={entry.prUrl} target="_blank" rel="noopener">
@@ -269,7 +351,8 @@ const evidenceLegend = evidenceClassesInUse();
       </ol>
 
       <p class="figure-note">
-        Newest entry {buildLog.newestEntryDate}. Selected from the last
+        Newest entry {buildLog.newestEntryDate}. This is a selection, not every
+        change and not a count of changes. It is drawn from the last
         {buildLog.scanned} commits: only reviewed, merged changes whose type
         corresponds to a change in what the project does — new behaviour,
         corrections, hardening, recorded decisions, and re-verifications of this
@@ -315,6 +398,56 @@ const evidenceLegend = evidenceClassesInUse();
 </Layout>
 
 <style>
+  .wrn-fresh-inner {
+    max-width: var(--measure-wide);
+  }
+
+  .wrn-fresh-inner h2 {
+    margin-bottom: var(--space-md);
+  }
+
+  .wrn-fresh time {
+    white-space: nowrap;
+  }
+
+  .wrn-fresh-list {
+    margin: var(--space-xl) 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-lg);
+  }
+
+  .wrn-fresh-row {
+    display: grid;
+    gap: var(--space-xs);
+    padding-left: var(--space-md);
+    border-left: 3px solid var(--border-teal);
+  }
+
+  .wrn-fresh-row dt {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .wrn-fresh-row dd {
+    margin: 0;
+    line-height: 1.65;
+  }
+
+  .wrn-log-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .wrn-log-after {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
   .wrn-hero {
     padding-top: calc(64px + var(--space-3xl));
   }

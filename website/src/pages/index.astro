@@ -40,7 +40,6 @@ import MaturityBadge from '../components/MaturityBadge.astro';
 import EvidenceBadge from '../components/EvidenceBadge.astro';
 import Icon from '../components/Icon.astro';
 import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectState';
-import buildLog from '../data/build-log.generated.json';
 
 // The homepage states the shape of the maturity picture, never a per-subsystem
 // claim — those belong on /whats-real-now, where each one carries its evidence
@@ -50,13 +49,6 @@ import buildLog from '../data/build-log.generated.json';
 const strongest = subsystemsInBand('strong');
 const weakest = subsystemsInBand('notyet');
 
-// The subsystem table is only as current as its last review. Counting the
-// recorded changes merged after that date lets the page say how far the code
-// has moved since, instead of implying the table is live. The count is a
-// floor: the build log is a curated selection, not every commit.
-const changesSinceReview = buildLog.entries.filter(
-  (e: { date: string }) => e.date > projectState.newestVerified,
-).length;
 
 const PARTICIPATION = [
   {
@@ -347,9 +339,9 @@ const PARTICIPATION = [
           <span class="state-figure-value state-figure-date">{projectState.newestVerified}</span>
           <span class="state-figure-label">last subsystem review</span>
           <p>
-            That review has not been repeated since. At least {changesSinceReview}
-            recorded changes have merged after it, so treat the counts here as a
-            dated snapshot. They are not re-derived from the code on each build.
+            That review has not been repeated since. Later changes have landed,
+            but a change landing is not a re-assessment, so treat the counts here
+            as a dated snapshot. What's real now keeps the two apart.
           </p>
         </div>
       </div>
