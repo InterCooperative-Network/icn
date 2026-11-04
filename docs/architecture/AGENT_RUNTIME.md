@@ -729,6 +729,15 @@ planned separate versioned reader (explicit profile, mandatory marker, exact pol
 digest-only lane lookup, conversation correlation, UNKNOWN for unmapped relations, fail-closed
 validation) asks for nothing ICN does not already provide: see the golden fixture below.
 
+**Later Conductor report (external, not reproduced by ICN).** The continuity-series handoff
+(`ops/mcp/src/tests/fixtures/observation-series/HANDOFF.md`, "Independent consumer
+verification") records that Conductor's separately developed consumer verified the five series
+exports offline at its commit `3d56e66`, after fixing three consumer-side defects, and that no
+producer defect was identified. ICN still has not inspected that reader: every UNVERIFIED row and
+every open question in this section stays open until the Conductor owner answers it. The report
+shows the contract is implementable by an independent reader; it does not establish producer
+authenticity, registry identity, clock ordering, or the behaviour of any live registry.
+
 **Open questions for the Conductor owner** (answers are small and contain no registry data; do
 not send real session ids or a real registry):
 
