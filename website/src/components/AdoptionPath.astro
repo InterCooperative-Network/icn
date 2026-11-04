@@ -116,7 +116,13 @@ const stages: Stage[] = [
     gloss:
       'One bounded function moves over — decided by the members, reversible, and narrow enough that the cooperative can still operate if it is reversed.',
     icon: 'authority',
-    readiness: 'building',
+    // Corrected from 'building' (the #2791 original): the only runnable
+    // end-to-end governed loop is the Rehearsal Node, recorded in
+    // docs/STATE.md as non_production=true, signed=false, with no pilot and no
+    // production deployment claim; docs/status.toml records stored votes as not
+    // independently verifiable. "Authoritative for a real function" therefore
+    // has nothing implemented to point at. PENDING MAINTAINER CONFIRMATION.
+    readiness: 'direction',
   },
   {
     n: '06',
@@ -176,13 +182,15 @@ const stages: Stage[] = [
 
   <p class="adopt-foot">
     <span class="adopt-foot-eyebrow">Where this is honest</span>
-    The two ends of this path are the most real part of it. Describing an
-    institution and running one bounded governed loop both rest on implemented
-    subsystems. The middle — reconciling against incumbent systems, and running
-    a function in parallel with one — is the least built part of ICN, and there
-    is no import tool, no connector library, and no migration product to point
-    at. An institution attempting this today would be doing the middle stages by
-    hand, with the project.
+    Only the first two stages rest on anything that exists today: doing the
+    inventory on paper needs no software, and describing an institution as
+    scopes, membership, and rules uses implemented parts of ICN. Running one
+    bounded governed loop exists only as a non-production rehearsal, and there
+    is no production deployment. Reconciling against incumbent systems, running
+    in parallel with one, and becoming authoritative are all direction, not
+    product: there is no import tool, no connector library, and no migration
+    product to point at. An institution attempting this today would be doing the
+    bridging stages by hand, with the project.
   </p>
 </figure>
 

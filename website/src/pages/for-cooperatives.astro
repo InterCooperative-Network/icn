@@ -131,6 +131,12 @@ import ReadingLadder from '../components/ReadingLadder.astro';
   <section class="section">
     <div class="container narrow">
       <h2 id="adoption-path" class="path-heading">If it did fit: a path that never requires a big-bang switch</h2>
+      <p class="path-note">
+        The readiness labels on this path are this site's editorial reading of
+        what exists. They are not maturity scores for any subsystem. The
+        evidence-backed account, with dates, is
+        <a href="/whats-real-now">What's real now</a>.
+      </p>
       <AdoptionPath />
     </div>
   </section>
@@ -229,6 +235,19 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 
   .coop-state {
     margin: var(--space-xl) 0;
+  }
+
+  /* The four questions and the adoption path are linked to by id; keep them
+     clear of the fixed 64px header. */
+  h2[id] {
+    scroll-margin-top: calc(64px + var(--space-md));
+  }
+
+  .path-note {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    max-width: var(--measure-wide);
+    margin: 0 0 var(--space-lg);
   }
 
   .path-heading {

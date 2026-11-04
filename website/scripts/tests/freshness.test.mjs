@@ -332,3 +332,141 @@ describe("the homepage and /for-cooperatives keep no competing readiness summary
     );
   });
 });
+
+// ─── Tranche 4: compaction must not delete evidence ──────────────────────────
+//
+// The phone layout folds gap lists and older log entries into native <details>.
+// That is only acceptable if every gap and every selected change is still in
+// the HTML a no-JavaScript reader receives. These run against the built page.
+
+const decode = (t) =>
+  t
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+const norm = (t) => decode(t).replace(/\s+/g, " ").trim();
+
+describe("collapsing the phone layout deletes no evidence", () => {
+  const have = fs.existsSync(path.join(root, "dist/whats-real-now/index.html"));
+
+  test("every recorded gap is present in the built page", (t) => {
+    if (!have) return t.skip("no dist/; run `npm run build` first");
+    const html = norm(builtText("whats-real-now/index.html"));
+    const state = JSON.parse(read("src/data/project-state.generated.json"));
+    let n = 0;
+    for (const s of state.subsystems)
+      for (const gap of s.gaps) {
+        n++;
+        assert.ok(
+          html.includes(norm(gap)),
+          `missing gap (${s.id}): ${gap.slice(0, 60)}`,
+        );
+      }
+    assert.ok(n > 0, "no gaps to check; the test would be vacuous");
+  });
+
+  test("every gap list sits in a native <details>, not behind script", (t) => {
+    if (!have) return t.skip("no dist/; run `npm run build` first");
+    const html = read("dist/whats-real-now/index.html");
+    const lists = (html.match(/<ul class="subsystem-gaps/g) ?? []).length;
+    const wrapped = (
+      html.match(
+        /<details class="subsystem-gap-details[^>]*>\s*<summary[\s\S]*?<\/summary>\s*<ul class="subsystem-gaps/g,
+      ) ?? []
+    ).length;
+    assert.ok(lists > 0);
+    assert.equal(wrapped, lists);
+  });
+
+  test("every selected change is present, including those folded away", (t) => {
+    if (!have) return t.skip("no dist/; run `npm run build` first");
+    const html = read("dist/whats-real-now/index.html");
+    const log = JSON.parse(read("src/data/build-log.generated.json"));
+    assert.equal(
+      (html.match(/class="wrn-log-item"/g) ?? []).length,
+      log.entries.length,
+    );
+    assert.ok(
+      log.entries.length > 5,
+      "nothing is folded; the test would be vacuous",
+    );
+  });
+
+  test("every subsystem has an anchor and a link from the short version", (t) => {
+    if (!have) return t.skip("no dist/; run `npm run build` first");
+    const html = read("dist/whats-real-now/index.html");
+    const state = JSON.parse(read("src/data/project-state.generated.json"));
+    for (const s of state.subsystems) {
+      assert.ok(html.includes(`id="sub-${s.id}"`), `no row anchor for ${s.id}`);
+      assert.ok(
+        html.includes(`href="#sub-${s.id}"`),
+        `no short-version link for ${s.id}`,
+      );
+    }
+  });
+
+  test("the short version is derived from the projection and makes no comparative claims", () => {
+    const wrn = read("src/pages/whats-real-now.astro");
+    assert.match(wrn, /subsystemsInBand\(band\)/);
+    assert.ok(
+      !/moving fastest|trailing the substrate|load-bearing does not/i.test(
+        wrn.replace(/^\s*\/\/.*$/gm, ""),
+      ),
+    );
+  });
+});
+
+describe("the homepage action says what it is", () => {
+  test("the primary action is not 'See ICN work' and the page says the walkthrough is fictional", (t) => {
+    if (!fs.existsSync(path.join(root, "dist/index.html")))
+      return t.skip("no dist/");
+    const text = builtText("index.html");
+    assert.ok(!/\bSee ICN work\b/.test(text), "old CTA label is back");
+    assert.match(text, /Follow one decision/);
+    assert.match(text, /A fictional walkthrough, not a live system/);
+  });
+});
+
+describe("AdoptionPath readiness labels are not stronger than the evidence", () => {
+  const src = read("src/components/AdoptionPath.astro");
+  const stages = [
+    ...src.matchAll(/n: '(\d\d)',[\s\S]*?readiness: '(\w+)'/g),
+  ].map((m) => [m[1], m[2]]);
+
+  test("six stages are parsed", () => {
+    assert.equal(stages.length, 6);
+  });
+
+  test("only stage 01 is 'today'; nothing past description is 'building'", () => {
+    const by = Object.fromEntries(stages);
+    assert.equal(by["01"], "today");
+    // 02 describes an institution using implemented entity/governance parts.
+    // 03-06 need tooling or a production deployment that does not exist.
+    for (const n of ["03", "04", "05", "06"])
+      assert.equal(by[n], "direction", `stage ${n}`);
+  });
+
+  test("the footer does not claim a runnable production loop", () => {
+    assert.ok(!/both rest on implemented\s+subsystems/.test(src));
+    assert.match(src, /non-production rehearsal/);
+  });
+
+  test("/for-cooperatives says the labels are editorial, not maturity scores", () => {
+    const coop = read("src/pages/for-cooperatives.astro");
+    assert.match(coop, /editorial reading/);
+    assert.match(coop, /not maturity scores/);
+  });
+});
+
+describe("in-page links do not land under the fixed header", () => {
+  test("anchored rows and headings carry a scroll offset", () => {
+    const table = read("src/components/SubsystemTable.astro");
+    const wrn = read("src/pages/whats-real-now.astro");
+    assert.match(table, /tr\[id\]\s*\{[^}]*scroll-margin-top:\s*calc\(64px/);
+    assert.match(wrn, /h2\[id\]\s*\{[^}]*scroll-margin-top:\s*calc\(64px/);
+    const coop = read("src/pages/for-cooperatives.astro");
+    assert.match(coop, /h2\[id\]\s*\{[^}]*scroll-margin-top:\s*calc\(64px/);
+  });
+});
