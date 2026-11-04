@@ -40,6 +40,7 @@ import MaturityBadge from '../components/MaturityBadge.astro';
 import EvidenceBadge from '../components/EvidenceBadge.astro';
 import Icon from '../components/Icon.astro';
 import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectState';
+import buildLog from '../data/build-log.generated.json';
 
 // The homepage states the shape of the maturity picture, never a per-subsystem
 // claim — those belong on /whats-real-now, where each one carries its evidence
@@ -48,6 +49,14 @@ import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectS
 // maturity page gives.
 const strongest = subsystemsInBand('strong');
 const weakest = subsystemsInBand('notyet');
+
+// The subsystem table is only as current as its last review. Counting the
+// recorded changes merged after that date lets the page say how far the code
+// has moved since, instead of implying the table is live. The count is a
+// floor: the build log is a curated selection, not every commit.
+const changesSinceReview = buildLog.entries.filter(
+  (e: { date: string }) => e.date > projectState.newestVerified,
+).length;
 
 const PARTICIPATION = [
   {
@@ -101,8 +110,9 @@ const PARTICIPATION = [
         </h1>
 
         <p class="lede hero-lede">
-          The InterCooperative Network is shared digital infrastructure for
-          cooperatives, communities, and federations. It connects the rules an
+          The network is the people, cooperatives, communities, and federations
+          who choose to coordinate. The InterCooperative Network software is the
+          shared infrastructure beneath them. It connects the rules an
           institution sets, the decisions it makes under them, the actions that
           follow, and the durable proof of why — instead of scattering those
           across six products owned by somebody else.
@@ -227,6 +237,14 @@ const PARTICIPATION = [
           without depending on a vendor to still exist, still export, and still
           be telling the truth.
         </p>
+        <p>
+          The direction, which is a design goal and not a shipped capability,
+          is that institutions which keep their own records this way can also
+          coordinate with one another on terms each of them has agreed to,
+          without any one of them, or any vendor, becoming the owner of the
+          relationship. Federation between institutions is not running today.
+          <a href="/whats-real-now">What's real now</a> says what exists.
+        </p>
       </div>
     </div>
   </section>
@@ -306,7 +324,7 @@ const PARTICIPATION = [
         <div class="state-figure">
           <span class="state-figure-value">{strongest.length} of {projectState.subsystems.length}</span>
           <span class="state-figure-label">
-            subsystems in the <MaturityBadge band="strong" /> band
+            subsystems were in the <MaturityBadge band="strong" /> band at the last review
           </span>
           <p>
             {strongest.map((s) => s.name).join(', ')}.
@@ -327,10 +345,11 @@ const PARTICIPATION = [
 
         <div class="state-figure">
           <span class="state-figure-value state-figure-date">{projectState.newestVerified}</span>
-          <span class="state-figure-label">last verified against source</span>
+          <span class="state-figure-label">last subsystem review</span>
           <p>
-            Generated from the repository's own state file on every build, so
-            this page cannot quietly fall behind the code.
+            That review has not been repeated since. At least {changesSinceReview}
+            recorded changes have merged after it, so treat the counts here as a
+            dated snapshot. They are not re-derived from the code on each build.
           </p>
         </div>
       </div>
