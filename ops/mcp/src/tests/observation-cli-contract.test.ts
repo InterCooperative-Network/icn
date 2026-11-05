@@ -24,6 +24,13 @@ import { addSession, makeRegistry, removeDir, sha256File, tempDir } from "./fixt
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
+const [NODE_MAJOR, NODE_MINOR] = process.versions.node.split(".").map(Number) as [number, number];
+const CAN_STRIP_TYPES = NODE_MAJOR > 22 || (NODE_MAJOR === 22 && NODE_MINOR >= 6);
+
+// The CLI runs under Node's type stripping (22.6+). `engines` still allows Node 20, where this whole
+// suite skips VISIBLY rather than failing before the CLI loads (same guard as the sibling fixtures).
+const suite = describe.skipIf(!CAN_STRIP_TYPES);
+
 function cli(...args: string[]) {
   return spawnSync(
     process.execPath,
@@ -39,7 +46,7 @@ function cli(...args: string[]) {
   );
 }
 
-describe("snapshot-export CLI contract (source-level invocation)", () => {
+suite("snapshot-export CLI contract (source-level invocation)", () => {
   let work: string;
   let out: string;
   beforeEach(() => {
