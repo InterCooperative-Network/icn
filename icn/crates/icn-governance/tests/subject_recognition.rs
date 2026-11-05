@@ -266,9 +266,11 @@ fn unicode_normalisation_forms_are_distinct_domains() {
         SubjectRecognitionV1::recognize_bootstrap_rehearsal(&GovernanceDomainId::new(nfc), &b)
             .is_ok()
     );
-    assert!(
-        SubjectRecognitionV1::recognize_bootstrap_rehearsal(&GovernanceDomainId::new(nfd), &b)
-            .is_err()
+    assert_eq!(
+        SubjectRecognitionV1::recognize_bootstrap_rehearsal(&GovernanceDomainId::new(nfd), &b),
+        Err(RecognitionError::Genesis(
+            GenesisVerifyError::ContextIdMismatch
+        ))
     );
 }
 
@@ -352,8 +354,9 @@ fn recognition_cannot_be_reused_in_another_context() {
 
 #[test]
 fn a_principal_is_not_a_subject() {
-    // Type level: the constructor derives the Subject from a verified genesis and offers no
-    // parameter for one, so a device Principal cannot be substituted. The two types are distinct.
+    // Type level (compile-time, not asserted at runtime): the constructor derives the Subject from
+    // a verified genesis and has no Subject parameter, so a device Principal cannot be passed in.
+    // The TypeId check only documents that the two types are distinct.
     assert_ne!(TypeId::of::<SubjectId>(), TypeId::of::<PrincipalKey>());
 
     // Value level: even the raw bytes of the device key, forced into a SubjectId, would commit a
@@ -446,9 +449,10 @@ fn mutating_any_committed_field_changes_the_hash() {
 
 #[test]
 fn length_prefix_prevents_trading_bytes_between_domain_and_subject() {
-    // Without a length prefix, domain "X" + subject S and domain "X||S[0]" + subject S[1..]||?
-    // could collide. Subject is fixed-width, so build the nearest adversarial pair and require
-    // different hashes.
+    // Smoke test only. Every field after the domain is fixed-width, so a prefix-free concatenation
+    // would also differ in total length here; this test would NOT fail if the u64le prefix were
+    // removed. The framing itself is pinned by `preimages_follow_the_documented_field_order`
+    // (hand-built preimage hashed with raw BLAKE3) and by the independent Python reference.
     let s = subject_from_hex(GEN_A_SUBJECT_ID);
     let kind = RecognitionBasisKind::BootstrapRehearsalV1;
     let bh = bootstrap_rehearsal_basis_hash(
@@ -510,5 +514,24 @@ fn basis_hash_type_has_no_public_constructor() {
         DOMAIN,
         &subject_from_hex(GEN_A_SUBJECT_ID),
         &context_ref_from_hex(GEN_A_SUBJECT_CONTEXT_REF),
+    );
+}
+
+#[test]
+fn a_second_context_incarnation_is_a_different_subject_and_does_not_cross_verify() {
+    // Same domain, same continuity secret, different salt => a different context incarnation.
+    let d = SubjectContextDescriptor::governance_domain_v1(DOMAIN, ContextSalt::from_bytes(seq(1)))
+        .unwrap();
+    let root = ContinuityRoot::new(seq(0x80), d.context_nonce(), 4);
+    let reincarnated = incept_subject_context_v1(&d, &root, device_for(0x40)).unwrap();
+
+    let first = recognise(&vector_bundle());
+    let second = recognise(&reincarnated);
+    assert_ne!(first.subject(), second.subject());
+    assert_ne!(first.basis_hash(), second.basis_hash());
+    assert_ne!(first.recognition_hash(), second.recognition_hash());
+    assert_eq!(
+        first.verify_against_genesis(&reincarnated),
+        Err(RecognitionError::Mismatch)
     );
 }

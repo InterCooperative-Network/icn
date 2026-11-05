@@ -190,8 +190,11 @@ vector — no genesis exists for that pairing): basis hash
 `5e7bc9db8ef7246acd3e3d569ce14d885ee9e2a2bd255515bae8b06383d2c916`.
 
 The values were produced by `subject_recognition_reference.py`, written from this document with a
-minimal single-chunk BLAKE3 (checked against the published empty-input hash), sharing no code with
-Rust. The script reads the `EXPECT_*` literals in the Rust test only as a comparison target and
+minimal single-chunk BLAKE3, sharing no code with Rust. Because the two preimages are 143 B and
+127 B (three and two 64-byte blocks), the script self-checks its BLAKE3 against the published
+empty-input hash **and** ten multi-block digests (lengths 1–1024, including 63/64/65, 127/128/129
+and 143) before deriving anything; those digests agree with the Rust `blake3` crate at every
+length 0–1024. The script reads the `EXPECT_*` literals in the Rust test only as a comparison target and
 exits non-zero on disagreement:
 
 ```bash
@@ -210,8 +213,9 @@ Wrong domain; empty domain; case, whitespace, NUL, trailing-delimiter and NFC/NF
 another Subject's genesis; a genesis for another domain; unsupported genesis version; mutated salt;
 unsupported standing and basis tags; mutation of domain, Subject and basis hash; device
 independence (a different initial device yields the identical recognition); a device Principal's
-bytes forced into a Subject; length-prefix framing between domain and Subject; tag prefix-freeness
-and separation; rehearsal basis is never production-grade. Type-level: a Subject is not a
+bytes forced into a Subject; a second context incarnation (different salt) giving a different Subject that does not cross-verify; tag prefix-freeness
+and separation; rehearsal basis is never production-grade. Length-prefix framing is pinned by the hand-built preimage test and the
+independent reference, not by a dedicated negative test. Type-level: a Subject is not a
 `PrincipalKey`, `SubjectRecognitionV1` has private fields and no Subject parameter, and the basis
 hash type has no public constructor.
 

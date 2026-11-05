@@ -9,8 +9,9 @@ The `EXPECT_*` literals in tests/subject_recognition.rs are read purely as a com
 the script exits non-zero on any disagreement.
 
 BLAKE3 is implemented here for inputs of at most one 1024-byte chunk (every GEN-B preimage is far
-smaller), because the stdlib has no BLAKE3. The implementation is itself checked against the
-published BLAKE3 empty-input hash before use.
+smaller), because the stdlib has no BLAKE3. Before use it is self-checked against the published
+empty-input hash and against 10 pattern-input digests (lengths 1, 63, 64, 65, 127, 128, 129, 143,
+1023, 1024) that cross block boundaries, cross-checked against the Rust `blake3` crate.
 
 Run:  python3 icn/crates/icn-governance/tests/reference/subject_recognition_reference.py
 """
@@ -116,10 +117,32 @@ def derive(domain):
     return bp, bh, rp, blake3(rp)
 
 
+BLAKE3_PATTERN_VECTORS = [
+    (1, "2d3adedff11b61f14c886e35afa036736dcd87a74d27b5c1510225d0f592e213"),
+    (63, "e9bc37a594daad83be9470df7f7b3798297c3d834ce80ba85d6e207627b7db7b"),
+    (64, "4eed7141ea4a5cd4b788606bd23f46e212af9cacebacdc7d1f4c6dc7f2511b98"),
+    (65, "de1e5fa0be70df6d2be8fffd0e99ceaa8eb6e8c93a63f2d8d1c30ecb6b263dee"),
+    (127, "d81293fda863f008c09e92fc382a81f5a0b4a1251cba1634016a0f86a6bd640d"),
+    (128, "f17e570564b26578c33bb7f44643f539624b05df1a76c81f30acd548c44b45ef"),
+    (129, "683aaae9f3c5ba37eaaf072aed0f9e30bac0865137bae68b1fde4ca2aebdcb12"),
+    (143, "c6f7010b6eeae3b1dbe83b6322c26d9de8603cec82a7b24e656d2b284406e91e"),
+    (1023, "10108970eeda3eb932baac1428c7a2163b0e924c9a9e25b35bba72b28f70bd11"),
+    (1024, "42214739f095a406f3fc83deb889744ac00df831c10daa55189b5d121c855af7"),
+]
+
+
 def main():
     # Self-check of the BLAKE3 implementation against the published empty-input hash.
     assert blake3(b"").hex() == \
         "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262", "blake3 self-check"
+    # Multi-block self-check. The GEN-B preimages are 143 B and 127 B, i.e. 3 and 2 blocks, so the
+    # empty-input hash alone would not exercise block chaining or the CHUNK_START/CHUNK_END/ROOT
+    # flag placement. Input is byte i = i % 251 (the BLAKE3 test-vector pattern); each digest was
+    # cross-checked against the Rust `blake3` crate 1.8.7 (a separate implementation) for every
+    # length 0..=1024 with zero mismatches.
+    for n, want in BLAKE3_PATTERN_VECTORS:
+        got = blake3(bytes(i % 251 for i in range(n))).hex()
+        assert got == want, "blake3 self-check len=%d" % n
 
     bp_a, bh_a, rp_a, rh_a = derive(DOMAIN_A)
     _, bh_b, _, rh_b = derive(DOMAIN_B)
