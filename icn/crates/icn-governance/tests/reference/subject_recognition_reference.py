@@ -137,9 +137,11 @@ def main():
         "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262", "blake3 self-check"
     # Multi-block self-check. The GEN-B preimages are 143 B and 127 B, i.e. 3 and 2 blocks, so the
     # empty-input hash alone would not exercise block chaining or the CHUNK_START/CHUNK_END/ROOT
-    # flag placement. Input is byte i = i % 251 (the BLAKE3 test-vector pattern); each digest was
-    # cross-checked against the Rust `blake3` crate 1.8.7 (a separate implementation) for every
-    # length 0..=1024 with zero mismatches.
+    # flag placement. Input is byte i = i % 251 (the BLAKE3 test-vector pattern). These ten digests
+    # are pinned here; they were produced by a one-off scratch run of the Rust `blake3` crate
+    # (1.8.7; the workspace lock pins 1.8.3, and BLAKE3 output does not depend on the patch
+    # version), which also agreed with this script at every length 0..=1024. That sweep is not
+    # reproducible from the repository; only the ten pinned digests are.
     for n, want in BLAKE3_PATTERN_VECTORS:
         got = blake3(bytes(i % 251 for i in range(n))).hex()
         assert got == want, "blake3 self-check len=%d" % n

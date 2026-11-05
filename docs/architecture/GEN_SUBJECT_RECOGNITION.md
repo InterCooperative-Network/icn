@@ -192,9 +192,10 @@ vector — no genesis exists for that pairing): basis hash
 The values were produced by `subject_recognition_reference.py`, written from this document with a
 minimal single-chunk BLAKE3, sharing no code with Rust. Because the two preimages are 143 B and
 127 B (three and two 64-byte blocks), the script self-checks its BLAKE3 against the published
-empty-input hash **and** ten multi-block digests (lengths 1–1024, including 63/64/65, 127/128/129
-and 143) before deriving anything; those digests agree with the Rust `blake3` crate at every
-length 0–1024. The script reads the `EXPECT_*` literals in the Rust test only as a comparison target and
+empty-input hash **and** ten pinned pattern-input digests (lengths 1–1024, including 63/64/65,
+127/128/129 and 143) before deriving anything. Those ten digests came from a one-off run of the
+Rust `blake3` crate, which also agreed with the script at every length 0–1024; only the ten pinned
+digests, not that sweep, are reproducible from the repository. The script reads the `EXPECT_*` literals in the Rust test only as a comparison target and
 exits non-zero on disagreement:
 
 ```bash
