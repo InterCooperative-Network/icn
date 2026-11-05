@@ -157,7 +157,8 @@ def main():
         "EXPECT_OTHER_DOMAIN_RECOGNITION_HASH": rh_b.hex(),
     }
     here = os.path.dirname(os.path.abspath(__file__))
-    rust = open(os.path.join(here, "..", "subject_recognition.rs"), encoding="utf-8").read()
+    with open(os.path.join(here, "..", "subject_recognition.rs"), encoding="utf-8") as f:
+        rust = f.read()
     ok = True
     for name, val in values.items():
         m = re.search(r"const %s: &str =\s*\"([0-9a-f]+)\"" % name, rust)
