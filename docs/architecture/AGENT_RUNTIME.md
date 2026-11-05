@@ -725,18 +725,40 @@ not about what Conductor accepts.
 legacy reader matches lanes on raw absolute git-dir paths, does not recognise the `.meta.json`
 marker, and its envelope requires raw path identities, so against an `observation` snapshot it can
 report `available` with zero sessions. That is a Conductor fail-closed defect, handled there. The
-planned separate versioned reader (explicit profile, mandatory marker, exact policy match,
-digest-only lane lookup, conversation correlation, UNKNOWN for unmapped relations, fail-closed
-validation) asks for nothing ICN does not already provide: see the golden fixture below.
+rows of the table above were written against that legacy full-schema reader. The `observation`
+profile is consumed by a separate, newer reader (explicit profile, mandatory marker, exact policy
+match, digest-only lane lookup, conversation correlation, UNKNOWN for unmapped relations,
+fail-closed validation), reported below. It asks for nothing ICN does not already provide: see
+the golden fixture below.
 
-**Later Conductor report (external, not reproduced by ICN).** The continuity-series handoff
-(`ops/mcp/src/tests/fixtures/observation-series/HANDOFF.md`, "Independent consumer
-verification") records that Conductor's separately developed consumer verified the five series
-exports offline at its commit `3d56e66`, after fixing three consumer-side defects, and that no
-producer defect was identified. ICN still has not inspected that reader: every UNVERIFIED row and
-every open question in this section stays open until the Conductor owner answers it. The report
-shows the contract is implementable by an independent reader; it does not establish producer
-authenticity, registry identity, clock ordering, or the behaviour of any live registry.
+**v2 reader, as reported by Conductor (external; ICN has not inspected or run it).** Conductor
+reports that `src/conductor/adapters/icn_observation.py` produces
+`conductor-icn-observation/v2` from an ICN `observation` snapshot: it requires the observation
+profile, registry schema v5, the policy and the sidecar; reads only `schema_version`, `sessions`
+and `file_claims`; treats missing identity as unknown; looks lanes up by digest; correlates ICN
+`(provider, provider_session_id)` to its own `(runtime, session_id)` through explicit bindings;
+and reports missing or malformed evidence as such rather than concluding a session ended. It
+reports verifying the golden fixture (61/61 checks) and the five-export continuity series
+(172/172 checks, 16/16 checksums), with its branch `recovery/20261101-hardening` at `bb669e0`
+(reader fix `fb46649`; an earlier report from the same branch cited `3d56e66`), and its compatibility
+packet §22 as the record. That packet is local to Conductor's host and was not available here. Two
+consumer-side defects (Unicode timestamp acceptance, a malformed-marker crash) were fixed on the
+Conductor side. The reported results are the Conductor session's own and were not re-run by ICN.
+They show the contract is implementable by an independent reader. They do not establish producer
+authenticity, registry identity, clock ordering, or the behaviour of any live registry, and every
+UNVERIFIED row and open question in this section stays open until the Conductor owner answers it.
+
+**What ICN verifies about the values a binding depends on** (producer side, pinned by
+`observation-producer-identity.test.ts` and `observation-timestamp-contract.test.ts`):
+
+| Value | Fact |
+|---|---|
+| `provider` | Free text supplied by the registering caller, copied verbatim into the `observation` file and never mapped. It is advisory, unvalidated and immutable after `INSERT`. The production hook (`.claude/hooks/session-lifecycle.sh`) and the `icn-agent-session` default both register `claude-code`. The synthetic fixtures use `claude`. A consumer must map `claude-code` explicitly; it must not assume the fixture spelling |
+| `worktree_id` (registry) | The realpath of `git rev-parse --absolute-git-dir`: a per-worktree Git admin directory (for a linked worktree `<common>/worktrees/<name>`), **not** the checkout path. If `realpath` fails the unresolved path is stored. Reaching the worktree through a symlink yields the same value |
+| `repo_id` (registry) | The realpath of `git rev-parse --git-common-dir`, resolved against the directory git ran in |
+| `worktree_id`, `repo_id` (`observation`) | `sha256:` + lowercase hex of SHA-256 over the UTF-8 bytes of the raw value above. Unsalted, so a consumer that already knows a path can digest it and compare. The raw value never appears in the database or the sidecar |
+| Timestamp columns | Exactly `YYYY-MM-DD HH:MM:SS`, UTC, and a real instant. Any other spelling (ISO-8601 `T`, `Z`, a fraction, an offset) or an impossible date refuses the whole export |
+| Row and size limits | Producer: 2,000,000 rows and 512 MiB of source (main file + WAL). Conductor reportedly accepts at most 200,000 rows and 64 MiB. That is a deliberate consumer limit, not a request to raise the producer's. The fixtures are far inside it (at most 15 rows and 86,016 bytes per snapshot). A registry above Conductor's limit would still export and be refused by Conductor. The live registry's size has not been measured |
 
 **Open questions for the Conductor owner** (answers are small and contain no registry data; do
 not send real session ids or a real registry):
@@ -780,7 +802,9 @@ not send real session ids or a real registry):
    `worktree_name` and the other verbatim text columns must match `[\p{L}\p{N}._:@+ -]{1,256}` — in
    particular contain no `/`, so they can never be a path. The time columns (`started_at`,
    `last_heartbeat`, `last_progress`, `file_claims.claimed_at`, `schema_version.applied_at`) must be
-   timestamps (`YYYY-MM-DD HH:MM:SS`, or ISO-8601 with `T`, optional fraction and `Z`); `agent_pid`,
+   timestamps in the one published form, `YYYY-MM-DD HH:MM:SS` UTC, and a real instant (an
+   impossible date such as `2026-02-30` is refused; ISO-8601 `T`, `Z`, fractions and offsets are
+   not accepted: every production writer uses SQLite `datetime('now')`); `agent_pid`,
    `progress_count` and `schema_version.version` must be numbers. Otherwise the export fails as
    `SNAPSHOT_VERIFY_FAILED` (naming the column, never the value) — before the value is written —
    rather than disclosing it or silently altering it. The remedy is to correct the registry row, or
