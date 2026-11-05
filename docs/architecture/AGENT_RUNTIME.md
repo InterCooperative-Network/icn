@@ -728,7 +728,7 @@ report `available` with zero sessions. That is a Conductor fail-closed defect, h
 rows of the table above were written against that legacy full-schema reader. The `observation`
 profile is consumed by a separate, newer reader (explicit profile, mandatory marker, exact policy
 match, digest-only lane lookup, conversation correlation, UNKNOWN for unmapped relations,
-fail-closed validation), reported below. It asks for nothing ICN does not already provide: see
+fail-closed validation), reported below. By its own report it asks for nothing ICN does not already provide: see
 the golden fixture below.
 
 **v2 reader, as reported by Conductor (external; ICN has not inspected or run it).** Conductor

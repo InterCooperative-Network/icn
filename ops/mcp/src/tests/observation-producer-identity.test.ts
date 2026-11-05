@@ -35,7 +35,16 @@ function git(dir: string, ...args: string[]): string {
   return execFileSync("git", ["-C", dir, ...args], {
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@e", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@e" },
+    env: {
+      ...process.env,
+      // Ambient git config (commit signing, hooks, templates) must not decide whether this test runs.
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_AUTHOR_NAME: "t",
+      GIT_AUTHOR_EMAIL: "t@e",
+      GIT_COMMITTER_NAME: "t",
+      GIT_COMMITTER_EMAIL: "t@e",
+    },
   }).trim();
 }
 
