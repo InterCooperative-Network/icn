@@ -95,11 +95,13 @@ describe("A. an unsafe value never reaches the output file (observation)", () =>
     expect(verifySnapshotPair(exportPair("observation", benignSource())).ok).toBe(true);
   });
 
-  it("control: SQLite-format and ISO-8601 timestamps are accepted", () => {
+  // ISO-8601 spellings were accepted here until the published contract (one form, SQLite
+  // `datetime('now')`) was enforced; their refusal is pinned in observation-timestamp-contract.test.ts.
+  it("control: SQLite-format timestamps are accepted", () => {
     const p = benignSource();
     const db = new Database(p);
     db.exec(
-      "UPDATE sessions SET started_at = '2026-01-01 10:00:00', last_heartbeat = '2026-01-01T10:05:00Z', last_progress = '2026-01-01T10:05:00.123Z'"
+      "UPDATE sessions SET started_at = '2026-01-01 10:00:00', last_heartbeat = '2026-01-01 10:05:00', last_progress = '2026-01-01 10:05:01'"
     );
     db.close();
     expect(verifySnapshotPair(exportPair("observation", p)).ok).toBe(true);

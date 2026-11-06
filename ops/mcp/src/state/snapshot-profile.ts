@@ -137,11 +137,35 @@ export function isDisclosablePath(p: string): boolean {
 const isSafeVerbatim = (s: string): boolean => SAFE_VERBATIM.test(s);
 
 /**
- * A timestamp as ICN writes it (SQLite `datetime('now')`: `YYYY-MM-DD HH:MM:SS`) or as ISO-8601
- * (`T` separator, optional fraction and `Z`). Anything else in a time column is free text, and
- * free text is exactly what the observation profile exists to keep out.
+ * A timestamp in the ONE form the published contract promises consumers: SQLite
+ * `datetime('now')`, `YYYY-MM-DD HH:MM:SS`, UTC (observation-golden `database.timestamps`).
+ * Every production writer of a registry time column uses `datetime('now')` or a column default,
+ * so no real registry holds another spelling. An earlier version also accepted ISO-8601 (`T`,
+ * fraction, `Z`), which copied through values the contract says cannot occur and that a strict
+ * reader must then refuse. Anything else in a time column is free text, and free text is exactly
+ * what the observation profile exists to keep out. `\d` is ASCII-only in JavaScript and `$`
+ * (no `m` flag) does not match before a trailing newline, so neither needs separate handling.
  */
-export const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z?$/;
+export const TIMESTAMP_RE = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
+
+/**
+ * True only for a timestamp of the published form that is also a real UTC instant (a real
+ * month/day for that year, hour 00-23, minute and second 00-59, year >= 0001). The shape alone
+ * admits `2026-02-30 10:00:00`, which a consumer that parses the value must reject.
+ */
+export function isObservationTimestamp(v: string): boolean {
+  const m = TIMESTAMP_RE.exec(v);
+  if (m === null) return false;
+  const [year, month, day, hour, minute, second] = m.slice(1).map(Number) as [
+    number, number, number, number, number, number,
+  ];
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  if (hour > 23 || minute > 59 || second > 59) return false;
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return day <= (month === 2 && leap ? 29 : DAYS_IN_MONTH[month - 1]!);
+}
 
 /** Which kind of value a copied (non-digested) observation column may hold. */
 type ValueKind = "text" | "timestamp" | "integer";
@@ -179,7 +203,7 @@ export function observationValueProblem(table: string, column: string, v: unknow
     case "integer":
       return typeof v === "number" && Number.isFinite(v) ? null : `${table}.${column} holds a non-numeric value`;
     case "timestamp":
-      return typeof v === "string" && TIMESTAMP_RE.test(v)
+      return typeof v === "string" && isObservationTimestamp(v)
         ? null
         : `${table}.${column} holds a value that is not a timestamp; refusing to disclose it`;
     case "text":
