@@ -63,7 +63,9 @@ permissions:
 jobs:
   drift-check:
     name: Agent Tooling Drift Check
-    runs-on: ubuntu-latest
+    # Pinned to ubuntu-24.04 (ubuntu-latest is now ubuntu-26): scripts/test-icn-wait.sh
+    # section 11 needs a locale whose [0-9] collates as digits, absent on the ubuntu-26 image.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 

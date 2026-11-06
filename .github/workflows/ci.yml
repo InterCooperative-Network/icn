@@ -856,7 +856,8 @@ jobs:
   member-shell:
     name: Member Shell Tests
     needs: [changes]
-    runs-on: ubuntu-latest
+    # Pinned to ubuntu-24.04 (was ubuntu-latest, now ubuntu-26): Playwright 1.60 refuses chromium on ubuntu26.04-x64.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
