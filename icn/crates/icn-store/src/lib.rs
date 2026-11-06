@@ -353,6 +353,47 @@ pub trait Store: Send + Sync {
     /// failure, and it must not become an empty write.
     fn delete_atomic(&self, keys: &[Vec<u8>]) -> Result<()>;
 
+    /// Write `new` to `key` **only if** the stored value still equals
+    /// `expected`, as one indivisible compare-and-write.
+    ///
+    /// `expected` is the exact byte string the caller previously read, or
+    /// `None` for "the key must be absent". Absence is a value here: `None`
+    /// does not match an empty stored value, and `Some(b"")` does not match an
+    /// absent key. The comparison is over bytes, never over a decoded view of
+    /// them, so a caller that validated a record it read is guaranteed that
+    /// the record it is replacing is that very one.
+    ///
+    /// Returns [`CompareAndPut::Applied`] when the write happened, and
+    /// [`CompareAndPut::Conflict`] — carrying the value actually found — when
+    /// it did not because the stored value differed. A conflict is an expected
+    /// outcome under concurrency, not an error: the caller re-reads,
+    /// revalidates and decides again. An `Err` means the backend could not
+    /// answer, and the caller must assume nothing was written.
+    ///
+    /// # Unsupported backends fail closed
+    ///
+    /// The default implementation returns [`CompareAndPutUnsupported`]. It
+    /// does **not** fall back to `get` followed by `put`: that sequence has a
+    /// window between the two calls, which is exactly the lost update this
+    /// method exists to rule out, and a backend that inherited it would look
+    /// atomic while not being so. Where [`Store::delete_atomic`] has no default
+    /// because any default would reproduce the defect it replaces, here the
+    /// only safe default is a refusal, so a refusal is what is provided. A
+    /// backend overrides this only if it can make the comparison and the write
+    /// one atomic step.
+    ///
+    /// Durability matches [`Store::put`]: the write is not forced to disk
+    /// until [`Store::flush`].
+    fn compare_and_put(
+        &self,
+        key: &[u8],
+        expected: Option<&[u8]>,
+        new: &[u8],
+    ) -> Result<CompareAndPut> {
+        let _ = (key, expected, new);
+        Err(CompareAndPutUnsupported.into())
+    }
+
     /// Scan all key-value pairs with the given prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
@@ -683,6 +724,28 @@ pub enum StoreTransactionError {
     StorageError { details: String },
 }
 
+/// Result of [`Store::compare_and_put`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompareAndPut {
+    /// The stored value equalled `expected` and the new value was written.
+    Applied,
+    /// The stored value did not equal `expected`; nothing was written.
+    /// `current` is the value found at the moment of the comparison (`None`
+    /// when the key was absent), so a caller can revalidate without a second
+    /// read.
+    Conflict { current: Option<Vec<u8>> },
+}
+
+/// The backend cannot make a compare-and-write one atomic step.
+///
+/// Returned (inside the `anyhow::Error`) by the default
+/// [`Store::compare_and_put`]. Callers that need the guarantee treat it as a
+/// refusal to write; they must not substitute `get` then `put`. Detect it with
+/// `err.downcast_ref::<CompareAndPutUnsupported>()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("this store backend does not support atomic compare-and-put")]
+pub struct CompareAndPutUnsupported;
+
 /// Storage statistics for monitoring
 #[derive(Debug, Clone, Default)]
 pub struct StorageStats {
@@ -983,6 +1046,24 @@ impl Store for SledStore {
             }
             Ok(())
         })
+    }
+
+    /// Delegates to sled's own `compare_and_swap`, which compares and links the
+    /// new value in one atomic step on the key's page (it retries internally
+    /// only when the page changed under it but the key's value did not). An
+    /// expected value of `None` matches only an absent key.
+    fn compare_and_put(
+        &self,
+        key: &[u8],
+        expected: Option<&[u8]>,
+        new: &[u8],
+    ) -> Result<CompareAndPut> {
+        match self.db.compare_and_swap(key, expected, Some(new))? {
+            Ok(()) => Ok(CompareAndPut::Applied),
+            Err(mismatch) => Ok(CompareAndPut::Conflict {
+                current: mismatch.current.map(|v| v.to_vec()),
+            }),
+        }
     }
 
     fn flush(&self) -> Result<()> {
@@ -2285,6 +2366,235 @@ mod tests {
         store.delete_atomic(&[b"present".to_vec(), b"never-existed".to_vec()])?;
         store.delete_atomic(&[b"present".to_vec()])?;
         assert!(store.get(b"present")?.is_none());
+        Ok(())
+    }
+
+    // ---- compare_and_put -------------------------------------------------
+
+    /// A store that deliberately does **not** override `compare_and_put`, so it
+    /// exercises the trait default. Every required method delegates to sled.
+    struct NoCas(SledStore);
+
+    impl Store for NoCas {
+        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            self.0.get(key)
+        }
+        fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+            self.0.put(key, value)
+        }
+        fn delete(&self, key: &[u8]) -> Result<()> {
+            self.0.delete(key)
+        }
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> Result<()> {
+            self.0.delete_atomic(keys)
+        }
+        fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.0.scan(prefix)
+        }
+        fn get_replica_metadata(&self, h: &ContentHash) -> Result<Option<ReplicaMetadata>> {
+            self.0.get_replica_metadata(h)
+        }
+        fn put_replica_metadata(&self, m: &ReplicaMetadata) -> Result<()> {
+            self.0.put_replica_metadata(m)
+        }
+        fn list_replica_hashes(&self) -> Result<Vec<ContentHash>> {
+            self.0.list_replica_hashes()
+        }
+    }
+
+    #[test]
+    fn compare_and_put_absent_expectation_matches_only_an_absent_key() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        assert_eq!(
+            store.compare_and_put(b"k", None, b"first")?,
+            CompareAndPut::Applied
+        );
+        assert_eq!(store.get(b"k")?.as_deref(), Some(b"first".as_slice()));
+
+        // The key is now present, so "must be absent" conflicts and reports
+        // what it found; nothing is overwritten.
+        assert_eq!(
+            store.compare_and_put(b"k", None, b"second")?,
+            CompareAndPut::Conflict {
+                current: Some(b"first".to_vec())
+            }
+        );
+        assert_eq!(store.get(b"k")?.as_deref(), Some(b"first".as_slice()));
+        Ok(())
+    }
+
+    #[test]
+    fn compare_and_put_compares_exact_bytes_and_reports_the_current_value() -> Result<()> {
+        let store = SledStore::temporary()?;
+        store.put(b"k", b"v1")?;
+
+        // A mismatch writes nothing and carries the value actually found.
+        assert_eq!(
+            store.compare_and_put(b"k", Some(b"other"), b"v2")?,
+            CompareAndPut::Conflict {
+                current: Some(b"v1".to_vec())
+            }
+        );
+        assert_eq!(store.get(b"k")?.as_deref(), Some(b"v1".as_slice()));
+
+        // A prefix of the stored value is not the stored value.
+        assert!(matches!(
+            store.compare_and_put(b"k", Some(b"v"), b"v2")?,
+            CompareAndPut::Conflict { .. }
+        ));
+
+        // The exact bytes match.
+        assert_eq!(
+            store.compare_and_put(b"k", Some(b"v1"), b"v2")?,
+            CompareAndPut::Applied
+        );
+        assert_eq!(store.get(b"k")?.as_deref(), Some(b"v2".as_slice()));
+        Ok(())
+    }
+
+    #[test]
+    fn compare_and_put_distinguishes_absent_from_empty() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // `Some(empty)` does not match an absent key, and leaves it absent.
+        assert_eq!(
+            store.compare_and_put(b"k", Some(b""), b"x")?,
+            CompareAndPut::Conflict { current: None }
+        );
+        assert!(store.get(b"k")?.is_none());
+
+        // `None` does not match a stored empty value.
+        store.put(b"k", b"")?;
+        assert_eq!(
+            store.compare_and_put(b"k", None, b"x")?,
+            CompareAndPut::Conflict {
+                current: Some(Vec::new())
+            }
+        );
+        assert_eq!(store.get(b"k")?.as_deref(), Some(b"".as_slice()));
+        Ok(())
+    }
+
+    #[test]
+    fn compare_and_put_touches_only_its_key() -> Result<()> {
+        let store = SledStore::temporary()?;
+        store.put(b"a", b"1")?;
+        store.put(b"b", b"1")?;
+        store.compare_and_put(b"a", Some(b"1"), b"2")?;
+        assert_eq!(store.get(b"b")?.as_deref(), Some(b"1".as_slice()));
+        Ok(())
+    }
+
+    /// Exactly one of many racers for an absent key wins, and the winner's
+    /// value is the one stored. A `get`-then-`put` fallback would let several
+    /// "win".
+    #[test]
+    fn compare_and_put_has_exactly_one_winner_for_an_absent_key() -> Result<()> {
+        use std::sync::{Arc, Barrier};
+        const RACERS: usize = 16;
+        for round in 0..50 {
+            let store = Arc::new(SledStore::temporary()?);
+            let gate = Arc::new(Barrier::new(RACERS));
+            let handles: Vec<_> = (0..RACERS)
+                .map(|i| {
+                    let (store, gate) = (store.clone(), gate.clone());
+                    std::thread::spawn(move || {
+                        gate.wait();
+                        let mine = format!("racer-{i}");
+                        let won = store.compare_and_put(b"k", None, mine.as_bytes()).unwrap()
+                            == CompareAndPut::Applied;
+                        (mine, won)
+                    })
+                })
+                .collect();
+            let results: Vec<(String, bool)> =
+                handles.into_iter().map(|h| h.join().unwrap()).collect();
+            let winners: Vec<_> = results.iter().filter(|(_, w)| *w).collect();
+            assert_eq!(winners.len(), 1, "round {round}: {results:?}");
+            assert_eq!(
+                store.get(b"k")?.as_deref(),
+                Some(winners[0].0.as_bytes()),
+                "round {round}: stored value must be the winner's"
+            );
+        }
+        Ok(())
+    }
+
+    /// Optimistic read-modify-write loops built on `compare_and_put` lose no
+    /// increments: the final counter equals the number of successful updates.
+    #[test]
+    fn compare_and_put_retry_loops_lose_no_update() -> Result<()> {
+        use std::sync::{Arc, Barrier};
+        const THREADS: usize = 8;
+        const PER_THREAD: u64 = 200;
+        let store = Arc::new(SledStore::temporary()?);
+        let gate = Arc::new(Barrier::new(THREADS));
+        let handles: Vec<_> = (0..THREADS)
+            .map(|_| {
+                let (store, gate) = (store.clone(), gate.clone());
+                std::thread::spawn(move || {
+                    gate.wait();
+                    for _ in 0..PER_THREAD {
+                        loop {
+                            let seen = store.get(b"n").unwrap();
+                            let n = seen
+                                .as_deref()
+                                .map(|b| u64::from_be_bytes(b.try_into().unwrap()))
+                                .unwrap_or(0);
+                            match store
+                                .compare_and_put(b"n", seen.as_deref(), &(n + 1).to_be_bytes())
+                                .unwrap()
+                            {
+                                CompareAndPut::Applied => break,
+                                CompareAndPut::Conflict { .. } => continue,
+                            }
+                        }
+                    }
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        let n = u64::from_be_bytes(store.get(b"n")?.unwrap().as_slice().try_into().unwrap());
+        assert_eq!(n, THREADS as u64 * PER_THREAD);
+        Ok(())
+    }
+
+    /// The default refuses — it neither errors silently into a write nor
+    /// degrades to `get` then `put` — and writes nothing.
+    #[test]
+    fn compare_and_put_default_refuses_and_writes_nothing() -> Result<()> {
+        let store = NoCas(SledStore::temporary()?);
+
+        let err = store
+            .compare_and_put(b"k", None, b"x")
+            .expect_err("a backend without atomic CAS must refuse");
+        assert!(err.downcast_ref::<CompareAndPutUnsupported>().is_some());
+        assert!(store.get(b"k")?.is_none(), "a refusal must not write");
+
+        // Refuses even when the comparison would have succeeded by a naive
+        // get/put emulation, and when it would have conflicted.
+        store.put(b"k", b"v")?;
+        for expected in [Some(b"v".as_slice()), Some(b"other".as_slice())] {
+            assert!(store
+                .compare_and_put(b"k", expected, b"x")
+                .unwrap_err()
+                .downcast_ref::<CompareAndPutUnsupported>()
+                .is_some());
+        }
+        assert_eq!(store.get(b"k")?.as_deref(), Some(b"v".as_slice()));
+        Ok(())
+    }
+
+    /// Existing consumers of `put`/`get` are unaffected by the new method.
+    #[test]
+    fn compare_and_put_does_not_change_plain_put_semantics() -> Result<()> {
+        let store = SledStore::temporary()?;
+        store.put(b"k", b"a")?;
+        store.put(b"k", b"b")?;
+        assert_eq!(store.get(b"k")?.as_deref(), Some(b"b".as_slice()));
         Ok(())
     }
 }
