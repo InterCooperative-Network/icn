@@ -5350,12 +5350,31 @@ impl GovernanceManager {
             icn_governance::DelegationScope::Blanket => return Ok(()),
             icn_governance::DelegationScope::Domain(id) => id.clone(),
             icn_governance::DelegationScope::Proposal(pid) => {
-                let proposals = self.proposals.read().map_err(|e| {
-                    anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
-                })?;
-                match proposals.get(pid) {
-                    Some(p) => p.domain_id.clone(),
-                    None => return Ok(()),
+                let cached = {
+                    let proposals = self.proposals.read().map_err(|e| {
+                        anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+                    })?;
+                    proposals.get(pid).map(|p| p.domain_id.clone())
+                };
+                match cached {
+                    Some(domain_id) => domain_id,
+                    // A cache miss is not proof the proposal does not exist:
+                    // hydration never loads proposals. Resolve it from the
+                    // attached store and run the domain guard on its real
+                    // domain. An unreadable record is refused, never treated
+                    // as absent. A proposal that is genuinely unknown (or a
+                    // manager with no store) keeps the established behaviour.
+                    None => match self.domain_store.as_ref() {
+                        None => return Ok(()),
+                        Some(store) => match store.get_proposal(pid) {
+                            Ok(Some(p)) => p.domain_id,
+                            Ok(None) => return Ok(()),
+                            Err(e) => anyhow::bail!(
+                                "Proposal '{}': stored proposal cannot be read ({e}); refusing delegation",
+                                pid.0
+                            ),
+                        },
+                    },
                 }
             }
         };
@@ -13715,5 +13734,113 @@ mod actor_model_firewall_tests {
             .unwrap();
         }
         assert_eq!(mgr.delegations.read().unwrap().len(), 2);
+    }
+
+    // ---- Proposal-scoped delegation against a persisted-but-uncached proposal
+
+    const PROPOSAL_KEY: &[u8] = b"gov:proposal:p-persisted";
+
+    fn persist_proposal(store: &Arc<dyn icn_store::Store>, domain_id: &str) {
+        SledGovernanceStateStore::new(store.clone())
+            .save_proposal(&open_proposal(domain_id, &did(), "p-persisted"))
+            .unwrap();
+    }
+
+    fn proposal_scope(id: &str) -> DelegationScope {
+        DelegationScope::Proposal(ProposalId(id.to_string()))
+    }
+
+    /// Both standalone wirings leave the proposal cache empty: `new_with_sled`
+    /// hydrates domains only, and `with_domain_store` hydrates nothing. A
+    /// delegation scoped to a persisted proposal of a persisted Subject
+    /// domain must be refused, with no row written and no stored byte changed.
+    #[tokio::test]
+    async fn proposal_delegation_checks_persisted_proposal_when_cache_misses() {
+        let (a, b) = (did(), did());
+        let db = Arc::new(sled::Config::new().temporary(true).open().unwrap());
+        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::from_db((*db).clone()));
+        persist_subject(&store);
+        persist_proposal(&store, "subject");
+        let (dom_before, prop_before) = (
+            store.get(KEY).unwrap().unwrap(),
+            store.get(PROPOSAL_KEY).unwrap().unwrap(),
+        );
+
+        // new_with_sled: domain hydrated into the cache, proposal cache empty.
+        let hydrated = GovernanceManager::new_with_sled(db.clone());
+        assert!(hydrated.proposals.read().unwrap().is_empty());
+        assert!(hydrated
+            .domains
+            .read()
+            .unwrap()
+            .contains_key(&GovernanceDomainId::new("subject")));
+        // with_domain_store: neither cache is populated.
+        let unhydrated = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+
+        for mgr in [&hydrated, &unhydrated] {
+            let r = mgr
+                .create_delegation(Delegation::new(
+                    a.clone(),
+                    b.clone(),
+                    proposal_scope("p-persisted"),
+                ))
+                .await;
+            assert_refused(r);
+            assert!(mgr.delegations.read().unwrap().is_empty());
+        }
+        assert_eq!(store.get(KEY).unwrap().unwrap(), dom_before);
+        assert_eq!(store.get(PROPOSAL_KEY).unwrap().unwrap(), prop_before);
+    }
+
+    /// An unreadable persisted proposal fails closed, writes nothing.
+    #[tokio::test]
+    async fn proposal_delegation_fails_closed_when_stored_proposal_unreadable() {
+        let store = sled_store();
+        store.put(PROPOSAL_KEY, b"\xff not a proposal").unwrap();
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+        let err = mgr
+            .create_delegation(Delegation::new(did(), did(), proposal_scope("p-persisted")))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("stored proposal cannot be read"), "{err}");
+        assert!(mgr.delegations.read().unwrap().is_empty());
+    }
+
+    /// Controls: a persisted proposal of a persisted legacy domain, and an
+    /// unknown proposal id (the established compatibility behaviour), still
+    /// succeed; with no store attached an unknown proposal id also succeeds.
+    #[tokio::test]
+    async fn proposal_delegation_legacy_and_unknown_behaviour_is_unchanged() {
+        let (a, b, c) = (did(), did(), did());
+        let store = sled_store();
+        let state = Arc::new(SledGovernanceStateStore::new(store.clone()));
+        state.save_domain(&domain("old", vec![did()])).unwrap();
+        persist_proposal(&store, "old");
+        let mgr = GovernanceManager::new().with_domain_store(state);
+
+        mgr.create_delegation(Delegation::new(
+            a.clone(),
+            b.clone(),
+            proposal_scope("p-persisted"),
+        ))
+        .await
+        .unwrap();
+        mgr.create_delegation(Delegation::new(
+            a.clone(),
+            c.clone(),
+            proposal_scope("never-persisted"),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(mgr.delegations.read().unwrap().len(), 2);
+
+        let bare = GovernanceManager::new();
+        bare.create_delegation(Delegation::new(a, b, proposal_scope("anything")))
+            .await
+            .unwrap();
+        assert_eq!(bare.delegations.read().unwrap().len(), 1);
     }
 }

@@ -14,9 +14,11 @@ convergence ladder · **Architecture owner:** #2602 (GEN) · **Builds on:**
 **Tests:** `icn/crates/icn-governance/tests/actor_model_firewall.rs`,
 `icn/apps/governance/tests/actor_model_firewall.rs`, `actor_model_firewall_tests` in `manager.rs`
 
-This is a **safety boundary**, not a voting system. It makes one thing impossible: a governance
-domain that has been explicitly configured for context-scoped human Subjects silently continuing to
-run on the legacy device-Principal membership, electorate and voting machinery.
+This is a **safety boundary**, not a voting system. On the supported, sequential write paths it
+refuses a governance domain that has been explicitly configured for context-scoped human Subjects
+silently continuing to run on the legacy device-Principal membership, electorate and voting
+machinery. It is an enforced boundary on those paths only: it is not a guarantee against concurrent
+writers (see "Not atomic across writers" below).
 
 ## 1. The setting
 
@@ -64,6 +66,8 @@ migration framework exists in this slice.
 
 **Not atomic across writers.** The manager's persisted-record check runs under its own `domains` lock; the actor's runs on its serial command loop. The store has no conditional put, so a manager and an actor writing the same store concurrently are not serialized against each other. This is a residual, tracked limitation, not a guarantee.
 
+**Single-writer storage is an assumption, not an enforced property.** By the documented layout the daemon's governance actor persists to its own store (`store/governance/`, `config/mod.rs`), while the gateway opens `{data_dir}/gateway_store` and builds a standalone `GovernanceManager::new_with_sled` on it only when no actor handle is connected (`icn-gateway/src/server.rs`); an actor-backed manager does not use that store for domains. `GovernanceManager::with_domain_store` has no non-test caller. That layout is the only thing keeping a manager and an actor off the same store: the code does not enforce it (the actor's store-opening site was not independently traced in this slice), and the store offers no compare-and-swap or equivalent. Two standalone writers (or a manager and an actor) on one store could invalidate a read-before-write check. This must be resolved, by a store-level guard or an enforced single-writer design, **before any real Subject-mode activation**. The same applies to the standalone manager's proposal- and domain-scoped delegation checks, which consult the persisted record on a cache miss but are equally not atomic with a concurrent writer.
+
 ## 4. What a Subject-mode domain refuses (fail-closed, before any mutation)
 
 | Operation | Refused at |
@@ -74,7 +78,7 @@ migration framework exists in this slice.
 | Resolve a Principal electorate | every `MembershipResolver` (`resolve_members`, `is_member`, async variants, composite) |
 | Close a proposal (with or without an eligibility filter) | `GovernanceActor` `CloseProposal`; `GovernanceManager::close_proposal*` (in-memory) |
 | Veto or force-close a proposal | `GovernanceActor` `VetoProposal`, `ForceCloseProposal` |
-| Create a domain- or proposal-scoped vote delegation | `GovernanceActor` `create_delegation`; `GovernanceManager::create_delegation` (in-memory) |
+| Create a domain- or proposal-scoped vote delegation | `GovernanceActor` `create_delegation`; `GovernanceManager::create_delegation` (cached domain/proposal first; on a cache miss it consults the persisted proposal and domain records and refuses if either cannot be read; an unknown proposal id keeps the legacy behaviour) |
 | Create a domain over a stored Subject-mode domain (replacement) | `GovernanceActor` `CreateDomain`; `GovernanceManager::create_domain` (checks the persisted record; an unreadable record is refused) |
 
 "Before any mutation" is checked, not asserted: the tests snapshot every record the actor can write
