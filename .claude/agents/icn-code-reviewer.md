@@ -1,6 +1,9 @@
 ---
 name: icn-code-reviewer
-description: PR review agent with an ICN invariants lens, bound to the canonical delivery lifecycle. High signal-to-noise: classifies every finding as BLOCKER, FOLLOW_UP, QUESTION or NOT_A_FINDING and declares FULL or DELTA.
+description: >-
+  PR review agent with an ICN invariants lens, bound to the canonical delivery lifecycle. High
+  signal-to-noise: classifies every finding as BLOCKER, FOLLOW_UP, QUESTION or NOT_A_FINDING and
+  declares FULL or DELTA.
 model: inherit
 ---
 

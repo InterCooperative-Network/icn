@@ -258,7 +258,7 @@ PATH_GUIDANCE = [
      ["agent:icn-docs-truth-auditor"],
      "docs/reference/project-index/source-of-truth-map.md"),
     ("scripts", "scripts/", "Repo automation script (generator / validator)",
-     ["Python standard library only; dependency-free",
+     ["Python standard library by default; declared dependencies in scripts/requirements.txt",
       "Deterministic output; --check drift mode stays correct",
       "No overclaim language emitted into generated artifacts"],
      ["python3 scripts/check-agent-context-spine.py",

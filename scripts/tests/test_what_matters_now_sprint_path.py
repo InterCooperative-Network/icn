@@ -66,6 +66,17 @@ def check(desc, cond):
 # ── fixture ──────────────────────────────────────────────────────────────────
 
 
+# Provider surfaces the agent registry declares. The checker validates against all of them, so
+# all of them have to exist in a fixture checkout. Kept as data here for the same reason the
+# registry keeps it as data: a second hand-written list is a second owner of the fact.
+AGENT_SURFACE_TREES = [
+    surface["tree"] if isinstance(surface, dict) else surface
+    for surface in json.loads(
+        (pathlib.Path(__file__).resolve().parents[2]
+         / "ops" / "state" / "truth" / "agents.json").read_text()
+    )["provider_surfaces"].values()
+]
+
 STATE_FILES = [
     "ops/state/sprint/current.json",
     "ops/state/truth/sources.json",
@@ -117,15 +128,29 @@ def build_checkout(parent, dirname, scripts=None):
     canonical_skills = root / "ops" / "automation" / "skills"
     canonical_skills.mkdir(parents=True, exist_ok=True)
 
-    # Drive the agents-registry read (drift-check.sh:291): one name that IS in the
-    # registry and one that is not, so both branches of the comparison execute.
+    # Drive the agents-registry read. drift-check.sh no longer reads agents.json itself:
+    # scripts/check-agent-registry.py is the single owner of agent-registry enforcement and
+    # drift-check.sh delegates to it (icn#2690). The read under test is therefore the CHECKER's,
+    # and the fixture has to be thick enough for it to run: every declared provider surface must
+    # exist, because the checker validates the registry against all of them and would otherwise
+    # report dozens of structural problems that drown the one this test is about.
+    #
+    # Copying the real trees rather than synthesising three files is deliberate. A thinner fixture
+    # would make the checker fail for reasons unrelated to the quoted path, and an assertion that
+    # cannot distinguish "the read worked" from "the fixture was wrong" is not evidence.
+    (root / "scripts").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "scripts" / "check-agent-registry.py",
+                 root / "scripts" / "check-agent-registry.py")
+    for surface in AGENT_SURFACE_TREES:
+        src = ROOT / surface
+        if not src.is_dir():
+            raise SystemExit("fixture: declared agent surface missing: %s" % surface)
+        shutil.copytree(src, root / surface, dirs_exist_ok=True)
+
+    # One definition that no record names, so the MUST-FAIL half of the comparison executes.
+    # A silently-empty registry read (the icn#2722 defect class) would flag EVERY definition
+    # instead of just this one, which is exactly what the assertions below distinguish.
     agents_dir = root / ".claude" / "agents"
-    agents_dir.mkdir(parents=True)
-    registry_agents = sorted(
-        a["name"] for a in json.loads(
-            (ROOT / "ops" / "state" / "truth" / "agents.json").read_text())["agents"])
-    for name in registry_agents[:3]:
-        (agents_dir / ("%s.md" % name)).write_text("# %s\n" % name)
     (agents_dir / "unregistered-extra.md").write_text("# unregistered-extra\n")
 
     # Drive the symlink-registry read (drift-check.sh:95): PROJECT_SKILLS is
@@ -249,17 +274,48 @@ try:
     check("the quoted path does not trigger the 'fewer than 11 required checks' fail",
           "fewer than 11 required checks" not in d_out)
 
-    # agents.json -> registered agent names (site at :291). Reading it wrongly
-    # yields an EMPTY name set, which turns every "Agent registered" into
-    # "Agent not in registry" -- so assert the positive line, not just equality.
+    # agents.json -> the delegated registry check. drift-check.sh reports the checker's findings
+    # as `agent registry: <line>`; scripts/check-agent-registry.py owns the enforcement itself.
+    #
+    # The icn#2722 defect class is a read that fails SILENTLY on a quoted path and yields an empty
+    # result. For this site that would mean the checker never resolving the registry, so the
+    # discriminating evidence is not "did it run" but "did it resolve the registry correctly":
+    # a broken read flags every definition, a working one flags exactly the planted intruder.
     registry_agents = sorted(
         a["name"] for a in json.loads(
             (ROOT / "ops" / "state" / "truth" / "agents.json").read_text())["agents"])
-    check("agents registry resolves registered names on a quoted path (%r)"
-          % registry_agents[:3],
-          all(("Agent registered: %s" % n) in d_out for n in registry_agents[:3]))
-    check("the agents read still detects a genuinely unregistered agent",
-          "Agent not in registry: unregistered-extra" in d_out)
+    registry_findings = [
+        line for line in d_out.splitlines() if "agent registry:" in line
+    ]
+    check("the delegated agent-registry check runs from a quoted path "
+          "(%d finding line(s))" % len(registry_findings),
+          bool(registry_findings))
+
+    # MUST-FAIL half: the planted unregistered definition is still detected. Not "the checker
+    # exited zero" -- it must exit NON-zero here, and name the intruder.
+    check("the delegated check still detects a genuinely unregistered agent definition",
+          any("unregistered-extra" in line for line in registry_findings))
+
+    # Positive half, stated as an EXACT set rather than an absence.
+    #
+    # "no registered agent was falsely flagged" is not sufficient evidence on its own: a registry
+    # that read as empty flags nothing at all, so the absence passes vacuously. This was found by
+    # mutating the fixture registry to `{"agents": []}` -- the intruder check failed, while both
+    # absence-shaped checks passed. The discriminating assertion is that the flagged set is
+    # EXACTLY the planted intruder: a read that collapsed to empty flags none of them, and a read
+    # that resolved the registry wrongly flags every definition. Both are failures here.
+    unregistered_flagged = sorted({
+        match.group(1)
+        for line in registry_findings
+        for match in [re.search(r"([\w.-]+)\.md exists but no record", line)]
+        if match
+    })
+    check("the delegated check flags EXACTLY the planted unregistered definition (%r)"
+          % unregistered_flagged,
+          unregistered_flagged == ["unregistered-extra"])
+    check("the registry resolved to its full name set on a quoted path "
+          "(%d registered names known)" % len(registry_agents),
+          len(registry_agents) > 1)
 
     # skills.json -> symlink names (site at :95). An empty read means the loop
     # body never runs, so the plain-directory drift below would go unreported.
