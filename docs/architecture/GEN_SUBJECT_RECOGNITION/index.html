@@ -274,7 +274,7 @@ independent reference, not by a dedicated negative test. Type-level: a Subject i
 <code>PrincipalKey</code>, <code>SubjectRecognitionV1</code> has private fields and no Subject parameter, and the basis
 hash type has no public constructor.</p>
 <h2 id="11-deliberate-scope-boundaries">11. Deliberate scope boundaries</h2>
-<p>Not in this slice: legacy-member migration (#2626); domain actor-model firewall; membership roster;
+<p>Not in this slice: legacy-member migration (#2626); the domain actor-model firewall (since added separately: <a href="https://github.com/InterCooperative-Network/icn/blob/main/GOVERNANCE_HUMAN_ACTOR_MODEL">`GOVERNANCE_HUMAN_ACTOR_MODEL.md`</a>); membership roster;
 <code>VotingProcessSnapshotV1</code>; proposal commitment; vote or decision records; settlement; persistence,
 gateway routes, wire/serde representation, session claims; production recognition bases.</p>
 <p>The next rung of #2694 consumes <code>recognition_hash</code> per eligible Subject in the frozen process
