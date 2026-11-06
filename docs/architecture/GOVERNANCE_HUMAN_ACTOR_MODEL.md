@@ -62,6 +62,8 @@ There is **no conversion of membership**, and no supported in-place switch for a
 with legacy members cannot become Subject-mode; unsafe transitions are refused, not repaired. No
 migration framework exists in this slice.
 
+**Not atomic across writers.** The manager's persisted-record check runs under its own `domains` lock; the actor's runs on its serial command loop. The store has no conditional put, so a manager and an actor writing the same store concurrently are not serialized against each other. This is a residual, tracked limitation, not a guarantee.
+
 ## 4. What a Subject-mode domain refuses (fail-closed, before any mutation)
 
 | Operation | Refused at |
@@ -121,5 +123,3 @@ increment; none is implied by this boundary.
 No change to GEN-A derivation or context-kind tags, GEN-B encoding or domain-separation tags, N1
 authority-event encoding, device Principal semantics, signed-byte layouts, kernel API, or federation
 wire contracts. `GovernanceDomain::update_config` now returns `Result` (callers updated).
-
-**Not atomic across writers.** The manager's persisted-record check runs under its own `domains` lock; the actor's runs on its serial command loop. The store has no conditional put, so a manager and an actor writing the same store concurrently are not serialized against each other. This is a residual, tracked limitation, not a guarantee.

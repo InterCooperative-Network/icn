@@ -13610,7 +13610,7 @@ mod actor_model_firewall_tests {
             .await
             .unwrap_err()
             .to_string();
-        assert!(err.contains("fail") || err.contains("read"), "{err}");
+        assert!(err.contains("stored record cannot be read"), "{err}");
 
         assert_eq!(store.get(KEY).unwrap().unwrap(), before);
         assert!(mgr.domains.read().unwrap().is_empty());
