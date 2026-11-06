@@ -3819,9 +3819,11 @@ impl GovernanceManager {
         // absent. Legacy replacement behaviour is unchanged.
         //
         // The lookup runs under this manager's `domains` write lock, so it is
-        // serialized against this manager's own writers. It is not an atomic
-        // compare-and-swap against a second writer of the same store (e.g. the
-        // GovernanceActor): the store trait has no conditional put.
+        // serialized against this manager's own writers. It is an early refusal,
+        // not the atomic line: `save_domain` below compare-and-puts against the
+        // exact bytes it read and refuses to replace a Subject record with a
+        // non-Subject one even if a second writer of the same store landed
+        // between this lookup and that write.
         if let Some(store) = self.domain_store.as_ref() {
             match store.get_domain(&domain_id) {
                 Ok(None) => {}
@@ -13734,6 +13736,47 @@ mod actor_model_firewall_tests {
             .unwrap();
         }
         assert_eq!(mgr.delegations.read().unwrap().len(), 2);
+    }
+
+    // ---- The race the persisted-record pre-check alone cannot close --------
+
+    /// `create_domain` reads the stored record ("absent"), a second writer then
+    /// persists a Subject domain, and `create_domain` carries on to
+    /// `save_domain` on its stale view. Before `save_domain` compared against
+    /// the bytes it replaced, the legacy record silently won.
+    #[tokio::test]
+    async fn create_domain_stale_view_cannot_replace_an_interleaved_subject_domain() {
+        use crate::state_store::test_support::HookStore;
+        use icn_store::Store;
+        let store = Arc::new(HookStore::new(true));
+        let subject_bytes = serde_json::to_vec(
+            &domain("subject", vec![])
+                .with_human_actor_model(HumanActorModel::ContextSubjectV1)
+                .unwrap(),
+        )
+        .unwrap();
+        let injected = subject_bytes.clone();
+        store.arm(
+            KEY.to_vec(),
+            Box::new(move |inner, n| {
+                if n == 1 {
+                    inner.put(KEY, &injected).unwrap();
+                }
+            }),
+        );
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+
+        let err = legacy_create(&mgr, "subject")
+            .await
+            .expect_err("a stale legacy create must not replace a Subject domain")
+            .to_string();
+        assert!(err.contains("leaving the ContextSubjectV1"), "{err}");
+        assert_eq!(store.inner.get(KEY).unwrap().unwrap(), subject_bytes);
+        assert!(
+            mgr.domains.read().unwrap().is_empty(),
+            "a refused create must not populate the cache"
+        );
     }
 
     // ---- Proposal-scoped delegation against a persisted-but-uncached proposal

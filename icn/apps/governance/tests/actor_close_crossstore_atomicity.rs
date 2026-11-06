@@ -115,6 +115,21 @@ impl Store for PrefixFailStore {
     fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
         self.inner.scan(prefix)
     }
+    /// `GovernanceStateStore::save_domain` writes through `compare_and_put`.
+    /// Forward it with the same injection as `put`, so this fixture keeps
+    /// modelling a store whose writes to the armed prefix fail, rather than
+    /// failing closed on every domain save.
+    fn compare_and_put(
+        &self,
+        key: &[u8],
+        expected: Option<&[u8]>,
+        new: &[u8],
+    ) -> anyhow::Result<icn_store::CompareAndPut> {
+        if self.fail.load(Ordering::SeqCst) && key.starts_with(&self.fail_prefix) {
+            anyhow::bail!("injected terminal-save failure for prefixed key");
+        }
+        self.inner.compare_and_put(key, expected, new)
+    }
     fn get_replica_metadata(&self, h: &ContentHash) -> anyhow::Result<Option<ReplicaMetadata>> {
         self.inner.get_replica_metadata(h)
     }

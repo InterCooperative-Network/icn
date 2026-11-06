@@ -8,11 +8,12 @@ use anyhow::Result;
 use std::sync::Arc;
 
 use icn_governance::{
-    Delegation, DelegationId, DomainPolicyId, GovernanceDomain, GovernanceDomainId,
-    InstitutionalDomain, Proposal, ProposalId, Timestamp, Vote,
+    ActorModelError, Delegation, DelegationId, DomainPolicyId, GovernanceDomain,
+    GovernanceDomainId, HumanActorModel, InstitutionalDomain, Proposal, ProposalId, Timestamp,
+    Vote,
 };
 use icn_identity::Did;
-use icn_store::Store;
+use icn_store::{CompareAndPut, Store};
 
 use crate::close_journal::CloseJournalEntry;
 
@@ -28,7 +29,13 @@ pub trait GovernanceStateStore: Send + Sync {
     /// Load a domain by ID.
     fn get_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>>;
 
-    /// Persist a domain (insert or overwrite).
+    /// Persist a domain (insert or overwrite), monotonic in the actor model:
+    /// a stored `ContextSubjectV1` domain is never replaced by one that is not
+    /// (`ActorModelError::ModeChangeRefused`). Implementations must make that
+    /// check atomic with the write; an unreadable stored record is refused, and
+    /// a backend that cannot do an atomic conditional write must fail rather
+    /// than fall back to an unconditional overwrite. This binds callers of this
+    /// trait only: it does not stop a raw `Store` write.
     fn save_domain(&self, domain: &GovernanceDomain) -> Result<()>;
 
     /// Return all domains in the store.
@@ -284,6 +291,13 @@ impl SledGovernanceStateStore {
     }
 }
 
+/// Upper bound on read→validate→compare-and-put rounds in `save_domain`.
+///
+/// Every lost round means another writer's write landed, so the system as a
+/// whole makes progress; the bound only stops one caller from spinning forever
+/// against a pathological writer. Exhaustion fails closed.
+pub(crate) const SAVE_DOMAIN_MAX_ATTEMPTS: usize = 16;
+
 impl GovernanceStateStore for SledGovernanceStateStore {
     // --- Domains ---
 
@@ -296,8 +310,48 @@ impl GovernanceStateStore for SledGovernanceStateStore {
         // loaded back, so persisting it would poison `list_domains`.
         domain.check_actor_model_invariant()?;
         let id = GovernanceDomainId(domain.id.0.clone());
-        self.store
-            .put(&domain_key(&id), &serde_json::to_vec(domain)?)
+        let key = domain_key(&id);
+        let new_bytes = serde_json::to_vec(domain)?;
+
+        // Monotonic actor model: a stored `ContextSubjectV1` domain is never
+        // replaced by a record that is not. The check is made against the exact
+        // bytes that the write then replaces, by compare-and-put, so a second
+        // writer landing between the read and the write turns into a conflict
+        // that is re-read and re-validated, not into a lost update.
+        for _ in 0..SAVE_DOMAIN_MAX_ATTEMPTS {
+            let current = self.store.get(&key)?;
+            if let Some(bytes) = current.as_deref() {
+                // An unreadable record cannot be proven not to be a Subject
+                // domain, so it is refused, never overwritten.
+                let existing: GovernanceDomain = serde_json::from_slice(bytes).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Domain '{}': stored record cannot be read ({e}); refusing to overwrite it",
+                        id.0
+                    )
+                })?;
+                if existing.human_actor_model() == HumanActorModel::ContextSubjectV1
+                    && domain.human_actor_model() != HumanActorModel::ContextSubjectV1
+                {
+                    return Err(ActorModelError::ModeChangeRefused {
+                        domain: id.0.clone(),
+                    }
+                    .into());
+                }
+            }
+            match self
+                .store
+                .compare_and_put(&key, current.as_deref(), &new_bytes)?
+            {
+                CompareAndPut::Applied => return Ok(()),
+                // Someone else wrote first. Re-read and re-validate.
+                CompareAndPut::Conflict { .. } => continue,
+            }
+        }
+        anyhow::bail!(
+            "Domain '{}': gave up saving after {SAVE_DOMAIN_MAX_ATTEMPTS} attempts \
+             because concurrent writers kept changing the record",
+            id.0
+        )
     }
 
     fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
@@ -658,6 +712,349 @@ mod tests {
         assert!(
             store.save_domain_policy_body(&id, b"anything").is_err(),
             "default save must fail closed, not silently succeed"
+        );
+    }
+}
+
+/// Test-only decorator for deterministic interleavings against a real sled.
+#[cfg(test)]
+pub(crate) mod test_support {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use icn_store::{
+        CompareAndPut, CompareAndPutUnsupported, ContentHash, ReplicaMetadata, SledStore, Store,
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    /// Called after every `get` of the armed key, with the underlying store and
+    /// the 1-based count of such reads. The hook plays "another writer".
+    pub type GetHook = Box<dyn Fn(&SledStore, usize) + Send + Sync>;
+
+    pub struct HookStore {
+        pub inner: SledStore,
+        hook: Mutex<Option<(Vec<u8>, GetHook)>>,
+        gets: AtomicUsize,
+        /// `false` models a backend that does not override `compare_and_put`.
+        forward_cas: bool,
+    }
+
+    impl HookStore {
+        pub fn new(forward_cas: bool) -> Self {
+            Self {
+                inner: SledStore::temporary().expect("temp sled"),
+                hook: Mutex::new(None),
+                gets: AtomicUsize::new(0),
+                forward_cas,
+            }
+        }
+        pub fn arm(&self, key: Vec<u8>, hook: GetHook) {
+            *self.hook.lock().unwrap() = Some((key, hook));
+        }
+        pub fn reads_of_armed_key(&self) -> usize {
+            self.gets.load(Ordering::SeqCst)
+        }
+    }
+
+    impl Store for HookStore {
+        fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+            // The value is read BEFORE the hook runs, so the caller holds a
+            // view that the hook then makes stale: a deterministic race.
+            let seen = self.inner.get(key)?;
+            if let Some((armed, hook)) = self.hook.lock().unwrap().as_ref() {
+                if armed.as_slice() == key {
+                    let n = self.gets.fetch_add(1, Ordering::SeqCst) + 1;
+                    hook(&self.inner, n);
+                }
+            }
+            Ok(seen)
+        }
+        fn put(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+            self.inner.put(key, value)
+        }
+        fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+            self.inner.delete(key)
+        }
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+            self.inner.delete_atomic(keys)
+        }
+        fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.inner.scan(prefix)
+        }
+        fn get_replica_metadata(&self, h: &ContentHash) -> anyhow::Result<Option<ReplicaMetadata>> {
+            self.inner.get_replica_metadata(h)
+        }
+        fn put_replica_metadata(&self, m: &ReplicaMetadata) -> anyhow::Result<()> {
+            self.inner.put_replica_metadata(m)
+        }
+        fn list_replica_hashes(&self) -> anyhow::Result<Vec<ContentHash>> {
+            self.inner.list_replica_hashes()
+        }
+        fn compare_and_put(
+            &self,
+            key: &[u8],
+            expected: Option<&[u8]>,
+            new: &[u8],
+        ) -> anyhow::Result<CompareAndPut> {
+            if self.forward_cas {
+                self.inner.compare_and_put(key, expected, new)
+            } else {
+                Err(CompareAndPutUnsupported.into())
+            }
+        }
+    }
+}
+
+/// `save_domain` must never turn a persisted `ContextSubjectV1` domain back
+/// into a legacy one, for any cooperating writer going through this API.
+#[cfg(test)]
+mod monotonic_domain_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::test_support::HookStore;
+    use super::*;
+    use icn_governance::{ActorModelError, GovernanceConfig, HumanActorModel, MembershipConfig};
+    use icn_identity::IdentityBundle;
+    use icn_store::{CompareAndPutUnsupported, Store};
+
+    fn legacy(id: &str, name: &str) -> GovernanceDomain {
+        let mut config = GovernanceConfig::cooperative_default();
+        config.membership =
+            MembershipConfig::static_list(vec![IdentityBundle::generate().unwrap().did().clone()]);
+        GovernanceDomain::with_id(GovernanceDomainId::new(id), name.to_string(), config)
+    }
+
+    fn subject(id: &str) -> GovernanceDomain {
+        let mut config = GovernanceConfig::cooperative_default();
+        config.membership = MembershipConfig::static_list(vec![]);
+        GovernanceDomain::with_id(GovernanceDomainId::new(id), id.to_string(), config)
+            .with_human_actor_model(HumanActorModel::ContextSubjectV1)
+            .unwrap()
+    }
+
+    fn key(id: &str) -> Vec<u8> {
+        domain_key(&GovernanceDomainId::new(id))
+    }
+
+    fn typed(store: &Arc<HookStore>) -> SledGovernanceStateStore {
+        SledGovernanceStateStore::new(store.clone())
+    }
+
+    fn stored(store: &HookStore, id: &str) -> Option<Vec<u8>> {
+        store.inner.get(&key(id)).unwrap()
+    }
+
+    fn stored_model(store: &HookStore, id: &str) -> HumanActorModel {
+        let bytes = stored(store, id).expect("record present");
+        serde_json::from_slice::<GovernanceDomain>(&bytes)
+            .unwrap()
+            .human_actor_model()
+    }
+
+    fn assert_mode_change_refused(err: anyhow::Error) {
+        assert!(
+            matches!(
+                err.downcast_ref::<ActorModelError>(),
+                Some(ActorModelError::ModeChangeRefused { .. })
+            ),
+            "expected ModeChangeRefused, got: {err:#}"
+        );
+    }
+
+    #[test]
+    fn creating_an_absent_domain_succeeds_in_both_models() {
+        let store = Arc::new(HookStore::new(true));
+        let s = typed(&store);
+        s.save_domain(&legacy("l", "l")).unwrap();
+        s.save_domain(&subject("s")).unwrap();
+        assert_eq!(
+            stored_model(&store, "l"),
+            HumanActorModel::LegacyPrincipalV0
+        );
+        assert_eq!(stored_model(&store, "s"), HumanActorModel::ContextSubjectV1);
+    }
+
+    #[test]
+    fn legacy_serialization_and_replacement_are_unchanged() {
+        let store = Arc::new(HookStore::new(true));
+        let s = typed(&store);
+        let first = legacy("d", "first");
+        s.save_domain(&first).unwrap();
+        let second = legacy("d", "second");
+        s.save_domain(&second).unwrap();
+        let bytes = stored(&store, "d").unwrap();
+        assert_eq!(bytes, serde_json::to_vec(&second).unwrap());
+        // The legacy wire form carries no actor-model field.
+        assert!(!String::from_utf8(bytes)
+            .unwrap()
+            .contains("human_actor_model"));
+    }
+
+    #[test]
+    fn subject_to_subject_update_and_legacy_to_subject_are_allowed_at_the_store() {
+        let store = Arc::new(HookStore::new(true));
+        let s = typed(&store);
+        s.save_domain(&subject("s")).unwrap();
+        s.save_domain(&subject("s")).unwrap();
+        // Whether a legacy domain may become Subject-mode is the domain
+        // builder's rule (no members may be dropped); the store only forbids
+        // leaving Subject mode.
+        s.save_domain(&legacy("l", "l")).unwrap();
+        s.save_domain(&subject("l")).unwrap();
+        assert_eq!(stored_model(&store, "l"), HumanActorModel::ContextSubjectV1);
+    }
+
+    #[test]
+    fn subject_to_legacy_is_refused_and_leaves_the_record_byte_identical() {
+        let store = Arc::new(HookStore::new(true));
+        let s = typed(&store);
+        s.save_domain(&subject("d")).unwrap();
+        let before = stored(&store, "d").unwrap();
+        assert_mode_change_refused(s.save_domain(&legacy("d", "evil")).unwrap_err());
+        assert_eq!(stored(&store, "d").unwrap(), before);
+    }
+
+    /// The deterministic race. The legacy writer's first view of the key is
+    /// "absent"; a second writer then persists a Subject domain; the legacy
+    /// writer proceeds on its stale view. It must not win.
+    #[test]
+    fn stale_legacy_writer_cannot_overwrite_an_interleaved_subject_write() {
+        let store = Arc::new(HookStore::new(true));
+        let subject_bytes = serde_json::to_vec(&subject("d")).unwrap();
+        let injected = subject_bytes.clone();
+        store.arm(
+            key("d"),
+            Box::new(move |inner, n| {
+                if n == 1 {
+                    inner.put(&key("d"), &injected).unwrap();
+                }
+            }),
+        );
+        let err = typed(&store)
+            .save_domain(&legacy("d", "stale"))
+            .expect_err("a stale legacy write must not replace a Subject domain");
+        assert_mode_change_refused(err);
+        assert_eq!(stored(&store, "d").unwrap(), subject_bytes);
+    }
+
+    /// A conflict with a harmless concurrent write is retried against the
+    /// freshly read record rather than failing or clobbering it blindly.
+    #[test]
+    fn a_conflicting_legacy_write_is_revalidated_and_then_applied() {
+        let store = Arc::new(HookStore::new(true));
+        let intruder = serde_json::to_vec(&legacy("d", "intruder")).unwrap();
+        store.arm(
+            key("d"),
+            Box::new(move |inner, n| {
+                if n == 1 {
+                    inner.put(&key("d"), &intruder).unwrap();
+                }
+            }),
+        );
+        let mine = legacy("d", "mine");
+        typed(&store).save_domain(&mine).unwrap();
+        assert_eq!(
+            stored(&store, "d").unwrap(),
+            serde_json::to_vec(&mine).unwrap()
+        );
+        assert_eq!(store.reads_of_armed_key(), 2, "one stale read, one retry");
+    }
+
+    /// A writer that keeps winning exhausts the bound, which fails closed.
+    #[test]
+    fn retry_exhaustion_fails_closed_without_overwriting() {
+        let store = Arc::new(HookStore::new(true));
+        store.arm(
+            key("d"),
+            Box::new(|inner, n| {
+                let other = serde_json::to_vec(&legacy("d", &format!("w{n}"))).unwrap();
+                inner.put(&key("d"), &other).unwrap();
+            }),
+        );
+        let err = typed(&store)
+            .save_domain(&legacy("d", "mine"))
+            .expect_err("must give up");
+        assert!(format!("{err:#}").contains("concurrent"), "{err:#}");
+        assert_eq!(store.reads_of_armed_key(), SAVE_DOMAIN_MAX_ATTEMPTS);
+        let last = format!("w{SAVE_DOMAIN_MAX_ATTEMPTS}");
+        let kept: GovernanceDomain = serde_json::from_slice(&stored(&store, "d").unwrap()).unwrap();
+        assert_eq!(kept.name, last, "the writer's own record must not land");
+    }
+
+    #[test]
+    fn an_unreadable_existing_record_is_refused_not_overwritten() {
+        let store = Arc::new(HookStore::new(true));
+        store.inner.put(&key("d"), b"\xff not a domain").unwrap();
+        let err = typed(&store).save_domain(&legacy("d", "x")).unwrap_err();
+        assert!(format!("{err:#}").contains("cannot be read"), "{err:#}");
+        assert_eq!(stored(&store, "d").unwrap(), b"\xff not a domain".to_vec());
+    }
+
+    #[test]
+    fn a_backend_without_atomic_compare_and_put_fails_closed_and_writes_nothing() {
+        let store = Arc::new(HookStore::new(false));
+        let err = typed(&store).save_domain(&legacy("d", "x")).unwrap_err();
+        assert!(
+            err.downcast_ref::<CompareAndPutUnsupported>().is_some(),
+            "{err:#}"
+        );
+        assert!(stored(&store, "d").is_none());
+    }
+
+    /// Real threads, real sled, no hooks. Whatever the interleaving, a Subject
+    /// write that returned Ok must still be what is stored at the end.
+    #[test]
+    fn concurrent_subject_and_legacy_writers_never_regress_the_mode() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Barrier;
+        for round in 0..40 {
+            let store = Arc::new(HookStore::new(true));
+            let gate = Arc::new(Barrier::new(8));
+            let subject_ok = Arc::new(AtomicBool::new(false));
+            let handles: Vec<_> = (0..8)
+                .map(|i| {
+                    let (store, gate, subject_ok) =
+                        (store.clone(), gate.clone(), subject_ok.clone());
+                    std::thread::spawn(move || {
+                        let s = typed(&store);
+                        gate.wait();
+                        if i % 2 == 0 {
+                            if s.save_domain(&subject("d")).is_ok() {
+                                subject_ok.store(true, Ordering::SeqCst);
+                            }
+                        } else {
+                            let _ = s.save_domain(&legacy("d", &format!("l{i}")));
+                        }
+                    })
+                })
+                .collect();
+            for h in handles {
+                h.join().unwrap();
+            }
+            if subject_ok.load(Ordering::SeqCst) {
+                assert_eq!(
+                    stored_model(&store, "d"),
+                    HumanActorModel::ContextSubjectV1,
+                    "round {round}: a successful Subject write was lost to a legacy writer"
+                );
+            }
+        }
+    }
+
+    /// KNOWN LIMITATION, pinned so it is not mistaken for protection: the
+    /// invariant lives in `save_domain`. A raw `Store::delete` of the key (as
+    /// any code holding the raw store could do) followed by a save is a
+    /// "create", which is allowed. `GovernanceStateStore` has no delete.
+    #[test]
+    fn raw_store_delete_then_recreate_bypasses_the_typed_invariant() {
+        let store = Arc::new(HookStore::new(true));
+        let s = typed(&store);
+        s.save_domain(&subject("d")).unwrap();
+        store.inner.delete(&key("d")).unwrap();
+        s.save_domain(&legacy("d", "recreated")).unwrap();
+        assert_eq!(
+            stored_model(&store, "d"),
+            HumanActorModel::LegacyPrincipalV0
         );
     }
 }
