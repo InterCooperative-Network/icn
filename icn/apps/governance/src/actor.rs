@@ -1917,7 +1917,7 @@ impl GovernanceActor {
                 // Legacy overwrite behaviour is deliberately unchanged.
                 self.require_legacy_rail_for_domain(
                     &domain_id,
-                    icn_governance::LegacyRailOp::MembershipMutation,
+                    icn_governance::LegacyRailOp::DomainReplacement,
                 )?;
 
                 let profile_id = GovernanceProfileId::builtin(&config.profile);

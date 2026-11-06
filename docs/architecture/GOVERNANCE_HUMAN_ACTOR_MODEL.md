@@ -58,7 +58,7 @@ Enforced at:
 | `GovernanceDomain::update_config` | returns `Err` and changes nothing if the new config would be mixed |
 | `Deserialize` (`try_from`) | a mixed record cannot be loaded from any store or message |
 
-There is **no conversion of membership**, and no supported in-place switch for a persisted domain: the setter is a library builder on an owned value, and `CreateDomain` refuses to overwrite a stored Subject-mode domain. A domain
+There is **no conversion of membership**, and no supported in-place switch for a persisted domain: the setter is a library builder on an owned value, and `CreateDomain` refuses to overwrite a stored Subject-mode domain on **both** write paths: `GovernanceActor` (refusal op `domain_replacement`) and the standalone `GovernanceManager::create_domain`, which consults the persisted record rather than trusting its in-memory cache (hydration falls back to an empty cache if the store cannot list), and refuses if that record cannot be read. A domain
 with legacy members cannot become Subject-mode; unsafe transitions are refused, not repaired. No
 migration framework exists in this slice.
 
@@ -73,6 +73,7 @@ migration framework exists in this slice.
 | Close a proposal (with or without an eligibility filter) | `GovernanceActor` `CloseProposal`; `GovernanceManager::close_proposal*` (in-memory) |
 | Veto or force-close a proposal | `GovernanceActor` `VetoProposal`, `ForceCloseProposal` |
 | Create a domain- or proposal-scoped vote delegation | `GovernanceActor` `create_delegation`; `GovernanceManager::create_delegation` (in-memory) |
+| Create a domain over a stored Subject-mode domain (replacement) | `GovernanceActor` `CreateDomain`; `GovernanceManager::create_domain` (checks the persisted record; an unreadable record is refused) |
 
 "Before any mutation" is checked, not asserted: the tests snapshot every record the actor can write
 (domains, proposals, votes, delegations, proofs) and require byte-equal snapshots across each
@@ -120,3 +121,5 @@ increment; none is implied by this boundary.
 No change to GEN-A derivation or context-kind tags, GEN-B encoding or domain-separation tags, N1
 authority-event encoding, device Principal semantics, signed-byte layouts, kernel API, or federation
 wire contracts. `GovernanceDomain::update_config` now returns `Result` (callers updated).
+
+**Not atomic across writers.** The manager's persisted-record check runs under its own `domains` lock; the actor's runs on its serial command loop. The store has no conditional put, so a manager and an actor writing the same store concurrently are not serialized against each other. This is a residual, tracked limitation, not a guarantee.

@@ -82,6 +82,8 @@ pub enum LegacyRailOp {
     ProposalClosure,
     /// Creating a Principal-to-Principal vote delegation.
     DelegationCreation,
+    /// Replacing a stored domain record by creating a domain under its id.
+    DomainReplacement,
 }
 
 impl LegacyRailOp {
@@ -93,6 +95,7 @@ impl LegacyRailOp {
             Self::ElectorateResolution => "electorate_resolution",
             Self::ProposalClosure => "proposal_closure",
             Self::DelegationCreation => "delegation_creation",
+            Self::DomainReplacement => "domain_replacement",
         }
     }
 }

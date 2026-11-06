@@ -615,6 +615,10 @@ async fn create_domain_cannot_overwrite_a_subject_domain() {
             },
         })
         .await;
+    assert!(
+        format!("{r:?}").contains("domain_replacement"),
+        "refusal must name the replacement op: {r:?}"
+    );
     refused(r);
     assert_eq!(snapshot(&f), before);
     let d = f

@@ -3811,6 +3811,31 @@ impl GovernanceManager {
             );
         }
 
+        // Actor-model firewall: a cache miss is not proof the store has no such
+        // domain (hydration falls back to an empty cache when the store fails to
+        // list), and `save_domain` overwrites by key. Consult the persisted
+        // record and refuse to replace a ContextSubjectV1 domain with this
+        // fresh legacy one. An unreadable record is refused, never treated as
+        // absent. Legacy replacement behaviour is unchanged.
+        //
+        // The lookup runs under this manager's `domains` write lock, so it is
+        // serialized against this manager's own writers. It is not an atomic
+        // compare-and-swap against a second writer of the same store (e.g. the
+        // GovernanceActor): the store trait has no conditional put.
+        if let Some(store) = self.domain_store.as_ref() {
+            match store.get_domain(&domain_id) {
+                Ok(None) => {}
+                Ok(Some(existing)) => {
+                    existing
+                        .require_legacy_rail(icn_governance::LegacyRailOp::DomainReplacement)?;
+                }
+                Err(e) => anyhow::bail!(
+                    "Domain '{}': stored record cannot be read ({e}); refusing to create over it",
+                    domain_id.0
+                ),
+            }
+        }
+
         // Write-through to persistent store before mutating the in-memory cache,
         // so a store failure aborts the create cleanly without leaving an
         // unpersisted domain that disappears on restart.
@@ -13501,5 +13526,122 @@ mod actor_model_firewall_tests {
         .await
         .unwrap();
         assert_eq!(mgr.delegations.read().unwrap().len(), 1);
+    }
+
+    // ---- Persisted-domain overwrite through the standalone manager ----------
+
+    const KEY: &[u8] = b"gov:domain:subject";
+
+    fn sled_store() -> Arc<dyn icn_store::Store> {
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        Arc::new(SledStore::from_db(db))
+    }
+
+    fn persist_subject(store: &Arc<dyn icn_store::Store>) {
+        let subject = domain("subject", vec![])
+            .with_human_actor_model(HumanActorModel::ContextSubjectV1)
+            .unwrap();
+        SledGovernanceStateStore::new(store.clone())
+            .save_domain(&subject)
+            .unwrap();
+    }
+
+    async fn legacy_create(mgr: &GovernanceManager, id: &str) -> Result<()> {
+        mgr.create_domain(
+            GovernanceDomainId::new(id),
+            "replacement".into(),
+            "cooperative_default".into(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![did()]),
+        )
+        .await
+    }
+
+    /// A: a persisted Subject domain plus an empty cache (the manager was
+    /// wired to the store with `with_domain_store`, which does not hydrate).
+    #[tokio::test]
+    async fn create_domain_cannot_replace_persisted_subject_domain_with_empty_cache() {
+        let store = sled_store();
+        persist_subject(&store);
+        let before = store.get(KEY).unwrap().unwrap();
+
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+        let r = legacy_create(&mgr, "subject").await;
+        assert!(
+            format!("{r:?}").contains("domain_replacement"),
+            "refusal must name the replacement op: {r:?}"
+        );
+        assert_refused(r);
+
+        assert_eq!(store.get(KEY).unwrap().unwrap(), before, "bytes unchanged");
+        assert!(mgr.domains.read().unwrap().is_empty(), "cache untouched");
+    }
+
+    /// B: hydration fails (an unrelated corrupt row breaks `list_domains`), so
+    /// the cache starts empty although a Subject domain is persisted.
+    #[tokio::test]
+    async fn create_domain_cannot_replace_subject_domain_after_hydration_failure() {
+        let db = Arc::new(sled::Config::new().temporary(true).open().unwrap());
+        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::from_db((*db).clone()));
+        persist_subject(&store);
+        store.put(b"gov:domain:zz-corrupt", b"not json").unwrap();
+        let before = store.get(KEY).unwrap().unwrap();
+
+        let mgr = GovernanceManager::new_with_sled(db);
+        assert!(mgr.domains.read().unwrap().is_empty(), "hydration failed");
+        assert_refused(legacy_create(&mgr, "subject").await);
+
+        assert_eq!(store.get(KEY).unwrap().unwrap(), before);
+        assert!(mgr.domains.read().unwrap().is_empty());
+    }
+
+    /// C: the lookup itself fails (the row for this id is undecodable). That is
+    /// not proof of absence, so the create fails closed and writes nothing.
+    #[tokio::test]
+    async fn create_domain_fails_closed_when_stored_record_cannot_be_read() {
+        let store = sled_store();
+        store.put(KEY, b"\xff not a domain").unwrap();
+        let before = store.get(KEY).unwrap().unwrap();
+
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+        let err = legacy_create(&mgr, "subject")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("fail") || err.contains("read"), "{err}");
+
+        assert_eq!(store.get(KEY).unwrap().unwrap(), before);
+        assert!(mgr.domains.read().unwrap().is_empty());
+    }
+
+    /// D: legacy behaviour is unchanged: a fresh id is created and persisted,
+    /// and a persisted *legacy* row is still replaced as before.
+    #[tokio::test]
+    async fn legacy_create_domain_behaviour_is_unchanged() {
+        let store = sled_store();
+        let state = Arc::new(SledGovernanceStateStore::new(store.clone()));
+        state.save_domain(&domain("old", vec![did()])).unwrap();
+        let mgr = GovernanceManager::new().with_domain_store(state.clone());
+
+        legacy_create(&mgr, "fresh").await.unwrap();
+        assert!(state
+            .get_domain(&GovernanceDomainId::new("fresh"))
+            .unwrap()
+            .is_some());
+
+        legacy_create(&mgr, "old").await.unwrap();
+        assert_eq!(
+            state
+                .get_domain(&GovernanceDomainId::new("old"))
+                .unwrap()
+                .unwrap()
+                .name,
+            "replacement"
+        );
+
+        // The in-memory duplicate rule is unchanged.
+        assert!(legacy_create(&mgr, "fresh").await.is_err());
     }
 }
