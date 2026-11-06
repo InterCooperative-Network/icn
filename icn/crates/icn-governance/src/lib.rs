@@ -78,6 +78,7 @@ pub mod steward;
 #[allow(missing_docs)]
 pub mod steward_store;
 pub mod store;
+pub mod subject_recognition;
 pub mod tally;
 pub mod verify;
 pub mod vote;
