@@ -148,6 +148,15 @@ impl GovernanceDomain {
         mut self,
         model: HumanActorModel,
     ) -> Result<Self, ActorModelError> {
+        // Leaving Subject mode would re-open the legacy rails on a domain that
+        // opted out of them; there is no downgrade path in this slice.
+        if self.human_actor_model == HumanActorModel::ContextSubjectV1
+            && model != HumanActorModel::ContextSubjectV1
+        {
+            return Err(ActorModelError::ModeChangeRefused {
+                domain: self.id.0.clone(),
+            });
+        }
         self.human_actor_model = model;
         self.check_actor_model_invariant()?;
         Ok(self)

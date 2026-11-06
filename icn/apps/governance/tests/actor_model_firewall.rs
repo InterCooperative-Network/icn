@@ -588,3 +588,66 @@ async fn state_store_refuses_to_persist_a_mixed_domain() {
     // And listing still works: nothing unloadable was written.
     assert_eq!(f.state.list_domains().unwrap().len(), 2);
 }
+
+/// `CreateDomain` is an alternate way to change a domain's membership source:
+/// it builds a fresh legacy-mode domain and overwrites by key. It must not
+/// replace a stored Subject-mode domain, and must not gossip anything.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_domain_cannot_overwrite_a_subject_domain() {
+    use icn_governance::GovernanceParams;
+    use icn_governance_actor::actor::GovernanceConfigLite;
+    let f = fx().await;
+    let before = snapshot(&f);
+    let before_subject = f
+        .state
+        .get_domain(&GovernanceDomainId::new(SUBJECT))
+        .unwrap()
+        .unwrap();
+    let r = f
+        .handle
+        .submit(GovernanceCommand::CreateDomain {
+            domain_id: GovernanceDomainId::new(SUBJECT),
+            name: "overwrite".into(),
+            config: GovernanceConfigLite {
+                profile: "cooperative_default".into(),
+                membership: MembershipConfig::static_list(vec![f.member.clone()]),
+                params: GovernanceParams::new(50, 50, 3600),
+            },
+        })
+        .await;
+    refused(r);
+    assert_eq!(snapshot(&f), before);
+    let d = f
+        .state
+        .get_domain(&GovernanceDomainId::new(SUBJECT))
+        .unwrap()
+        .unwrap();
+    assert_eq!(d.human_actor_model(), HumanActorModel::ContextSubjectV1);
+    // The stored record is byte-for-byte what it was.
+    assert_eq!(
+        serde_json::to_vec(&d).unwrap(),
+        serde_json::to_vec(&before_subject).unwrap()
+    );
+
+    // Legacy control: the same command over a legacy domain is still accepted
+    // (behaviour unchanged), so the refusal above is the mode check, not a
+    // generic duplicate-id rejection.
+    f.handle
+        .submit(GovernanceCommand::CreateDomain {
+            domain_id: GovernanceDomainId::new(LEGACY),
+            name: "legacy-overwrite".into(),
+            config: GovernanceConfigLite {
+                profile: "cooperative_default".into(),
+                membership: MembershipConfig::static_list(vec![f.member.clone()]),
+                params: GovernanceParams::new(50, 50, 3600),
+            },
+        })
+        .await
+        .expect("legacy CreateDomain must keep working");
+    let l = f
+        .state
+        .get_domain(&GovernanceDomainId::new(LEGACY))
+        .unwrap()
+        .unwrap();
+    assert_eq!(l.name, "legacy-overwrite");
+}

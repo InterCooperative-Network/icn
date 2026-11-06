@@ -282,3 +282,19 @@ fn sled_store_refuses_to_persist_a_mixed_domain() {
     // The valid row is intact and the listing still loads.
     assert_eq!(store.list_domains().unwrap().len(), 1);
 }
+
+/// There is no downgrade path: a Subject domain cannot be rebuilt as legacy.
+#[test]
+fn subject_domain_cannot_be_downgraded_to_legacy() {
+    let d = subject_domain("no-downgrade");
+    assert!(matches!(
+        d.clone()
+            .with_human_actor_model(HumanActorModel::LegacyPrincipalV0)
+            .unwrap_err(),
+        ActorModelError::ModeChangeRefused { .. }
+    ));
+    // Re-selecting the same mode is idempotent.
+    assert!(d
+        .with_human_actor_model(HumanActorModel::ContextSubjectV1)
+        .is_ok());
+}

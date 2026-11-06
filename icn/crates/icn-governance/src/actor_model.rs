@@ -74,8 +74,6 @@ impl HumanActorModel {
 pub enum LegacyRailOp {
     /// Adding or removing a legacy member.
     MembershipMutation,
-    /// Replacing the domain configuration.
-    ConfigMutation,
     /// Recording a Principal-keyed vote.
     VoteCast,
     /// Resolving a Principal-based electorate.
@@ -91,7 +89,6 @@ impl LegacyRailOp {
     pub fn name(&self) -> &'static str {
         match self {
             Self::MembershipMutation => "membership_mutation",
-            Self::ConfigMutation => "config_mutation",
             Self::VoteCast => "vote_cast",
             Self::ElectorateResolution => "electorate_resolution",
             Self::ProposalClosure => "proposal_closure",
@@ -116,6 +113,12 @@ pub enum ActorModelError {
         domain: String,
         /// The refused operation.
         op: LegacyRailOp,
+    },
+    /// An attempt to move a `ContextSubjectV1` domain back to another model.
+    #[error("domain '{domain}': leaving the ContextSubjectV1 actor model is refused")]
+    ModeChangeRefused {
+        /// The domain whose mode was to change.
+        domain: String,
     },
     /// A `ContextSubjectV1` domain would carry a legacy membership source.
     #[error(

@@ -54,11 +54,11 @@ Enforced at:
 
 | Boundary | Behaviour |
 |---|---|
-| `GovernanceDomain::with_human_actor_model` | returns `Err`; the only way to select Subject mode |
+| `GovernanceDomain::with_human_actor_model` | the only setter; returns `Err` for a mixed domain and refuses leaving Subject mode (no downgrade) |
 | `GovernanceDomain::update_config` | returns `Err` and changes nothing if the new config would be mixed |
 | `Deserialize` (`try_from`) | a mixed record cannot be loaded from any store or message |
 
-There is **no in-place switch** for an existing domain and no conversion of membership. A domain
+There is **no conversion of membership**, and no supported in-place switch for a persisted domain: the setter is a library builder on an owned value, and `CreateDomain` refuses to overwrite a stored Subject-mode domain. A domain
 with legacy members cannot become Subject-mode; unsafe transitions are refused, not repaired. No
 migration framework exists in this slice.
 
@@ -114,6 +114,8 @@ Subject vote-set hashing and deterministic tally; a Subject decision receipt. Ea
 increment; none is implied by this boundary.
 
 ## 8. Compatibility
+
+**Downgrade warning.** A binary that predates this field ignores `human_actor_model`, so it would load a Subject-mode record as a legacy domain with an empty list and could re-save it without the field. Subject-mode records must not be handled by pre-rung-4 binaries. This is harmless while no production surface can create one.
 
 No change to GEN-A derivation or context-kind tags, GEN-B encoding or domain-separation tags, N1
 authority-event encoding, device Principal semantics, signed-byte layouts, kernel API, or federation

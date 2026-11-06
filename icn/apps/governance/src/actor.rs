@@ -1910,6 +1910,16 @@ impl GovernanceActor {
             } => {
                 info!("Creating governance domain: {}", domain_id.0);
 
+                // Actor-model firewall: `CreateDomain` builds a fresh legacy-mode
+                // domain and `save_domain` overwrites by key, so it must not be
+                // allowed to replace a stored ContextSubjectV1 domain (that
+                // would silently reset the mode and open the legacy rails).
+                // Legacy overwrite behaviour is deliberately unchanged.
+                self.require_legacy_rail_for_domain(
+                    &domain_id,
+                    icn_governance::LegacyRailOp::MembershipMutation,
+                )?;
+
                 let profile_id = GovernanceProfileId::builtin(&config.profile);
                 let domain = GovernanceDomain::with_id(
                     domain_id.clone(),
