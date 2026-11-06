@@ -67,6 +67,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Select Node explicitly: the runner default moved to Node 24 on ubuntu-26,
+      # whose headers require C++20 while better-sqlite3 9.x builds as C++17, so
+      # the ops/mcp native build below fails. Node 22 is what mcp-portability.yml
+      # already uses for the same build.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
       - name: Verify canonical truth files exist
         run: bash ops/scripts/drift-check.sh
 
