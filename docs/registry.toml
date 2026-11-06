@@ -1346,6 +1346,27 @@ depends_on = [
   "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
 ]
 
+[docs."docs/architecture/GEN_SUBJECT_RECOGNITION.md"]
+category = "architecture"
+status = "living"
+title = "GEN-B - institutional Subject recognition (SubjectRecognitionV1)"
+description = "NORMATIVE BYTE-LEVEL CONTRACT for GEN-B, rung 3 of the #2694 semantic convergence ladder: the immutable, deterministic recognition fact binding a governance-domain id, a GEN-A-verified SubjectId, standing class Member and a non-production bootstrap-rehearsal basis to a domain-separated BLAKE3 recognition_hash (CANONICAL_ENCODING 4.1.3). Specifies the two tags, exact field order and framing, the constructor that re-verifies the GEN-A genesis bundle against the domain's exact id bytes, the rehearsal-policy boundary (fresh Alpha Subject only, not legacy migration), and fixed vectors reproduced by an independent non-Rust reference. Library, spec and tests only: it makes NO claim of membership legitimacy, voting eligibility, economic authority, current device authorization, deployment or production readiness."
+last_updated = "2026-11-05"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "governance", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-11-05"
+depends_on = [
+  "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/CANONICAL_ENCODING.md",
+  "icn/crates/icn-governance/src/subject_recognition.rs",
+]
+
 [docs."docs/architecture/GOVERNANCE_STATE_MACHINE.md"]
 category = "architecture"
 status = "living"
