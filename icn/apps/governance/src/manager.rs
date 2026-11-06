@@ -3811,6 +3811,31 @@ impl GovernanceManager {
             );
         }
 
+        // Actor-model firewall: a cache miss is not proof the store has no such
+        // domain (hydration falls back to an empty cache when the store fails to
+        // list), and `save_domain` overwrites by key. Consult the persisted
+        // record and refuse to replace a ContextSubjectV1 domain with this
+        // fresh legacy one. An unreadable record is refused, never treated as
+        // absent. Legacy replacement behaviour is unchanged.
+        //
+        // The lookup runs under this manager's `domains` write lock, so it is
+        // serialized against this manager's own writers. It is not an atomic
+        // compare-and-swap against a second writer of the same store (e.g. the
+        // GovernanceActor): the store trait has no conditional put.
+        if let Some(store) = self.domain_store.as_ref() {
+            match store.get_domain(&domain_id) {
+                Ok(None) => {}
+                Ok(Some(existing)) => {
+                    existing
+                        .require_legacy_rail(icn_governance::LegacyRailOp::DomainReplacement)?;
+                }
+                Err(e) => anyhow::bail!(
+                    "Domain '{}': stored record cannot be read ({e}); refusing to create over it",
+                    domain_id.0
+                ),
+            }
+        }
+
         // Write-through to persistent store before mutating the in-memory cache,
         // so a store failure aborts the create cleanly without leaving an
         // unpersisted domain that disappears on restart.
@@ -3844,6 +3869,9 @@ impl GovernanceManager {
         let domain = domains
             .get_mut(&domain_id)
             .ok_or_else(|| anyhow::anyhow!("Domain '{}' not found", domain_id.0))?;
+
+        // Actor-model firewall: refuse before the member list is touched.
+        domain.require_legacy_rail(icn_governance::LegacyRailOp::MembershipMutation)?;
 
         match &mut domain.config.membership.source {
             MembershipSource::StaticList(members) => match action {
@@ -4278,6 +4306,11 @@ impl GovernanceManager {
                     proposal_id.0
                 )
             })?;
+
+            // Actor-model firewall: no legacy-electorate decision for a
+            // ContextSubjectV1 domain. Runs before the tally and before any
+            // state change to the proposal.
+            domain.require_legacy_rail(icn_governance::LegacyRailOp::ProposalClosure)?;
 
             let raw_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
 
@@ -5241,6 +5274,11 @@ impl GovernanceManager {
             )
         })?;
 
+        // Actor-model firewall: refuse before the membership decision (the
+        // `TrustThreshold => true` arm below would otherwise admit anyone) and
+        // before any vote row is created.
+        domain.require_legacy_rail(icn_governance::LegacyRailOp::VoteCast)?;
+
         let is_member = match &domain.config.membership.source {
             MembershipSource::StaticList(members) => members.contains(&voter),
             MembershipSource::TrustThreshold(_) => true,
@@ -5302,6 +5340,72 @@ impl GovernanceManager {
     // Delegation Methods
     // ============================================================================
 
+    /// Refuse a delegation whose scope names a `ContextSubjectV1` domain
+    /// (directly, or through its proposal). Blanket scope names no domain.
+    fn require_legacy_rail_for_delegation_scope(
+        &self,
+        scope: &icn_governance::DelegationScope,
+    ) -> Result<()> {
+        let domain_id = match scope {
+            icn_governance::DelegationScope::Blanket => return Ok(()),
+            icn_governance::DelegationScope::Domain(id) => id.clone(),
+            icn_governance::DelegationScope::Proposal(pid) => {
+                let cached = {
+                    let proposals = self.proposals.read().map_err(|e| {
+                        anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+                    })?;
+                    proposals.get(pid).map(|p| p.domain_id.clone())
+                };
+                match cached {
+                    Some(domain_id) => domain_id,
+                    // A cache miss is not proof the proposal does not exist:
+                    // hydration never loads proposals. Resolve it from the
+                    // attached store and run the domain guard on its real
+                    // domain. An unreadable record is refused, never treated
+                    // as absent. A proposal that is genuinely unknown (or a
+                    // manager with no store) keeps the established behaviour.
+                    None => match self.domain_store.as_ref() {
+                        None => return Ok(()),
+                        Some(store) => match store.get_proposal(pid) {
+                            Ok(Some(p)) => p.domain_id,
+                            Ok(None) => return Ok(()),
+                            Err(e) => anyhow::bail!(
+                                "Proposal '{}': stored proposal cannot be read ({e}); refusing delegation",
+                                pid.0
+                            ),
+                        },
+                    },
+                }
+            }
+        };
+        {
+            let domains = self.domains.read().map_err(|e| {
+                anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+            })?;
+            if let Some(domain) = domains.get(&domain_id) {
+                return Ok(
+                    domain.require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?
+                );
+            }
+        }
+        // A cache miss is not proof the domain is not a persisted
+        // ContextSubjectV1 domain (hydration falls back to an empty cache when
+        // the store cannot list). Consult the persisted record; an unreadable
+        // record is refused, never treated as absent.
+        if let Some(store) = self.domain_store.as_ref() {
+            match store.get_domain(&domain_id) {
+                Ok(None) => {}
+                Ok(Some(existing)) => existing
+                    .require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?,
+                Err(e) => anyhow::bail!(
+                    "Domain '{}': stored record cannot be read ({e}); refusing delegation",
+                    domain_id.0
+                ),
+            }
+        }
+        Ok(())
+    }
+
     /// Create a new vote delegation
     pub async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
         if let Some(ref handle) = self.governance_handle {
@@ -5313,6 +5417,10 @@ impl GovernanceManager {
                 "Cannot delegate to yourself. Delegator and delegate must be different DIDs."
             );
         }
+
+        // Actor-model firewall: domain- or proposal-scoped delegation into a
+        // ContextSubjectV1 domain is refused before any row is written.
+        self.require_legacy_rail_for_delegation_scope(&delegation.scope)?;
 
         let mut delegations = self.delegations.write().map_err(|e| {
             anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
@@ -13276,5 +13384,463 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(mandate.grants, grant_ids_via_decision);
+    }
+}
+
+/// Rung 4 — actor-model firewall on the manager's own in-memory stack.
+///
+/// `GovernanceManager` carries a second, independent implementation of
+/// membership, voting, closure and delegation that runs whenever no actor
+/// handle is attached. The actor-level tests cannot reach it, so a guard
+/// missing here would be an alternate-entry-point bypass. Each negative has a
+/// legacy control so a pass cannot be vacuous.
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod actor_model_firewall_tests {
+    use super::*;
+    use icn_governance::{
+        DelegationScope, GovernanceConfig, HumanActorModel, MembershipAction, VoteChoice,
+    };
+    use icn_identity::IdentityBundle;
+
+    fn did() -> Did {
+        IdentityBundle::generate().unwrap().did().clone()
+    }
+
+    fn domain(id: &str, members: Vec<Did>) -> GovernanceDomain {
+        let mut config = GovernanceConfig::cooperative_default();
+        config.membership = MembershipConfig::static_list(members);
+        GovernanceDomain::with_id(GovernanceDomainId::new(id), id.to_string(), config)
+    }
+
+    fn open_proposal(domain_id: &str, proposer: &Did, id: &str) -> Proposal {
+        let mut p = Proposal::new(
+            GovernanceDomainId::new(domain_id),
+            proposer.clone(),
+            "t".to_string(),
+            "d".to_string(),
+            ProposalPayload::Text { body: "b".into() },
+        );
+        p.id = ProposalId(id.to_string());
+        p.open(3600).unwrap();
+        p
+    }
+
+    /// Manager with a legacy domain `legacy` (one member) and a Subject-mode
+    /// domain `subject`, each with an open proposal.
+    fn manager(member: &Did) -> GovernanceManager {
+        let mgr = GovernanceManager::new();
+        let subject = domain("subject", vec![])
+            .with_human_actor_model(HumanActorModel::ContextSubjectV1)
+            .unwrap();
+        {
+            let mut d = mgr.domains.write().unwrap();
+            d.insert(
+                GovernanceDomainId::new("legacy"),
+                domain("legacy", vec![member.clone()]),
+            );
+            d.insert(GovernanceDomainId::new("subject"), subject);
+            let mut p = mgr.proposals.write().unwrap();
+            p.insert(
+                ProposalId("p-legacy".into()),
+                open_proposal("legacy", member, "p-legacy"),
+            );
+            p.insert(
+                ProposalId("p-subject".into()),
+                open_proposal("subject", member, "p-subject"),
+            );
+        }
+        mgr
+    }
+
+    fn assert_refused(r: Result<()>) {
+        let msg = r.expect_err("must be refused").to_string();
+        assert!(msg.contains("ContextSubjectV1"), "wrong refusal: {msg}");
+    }
+
+    #[tokio::test]
+    async fn in_memory_membership_edit_refused() {
+        let member = did();
+        let mgr = manager(&member);
+        for action in [MembershipAction::Add, MembershipAction::Remove] {
+            assert_refused(
+                mgr.update_domain_membership(GovernanceDomainId::new("subject"), did(), action)
+                    .await,
+            );
+        }
+        {
+            let d = mgr.domains.read().unwrap();
+            let s = &d[&GovernanceDomainId::new("subject")];
+            assert!(matches!(
+                &s.config.membership.source,
+                MembershipSource::StaticList(m) if m.is_empty()
+            ));
+        }
+
+        // Control.
+        let newcomer = did();
+        mgr.update_domain_membership(
+            GovernanceDomainId::new("legacy"),
+            newcomer.clone(),
+            MembershipAction::Add,
+        )
+        .await
+        .unwrap();
+        assert!(
+            mgr.domains.read().unwrap()[&GovernanceDomainId::new("legacy")]
+                .config
+                .membership
+                .source
+                .contains_static(&newcomer)
+        );
+    }
+
+    #[tokio::test]
+    async fn in_memory_vote_refused_without_vote_row() {
+        let member = did();
+        let mgr = manager(&member);
+        for voter in [member.clone(), did()] {
+            assert_refused(
+                mgr.cast_vote(ProposalId("p-subject".into()), voter, VoteChoice::For, None)
+                    .await,
+            );
+        }
+        assert!(
+            mgr.votes
+                .read()
+                .unwrap()
+                .get(&ProposalId("p-subject".into()))
+                .is_none(),
+            "no vote row may be created"
+        );
+
+        // Control.
+        mgr.cast_vote(ProposalId("p-legacy".into()), member, VoteChoice::For, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            mgr.votes.read().unwrap()[&ProposalId("p-legacy".into())].len(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn in_memory_close_refused_and_proposal_stays_open() {
+        let member = did();
+        let mgr = manager(&member);
+        let id = ProposalId("p-subject".into());
+        assert_refused(mgr.close_proposal(id.clone()).await);
+        let eligible: HashSet<Did> = [member.clone()].into_iter().collect();
+        assert_refused(mgr.close_proposal_filtered(id.clone(), &eligible).await);
+        assert_refused(
+            mgr.close_proposal_with_suspension(id.clone(), Some(eligible), None, None)
+                .await,
+        );
+        assert!(mgr.proposals.read().unwrap()[&id].state.is_open());
+    }
+
+    #[tokio::test]
+    async fn in_memory_delegation_into_subject_domain_refused() {
+        let member = did();
+        let mgr = manager(&member);
+        let (a, b) = (did(), did());
+        for scope in [
+            DelegationScope::Domain(GovernanceDomainId::new("subject")),
+            DelegationScope::Proposal(ProposalId("p-subject".into())),
+        ] {
+            assert_refused(
+                mgr.create_delegation(Delegation::new(a.clone(), b.clone(), scope))
+                    .await,
+            );
+        }
+        assert!(mgr.delegations.read().unwrap().is_empty());
+
+        // Control.
+        mgr.create_delegation(Delegation::new(
+            a,
+            b,
+            DelegationScope::Domain(GovernanceDomainId::new("legacy")),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(mgr.delegations.read().unwrap().len(), 1);
+    }
+
+    // ---- Persisted-domain overwrite through the standalone manager ----------
+
+    const KEY: &[u8] = b"gov:domain:subject";
+
+    fn sled_store() -> Arc<dyn icn_store::Store> {
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        Arc::new(SledStore::from_db(db))
+    }
+
+    fn persist_subject(store: &Arc<dyn icn_store::Store>) {
+        let subject = domain("subject", vec![])
+            .with_human_actor_model(HumanActorModel::ContextSubjectV1)
+            .unwrap();
+        SledGovernanceStateStore::new(store.clone())
+            .save_domain(&subject)
+            .unwrap();
+    }
+
+    async fn legacy_create(mgr: &GovernanceManager, id: &str) -> Result<()> {
+        mgr.create_domain(
+            GovernanceDomainId::new(id),
+            "replacement".into(),
+            "cooperative_default".into(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![did()]),
+        )
+        .await
+    }
+
+    /// A: a persisted Subject domain plus an empty cache (the manager was
+    /// wired to the store with `with_domain_store`, which does not hydrate).
+    #[tokio::test]
+    async fn create_domain_cannot_replace_persisted_subject_domain_with_empty_cache() {
+        let store = sled_store();
+        persist_subject(&store);
+        let before = store.get(KEY).unwrap().unwrap();
+
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+        let r = legacy_create(&mgr, "subject").await;
+        assert!(
+            format!("{r:?}").contains("domain_replacement"),
+            "refusal must name the replacement op: {r:?}"
+        );
+        assert_refused(r);
+
+        assert_eq!(store.get(KEY).unwrap().unwrap(), before, "bytes unchanged");
+        assert!(mgr.domains.read().unwrap().is_empty(), "cache untouched");
+    }
+
+    /// B: hydration fails (an unrelated corrupt row breaks `list_domains`), so
+    /// the cache starts empty although a Subject domain is persisted.
+    #[tokio::test]
+    async fn create_domain_cannot_replace_subject_domain_after_hydration_failure() {
+        let db = Arc::new(sled::Config::new().temporary(true).open().unwrap());
+        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::from_db((*db).clone()));
+        persist_subject(&store);
+        store.put(b"gov:domain:zz-corrupt", b"not json").unwrap();
+        let before = store.get(KEY).unwrap().unwrap();
+
+        let mgr = GovernanceManager::new_with_sled(db);
+        assert!(mgr.domains.read().unwrap().is_empty(), "hydration failed");
+        assert_refused(legacy_create(&mgr, "subject").await);
+
+        assert_eq!(store.get(KEY).unwrap().unwrap(), before);
+        assert!(mgr.domains.read().unwrap().is_empty());
+    }
+
+    /// C: the lookup itself fails (the row for this id is undecodable). That is
+    /// not proof of absence, so the create fails closed and writes nothing.
+    #[tokio::test]
+    async fn create_domain_fails_closed_when_stored_record_cannot_be_read() {
+        let store = sled_store();
+        store.put(KEY, b"\xff not a domain").unwrap();
+        let before = store.get(KEY).unwrap().unwrap();
+
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+        let err = legacy_create(&mgr, "subject")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("stored record cannot be read"), "{err}");
+
+        assert_eq!(store.get(KEY).unwrap().unwrap(), before);
+        assert!(mgr.domains.read().unwrap().is_empty());
+    }
+
+    /// D: legacy behaviour is unchanged: a fresh id is created and persisted,
+    /// and a persisted *legacy* row is still replaced as before.
+    #[tokio::test]
+    async fn legacy_create_domain_behaviour_is_unchanged() {
+        let store = sled_store();
+        let state = Arc::new(SledGovernanceStateStore::new(store.clone()));
+        state.save_domain(&domain("old", vec![did()])).unwrap();
+        let mgr = GovernanceManager::new().with_domain_store(state.clone());
+
+        legacy_create(&mgr, "fresh").await.unwrap();
+        assert!(state
+            .get_domain(&GovernanceDomainId::new("fresh"))
+            .unwrap()
+            .is_some());
+
+        legacy_create(&mgr, "old").await.unwrap();
+        assert_eq!(
+            state
+                .get_domain(&GovernanceDomainId::new("old"))
+                .unwrap()
+                .unwrap()
+                .name,
+            "replacement"
+        );
+
+        // The in-memory duplicate rule is unchanged.
+        assert!(legacy_create(&mgr, "fresh").await.is_err());
+    }
+
+    // ---- Scoped delegation against a persisted-but-uncached domain ----------
+
+    /// A persisted Subject domain missing from the cache (empty hydration)
+    /// must still refuse a domain-scoped delegation, and an unreadable record
+    /// must fail closed. Legacy behaviour (persisted legacy / no record) holds.
+    #[tokio::test]
+    async fn delegation_checks_persisted_domain_when_cache_misses() {
+        let (a, b) = (did(), did());
+        let scope = || DelegationScope::Domain(GovernanceDomainId::new("subject"));
+
+        // Persisted Subject domain, empty cache.
+        let store = sled_store();
+        persist_subject(&store);
+        let before = store.get(KEY).unwrap().unwrap();
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+        let r = mgr
+            .create_delegation(Delegation::new(a.clone(), b.clone(), scope()))
+            .await;
+        assert_refused(r);
+        assert!(mgr.delegations.read().unwrap().is_empty());
+        assert_eq!(store.get(KEY).unwrap().unwrap(), before);
+
+        // Unreadable record: fail closed, nothing inserted.
+        let bad = sled_store();
+        bad.put(KEY, b"\xff not a domain").unwrap();
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(bad.clone())));
+        let err = mgr
+            .create_delegation(Delegation::new(a.clone(), b.clone(), scope()))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("stored record cannot be read"), "{err}");
+        assert!(mgr.delegations.read().unwrap().is_empty());
+
+        // Controls: persisted legacy domain with empty cache, and no record.
+        let ok = sled_store();
+        let state = Arc::new(SledGovernanceStateStore::new(ok.clone()));
+        state.save_domain(&domain("old", vec![did()])).unwrap();
+        let mgr = GovernanceManager::new().with_domain_store(state);
+        for id in ["old", "never-persisted"] {
+            mgr.create_delegation(Delegation::new(
+                a.clone(),
+                b.clone(),
+                DelegationScope::Domain(GovernanceDomainId::new(id)),
+            ))
+            .await
+            .unwrap();
+        }
+        assert_eq!(mgr.delegations.read().unwrap().len(), 2);
+    }
+
+    // ---- Proposal-scoped delegation against a persisted-but-uncached proposal
+
+    const PROPOSAL_KEY: &[u8] = b"gov:proposal:p-persisted";
+
+    fn persist_proposal(store: &Arc<dyn icn_store::Store>, domain_id: &str) {
+        SledGovernanceStateStore::new(store.clone())
+            .save_proposal(&open_proposal(domain_id, &did(), "p-persisted"))
+            .unwrap();
+    }
+
+    fn proposal_scope(id: &str) -> DelegationScope {
+        DelegationScope::Proposal(ProposalId(id.to_string()))
+    }
+
+    /// Both standalone wirings leave the proposal cache empty: `new_with_sled`
+    /// hydrates domains only, and `with_domain_store` hydrates nothing. A
+    /// delegation scoped to a persisted proposal of a persisted Subject
+    /// domain must be refused, with no row written and no stored byte changed.
+    #[tokio::test]
+    async fn proposal_delegation_checks_persisted_proposal_when_cache_misses() {
+        let (a, b) = (did(), did());
+        let db = Arc::new(sled::Config::new().temporary(true).open().unwrap());
+        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::from_db((*db).clone()));
+        persist_subject(&store);
+        persist_proposal(&store, "subject");
+        let (dom_before, prop_before) = (
+            store.get(KEY).unwrap().unwrap(),
+            store.get(PROPOSAL_KEY).unwrap().unwrap(),
+        );
+
+        // new_with_sled: domain hydrated into the cache, proposal cache empty.
+        let hydrated = GovernanceManager::new_with_sled(db.clone());
+        assert!(hydrated.proposals.read().unwrap().is_empty());
+        assert!(hydrated
+            .domains
+            .read()
+            .unwrap()
+            .contains_key(&GovernanceDomainId::new("subject")));
+        // with_domain_store: neither cache is populated.
+        let unhydrated = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+
+        for mgr in [&hydrated, &unhydrated] {
+            let r = mgr
+                .create_delegation(Delegation::new(
+                    a.clone(),
+                    b.clone(),
+                    proposal_scope("p-persisted"),
+                ))
+                .await;
+            assert_refused(r);
+            assert!(mgr.delegations.read().unwrap().is_empty());
+        }
+        assert_eq!(store.get(KEY).unwrap().unwrap(), dom_before);
+        assert_eq!(store.get(PROPOSAL_KEY).unwrap().unwrap(), prop_before);
+    }
+
+    /// An unreadable persisted proposal fails closed, writes nothing.
+    #[tokio::test]
+    async fn proposal_delegation_fails_closed_when_stored_proposal_unreadable() {
+        let store = sled_store();
+        store.put(PROPOSAL_KEY, b"\xff not a proposal").unwrap();
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+        let err = mgr
+            .create_delegation(Delegation::new(did(), did(), proposal_scope("p-persisted")))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("stored proposal cannot be read"), "{err}");
+        assert!(mgr.delegations.read().unwrap().is_empty());
+    }
+
+    /// Controls: a persisted proposal of a persisted legacy domain, and an
+    /// unknown proposal id (the established compatibility behaviour), still
+    /// succeed; with no store attached an unknown proposal id also succeeds.
+    #[tokio::test]
+    async fn proposal_delegation_legacy_and_unknown_behaviour_is_unchanged() {
+        let (a, b, c) = (did(), did(), did());
+        let store = sled_store();
+        let state = Arc::new(SledGovernanceStateStore::new(store.clone()));
+        state.save_domain(&domain("old", vec![did()])).unwrap();
+        persist_proposal(&store, "old");
+        let mgr = GovernanceManager::new().with_domain_store(state);
+
+        mgr.create_delegation(Delegation::new(
+            a.clone(),
+            b.clone(),
+            proposal_scope("p-persisted"),
+        ))
+        .await
+        .unwrap();
+        mgr.create_delegation(Delegation::new(
+            a.clone(),
+            c.clone(),
+            proposal_scope("never-persisted"),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(mgr.delegations.read().unwrap().len(), 2);
+
+        let bare = GovernanceManager::new();
+        bare.create_delegation(Delegation::new(a, b, proposal_scope("anything")))
+            .await
+            .unwrap();
+        assert_eq!(bare.delegations.read().unwrap().len(), 1);
     }
 }

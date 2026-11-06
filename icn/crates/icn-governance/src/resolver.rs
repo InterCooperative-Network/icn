@@ -1,6 +1,6 @@
 //! Membership resolution - determining who can vote
 
-use crate::{GovernanceDomain, MembershipSource};
+use crate::{GovernanceDomain, LegacyRailOp, MembershipSource};
 use anyhow::Result;
 use icn_identity::Did;
 use icn_trust::TrustGraph;
@@ -59,6 +59,7 @@ impl Default for StaticMembershipResolver {
 
 impl MembershipResolver for StaticMembershipResolver {
     fn resolve_members(&self, domain: &GovernanceDomain) -> Result<Vec<Did>> {
+        domain.require_legacy_rail(LegacyRailOp::ElectorateResolution)?;
         match &domain.config.membership.source {
             MembershipSource::StaticList(members) => Ok(members.clone()),
             MembershipSource::TrustThreshold(_) => {
@@ -91,6 +92,7 @@ impl TrustMembershipResolver {
 
 impl MembershipResolver for TrustMembershipResolver {
     fn resolve_members(&self, domain: &GovernanceDomain) -> Result<Vec<Did>> {
+        domain.require_legacy_rail(LegacyRailOp::ElectorateResolution)?;
         match &domain.config.membership.source {
             MembershipSource::StaticList(members) => Ok(members.clone()),
             MembershipSource::TrustThreshold(threshold) => {
@@ -109,6 +111,7 @@ impl MembershipResolver for TrustMembershipResolver {
     }
 
     fn is_member(&self, domain: &GovernanceDomain, did: &Did) -> Result<bool> {
+        domain.require_legacy_rail(LegacyRailOp::ElectorateResolution)?;
         match &domain.config.membership.source {
             MembershipSource::StaticList(members) => Ok(members.contains(did)),
             MembershipSource::TrustThreshold(threshold) => {
@@ -128,6 +131,7 @@ impl MembershipResolver for TrustMembershipResolver {
 impl TrustMembershipResolver {
     /// Async version of resolve_members for use in async contexts
     pub async fn resolve_members_async(&self, domain: &GovernanceDomain) -> Result<Vec<Did>> {
+        domain.require_legacy_rail(LegacyRailOp::ElectorateResolution)?;
         match &domain.config.membership.source {
             MembershipSource::StaticList(members) => Ok(members.clone()),
             MembershipSource::TrustThreshold(threshold) => {
@@ -139,6 +143,7 @@ impl TrustMembershipResolver {
 
     /// Async version of is_member for use in async contexts
     pub async fn is_member_async(&self, domain: &GovernanceDomain, did: &Did) -> Result<bool> {
+        domain.require_legacy_rail(LegacyRailOp::ElectorateResolution)?;
         match &domain.config.membership.source {
             MembershipSource::StaticList(members) => Ok(members.contains(did)),
             MembershipSource::TrustThreshold(threshold) => {
@@ -182,6 +187,7 @@ impl Default for CompositeMembershipResolver {
 
 impl MembershipResolver for CompositeMembershipResolver {
     fn resolve_members(&self, domain: &GovernanceDomain) -> Result<Vec<Did>> {
+        domain.require_legacy_rail(LegacyRailOp::ElectorateResolution)?;
         let mut all_members = HashSet::new();
         let mut last_error = None;
 
@@ -231,6 +237,7 @@ impl TrustServiceMembershipResolver {
 
 impl MembershipResolver for TrustServiceMembershipResolver {
     fn resolve_members(&self, domain: &GovernanceDomain) -> Result<Vec<Did>> {
+        domain.require_legacy_rail(LegacyRailOp::ElectorateResolution)?;
         match &domain.config.membership.source {
             MembershipSource::StaticList(members) => Ok(members.clone()),
             MembershipSource::TrustThreshold(threshold) => self
@@ -536,5 +543,103 @@ mod tests {
 
         // Test async is_member
         assert!(resolver.is_member_async(&domain, &did1).await.unwrap());
+    }
+
+    // ---- Rung 4: every resolver refuses a ContextSubjectV1 domain -----------
+
+    fn subject_domain() -> GovernanceDomain {
+        let mut config = GovernanceConfig::cooperative_default();
+        config.membership = MembershipConfig::static_list(vec![]);
+        GovernanceDomain::new("Subject Domain".to_string(), config)
+            .with_human_actor_model(crate::HumanActorModel::ContextSubjectV1)
+            .unwrap()
+    }
+
+    /// A resolver that knows nothing about actor models and happily returns an
+    /// electorate. It stands for any custom `MembershipResolver` in the wild.
+    struct PermissiveResolver(Did);
+
+    impl MembershipResolver for PermissiveResolver {
+        fn resolve_members(&self, _domain: &GovernanceDomain) -> Result<Vec<Did>> {
+            Ok(vec![self.0.clone()])
+        }
+    }
+
+    #[test]
+    fn composite_refuses_even_over_an_unguarded_custom_resolver() {
+        let did = KeyPair::generate().unwrap().did().clone();
+        let composite = CompositeMembershipResolver::new()
+            .add_resolver(Box::new(PermissiveResolver(did.clone())));
+        let domain = subject_domain();
+        assert!(composite.resolve_members(&domain).is_err());
+        assert!(composite.is_member(&domain, &did).is_err());
+        assert!(composite.member_count(&domain).is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn trust_resolvers_refuse_subject_domain_in_every_method() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let owner = KeyPair::generate().unwrap();
+        let kp1 = KeyPair::generate().unwrap();
+        let did1 = kp1.did().clone();
+        let mut graph = TrustGraph::new(store, owner.did().clone());
+        graph
+            .add_edge(TrustEdge::new(
+                owner.did().clone(),
+                did1.clone(),
+                TrustScore::unchecked(0.9),
+            ))
+            .unwrap();
+        let resolver = TrustMembershipResolver::new(Arc::new(RwLock::new(graph)));
+        let domain = subject_domain();
+
+        // The sync trait methods use block_in_place, so run them off the
+        // current-thread runtime's worker the way production does.
+        let r = tokio::task::block_in_place(|| {
+            (
+                resolver.resolve_members(&domain).is_err(),
+                resolver.is_member(&domain, &did1).is_err(),
+            )
+        });
+        assert_eq!(r, (true, true));
+        assert!(resolver.resolve_members_async(&domain).await.is_err());
+        assert!(resolver.is_member_async(&domain, &did1).await.is_err());
+    }
+
+    struct FixedTrust(String);
+
+    impl icn_kernel_api::services::TrustService for FixedTrust {
+        fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+            Arc::new(icn_kernel_api::authz::AllowAllOracle::wildcard())
+        }
+        fn trust_score(&self, _actor: &icn_kernel_api::types::Did) -> f64 {
+            1.0
+        }
+        fn get_dids_above_threshold(
+            &self,
+            _threshold: f64,
+        ) -> std::result::Result<Vec<icn_kernel_api::types::Did>, String> {
+            Ok(vec![self.0.clone()])
+        }
+        fn record_event(
+            &self,
+            _actor: &icn_kernel_api::types::Did,
+            _event: icn_kernel_api::services::TrustEvent,
+        ) {
+        }
+    }
+
+    #[test]
+    fn trust_service_resolver_refuses_subject_domain() {
+        let did = KeyPair::generate().unwrap().did().clone();
+        let resolver = TrustServiceMembershipResolver::new(Arc::new(FixedTrust(did.to_string())));
+
+        // Control: a legacy trust-threshold domain still resolves through the service.
+        let mut config = GovernanceConfig::cooperative_default();
+        config.membership = MembershipConfig::trust_threshold(0.5);
+        let legacy = GovernanceDomain::new("Legacy".to_string(), config);
+        assert_eq!(resolver.resolve_members(&legacy).unwrap(), vec![did]);
+
+        assert!(resolver.resolve_members(&subject_domain()).is_err());
     }
 }

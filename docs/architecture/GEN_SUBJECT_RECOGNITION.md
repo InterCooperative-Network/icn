@@ -222,7 +222,7 @@ hash type has no public constructor.
 
 ## 11. Deliberate scope boundaries
 
-Not in this slice: legacy-member migration (#2626); domain actor-model firewall; membership roster;
+Not in this slice: legacy-member migration (#2626); the domain actor-model firewall (since added separately: [`GOVERNANCE_HUMAN_ACTOR_MODEL.md`](GOVERNANCE_HUMAN_ACTOR_MODEL.md)); membership roster;
 `VotingProcessSnapshotV1`; proposal commitment; vote or decision records; settlement; persistence,
 gateway routes, wire/serde representation, session claims; production recognition bases.
 

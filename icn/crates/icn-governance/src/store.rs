@@ -156,6 +156,9 @@ impl Default for InMemoryGovernanceStore {
 
 impl GovernanceStore for InMemoryGovernanceStore {
     fn store_domain(&self, domain: &GovernanceDomain) -> Result<()> {
+        // Refuse a mixed-actor-model domain at write time; it could not be
+        // loaded back (see `actor_model`), so persisting it would poison reads.
+        domain.check_actor_model_invariant()?;
         let mut domains = self.domains.write().map_err(|e| {
             error!("Domains lock poisoned in store_domain: {e}");
             anyhow::anyhow!("Lock poisoned in store_domain - store may contain corrupt state")
@@ -479,6 +482,8 @@ impl SledGovernanceStore {
 #[allow(dead_code)]
 impl GovernanceStore for SledGovernanceStore {
     fn store_domain(&self, domain: &GovernanceDomain) -> Result<()> {
+        // See `InMemoryGovernanceStore::store_domain`.
+        domain.check_actor_model_invariant()?;
         let key = Self::domain_key(&domain.id);
         let value = serde_json::to_vec(domain)?;
         self.db.insert(&key, value)?;
