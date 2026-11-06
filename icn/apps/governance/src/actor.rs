@@ -1659,6 +1659,22 @@ impl GovernanceActor {
         entry: crate::close_journal::CloseJournalEntry,
     ) -> std::result::Result<(), String> {
         let proposal_id = entry.proposal.id.clone();
+        // Actor-model firewall. Journal replay (the in-command retry path and
+        // startup recovery) finalises a stored terminal proposal without ever
+        // consulting the electorate resolver, so it needs its own guard: a
+        // ContextSubjectV1 domain must not be closed by replaying a journaled
+        // legacy-rail decision. The entry is left in place, unmodified.
+        if let Err(e) = self.require_legacy_rail_for_domain(
+            &entry.proposal.domain_id,
+            icn_governance::LegacyRailOp::ProposalClosure,
+        ) {
+            warn!(
+                proposal_id = %proposal_id.0,
+                error = %e,
+                "Refusing to complete a journaled close for a ContextSubjectV1 domain"
+            );
+            return Err(e.to_string());
+        }
         // 1. Re-commit the durable state (receipts + proof + proposal),
         //    idempotently. On failure, leave the entry for replay.
         if let Err(e) = entry.commit(self.receipt_store.as_deref(), self.store.as_ref()) {
@@ -2156,6 +2172,13 @@ impl GovernanceActor {
             } => {
                 info!("Casting vote on proposal: {} by {}", proposal_id.0, voter);
 
+                // Actor-model firewall: a Principal-keyed vote is a legacy-rail
+                // act. Refuse before reading or writing any vote row.
+                self.require_legacy_rail_for_proposal(
+                    &proposal_id,
+                    icn_governance::LegacyRailOp::VoteCast,
+                )?;
+
                 // One stored row per cryptographic principal (#2641). This path
                 // has no duplicate-vote guard, so a voter re-spelling their DID
                 // in another accepted multibase encoding used to write a second
@@ -2217,6 +2240,15 @@ impl GovernanceActor {
                 capability_scope,
             } => {
                 info!("Closing proposal: {}", proposal_id.0);
+
+                // Actor-model firewall: closure under a legacy electorate (or an
+                // electorate-free override) must not yield a decision for a
+                // ContextSubjectV1 domain. Runs before the scheduler cancel
+                // below, which is itself an observable side effect.
+                self.require_legacy_rail_for_proposal(
+                    &proposal_id,
+                    icn_governance::LegacyRailOp::ProposalClosure,
+                )?;
 
                 // Notify scheduler to cancel any pending events (if scheduled)
                 let _ = self.cancel_tx.send(proposal_id.clone());
@@ -2808,6 +2840,15 @@ impl GovernanceActor {
                     proposal_id.0, reason
                 );
 
+                // Actor-model firewall: closure under a legacy electorate (or an
+                // electorate-free override) must not yield a decision for a
+                // ContextSubjectV1 domain. Runs before the scheduler cancel
+                // below, which is itself an observable side effect.
+                self.require_legacy_rail_for_proposal(
+                    &proposal_id,
+                    icn_governance::LegacyRailOp::ProposalClosure,
+                )?;
+
                 // Notify scheduler to cancel any pending events (if scheduled)
                 let _ = self.cancel_tx.send(proposal_id.clone());
 
@@ -2849,6 +2890,15 @@ impl GovernanceActor {
                     "⚡ Force closing proposal: {} as {:?} (reason: {})",
                     proposal_id.0, forced_outcome, reason
                 );
+
+                // Actor-model firewall: closure under a legacy electorate (or an
+                // electorate-free override) must not yield a decision for a
+                // ContextSubjectV1 domain. Runs before the scheduler cancel
+                // below, which is itself an observable side effect.
+                self.require_legacy_rail_for_proposal(
+                    &proposal_id,
+                    icn_governance::LegacyRailOp::ProposalClosure,
+                )?;
 
                 // Notify scheduler to cancel any pending events (if scheduled)
                 let _ = self.cancel_tx.send(proposal_id.clone());
@@ -3132,7 +3182,7 @@ impl GovernanceActor {
                     .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", domain_id.0))?;
 
                 // Update configuration
-                domain.update_config(new_config);
+                domain.update_config(new_config)?;
 
                 // Persist locally
                 self.store.save_domain(&domain)?;
@@ -3159,6 +3209,10 @@ impl GovernanceActor {
                 let mut domain = self
                     .load_domain(&domain_id)?
                     .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", domain_id.0))?;
+
+                // Actor-model firewall: legacy membership edits are refused
+                // before the in-memory domain is touched or saved.
+                domain.require_legacy_rail(icn_governance::LegacyRailOp::MembershipMutation)?;
 
                 // Update membership based on source type
                 match &mut domain.config.membership.source {
@@ -3405,6 +3459,35 @@ impl GovernanceActor {
         self.store.get_domain(id)
     }
 
+    /// Actor-model firewall: refuse a legacy Principal-rail operation aimed at
+    /// a `ContextSubjectV1` domain. Must run before any mutation or side
+    /// effect of the calling command. A missing domain passes so the caller's
+    /// own not-found error is preserved (a domain that does not exist cannot
+    /// be Subject-mode); a store/decode failure fails closed.
+    fn require_legacy_rail_for_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        op: icn_governance::LegacyRailOp,
+    ) -> Result<()> {
+        if let Some(domain) = self.load_domain(domain_id)? {
+            domain.require_legacy_rail(op)?;
+        }
+        Ok(())
+    }
+
+    /// As [`Self::require_legacy_rail_for_domain`], resolving the domain through
+    /// the proposal. A missing proposal passes (caller reports not-found).
+    fn require_legacy_rail_for_proposal(
+        &self,
+        proposal_id: &ProposalId,
+        op: icn_governance::LegacyRailOp,
+    ) -> Result<()> {
+        if let Some(proposal) = self.load_proposal(proposal_id)? {
+            self.require_legacy_rail_for_domain(&proposal.domain_id, op)?;
+        }
+        Ok(())
+    }
+
     /// Materialize action items from an accepted proposal's specs.
     ///
     /// Idempotent: checks for existing linked items before creating new ones.
@@ -3538,6 +3621,23 @@ impl GovernanceActor {
 
     /// Create a new delegation
     fn create_delegation(&mut self, delegation: Delegation) -> Result<()> {
+        // Actor-model firewall: a domain- or proposal-scoped delegation is a
+        // Principal-to-Principal voting construct. A blanket delegation names
+        // no domain; it is inert for a Subject domain because closure refuses.
+        match &delegation.scope {
+            icn_governance::DelegationScope::Domain(domain_id) => self
+                .require_legacy_rail_for_domain(
+                    domain_id,
+                    icn_governance::LegacyRailOp::DelegationCreation,
+                )?,
+            icn_governance::DelegationScope::Proposal(proposal_id) => self
+                .require_legacy_rail_for_proposal(
+                    proposal_id,
+                    icn_governance::LegacyRailOp::DelegationCreation,
+                )?,
+            icn_governance::DelegationScope::Blanket => {}
+        }
+
         // Validate no self-delegation
         if delegation.delegator == delegation.delegate {
             bail!("Cannot delegate to yourself");

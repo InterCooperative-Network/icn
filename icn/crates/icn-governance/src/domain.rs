@@ -1,5 +1,8 @@
 //! Governance domain - the decision space for a community
 
+use crate::actor_model::{
+    check_no_legacy_membership, ActorModelError, HumanActorModel, LegacyRailOp,
+};
 use crate::config::GovernanceConfig;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -30,6 +33,7 @@ impl std::fmt::Display for GovernanceDomainId {
 ///
 /// Examples: a cooperative, a working group, a project team
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "GovernanceDomainWire")]
 pub struct GovernanceDomain {
     /// Unique identifier for this domain
     pub id: GovernanceDomainId,
@@ -48,6 +52,48 @@ pub struct GovernanceDomain {
 
     /// When this domain was last updated
     pub updated_at: u64,
+
+    /// Which kind of human actor this domain recognises.
+    ///
+    /// Absent in serialized domains that predate the field, which load as
+    /// [`HumanActorModel::LegacyPrincipalV0`]. Omitted again on serialization
+    /// when legacy, so legacy encodings are unchanged. Set only through
+    /// [`GovernanceDomain::with_human_actor_model`]; see [`crate::actor_model`].
+    #[serde(default, skip_serializing_if = "HumanActorModel::is_legacy")]
+    human_actor_model: HumanActorModel,
+}
+
+/// Deserialization shape for [`GovernanceDomain`]. Exists so that the
+/// mixed-state invariant is checked on every load path (store, gossip,
+/// import) rather than only where a caller remembers to.
+#[derive(Deserialize)]
+struct GovernanceDomainWire {
+    id: GovernanceDomainId,
+    name: String,
+    description: Option<String>,
+    config: GovernanceConfig,
+    created_at: u64,
+    updated_at: u64,
+    #[serde(default)]
+    human_actor_model: HumanActorModel,
+}
+
+impl TryFrom<GovernanceDomainWire> for GovernanceDomain {
+    type Error = ActorModelError;
+
+    fn try_from(w: GovernanceDomainWire) -> Result<Self, Self::Error> {
+        let domain = Self {
+            id: w.id,
+            name: w.name,
+            description: w.description,
+            config: w.config,
+            created_at: w.created_at,
+            updated_at: w.updated_at,
+            human_actor_model: w.human_actor_model,
+        };
+        domain.check_actor_model_invariant()?;
+        Ok(domain)
+    }
 }
 
 impl GovernanceDomain {
@@ -62,6 +108,7 @@ impl GovernanceDomain {
             config,
             created_at: now,
             updated_at: now,
+            human_actor_model: HumanActorModel::default(),
         }
     }
 
@@ -76,6 +123,7 @@ impl GovernanceDomain {
             config,
             created_at: now,
             updated_at: now,
+            human_actor_model: HumanActorModel::default(),
         }
     }
 
@@ -85,10 +133,62 @@ impl GovernanceDomain {
         self
     }
 
-    /// Update the governance configuration
-    pub fn update_config(&mut self, config: GovernanceConfig) {
+    /// The domain's human actor model.
+    pub fn human_actor_model(&self) -> HumanActorModel {
+        self.human_actor_model
+    }
+
+    /// Select the human actor model at construction time.
+    ///
+    /// Refuses (returns `Err`, consuming nothing observable) when the domain
+    /// already carries a legacy membership source and `model` is
+    /// [`HumanActorModel::ContextSubjectV1`]. There is no in-place switch for
+    /// an existing domain: membership is never converted or dropped.
+    pub fn with_human_actor_model(
+        mut self,
+        model: HumanActorModel,
+    ) -> Result<Self, ActorModelError> {
+        self.human_actor_model = model;
+        self.check_actor_model_invariant()?;
+        Ok(self)
+    }
+
+    /// Verify the mixed-state invariant: a Subject-mode domain holds no legacy
+    /// membership source.
+    pub fn check_actor_model_invariant(&self) -> Result<(), ActorModelError> {
+        match self.human_actor_model {
+            HumanActorModel::LegacyPrincipalV0 => Ok(()),
+            HumanActorModel::ContextSubjectV1 => {
+                check_no_legacy_membership(&self.id.0, &self.config.membership.source)
+            }
+        }
+    }
+
+    /// Refuse a legacy Principal-rail operation on a Subject-mode domain.
+    ///
+    /// Call this **before** any mutation, persistence write, event emission or
+    /// authorization decision. Legacy domains always pass.
+    pub fn require_legacy_rail(&self, op: LegacyRailOp) -> Result<(), ActorModelError> {
+        match self.human_actor_model {
+            HumanActorModel::LegacyPrincipalV0 => Ok(()),
+            HumanActorModel::ContextSubjectV1 => Err(ActorModelError::LegacyRailRefused {
+                domain: self.id.0.clone(),
+                op,
+            }),
+        }
+    }
+
+    /// Update the governance configuration.
+    ///
+    /// On a Subject-mode domain the new configuration must also satisfy the
+    /// mixed-state invariant; otherwise nothing is changed.
+    pub fn update_config(&mut self, config: GovernanceConfig) -> Result<(), ActorModelError> {
+        if self.human_actor_model == HumanActorModel::ContextSubjectV1 {
+            check_no_legacy_membership(&self.id.0, &config.membership.source)?;
+        }
         self.config = config;
         self.updated_at = icn_time::current_timestamp_secs();
+        Ok(())
     }
 }
 

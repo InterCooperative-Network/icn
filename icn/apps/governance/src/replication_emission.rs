@@ -305,28 +305,24 @@ mod tests {
     fn static_domain(id: &str, members: Vec<Did>) -> GovernanceDomain {
         let mut config = GovernanceConfig::cooperative_default();
         config.membership = MembershipConfig::static_list(members);
-        GovernanceDomain {
-            id: GovernanceDomainId::new(id),
-            name: id.to_string(),
-            description: None,
-            config,
-            created_at: 0,
-            updated_at: 0,
-        }
+        let mut domain =
+            GovernanceDomain::with_id(GovernanceDomainId::new(id), id.to_string(), config);
+        domain.created_at = 0;
+        domain.updated_at = 0;
+        domain
     }
 
     /// The stock cooperative profile. Asserting it is `TrustThreshold` here keeps the
     /// "default profile is ineligible" claim pinned to the profile rather than to a literal
     /// this test happened to write.
     fn default_profile_domain(id: &str) -> GovernanceDomain {
-        let domain = GovernanceDomain {
-            id: GovernanceDomainId::new(id),
-            name: id.to_string(),
-            description: None,
-            config: GovernanceConfig::cooperative_default(),
-            created_at: 0,
-            updated_at: 0,
-        };
+        let mut domain = GovernanceDomain::with_id(
+            GovernanceDomainId::new(id),
+            id.to_string(),
+            GovernanceConfig::cooperative_default(),
+        );
+        domain.created_at = 0;
+        domain.updated_at = 0;
         assert!(
             matches!(
                 domain.config.membership.source,

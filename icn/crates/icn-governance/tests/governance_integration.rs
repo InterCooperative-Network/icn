@@ -55,7 +55,7 @@ fn test_domain_config_update() {
     // Update config
     let mut config2 = GovernanceConfig::cooperative_default();
     config2.params.quorum_percentage = 75;
-    domain.update_config(config2.clone());
+    domain.update_config(config2.clone()).unwrap();
 
     assert_eq!(domain.config.params.quorum_percentage, 75);
     assert!(domain.updated_at >= original_updated);

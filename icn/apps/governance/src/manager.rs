@@ -3845,6 +3845,9 @@ impl GovernanceManager {
             .get_mut(&domain_id)
             .ok_or_else(|| anyhow::anyhow!("Domain '{}' not found", domain_id.0))?;
 
+        // Actor-model firewall: refuse before the member list is touched.
+        domain.require_legacy_rail(icn_governance::LegacyRailOp::MembershipMutation)?;
+
         match &mut domain.config.membership.source {
             MembershipSource::StaticList(members) => match action {
                 icn_governance::MembershipAction::Add => {
@@ -4278,6 +4281,11 @@ impl GovernanceManager {
                     proposal_id.0
                 )
             })?;
+
+            // Actor-model firewall: no legacy-electorate decision for a
+            // ContextSubjectV1 domain. Runs before the tally and before any
+            // state change to the proposal.
+            domain.require_legacy_rail(icn_governance::LegacyRailOp::ProposalClosure)?;
 
             let raw_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
 
@@ -5241,6 +5249,11 @@ impl GovernanceManager {
             )
         })?;
 
+        // Actor-model firewall: refuse before the membership decision (the
+        // `TrustThreshold => true` arm below would otherwise admit anyone) and
+        // before any vote row is created.
+        domain.require_legacy_rail(icn_governance::LegacyRailOp::VoteCast)?;
+
         let is_member = match &domain.config.membership.source {
             MembershipSource::StaticList(members) => members.contains(&voter),
             MembershipSource::TrustThreshold(_) => true,
@@ -5302,6 +5315,34 @@ impl GovernanceManager {
     // Delegation Methods
     // ============================================================================
 
+    /// Refuse a delegation whose scope names a `ContextSubjectV1` domain
+    /// (directly, or through its proposal). Blanket scope names no domain.
+    fn require_legacy_rail_for_delegation_scope(
+        &self,
+        scope: &icn_governance::DelegationScope,
+    ) -> Result<()> {
+        let domain_id = match scope {
+            icn_governance::DelegationScope::Blanket => return Ok(()),
+            icn_governance::DelegationScope::Domain(id) => id.clone(),
+            icn_governance::DelegationScope::Proposal(pid) => {
+                let proposals = self.proposals.read().map_err(|e| {
+                    anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+                })?;
+                match proposals.get(pid) {
+                    Some(p) => p.domain_id.clone(),
+                    None => return Ok(()),
+                }
+            }
+        };
+        let domains = self.domains.read().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
+        if let Some(domain) = domains.get(&domain_id) {
+            domain.require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?;
+        }
+        Ok(())
+    }
+
     /// Create a new vote delegation
     pub async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
         if let Some(ref handle) = self.governance_handle {
@@ -5313,6 +5354,10 @@ impl GovernanceManager {
                 "Cannot delegate to yourself. Delegator and delegate must be different DIDs."
             );
         }
+
+        // Actor-model firewall: domain- or proposal-scoped delegation into a
+        // ContextSubjectV1 domain is refused before any row is written.
+        self.require_legacy_rail_for_delegation_scope(&delegation.scope)?;
 
         let mut delegations = self.delegations.write().map_err(|e| {
             anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
@@ -13276,5 +13321,185 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(mandate.grants, grant_ids_via_decision);
+    }
+}
+
+/// Rung 4 — actor-model firewall on the manager's own in-memory stack.
+///
+/// `GovernanceManager` carries a second, independent implementation of
+/// membership, voting, closure and delegation that runs whenever no actor
+/// handle is attached. The actor-level tests cannot reach it, so a guard
+/// missing here would be an alternate-entry-point bypass. Each negative has a
+/// legacy control so a pass cannot be vacuous.
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod actor_model_firewall_tests {
+    use super::*;
+    use icn_governance::{
+        DelegationScope, GovernanceConfig, HumanActorModel, MembershipAction, VoteChoice,
+    };
+    use icn_identity::IdentityBundle;
+
+    fn did() -> Did {
+        IdentityBundle::generate().unwrap().did().clone()
+    }
+
+    fn domain(id: &str, members: Vec<Did>) -> GovernanceDomain {
+        let mut config = GovernanceConfig::cooperative_default();
+        config.membership = MembershipConfig::static_list(members);
+        GovernanceDomain::with_id(GovernanceDomainId::new(id), id.to_string(), config)
+    }
+
+    fn open_proposal(domain_id: &str, proposer: &Did, id: &str) -> Proposal {
+        let mut p = Proposal::new(
+            GovernanceDomainId::new(domain_id),
+            proposer.clone(),
+            "t".to_string(),
+            "d".to_string(),
+            ProposalPayload::Text { body: "b".into() },
+        );
+        p.id = ProposalId(id.to_string());
+        p.open(3600).unwrap();
+        p
+    }
+
+    /// Manager with a legacy domain `legacy` (one member) and a Subject-mode
+    /// domain `subject`, each with an open proposal.
+    fn manager(member: &Did) -> GovernanceManager {
+        let mgr = GovernanceManager::new();
+        let subject = domain("subject", vec![])
+            .with_human_actor_model(HumanActorModel::ContextSubjectV1)
+            .unwrap();
+        {
+            let mut d = mgr.domains.write().unwrap();
+            d.insert(
+                GovernanceDomainId::new("legacy"),
+                domain("legacy", vec![member.clone()]),
+            );
+            d.insert(GovernanceDomainId::new("subject"), subject);
+            let mut p = mgr.proposals.write().unwrap();
+            p.insert(
+                ProposalId("p-legacy".into()),
+                open_proposal("legacy", member, "p-legacy"),
+            );
+            p.insert(
+                ProposalId("p-subject".into()),
+                open_proposal("subject", member, "p-subject"),
+            );
+        }
+        mgr
+    }
+
+    fn assert_refused(r: Result<()>) {
+        let msg = r.expect_err("must be refused").to_string();
+        assert!(msg.contains("ContextSubjectV1"), "wrong refusal: {msg}");
+    }
+
+    #[tokio::test]
+    async fn in_memory_membership_edit_refused() {
+        let member = did();
+        let mgr = manager(&member);
+        for action in [MembershipAction::Add, MembershipAction::Remove] {
+            assert_refused(
+                mgr.update_domain_membership(GovernanceDomainId::new("subject"), did(), action)
+                    .await,
+            );
+        }
+        {
+            let d = mgr.domains.read().unwrap();
+            let s = &d[&GovernanceDomainId::new("subject")];
+            assert!(matches!(
+                &s.config.membership.source,
+                MembershipSource::StaticList(m) if m.is_empty()
+            ));
+        }
+
+        // Control.
+        let newcomer = did();
+        mgr.update_domain_membership(
+            GovernanceDomainId::new("legacy"),
+            newcomer.clone(),
+            MembershipAction::Add,
+        )
+        .await
+        .unwrap();
+        assert!(
+            mgr.domains.read().unwrap()[&GovernanceDomainId::new("legacy")]
+                .config
+                .membership
+                .source
+                .contains_static(&newcomer)
+        );
+    }
+
+    #[tokio::test]
+    async fn in_memory_vote_refused_without_vote_row() {
+        let member = did();
+        let mgr = manager(&member);
+        for voter in [member.clone(), did()] {
+            assert_refused(
+                mgr.cast_vote(ProposalId("p-subject".into()), voter, VoteChoice::For, None)
+                    .await,
+            );
+        }
+        assert!(
+            mgr.votes
+                .read()
+                .unwrap()
+                .get(&ProposalId("p-subject".into()))
+                .is_none(),
+            "no vote row may be created"
+        );
+
+        // Control.
+        mgr.cast_vote(ProposalId("p-legacy".into()), member, VoteChoice::For, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            mgr.votes.read().unwrap()[&ProposalId("p-legacy".into())].len(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn in_memory_close_refused_and_proposal_stays_open() {
+        let member = did();
+        let mgr = manager(&member);
+        let id = ProposalId("p-subject".into());
+        assert_refused(mgr.close_proposal(id.clone()).await);
+        let eligible: HashSet<Did> = [member.clone()].into_iter().collect();
+        assert_refused(mgr.close_proposal_filtered(id.clone(), &eligible).await);
+        assert_refused(
+            mgr.close_proposal_with_suspension(id.clone(), Some(eligible), None, None)
+                .await,
+        );
+        assert!(mgr.proposals.read().unwrap()[&id].state.is_open());
+    }
+
+    #[tokio::test]
+    async fn in_memory_delegation_into_subject_domain_refused() {
+        let member = did();
+        let mgr = manager(&member);
+        let (a, b) = (did(), did());
+        for scope in [
+            DelegationScope::Domain(GovernanceDomainId::new("subject")),
+            DelegationScope::Proposal(ProposalId("p-subject".into())),
+        ] {
+            assert_refused(
+                mgr.create_delegation(Delegation::new(a.clone(), b.clone(), scope))
+                    .await,
+            );
+        }
+        assert!(mgr.delegations.read().unwrap().is_empty());
+
+        // Control.
+        mgr.create_delegation(Delegation::new(
+            a,
+            b,
+            DelegationScope::Domain(GovernanceDomainId::new("legacy")),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(mgr.delegations.read().unwrap().len(), 1);
     }
 }

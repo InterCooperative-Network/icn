@@ -1367,6 +1367,47 @@ depends_on = [
   "icn/crates/icn-governance/src/subject_recognition.rs",
 ]
 
+[docs."docs/architecture/GOVERNANCE_HUMAN_ACTOR_MODEL.md"]
+category = "architecture"
+status = "living"
+title = "Governance human actor model - the legacy-rail firewall (HumanActorModel)"
+description = "NORMATIVE contract for rung 4 of the #2694 semantic convergence ladder: the explicit, opt-in HumanActorModel setting of a GovernanceDomain (LegacyPrincipalV0 default, ContextSubjectV1), its backward-compatible serialization, the mixed-state invariant (a Subject-mode domain carries no legacy membership source; the one inert shape is an empty static list), and the legacy Principal-rail operations a Subject-mode domain refuses before any mutation (membership edits, Principal-keyed votes, electorate resolution, proposal close/veto/force-close, domain- and proposal-scoped delegation). States that GEN-B recognition is not membership or authority. A safety boundary only: Subject membership, electorate, voting and closure are deferred, Subject mode is not exposed through RPC, gateway or CLI, and nothing here is a production-readiness claim."
+last_updated = "2026-11-06"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "governance", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-11-06"
+depends_on = [
+  "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
+  "docs/architecture/GEN_SUBJECT_RECOGNITION.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "icn/crates/icn-governance/src/actor_model.rs",
+]
+
+[docs."docs/architecture/GEN_BEYOND_GOVERNANCE_DOMAIN_NOTE.md"]
+category = "architecture"
+status = "living"
+title = "Design note - generalizing GEN beyond GovernanceDomainV1"
+description = "PROPOSED, non-normative, non-mutating design note: which institution-shaped assumptions the rung-4 actor-model firewall makes (GovernanceDomainId as context key, MembershipSource as the model of who is in, recognition as a domain-issued fact), the distinctions GEN must keep apart (context identity vs institutional authority, bilateral recognition vs membership, personal and household contexts vs cooperative governance, informal agreements vs governed decisions, device delegation vs institutional mandate, shared logical computers vs physical ownership, federation participation vs control), and the open questions routed to the GEN owner #2602. No personal, household, bilateral or federative context genesis exists; no code, tag or contract changes."
+last_updated = "2026-11-06"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+role = "architecture"
+freshness = "current"
+domain_tags = ["architecture", "identity", "governance"]
+recommended_action = "keep"
+last_reviewed = "2026-11-06"
+depends_on = [
+  "docs/architecture/GOVERNANCE_HUMAN_ACTOR_MODEL.md",
+  "docs/architecture/GEN_SUBJECT_CONTEXT_GENESIS.md",
+  "docs/architecture/GEN_SUBJECT_RECOGNITION.md",
+]
+
 [docs."docs/architecture/GOVERNANCE_STATE_MACHINE.md"]
 category = "architecture"
 status = "living"

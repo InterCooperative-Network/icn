@@ -292,6 +292,9 @@ impl GovernanceStateStore for SledGovernanceStateStore {
     }
 
     fn save_domain(&self, domain: &GovernanceDomain) -> Result<()> {
+        // Refuse a mixed-actor-model domain at write time; it could not be
+        // loaded back, so persisting it would poison `list_domains`.
+        domain.check_actor_model_invariant()?;
         let id = GovernanceDomainId(domain.id.0.clone());
         self.store
             .put(&domain_key(&id), &serde_json::to_vec(domain)?)

@@ -28,6 +28,7 @@
 //! );
 //! ```
 
+pub mod actor_model;
 #[allow(missing_docs)]
 pub mod amendment;
 #[allow(missing_docs)]
@@ -107,6 +108,7 @@ pub mod proposal_cleanup;
 pub mod authority;
 pub mod mandate;
 
+pub use actor_model::{ActorModelError, HumanActorModel, LegacyRailOp};
 pub use amendment::{
     Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentStatus, AmendmentType,
     ChangeTarget, ChangeType, Ratification, RatificationRequirements, RatificationResult,
