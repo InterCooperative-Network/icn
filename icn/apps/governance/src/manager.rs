@@ -5359,11 +5359,30 @@ impl GovernanceManager {
                 }
             }
         };
-        let domains = self.domains.read().map_err(|e| {
-            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
-        })?;
-        if let Some(domain) = domains.get(&domain_id) {
-            domain.require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?;
+        {
+            let domains = self.domains.read().map_err(|e| {
+                anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+            })?;
+            if let Some(domain) = domains.get(&domain_id) {
+                return Ok(
+                    domain.require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?
+                );
+            }
+        }
+        // A cache miss is not proof the domain is not a persisted
+        // ContextSubjectV1 domain (hydration falls back to an empty cache when
+        // the store cannot list). Consult the persisted record; an unreadable
+        // record is refused, never treated as absent.
+        if let Some(store) = self.domain_store.as_ref() {
+            match store.get_domain(&domain_id) {
+                Ok(None) => {}
+                Ok(Some(existing)) => existing
+                    .require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?,
+                Err(e) => anyhow::bail!(
+                    "Domain '{}': stored record cannot be read ({e}); refusing delegation",
+                    domain_id.0
+                ),
+            }
         }
         Ok(())
     }
@@ -13643,5 +13662,58 @@ mod actor_model_firewall_tests {
 
         // The in-memory duplicate rule is unchanged.
         assert!(legacy_create(&mgr, "fresh").await.is_err());
+    }
+
+    // ---- Scoped delegation against a persisted-but-uncached domain ----------
+
+    /// A persisted Subject domain missing from the cache (empty hydration)
+    /// must still refuse a domain-scoped delegation, and an unreadable record
+    /// must fail closed. Legacy behaviour (persisted legacy / no record) holds.
+    #[tokio::test]
+    async fn delegation_checks_persisted_domain_when_cache_misses() {
+        let (a, b) = (did(), did());
+        let scope = || DelegationScope::Domain(GovernanceDomainId::new("subject"));
+
+        // Persisted Subject domain, empty cache.
+        let store = sled_store();
+        persist_subject(&store);
+        let before = store.get(KEY).unwrap().unwrap();
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+        let r = mgr
+            .create_delegation(Delegation::new(a.clone(), b.clone(), scope()))
+            .await;
+        assert_refused(r);
+        assert!(mgr.delegations.read().unwrap().is_empty());
+        assert_eq!(store.get(KEY).unwrap().unwrap(), before);
+
+        // Unreadable record: fail closed, nothing inserted.
+        let bad = sled_store();
+        bad.put(KEY, b"\xff not a domain").unwrap();
+        let mgr = GovernanceManager::new()
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(bad.clone())));
+        let err = mgr
+            .create_delegation(Delegation::new(a.clone(), b.clone(), scope()))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("stored record cannot be read"), "{err}");
+        assert!(mgr.delegations.read().unwrap().is_empty());
+
+        // Controls: persisted legacy domain with empty cache, and no record.
+        let ok = sled_store();
+        let state = Arc::new(SledGovernanceStateStore::new(ok.clone()));
+        state.save_domain(&domain("old", vec![did()])).unwrap();
+        let mgr = GovernanceManager::new().with_domain_store(state);
+        for id in ["old", "never-persisted"] {
+            mgr.create_delegation(Delegation::new(
+                a.clone(),
+                b.clone(),
+                DelegationScope::Domain(GovernanceDomainId::new(id)),
+            ))
+            .await
+            .unwrap();
+        }
+        assert_eq!(mgr.delegations.read().unwrap().len(), 2);
     }
 }
