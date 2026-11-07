@@ -56,8 +56,8 @@
 //! # Status: provisional, not frozen
 //!
 //! The bytes above are unambiguous for every input that can be committed. They are **not yet to
-//! be treated as a frozen durable format**, because two owner decisions are open and the owner
-//! documents contradict the code:
+//! be treated as a frozen durable format**, because three items are open: two owner decisions
+//! where the owner documents contradict the code, and one ledger alias hazard:
 //!
 //! 1. **DID spelling.** `CANONICAL_ENCODING.md` §5.1 requires `did:icn:<base58btc>`, but `Did`
 //!    accepts any multibase spelling (e.g. `did:icn:f<hex>`) and N2 (I7) treats them as one
