@@ -27,10 +27,14 @@
 //!
 //! These tests drive the **production** wiring, not a reimplementation:
 //!
-//! * `icn_governance_actor::init::init_governance_actor` is the exact function the
-//!   `icnd` supervisor calls (`icn-core/src/supervisor/init_governance.rs`). It
-//!   creates the `governance:proposal` topic, opens the real Sled-backed store,
-//!   spawns the real `GovernanceActor`, and registers the real notification callback.
+//! * `icn_governance_actor::init::init_governance_actor_with_store` is the body of
+//!   the function the `icnd` supervisor calls
+//!   (`icn-core/src/supervisor/init_governance.rs` -> `init_governance_actor`, which
+//!   only opens `<store_path>/governance` and delegates). The test opens that same
+//!   real Sled store itself so that it keeps its own handle: the crate no longer
+//!   hands the raw store out (#2864 A2) and sled's directory lock forbids reopening.
+//!   It creates the `governance:proposal` topic, spawns the real `GovernanceActor`,
+//!   and registers the real notification callback.
 //! * Forged entries are injected through the real remote ingress
 //!   `GossipActor::handle_message(sender, GossipMessage::Response { entry })`, which
 //!   dispatches to `handle_response` → `store_entry` → notification callbacks —
@@ -50,7 +54,7 @@ use icn_governance::{
     Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalScope, ProposalState,
     TallySnapshot, Vote, VoteChoice,
 };
-use icn_governance_actor::init::{init_governance_actor, GovernanceActorDeps};
+use icn_governance_actor::init::{init_governance_actor_with_store, GovernanceActorDeps};
 use icn_governance_actor::manager::GovernanceManager;
 use icn_governance_actor::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 use icn_identity::{Did, IdentityBundle};
@@ -100,9 +104,17 @@ impl Node {
             None,
         )));
 
-        // The production entry point: creates the topic, opens the store, spawns the
-        // actor, and registers the governance notification callback.
-        let services = init_governance_actor(
+        // The test keeps its own handle to the real Sled store at the exact path the
+        // daemon uses, so it can read persisted state while the actor runs.
+        let gov_store: Arc<dyn icn_store::Store> = Arc::new(
+            icn_store::SledStore::open(tmp.path().join("governance"))
+                .expect("open governance store"),
+        );
+
+        // The production wiring: creates the topic, spawns the actor, and registers
+        // the governance notification callback.
+        let services = init_governance_actor_with_store(
+            gov_store.clone(),
             tmp.path(),
             did.clone(),
             GovernanceActorDeps {
@@ -113,7 +125,7 @@ impl Node {
             },
         )
         .await
-        .expect("init_governance_actor");
+        .expect("init_governance_actor_with_store");
 
         let observed: Arc<std::sync::Mutex<Vec<(String, Did)>>> =
             Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -134,7 +146,7 @@ impl Node {
             ));
         }
 
-        let state = SledGovernanceStateStore::new(services.governance_store.clone());
+        let state = SledGovernanceStateStore::new(gov_store);
         let ops = GovernanceManager::with_handle(
             Arc::new(services.governance_handle) as Arc<dyn GovernanceOps + Send + Sync>
         );

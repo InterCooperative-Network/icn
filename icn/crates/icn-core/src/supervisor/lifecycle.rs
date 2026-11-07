@@ -814,7 +814,6 @@ async fn spawn_actors_with_identity(
 
     let governance_handle = governance_services.governance_handle;
     let _dead_letter_queue = governance_services.dead_letter_queue;
-    let _gov_store = governance_services.governance_store;
     let protocol_parameter_store = governance_services.protocol_parameter_store;
 
     // Store handles for gateway

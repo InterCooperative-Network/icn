@@ -45,6 +45,29 @@ pub struct GovernanceDeps {
 }
 
 /// Services returned from governance initialization
+///
+/// # No raw governance-store handle (#2864 A2)
+///
+/// The supervisor does not hold a raw handle to the governance store. This
+/// struct used to carry one ("for audit trail"), bound to an unused local in
+/// the lifecycle and never read; it only invited an unrestricted second writer
+/// on the store that holds `gov:domain:*` records. The control compiles; the
+/// `compile_fail` block differs from it only by the removed field.
+///
+/// ```
+/// use icn_core::supervisor::init_governance::GovernanceServices;
+/// fn _no_raw_store(s: GovernanceServices) {
+///     let _ = s.governance_handle;
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use icn_core::supervisor::init_governance::GovernanceServices;
+/// fn _no_raw_store(s: GovernanceServices) {
+///     let _ = s.governance_handle;
+///     let _raw = s.governance_store;
+/// }
+/// ```
 pub struct GovernanceServices {
     /// Handle to the governance actor
     pub governance_handle: GovernanceHandle,
@@ -54,8 +77,6 @@ pub struct GovernanceServices {
     pub version_tracker: VersionTracker,
     /// Dead-letter queue for failed operations recovery
     pub dead_letter_queue: Arc<crate::dead_letter::DeadLetterQueue<SledStore>>,
-    /// Governance store for audit trail
-    pub governance_store: Arc<dyn icn_store::Store>,
     /// Protocol parameter store for governable parameters (Phase 20)
     pub protocol_parameter_store: Arc<dyn ProtocolParameterStore>,
 }
@@ -149,7 +170,6 @@ pub async fn init_governance_services(
         upgrade_handle,
         version_tracker,
         dead_letter_queue,
-        governance_store: actor_services.governance_store,
         protocol_parameter_store,
     })
 }
