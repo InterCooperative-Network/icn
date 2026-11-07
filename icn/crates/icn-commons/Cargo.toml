@@ -13,7 +13,7 @@ anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 tracing = "0.1"
-lru = "0.16"
+lru = "0.18"
 sled = { workspace = true }
 tokio = { version = "1", features = ["sync"] }
 hex = "0.4"
