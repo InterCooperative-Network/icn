@@ -305,31 +305,36 @@ async fn invariant_payload_treasury_must_match_the_configured_treasury() {
     assert_ne!(other, h.configured);
     let recipient = KeyPair::generate().unwrap().did().clone();
 
-    // Positive control: a spend naming the configured treasury applies, so the fixture is valid.
-    let configured = h.configured.clone();
-    let control = h.accept_spend(&configured, &recipient, 0).await;
-    assert!(
-        control.result.success,
-        "fixture must apply a legitimate spend: {:?}",
-        control.result
-    );
+    // Positive control in a SEPARATE harness (own ledger and nonce index): a spend naming the
+    // configured treasury applies, so the fixture is valid. It must not share a nonce lane with
+    // the case under test, or a fix that merely keys the nonce by the debited account could turn
+    // this test green without any binding check.
+    {
+        let mut control_h = Harness::new();
+        let control_treasury = control_h.configured.clone();
+        let control = control_h
+            .accept_spend(&control_treasury, &recipient, 0)
+            .await;
+        assert!(
+            control.result.success,
+            "fixture must apply a legitimate spend: {:?}",
+            control.result
+        );
+    }
 
-    // The case under test: same expected nonce, but the payload names a different treasury.
+    // The case under test, on a fresh ledger whose configured nonce lane is untouched (0): the
+    // payload names a different treasury at that same expected nonce.
     // Outcome, not mechanism: any refusal satisfies the invariant.
     let spend = h.accept_spend(&other, &recipient, 0).await;
-    assert_ne!(
-        spend.receipt_id, control.receipt_id,
-        "distinct receipts: not a duplicate"
-    );
     assert!(
         !spend.result.success,
         "spend naming a non-configured treasury must be refused: {:?}",
         spend.result
     );
     assert_eq!(
-        h.balance(&configured).await,
-        AMOUNT,
-        "configured treasury debited only by the control"
+        h.balance(&h.configured.clone()).await,
+        0,
+        "configured treasury untouched"
     );
     assert!(
         h.nonce_rows()
