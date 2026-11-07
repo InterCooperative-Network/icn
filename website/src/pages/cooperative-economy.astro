@@ -9,7 +9,7 @@ import MaturityBadge from '../components/MaturityBadge.astro';
   description="Credit unions, fiscal sponsors, and community development financial institutions (CDFIs) help cooperatives interface with the existing economy. ICN is the machinery a cooperative economy needs on its own side of the bridge."
 >
 
-  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+  <section class="section section-page-top">
     <div class="container narrow">
       <div class="page-hero">
         <span class="badge badge-teal">A framing</span>
@@ -73,24 +73,27 @@ import MaturityBadge from '../components/MaturityBadge.astro';
         institution whose job is to provide the digital infrastructure for it.
       </p>
 
+      <!-- This was the site's THIRD full run at the borrowed-machinery
+           argument, after /why-icn (which owns it) and /for-cooperatives (whose
+           copy is now a handoff). It restated the named stack and repeated the
+           "own your workplace, rent your nervous system" line verbatim from
+           /why-icn. What is specific to THIS page is the economic consequence —
+           that the gap is an unfilled institutional role, not just bad software
+           — so only that is kept. -->
       <h2>The cooperative economy still runs on borrowed machinery</h2>
       <p>
-        Right now, most cooperatives carry that everyday work on tools that were built for firms,
-        platforms, or administrative convenience. Documents and email run on Google Workspace or
-        Microsoft 365. Voting runs on Loomio. Books run on QuickBooks. Coordination runs on Slack
-        or Teams. Membership often lives in a CRM built for a sales team. Each tool is fine in
-        isolation. None of them models the cooperative as an institution.
+        <a href="/why-icn">Why ICN</a> makes the case that the tools cooperatives
+        use were built for firms and stretched to cover democratic life. The point
+        here is narrower and economic: that gap is an <strong>unfilled
+        institutional role</strong>. Credit unions, CDFIs, and fiscal sponsors
+        exist because the cooperative economy needed them and built them. Nothing
+        occupies the equivalent position for its digital infrastructure.
       </p>
       <p>
-        A cooperative can own its workplace and still rent its nervous system from companies that
-        do not answer to it. A federation can hold formal agreements between member cooperatives and
-        still depend on a chat platform whose owner can change the terms of service tomorrow.
-        That is not a tooling complaint. It is a structural dependency on systems that do not share
-        the cooperative's purpose.
-      </p>
-      <p>
-        The cooperative economy cannot scale on spreadsheets, heroic memory, and software built for
-        bosses. It needs shared machinery designed for the kind of institution it actually is.
+        The cooperative economy cannot scale on spreadsheets, heroic memory, and
+        software built for bosses. It needs shared machinery designed for the kind
+        of institution it actually is — and owned the way its other shared
+        machinery is owned.
       </p>
 
       <h2>What machinery cooperatives need</h2>
@@ -129,10 +132,21 @@ import MaturityBadge from '../components/MaturityBadge.astro';
           between distinct cooperatives without dissolving them into one organization.
           <MaturityBadge band="maturing" />
         </li>
+        <!-- This bullet banded "shared resources and compute capacity" as a
+             single `maturing` claim. docs/status.toml has Storage (DAG) at
+             maturing but Distributed Compute at not-yet, so bundling them under
+             one badge promoted compute by association. Split, so each half
+             carries the band its own source data supports. -->
         <li>
-          <strong>Commons and coordinated work</strong> — shared resources and compute capacity governed
-          collectively, with placement, clearing, and dispute paths in the same loop as governance.
+          <strong>Shared storage for institutional records</strong> — held so that
+          the institution, not a vendor, can still read its own history.
           <MaturityBadge band="maturing" />
+        </li>
+        <li>
+          <strong>Commons compute</strong> — shared capacity with collective
+          placement, clearing, and dispute paths. Designed in detail; the
+          capability is not built.
+          <MaturityBadge band="notyet" />
         </li>
         <li>
           <strong>Member-facing experience</strong> — the surface where standing, decisions, action,

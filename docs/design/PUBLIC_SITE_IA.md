@@ -2,7 +2,7 @@
 Status: normative
 Canonical: yes
 Owner: Matt Faherty
-Last Reviewed: 2026-08-17
+Last Reviewed: 2026-09-14
 Purpose: Defines the public website's information architecture — one primary job per page, the narrative order, the reduced top-level navigation, and the plain-language-first convention for introductory surfaces.
 ---
 
@@ -42,7 +42,7 @@ Fixed, and the order is the argument:
 
 | # | Section | Job |
 |---|---|---|
-| 1 | Hero | One claim, one supporting explanation, two ways forward: *See ICN work* and *Start reading*. |
+| 1 | Hero | One claim, one supporting explanation, two ways forward: *Follow one decision* and *Start reading*. |
 | 2 | The problem | Fragmentation, **shown** as a two-column comparison rather than asserted in prose. |
 | 3 | A concrete story | One fictional cooperative, one decision, told as a human sequence — not as protocol nouns. |
 | 4 | What ICN changes | The shift, stated narrowly enough to be true. |
@@ -91,12 +91,46 @@ exactly one.
 Both are permanent redirects in `astro.config.mjs`, not deletions — external
 links keep working.
 
+### Duplication resolved in the 2026-09-14 pass
+
+The institutional-problem argument had been appearing in some form on `/`,
+`/why-icn`, `/for-cooperatives`, `/cooperative-economy`, and `/what-is-icn`.
+`/why-icn` owns it. The other three now hand off to it and keep only their own
+angle:
+
+- **`/for-cooperatives`** — three sections ("Bridges, and what the bridge does
+  not cover", "The institutional problem you actually face", "Why generic
+  software is not enough") became one short handoff. One sentence had been
+  *verbatim identical* to `why-icn.astro` ("Integrating them only spreads the
+  gap more evenly"), which is how the duplication was found. What replaced them
+  is the question the page never answered: the adoption path (§9).
+- **`/cooperative-economy`** — the third full run at the argument became a link
+  plus the economic claim that is specific to this page: the gap is an unfilled
+  institutional role, not merely bad software.
+- **`/what-is-icn`** — the named-stack inventory became one sentence and a link.
+  The page also stopped rendering the full nine-station `ClosureLoop` beneath
+  `PublicLoop`; carrying the mechanism in full is `/how-it-works`' single job,
+  and two versions of one diagram on a screen makes the reader choose which to
+  learn.
+
+Two further consolidations in the same pass:
+
+- **Hand-written maturity prose.** `/for-cooperatives` restated the
+  per-subsystem account in four hand-maintained paragraphs. `/whats-real-now`
+  generates that account from `docs/status.toml` and states that where the two
+  disagree it wins. A second hand-maintained copy is precisely how `/roadmap`
+  drifted a month behind canonical state. The summary is now derived.
+- **Two "How to engage" headings** sat adjacent on `/for-cooperatives`, one in
+  abstract prose and one as steps. One section now.
+
 ### Duplication still outstanding
 
-The institutional-problem argument appears in some form on `/`, `/why-icn`,
-`/for-cooperatives`, and `/cooperative-economy`. The homepage and `/why-icn`
-were reconciled in this pass; the two audience pages still restate it and should
-be reduced to a link plus their own specific angle.
+The "ICN does not replace human judgement" argument appears on `/`,
+`/how-it-works` (a 33-line section), and `/get-involved`. `/how-it-works` should
+keep the long version. `/get-involved` routes every audience three times — as a
+route card, as a long-form path section, and again in a closing fallback; the
+long-form sections predate the card model that replaced them and were never
+collapsed into it.
 
 ---
 
@@ -236,6 +270,36 @@ never in generic ICN material.
 steward" — which avoids fake-PII entirely and is also the more accurate way to
 talk about standing, since standing attaches to a role in a scope rather than to
 a person.
+
+---
+
+## 9 · The adoption path
+
+`/for-cooperatives` carries one figure the rest of the site does not: a six-stage
+progressive adoption sequence (`AdoptionPath.astro`), from *look at what you
+already run* through *retire the incumbent when it is safe*.
+
+**Why it lives there.** Its job — "how could an institution like ours
+realistically approach this?" — is the second half of that page's one job. It is
+not a roadmap, so it does not belong on `/whats-real-now`; it is not a mechanism,
+so it does not belong on `/how-it-works`.
+
+**Why it carries its own readiness axis.** The sequence spans current capability,
+active development, and architectural direction, so each stage states which it
+is: *possible today* · *parts exist, path does not* · *architectural direction*.
+
+This axis is deliberately **not** the ADR-0032 maturity bands. Those describe
+subsystems verified against source in `docs/status.toml`; adoption stages are not
+subsystems and have no row in that file, so borrowing the band vocabulary would
+imply a verification that has not happened. Keeping the vocabularies separate is
+what stops the figure from becoming a second, un-generated maturity claim.
+
+**The shape has to stay honest.** The two ends of the path rest on implemented
+subsystems; the bridging middle — reconciling against incumbent systems, running
+a function in parallel with one — is the least built part of ICN. There is no
+import tool, no connector library, and no migration product. The figure's closing
+note says so, and it is load-bearing: an adoption diagram is the easiest place on
+a public site to imply a product that does not exist.
 
 ---
 
