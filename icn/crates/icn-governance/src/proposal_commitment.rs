@@ -59,14 +59,21 @@
 //! be treated as a frozen durable format**, because two owner decisions are open and the owner
 //! documents contradict the code:
 //!
-//! 1. **DID spelling.** `CANONICAL_ENCODING.md` §5.1 says DIDs MUST be normalised to Base58btc,
-//!    but `Did` accepts any multibase spelling (e.g. `did:icn:f<hex>`) and N2 (I7) treats them as
-//!    one principal. Choose: accept every spelling `Did` accepts (this v1), or refuse any
-//!    non-Base58btc spelling at commit time. Never convert to the decoded principal for
-//!    `treasury_did` (see above).
+//! 1. **DID spelling.** `CANONICAL_ENCODING.md` §5.1 requires `did:icn:<base58btc>`, but `Did`
+//!    accepts any multibase spelling (e.g. `did:icn:f<hex>`) and N2 (I7) treats them as one
+//!    principal. Choose: accept every spelling `Did` accepts (this v1), or refuse any
+//!    non-Base58btc spelling at commit time. Do not convert `treasury_did` to the decoded
+//!    principal while the treasury nonce is keyed by the spelling (item 3).
 //! 2. **Currency.** §5.2 describes a normalised `<scope>:<SYMBOL>` `CurrencyId`; no such type
 //!    exists in code and the rehearsed action uses bare symbols such as `HOURS`. A later mandate
 //!    to normalise changes the bytes and so needs a new tag, or a refusal here.
+//! 3. **Treasury nonce keying.** The ledger keys `ledger:treasury_nonce:` by the raw treasury
+//!    string; that keyspace is not among the N2 alias-scan keyspaces (`n2a_keyspaces()`), and the
+//!    ledger always debits its configured treasury rather than the payload's `treasury_did`. Two
+//!    spellings of one treasury therefore get independent nonce slots against one account. This
+//!    is an unregistered alias hazard in the ledger, not settled design. If owners key the nonce
+//!    by principal, the spelling rationale for `treasury_did` lapses; committing the spelling then
+//!    stays safe, only stricter.
 //!
 //! §4.1.3 itself imposes no identifier normalisation on field strings; whether §5.1/§5.2 apply to
 //! them is unspecified.
