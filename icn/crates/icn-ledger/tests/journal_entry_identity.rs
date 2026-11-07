@@ -171,39 +171,63 @@ async fn invariant_rapid_distinct_receipts_are_all_journaled() {
         .expect("cached balances must match the journal");
 }
 
+// Control: a restart WITHOUT a collision keeps the balance and still verifies, so the
+// characterization below fails to verify because of the collision and not because of the restart.
+#[tokio::test]
+async fn control_restart_without_a_collision_verifies() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (a, b) = (did(), did());
+    {
+        let mut ledger = open(tmp.path());
+        ledger
+            .append_entry(gov_entry(&a, &b, "gov:coop:1:receipt"))
+            .await
+            .unwrap();
+        ledger.verify_integrity().unwrap();
+    }
+    let reopened = open(tmp.path());
+    assert_eq!(reopened.get_balance(&b, CURRENCY), -AMOUNT);
+    reopened.verify_integrity().unwrap();
+}
+
 // Characterization (passes today, not an endorsement). I expected a restart to silently MOVE
 // balances (cache rebuilt from the journal). It does not: the cached balances are persisted and
 // reloaded as they were, so after an id collision the disagreement between the cache and the journal
-// is durable across a restart, and `verify_integrity` keeps failing.
+// is durable across a restart, and `verify_integrity` keeps failing. The collision is built
+// deterministically (same id, different provenance), not by racing the clock.
 #[tokio::test]
 async fn characterization_restart_keeps_cached_balances_that_disagree_with_the_journal() {
     let tmp = tempfile::tempdir().unwrap();
     let (a, b) = (did(), did());
-    let (before, journaled);
+    let first = gov_entry(&a, &b, "gov:coop:1:receipt");
+    let mut second = first.clone();
+    second.provenance = ProvenanceRef::Governance {
+        receipt_id: "gov:coop:2:receipt".to_string(),
+        decision_hash: "sha256:other".to_string(),
+    };
     {
         let mut ledger = open(tmp.path());
-        for i in 0..200 {
-            ledger
-                .append_entry(gov_entry(&a, &b, &format!("gov:coop:{i}:receipt")))
-                .await
-                .unwrap();
-        }
-        before = ledger.get_balance(&b, CURRENCY);
-        journaled = ledger.get_all_entries().unwrap().len() as i64;
+        ledger.append_entry(first).await.unwrap();
+        ledger.append_entry(second).await.unwrap();
+        assert_eq!(
+            ledger.get_all_entries().unwrap().len(),
+            1,
+            "premise: one journal entry"
+        );
+        assert_eq!(
+            ledger.get_balance(&b, CURRENCY),
+            -2 * AMOUNT,
+            "the cache applied both deltas"
+        );
     } // dropped: in-memory cache gone
-    assert!(
-        journaled < 200,
-        "premise: rapid builds collided (journal holds {journaled} of 200)"
-    );
     let reopened = open(tmp.path());
     assert_eq!(
         reopened.get_balance(&b, CURRENCY),
-        before,
+        -2 * AMOUNT,
         "restart reloads the persisted cache"
     );
-    assert_eq!(before, -200 * AMOUNT, "the cache applied all 200 deltas");
     assert!(
         reopened.verify_integrity().is_err(),
-        "the cache still disagrees with the {journaled} journaled entries after a restart"
+        "the cache still disagrees with the one journaled entry after a restart"
     );
 }
