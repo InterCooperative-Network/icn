@@ -3868,8 +3868,18 @@ impl GovernanceManager {
             anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
         })?;
 
-        let domain = domains
-            .get_mut(&domain_id)
+        // The `domains` write lock is held from this read through the cache swap
+        // below, so concurrent in-process edits serialize and none is lost. The
+        // edit is applied to a COPY of the authoritative domain: the cached
+        // instance is replaced only after the copy has been persisted, so a
+        // refused or failed save (Subject-mode, a conflict, retry exhaustion, an
+        // unsupported backend, a storage error) leaves the cache exactly as it
+        // was and cannot diverge from the store (#2864 A8). The decision is
+        // taken against the persisted record, not a possibly stale cache hit
+        // (#2864 A4); a domain that is persisted but missing from the cache is
+        // resolved from the store and enters the cache on success.
+        let mut domain = self
+            .resolve_domain(domains.get(&domain_id), &domain_id)?
             .ok_or_else(|| anyhow::anyhow!("Domain '{}' not found", domain_id.0))?;
 
         // Actor-model firewall: refuse before the member list is touched.
@@ -3902,13 +3912,16 @@ impl GovernanceManager {
         // Mirror the membership change into the persistent store so it
         // survives gateway restart in standalone mode.
         if let Some(store) = self.domain_store.as_ref() {
-            store.save_domain(domain).map_err(|e| {
+            store.save_domain(&domain).map_err(|e| {
                 anyhow::anyhow!(
                     "Failed to persist membership update for domain '{}': {e}",
                     domain_id.0
                 )
             })?;
         }
+
+        // Persisted (or no store attached): only now does the cache change.
+        domains.insert(domain_id, domain);
         Ok(())
     }
 
@@ -4301,13 +4314,19 @@ impl GovernanceManager {
                 );
             }
 
-            let domain = domains.get(&proposal.domain_id).ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Domain '{}' not found for proposal '{}'. Domain may have been deleted.",
-                    proposal.domain_id.0,
-                    proposal_id.0
-                )
-            })?;
+            // The electorate and the firewall decision come from the persisted
+            // domain when a store is attached, not a possibly stale cache hit
+            // (#2864 A4). Store I/O here runs under this function's existing
+            // proposals/votes/domains guards; the store takes no manager lock.
+            let domain = self
+                .resolve_domain(domains.get(&proposal.domain_id), &proposal.domain_id)?
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Domain '{}' not found for proposal '{}'. Domain may have been deleted.",
+                        proposal.domain_id.0,
+                        proposal_id.0
+                    )
+                })?;
 
             // Actor-model firewall: no legacy-electorate decision for a
             // ContextSubjectV1 domain. Runs before the tally and before any
@@ -5269,12 +5288,16 @@ impl GovernanceManager {
         let domains = self.domains.read().map_err(|e| {
             anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
         })?;
-        let domain = domains.get(&proposal.domain_id).ok_or_else(|| {
-            anyhow::anyhow!(
-                "Domain '{}' not found. Cannot verify voter membership.",
-                proposal.domain_id.0
-            )
-        })?;
+        // The membership decision is taken against the persisted domain when a
+        // store is attached, not a possibly stale cache hit (#2864 A4).
+        let domain = self
+            .resolve_domain(domains.get(&proposal.domain_id), &proposal.domain_id)?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Domain '{}' not found. Cannot verify voter membership.",
+                    proposal.domain_id.0
+                )
+            })?;
 
         // Actor-model firewall: refuse before the membership decision (the
         // `TrustThreshold => true` arm below would otherwise admit anyone) and
@@ -5342,6 +5365,51 @@ impl GovernanceManager {
     // Delegation Methods
     // ============================================================================
 
+    /// Resolve a domain for an authorization-sensitive decision (membership
+    /// edit, vote, close, delegation scope).
+    ///
+    /// # Cache coherence (standalone manager)
+    ///
+    /// The `domains` map is a cache hydrated once. When a domain store is
+    /// attached, the **persisted record is authoritative**: a record found in
+    /// the store is returned in preference to `cached`, so a cache that went
+    /// stale (an external typed writer made the domain Subject-mode) cannot
+    /// authorize a legacy operation. If the store has no record the cached
+    /// entry stands (a domain that was never persisted cannot be Subject-mode
+    /// through a persisting writer). A record that cannot be read fails closed:
+    /// it cannot be proven not to be Subject-mode, and a good-looking cache hit
+    /// must not paper over it. With no store attached the cache is all there is
+    /// and behaviour is unchanged.
+    ///
+    /// This is a read, not a refresh: it never mutates the cache, so it is safe
+    /// to call under any guard the caller already holds. The store takes no
+    /// manager lock, so the added I/O cannot deadlock; it does lengthen the time
+    /// those guards are held by one sled read.
+    ///
+    /// It narrows, and does not close, the cross-writer window: the persisted
+    /// record can still change between this read and the caller's next step.
+    /// For a membership edit the atomic line remains
+    /// `GovernanceStateStore::save_domain` (compare-and-put against the exact
+    /// bytes it read). A vote or a close has no atomic line: nothing re-checks
+    /// the persisted record before its vote row or state change.
+    fn resolve_domain(
+        &self,
+        cached: Option<&GovernanceDomain>,
+        domain_id: &GovernanceDomainId,
+    ) -> Result<Option<GovernanceDomain>> {
+        let Some(store) = self.domain_store.as_ref() else {
+            return Ok(cached.cloned());
+        };
+        match store.get_domain(domain_id) {
+            Ok(Some(persisted)) => Ok(Some(persisted)),
+            Ok(None) => Ok(cached.cloned()),
+            Err(e) => anyhow::bail!(
+                "Domain '{}': stored record cannot be read ({e}); refusing",
+                domain_id.0
+            ),
+        }
+    }
+
     /// Refuse a delegation whose scope names a `ContextSubjectV1` domain
     /// (directly, or through its proposal). Blanket scope names no domain.
     fn require_legacy_rail_for_delegation_scope(
@@ -5380,30 +5448,19 @@ impl GovernanceManager {
                 }
             }
         };
-        {
+        // Neither a cache hit nor a cache miss is proof of the domain's mode:
+        // the cache can be stale (an external writer made it Subject-mode) or
+        // empty (hydration falls back to an empty cache when the store cannot
+        // list). `resolve_domain` takes the persisted record when a store is
+        // attached and refuses an unreadable one.
+        let cached = {
             let domains = self.domains.read().map_err(|e| {
                 anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
             })?;
-            if let Some(domain) = domains.get(&domain_id) {
-                return Ok(
-                    domain.require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?
-                );
-            }
-        }
-        // A cache miss is not proof the domain is not a persisted
-        // ContextSubjectV1 domain (hydration falls back to an empty cache when
-        // the store cannot list). Consult the persisted record; an unreadable
-        // record is refused, never treated as absent.
-        if let Some(store) = self.domain_store.as_ref() {
-            match store.get_domain(&domain_id) {
-                Ok(None) => {}
-                Ok(Some(existing)) => existing
-                    .require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?,
-                Err(e) => anyhow::bail!(
-                    "Domain '{}': stored record cannot be read ({e}); refusing delegation",
-                    domain_id.0
-                ),
-            }
+            domains.get(&domain_id).cloned()
+        };
+        if let Some(domain) = self.resolve_domain(cached.as_ref(), &domain_id)? {
+            domain.require_legacy_rail(icn_governance::LegacyRailOp::DelegationCreation)?;
         }
         Ok(())
     }
@@ -13885,5 +13942,357 @@ mod actor_model_firewall_tests {
             .await
             .unwrap();
         assert_eq!(bare.delegations.read().unwrap().len(), 1);
+    }
+
+    /// Cache coherence of the standalone manager (#2864 A4, A8): an
+    /// authorization decision must be taken against the persisted domain, not a
+    /// stale cache hit, and a failed save must leave the cache untouched.
+    mod cache_coherence {
+        use super::*;
+        use crate::state_store::test_support::HookStore;
+        use icn_store::Store;
+
+        const DKEY: &[u8] = b"gov:domain:d";
+
+        fn dom() -> GovernanceDomainId {
+            GovernanceDomainId::new("d")
+        }
+
+        fn cached_members(mgr: &GovernanceManager) -> Vec<Did> {
+            match &mgr.domains.read().unwrap()[&dom()].config.membership.source {
+                MembershipSource::StaticList(m) => m.clone(),
+                other => panic!("unexpected membership source: {other:?}"),
+            }
+        }
+
+        fn subject_d() -> GovernanceDomain {
+            domain("d", vec![])
+                .with_human_actor_model(HumanActorModel::ContextSubjectV1)
+                .unwrap()
+        }
+
+        /// A manager hydrated (via `new_with_sled`) with legacy domain `d`
+        /// (one member) and an open proposal `p-d`, after which an external
+        /// typed writer persists `d` as Subject-mode. The manager's cache is
+        /// now stale: it still says legacy.
+        fn stale_manager(member: &Did) -> (GovernanceManager, Arc<dyn icn_store::Store>) {
+            let db = Arc::new(sled::Config::new().temporary(true).open().unwrap());
+            let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::from_db((*db).clone()));
+            let typed = SledGovernanceStateStore::new(store.clone());
+            typed
+                .save_domain(&domain("d", vec![member.clone()]))
+                .unwrap();
+            let mgr = GovernanceManager::new_with_sled(db);
+            assert_eq!(cached_members(&mgr), vec![member.clone()]);
+            mgr.proposals
+                .write()
+                .unwrap()
+                .insert(ProposalId("p-d".into()), open_proposal("d", member, "p-d"));
+            typed.save_domain(&subject_d()).unwrap();
+            (mgr, store)
+        }
+
+        #[tokio::test]
+        async fn stale_cached_legacy_domain_cannot_authorize_a_membership_edit() {
+            let member = did();
+            let (mgr, store) = stale_manager(&member);
+            let before = store.get(DKEY).unwrap().unwrap();
+            let err = mgr
+                .update_domain_membership(dom(), did(), MembershipAction::Add)
+                .await
+                .expect_err("a stale legacy cache must not authorize the edit")
+                .to_string();
+            assert!(err.contains("ContextSubjectV1"), "wrong refusal: {err}");
+            // The decision must be the EARLY firewall refusal taken against the
+            // persisted record. `save_domain`'s compare-and-put would also refuse
+            // a Subject->legacy write ("Failed to persist ..."), but that is the
+            // backstop, not the authorization: this test must carry A4 itself.
+            assert!(
+                !err.contains("Failed to persist"),
+                "refused only by the save backstop, not by the persisted-record decision: {err}"
+            );
+            assert_eq!(store.get(DKEY).unwrap().unwrap(), before);
+            assert_eq!(
+                cached_members(&mgr),
+                vec![member],
+                "a refused edit must not alter cached membership"
+            );
+        }
+
+        #[tokio::test]
+        async fn stale_cached_legacy_domain_cannot_authorize_a_vote() {
+            let member = did();
+            let (mgr, _store) = stale_manager(&member);
+            assert_refused(
+                mgr.cast_vote(ProposalId("p-d".into()), member, VoteChoice::For, None)
+                    .await,
+            );
+            assert!(mgr
+                .votes
+                .read()
+                .unwrap()
+                .get(&ProposalId("p-d".into()))
+                .is_none());
+        }
+
+        #[tokio::test]
+        async fn stale_cached_legacy_domain_cannot_authorize_a_close() {
+            let member = did();
+            let (mgr, _store) = stale_manager(&member);
+            let id = ProposalId("p-d".into());
+            assert_refused(mgr.close_proposal(id.clone()).await);
+            assert!(mgr.proposals.read().unwrap()[&id].state.is_open());
+        }
+
+        #[tokio::test]
+        async fn stale_cached_legacy_domain_cannot_authorize_a_delegation() {
+            let member = did();
+            let (mgr, _store) = stale_manager(&member);
+            for scope in [
+                DelegationScope::Domain(dom()),
+                DelegationScope::Proposal(ProposalId("p-d".into())),
+            ] {
+                assert_refused(
+                    mgr.create_delegation(Delegation::new(did(), did(), scope))
+                        .await,
+                );
+            }
+            assert!(mgr.delegations.read().unwrap().is_empty());
+        }
+
+        /// A save that fails must leave the cached domain exactly as it was.
+        #[tokio::test]
+        async fn failed_save_leaves_cached_membership_unchanged() {
+            let member = did();
+            // A backend with no atomic compare-and-put: every save fails closed.
+            let store = Arc::new(HookStore::new(false));
+            let mgr = GovernanceManager::new()
+                .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+            mgr.domains
+                .write()
+                .unwrap()
+                .insert(dom(), domain("d", vec![member.clone()]));
+            let before = mgr.domains.read().unwrap()[&dom()].clone();
+
+            let err = mgr
+                .update_domain_membership(dom(), did(), MembershipAction::Add)
+                .await
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("Failed to persist"), "{err}");
+            assert_eq!(cached_members(&mgr), vec![member]);
+            assert_eq!(
+                mgr.domains.read().unwrap()[&dom()].updated_at,
+                before.updated_at,
+                "a failed save must not touch updated_at either"
+            );
+            assert!(store.inner.get(DKEY).unwrap().is_none());
+        }
+
+        /// A storage conflict between the manager's read and its save: a second
+        /// writer persists Subject-mode in that window. The save is refused and
+        /// neither the cache nor the store diverges.
+        #[tokio::test]
+        async fn conflict_between_read_and_save_does_not_diverge_cache_and_store() {
+            let member = did();
+            let store = Arc::new(HookStore::new(true));
+            let typed = SledGovernanceStateStore::new(store.clone());
+            typed
+                .save_domain(&domain("d", vec![member.clone()]))
+                .unwrap();
+            let mgr = GovernanceManager::new()
+                .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+            mgr.domains
+                .write()
+                .unwrap()
+                .insert(dom(), domain("d", vec![member.clone()]));
+
+            let subject_bytes = serde_json::to_vec(&subject_d()).unwrap();
+            let injected = subject_bytes.clone();
+            store.arm(
+                DKEY.to_vec(),
+                Box::new(move |inner, n| {
+                    if n == 1 {
+                        inner.put(DKEY, &injected).unwrap();
+                    }
+                }),
+            );
+
+            let r = mgr
+                .update_domain_membership(dom(), did(), MembershipAction::Add)
+                .await;
+            assert!(r.is_err(), "the save must be refused: {r:?}");
+            assert_eq!(store.inner.get(DKEY).unwrap().unwrap(), subject_bytes);
+            assert_eq!(cached_members(&mgr), vec![member]);
+        }
+
+        /// An unreadable persisted record fails every authorization closed,
+        /// even though the cache holds a perfectly good legacy domain.
+        #[tokio::test]
+        async fn storage_read_error_fails_closed_for_every_decision() {
+            let member = did();
+            let store = Arc::new(HookStore::new(true));
+            store.inner.put(DKEY, b"\xff not a domain").unwrap();
+            let mgr = GovernanceManager::new()
+                .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+            mgr.domains
+                .write()
+                .unwrap()
+                .insert(dom(), domain("d", vec![member.clone()]));
+            mgr.proposals
+                .write()
+                .unwrap()
+                .insert(ProposalId("p-d".into()), open_proposal("d", &member, "p-d"));
+
+            fn cannot_be_read(r: Result<()>, what: &str) {
+                let e = r.expect_err(what).to_string();
+                assert!(e.contains("cannot be read"), "{what}: {e}");
+            }
+            cannot_be_read(
+                mgr.update_domain_membership(dom(), did(), MembershipAction::Add)
+                    .await,
+                "membership",
+            );
+            cannot_be_read(
+                mgr.cast_vote(
+                    ProposalId("p-d".into()),
+                    member.clone(),
+                    VoteChoice::For,
+                    None,
+                )
+                .await,
+                "vote",
+            );
+            cannot_be_read(mgr.close_proposal(ProposalId("p-d".into())).await, "close");
+            cannot_be_read(
+                mgr.create_delegation(Delegation::new(
+                    did(),
+                    did(),
+                    DelegationScope::Domain(dom()),
+                ))
+                .await,
+                "delegation",
+            );
+            assert_eq!(cached_members(&mgr), vec![member]);
+            assert!(mgr.votes.read().unwrap().is_empty());
+            assert!(mgr.delegations.read().unwrap().is_empty());
+            assert_eq!(
+                store.inner.get(DKEY).unwrap().unwrap(),
+                b"\xff not a domain".to_vec()
+            );
+        }
+
+        /// Supported legacy behaviour is unchanged: with a store attached and
+        /// the cache coherent, edits persist and show in the cache; votes and
+        /// delegations work.
+        #[tokio::test]
+        async fn coherent_legacy_domain_behaves_as_before() {
+            let member = did();
+            let db = Arc::new(sled::Config::new().temporary(true).open().unwrap());
+            let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::from_db((*db).clone()));
+            let typed = SledGovernanceStateStore::new(store.clone());
+            typed
+                .save_domain(&domain("d", vec![member.clone()]))
+                .unwrap();
+            let mgr = GovernanceManager::new_with_sled(db);
+            mgr.proposals
+                .write()
+                .unwrap()
+                .insert(ProposalId("p-d".into()), open_proposal("d", &member, "p-d"));
+
+            let newcomer = did();
+            mgr.update_domain_membership(dom(), newcomer.clone(), MembershipAction::Add)
+                .await
+                .unwrap();
+            assert_eq!(cached_members(&mgr), vec![member.clone(), newcomer.clone()]);
+            let stored: GovernanceDomain =
+                serde_json::from_slice(&store.get(DKEY).unwrap().unwrap()).unwrap();
+            assert!(stored.config.membership.source.contains_static(&newcomer));
+
+            mgr.cast_vote(
+                ProposalId("p-d".into()),
+                newcomer.clone(),
+                VoteChoice::For,
+                None,
+            )
+            .await
+            .unwrap();
+            mgr.create_delegation(Delegation::new(
+                member.clone(),
+                newcomer.clone(),
+                DelegationScope::Domain(dom()),
+            ))
+            .await
+            .unwrap();
+
+            mgr.update_domain_membership(dom(), newcomer.clone(), MembershipAction::Remove)
+                .await
+                .unwrap();
+            assert_eq!(cached_members(&mgr), vec![member]);
+        }
+
+        /// A domain that is persisted but missing from the cache (hydration
+        /// failed) is resolved from the store rather than reported not found,
+        /// and the cache is populated only after the save succeeds.
+        #[tokio::test]
+        async fn membership_update_resolves_a_persisted_domain_missing_from_the_cache() {
+            let member = did();
+            let store = Arc::new(HookStore::new(true));
+            let typed = SledGovernanceStateStore::new(store.clone());
+            typed
+                .save_domain(&domain("d", vec![member.clone()]))
+                .unwrap();
+            let mgr = GovernanceManager::new()
+                .with_domain_store(Arc::new(SledGovernanceStateStore::new(store.clone())));
+            assert!(mgr.domains.read().unwrap().is_empty());
+
+            let newcomer = did();
+            mgr.update_domain_membership(dom(), newcomer.clone(), MembershipAction::Add)
+                .await
+                .unwrap();
+            assert_eq!(cached_members(&mgr), vec![member, newcomer]);
+        }
+
+        /// Concurrent in-process edits serialize on the `domains` write lock,
+        /// which is held across the read, the save and the cache swap: none is
+        /// lost, in the cache or in the store.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+        async fn concurrent_in_process_membership_edits_lose_none() {
+            let member = did();
+            let db = Arc::new(sled::Config::new().temporary(true).open().unwrap());
+            let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::from_db((*db).clone()));
+            SledGovernanceStateStore::new(store.clone())
+                .save_domain(&domain("d", vec![member.clone()]))
+                .unwrap();
+            let mgr = Arc::new(GovernanceManager::new_with_sled(db));
+
+            let adds: Vec<Did> = (0..8).map(|_| did()).collect();
+            let handles: Vec<_> = adds
+                .iter()
+                .cloned()
+                .map(|m| {
+                    let mgr = mgr.clone();
+                    tokio::spawn(async move {
+                        mgr.update_domain_membership(dom(), m, MembershipAction::Add)
+                            .await
+                            .unwrap();
+                    })
+                })
+                .collect();
+            for h in handles {
+                h.await.unwrap();
+            }
+            let cached = cached_members(&mgr);
+            let stored: GovernanceDomain =
+                serde_json::from_slice(&store.get(DKEY).unwrap().unwrap()).unwrap();
+            for m in adds.iter().chain(std::iter::once(&member)) {
+                assert!(cached.contains(m), "cache lost a member");
+                assert!(
+                    stored.config.membership.source.contains_static(m),
+                    "store lost a member"
+                );
+            }
+            assert_eq!(cached.len(), 9);
+        }
     }
 }
