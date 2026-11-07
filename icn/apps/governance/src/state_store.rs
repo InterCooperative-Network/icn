@@ -271,6 +271,36 @@ pub(crate) fn load_json<T: for<'a> serde::Deserialize<'a>>(
 /// `icn_store::Store`-backed implementation of [`GovernanceStateStore`].
 ///
 /// All key encoding is centralised here; the actor never constructs raw keys.
+///
+/// # No raw-handle accessor (#2864 A2)
+///
+/// A dependent crate holding this type cannot obtain the underlying
+/// `dyn Store` from it: a raw handle would let it `put`/`delete` any key,
+/// including a `gov:domain:*` record, without the monotonic check in
+/// [`GovernanceStateStore::save_domain`]. The pair below guards that. The
+/// control compiles; the `compile_fail` block differs from it only by the call
+/// to the removed accessor, so it cannot pass for an unrelated reason.
+///
+/// ```
+/// use icn_governance::GovernanceDomainId;
+/// use icn_governance_actor::{GovernanceStateStore, SledGovernanceStateStore};
+/// use icn_store::SledStore;
+/// use std::sync::Arc;
+///
+/// let typed = SledGovernanceStateStore::new(Arc::new(SledStore::temporary().unwrap()));
+/// let _ = typed.get_domain(&GovernanceDomainId::new("d")).unwrap();
+/// ```
+///
+/// ```compile_fail
+/// use icn_governance::GovernanceDomainId;
+/// use icn_governance_actor::{GovernanceStateStore, SledGovernanceStateStore};
+/// use icn_store::SledStore;
+/// use std::sync::Arc;
+///
+/// let typed = SledGovernanceStateStore::new(Arc::new(SledStore::temporary().unwrap()));
+/// let _ = typed.get_domain(&GovernanceDomainId::new("d")).unwrap();
+/// let _raw = typed.as_store();
+/// ```
 pub struct SledGovernanceStateStore {
     store: Arc<dyn Store>,
 }
@@ -281,12 +311,17 @@ impl SledGovernanceStateStore {
         Self { store }
     }
 
-    /// Expose the inner store for callers that still need raw KV access.
+    /// Raw KV access to the inner store, for this module's own tests that
+    /// corrupt a stored row on purpose.
     ///
-    /// This used to name the gossip ingress (`handle_incoming`) as the motivating
-    /// caller. That ingress no longer applies replicated state and holds no store
-    /// handle at all — see `actor::observe_replicated_governance_message`.
-    pub fn as_store(&self) -> &dyn Store {
+    /// Test-only by design (#2864 A2). It used to be `pub` and name the gossip
+    /// ingress as its motivating caller; that ingress no longer applies
+    /// replicated state and holds no store handle at all (see
+    /// `actor::observe_replicated_governance_message`), so the only remaining
+    /// caller is a test. A public raw accessor would let any holder of this type
+    /// bypass the monotonic check in `save_domain`.
+    #[cfg(test)]
+    pub(crate) fn as_store(&self) -> &dyn Store {
         self.store.as_ref()
     }
 }

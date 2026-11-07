@@ -43,18 +43,40 @@ pub struct GovernanceActorDeps {
 }
 
 /// Services returned from governance actor initialization.
+///
+/// # No raw governance-store handle (#2864 A2)
+///
+/// This used to carry the daemon's raw governance `dyn Store` ("for audit
+/// trail"). Nothing used it for that; it only invited a second, unrestricted
+/// writer on the store that holds `gov:domain:*` records. It is gone: the only
+/// holders of that handle are now inside the actor. The control compiles; the
+/// `compile_fail` block differs from it only by the removed field.
+///
+/// ```
+/// use icn_governance_actor::init::GovernanceActorServices;
+/// fn _only_the_handle(s: GovernanceActorServices) {
+///     let _ = s.governance_handle;
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use icn_governance_actor::init::GovernanceActorServices;
+/// fn _only_the_handle(s: GovernanceActorServices) {
+///     let _ = s.governance_handle;
+///     let _raw = s.governance_store;
+/// }
+/// ```
 pub struct GovernanceActorServices {
     /// Handle to the governance actor
     pub governance_handle: GovernanceHandle,
-    /// Governance store for audit trail
-    pub governance_store: Arc<dyn icn_store::Store>,
 }
 
 /// Initialize the governance actor.
 ///
 /// Creates:
 /// - Governance gossip topic (`governance:proposal`)
-/// - Governance store (Sled)
+/// - Governance store (Sled, opened at `<store_path>/governance` and owned by
+///   the actor from here on: no handle to it is returned)
 /// - Static membership resolver
 /// - GovernanceActor
 ///
@@ -67,6 +89,24 @@ pub async fn init_governance_actor(
     did: Did,
     deps: GovernanceActorDeps,
 ) -> anyhow::Result<GovernanceActorServices> {
+    let gov_store_path = store_path.join("governance");
+    let gov_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gov_store_path)?);
+    init_governance_actor_with_store(gov_store, store_path, did, deps).await
+}
+
+/// [`init_governance_actor`] with the governance store supplied by the caller.
+///
+/// The store is moved into the actor. A caller that wants to inspect persisted
+/// state while the actor runs (sled's directory lock forbids reopening the
+/// directory) opens the store itself and keeps its own handle, so it is that
+/// caller's handle, not one this crate hands out. `store_path` still locates the
+/// sibling `governance_action_items` database.
+pub async fn init_governance_actor_with_store(
+    gov_store: Arc<dyn icn_store::Store>,
+    store_path: &Path,
+    did: Did,
+    deps: GovernanceActorDeps,
+) -> anyhow::Result<GovernanceActorServices> {
     // Create governance topic before spawning GovernanceActor
     {
         let mut gossip = deps.gossip_handle.write().await;
@@ -75,10 +115,6 @@ pub async fn init_governance_actor(
             icn_gossip::AccessControl::Public,
         ));
     }
-
-    // Open governance store
-    let gov_store_path = store_path.join("governance");
-    let gov_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gov_store_path)?);
 
     // Create membership resolver.
     // When a TrustService is available, use TrustServiceMembershipResolver so that
@@ -95,7 +131,7 @@ pub async fn init_governance_actor(
     // Spawn GovernanceActor
     let governance_handle = GovernanceActor::spawn(
         did,
-        gov_store.clone(),
+        gov_store,
         deps.gossip_handle.clone(),
         gov_resolver,
         Some(deps.event_bus),
@@ -113,10 +149,10 @@ pub async fn init_governance_actor(
     );
     let governance_handle = governance_handle.with_action_item_store(action_store);
 
-    info!("Governance actor spawned at {}", gov_store_path.display());
+    info!(
+        "Governance actor spawned at {}",
+        store_path.join("governance").display()
+    );
 
-    Ok(GovernanceActorServices {
-        governance_handle,
-        governance_store: gov_store,
-    })
+    Ok(GovernanceActorServices { governance_handle })
 }

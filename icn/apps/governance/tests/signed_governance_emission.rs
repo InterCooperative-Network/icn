@@ -1,8 +1,10 @@
 //! Signed governance emission through the production composition (#2469 slice 3).
 //!
-//! Every test here drives `init_governance_actor` — the same entry point
-//! `icn-core/src/supervisor/init_governance.rs` calls — and then reads the bytes that
-//! actually reached the gossip topic. Nothing asserts on a helper in isolation: the claim
+//! Every test here drives `init_governance_actor_with_store` — the body of the entry point
+//! `icn-core/src/supervisor/init_governance.rs` calls (`init_governance_actor` only opens
+//! `<store_path>/governance` and delegates; the test opens that same real store itself and
+//! keeps its own handle, because the crate no longer hands the raw store out, #2864 A2) —
+//! and then reads the bytes that actually reached the gossip topic. Nothing asserts on a helper in isolation: the claim
 //! under test is "what this node puts on the wire", and only the wire can answer it.
 //!
 //! # What this suite does NOT claim
@@ -42,7 +44,7 @@ use icn_governance::{
     GovernanceParams, MembershipConfig, ProposalId, ProposalPayload, ProposalScope, ProposalState,
     Vote, VoteChoice,
 };
-use icn_governance_actor::init::{init_governance_actor, GovernanceActorDeps};
+use icn_governance_actor::init::{init_governance_actor_with_store, GovernanceActorDeps};
 use icn_governance_actor::manager::GovernanceManager;
 use icn_governance_actor::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 use icn_identity::{Did, IdentityBundle};
@@ -99,7 +101,12 @@ impl Node {
             None,
         )));
 
-        let services = init_governance_actor(
+        let gov_store: Arc<dyn icn_store::Store> = Arc::new(
+            icn_store::SledStore::open(tmp.path().join("governance"))
+                .expect("open governance store"),
+        );
+        let services = init_governance_actor_with_store(
+            gov_store.clone(),
             tmp.path(),
             did.clone(),
             GovernanceActorDeps {
@@ -110,7 +117,7 @@ impl Node {
             },
         )
         .await
-        .expect("init_governance_actor");
+        .expect("init_governance_actor_with_store");
 
         let delivered = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         {
@@ -127,7 +134,7 @@ impl Node {
             ));
         }
 
-        let state = SledGovernanceStateStore::new(services.governance_store.clone());
+        let state = SledGovernanceStateStore::new(gov_store);
         let ops = GovernanceManager::with_handle(
             Arc::new(services.governance_handle) as Arc<dyn GovernanceOps + Send + Sync>
         );
