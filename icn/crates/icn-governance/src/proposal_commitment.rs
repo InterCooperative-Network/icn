@@ -10,8 +10,8 @@
 //!
 //! `GovernanceDecisionReceipt::decision_hash` covers proposal id, domain id, outcome, tally and vote
 //! hash, but not the payload. The only payload digest on the accept path today is
-//! `canonical_payload_hash`, BLAKE3 over `serde_json::to_string(&payload)`, which no contract
-//! defines as a canonical encoding. This commitment is the byte-exact, versioned replacement a
+//! `canonical_payload_hash`, BLAKE3 over `serde_json::to_string` of the payload's
+//! `serde_json::Value`, which no contract defines as a canonical encoding. This commitment is the byte-exact, versioned replacement a
 //! future frozen `VotingProcessSnapshotV1` can bind (domain id, proposal id, **this hash**), so an
 //! accepted decision names the exact action voters approved.
 //!
@@ -41,13 +41,35 @@
 //!   field set needs a new tag/version, never a reinterpretation of this one.
 //! * There are no optional fields in a `Spend`, so no absence encoding exists to get wrong.
 //! * `treasury_did` and `recipient` are committed as the **exact spelling** the executor passes on
-//!   (`Did::to_string()`), not as decoded principals. `Did` equality may identify several spellings
-//!   of one principal; committing the spelling is the fail-safe direction (a different spelling is
-//!   a different commitment).
+//!   (`Did::to_string()`), not as decoded principals. `Did` equality (I7) identifies several
+//!   multibase spellings of one principal. For `treasury_did` the spelling is itself
+//!   effect-relevant: the ledger keys the treasury nonce by the treasury string, so two spellings
+//!   advance different nonce slots, and a principal-level commitment would let two different
+//!   effects share one hash. For `recipient` the ledger parses to a `Did` and credits by
+//!   principal, so an alias spelling is the same economic effect with a different commitment: a
+//!   false rejection, never a false acceptance.
 //! * `currency` and `memo` are committed verbatim. No `CurrencyId` normalisation is applied: the
-//!   executor passes the string through unchanged, and the rehearsed code uses bare symbols that
-//!   `CANONICAL_ENCODING.md` §5.2 would not accept (an open owner decision: whether committed currency must be normalised first).
+//!   ledger keys balances by the exact currency string with no case folding, so `HOURS` and
+//!   `hours` are different balances and normalising would merge distinct effects.
 //! * `amount` must be strictly positive, then is committed as its u64 value.
+//!
+//! # Status: provisional, not frozen
+//!
+//! The bytes above are unambiguous for every input that can be committed. They are **not yet to
+//! be treated as a frozen durable format**, because two owner decisions are open and the owner
+//! documents contradict the code:
+//!
+//! 1. **DID spelling.** `CANONICAL_ENCODING.md` §5.1 says DIDs MUST be normalised to Base58btc,
+//!    but `Did` accepts any multibase spelling (e.g. `did:icn:f<hex>`) and N2 (I7) treats them as
+//!    one principal. Choose: accept every spelling `Did` accepts (this v1), or refuse any
+//!    non-Base58btc spelling at commit time. Never convert to the decoded principal for
+//!    `treasury_did` (see above).
+//! 2. **Currency.** §5.2 describes a normalised `<scope>:<SYMBOL>` `CurrencyId`; no such type
+//!    exists in code and the rehearsed action uses bare symbols such as `HOURS`. A later mandate
+//!    to normalise changes the bytes and so needs a new tag, or a refusal here.
+//!
+//! §4.1.3 itself imposes no identifier normalisation on field strings; whether §5.1/§5.2 apply to
+//! them is unspecified.
 
 use icn_kernel_api::canonical::DomainTag;
 use thiserror::Error;

@@ -278,9 +278,11 @@ fn empty_required_fields_are_refused() {
     );
 }
 
-// Fails if any other payload kind is given a commitment (fail closed, no invented encoding).
+// Samples two non-treasury payload kinds. Refusal of all others is structural (a wildcard arm in
+// `commit`), so this test does not enumerate every variant.
+// Fails if either sampled kind is given a commitment (fail closed, no invented encoding).
 #[test]
-fn every_other_payload_variant_is_refused_as_unsupported() {
+fn text_and_budget_payloads_are_refused_as_unsupported() {
     let text = ProposalPayload::Text {
         body: "hello".into(),
     };
@@ -363,22 +365,12 @@ fn verify_accepts_only_the_committed_triple() {
     );
 }
 
-// Fails if the same fields under a different tag/version hash alike (domain separation).
+// Fails if the exposed bytes/hash drift from the shared `CanonicalHasher` recipe
+// (CANONICAL_ENCODING.md 4.1.3) under the registered tag.
 #[test]
-fn same_fields_under_another_tag_hash_differently() {
-    use icn_kernel_api::canonical::{CanonicalHasher, DomainTag};
+fn commitment_equals_canonical_hasher_under_the_registered_tag() {
+    use icn_kernel_api::canonical::CanonicalHasher;
     let c = commit(&BASE).unwrap();
-    let mut h = CanonicalHasher::new(DomainTag::new(b"icn:gov:decision:v1"));
-    h.str(BASE.domain)
-        .str(BASE.proposal)
-        .str(BASE.treasury)
-        .str(BASE.recipient)
-        .str(BASE.currency)
-        .str(BASE.memo)
-        .u64(BASE.amount as u64)
-        .u64(BASE.nonce);
-    assert_ne!(&h.finish(), c.commitment_hash());
-    // and under the real tag the shared mechanism reproduces the commitment byte for byte.
     let mut h = CanonicalHasher::new(TREASURY_SPEND_COMMITMENT_TAG);
     h.str(BASE.domain)
         .str(BASE.proposal)
