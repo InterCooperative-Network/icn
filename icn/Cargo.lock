@@ -3125,6 +3125,7 @@ dependencies = [
  "icn-time",
  "icn-trust",
  "icn-trust-app",
+ "libc",
  "metrics",
  "metrics-util 0.19.1",
  "portpicker",

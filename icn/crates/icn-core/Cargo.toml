@@ -21,6 +21,8 @@ ed25519-dalek.workspace = true
 x25519-dalek.workspace = true
 async-trait = "0.1"
 hex = "0.4"
+# O_NOFOLLOW / O_NONBLOCK for reading the import marker without following or blocking.
+libc = "0.2"
 sled.workspace = true
 sha2.workspace = true
 rand.workspace = true

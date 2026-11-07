@@ -477,6 +477,85 @@ fn a_start_refused_by_the_n2a_gate_leaves_no_receipt_from_the_previous_start() {
     );
 }
 
+// ── I: the import-incomplete marker (ADR-0089 §6, §7; refusal side only) ─────────────────────────
+
+#[test]
+fn an_unfinished_import_stops_startup_keeps_the_marker_and_loses_no_fact() {
+    let node = Node::init("n1r1-i");
+    node.seed_offline();
+    let mut daemon = node.start();
+    assert!(daemon.sigterm().success());
+    assert!(
+        receipt_path(node.dir()).exists(),
+        "fixture: a successful start wrote one"
+    );
+
+    let marker = icn_core::import_marker::import_marker_path(node.dir());
+    let record = format!(
+        "icn-import-incomplete v1\nsegment-id {}\nsubject {}\nfact-count 3\n",
+        "f320220a862f9e626da7edb0837e18198539ea27f04919d94441cc61897468ba",
+        "a0068f2e8e052f31533edaac720f0911ef32aa24a4b056106b7bbb7002b4c04d",
+    );
+    std::fs::write(&marker, &record).unwrap();
+    let record_before = std::fs::read(init_record_path(node.dir())).unwrap();
+
+    // Twice: a repeated start is refused the same way and clears nothing.
+    for attempt in 0..2 {
+        let (status, log) = node.run_expecting_refusal();
+        assert_refused(&node, status, &log, "offline N1 authority import");
+        assert!(
+            log.contains("not implemented yet"),
+            "attempt {attempt}:\n{log}"
+        );
+        assert_eq!(
+            std::fs::read(&marker).unwrap(),
+            record.as_bytes(),
+            "the marker is kept"
+        );
+        // The store's files are not compared byte for byte: the N2-A gate opens every sled root,
+        // `store/authority` included, before the registry refuses (ADR-0089 §7 keeps that order),
+        // and sled may write its own files on open. That no fact is lost is shown semantically by
+        // the positive control below.
+        assert_eq!(
+            std::fs::read(init_record_path(node.dir())).unwrap(),
+            record_before,
+            "the record is untouched"
+        );
+        // Expected, not damage: the daemon discards the previous start's receipt as soon as it
+        // holds the lock, before the registry refuses, so no stale receipt is read as this one's.
+        assert!(!receipt_path(node.dir()).exists());
+    }
+
+    // The N2-A gate ran before the registry and did not take the marker for a store.
+    let gate: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(icn_store::n2a_startup_gate::receipt_path(node.dir())).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(gate["verdict"], "clear", "{gate:#}");
+    assert!(
+        !gate.to_string().contains(".icn-import-incomplete"),
+        "the marker is not a sled root:\n{gate:#}"
+    );
+
+    // Positive control (a test fixture, not an operator procedure): with the marker gone, the node
+    // starts on exactly the facts it had, so the refused starts lost none.
+    std::fs::remove_file(&marker).unwrap();
+    let _daemon = node.start();
+    assert_decisions(&node.receipt());
+}
+
+#[test]
+fn an_unreadable_import_marker_stops_startup_too() {
+    let node = Node::init("n1r1-j");
+    node.seed_offline();
+    let marker = icn_core::import_marker::import_marker_path(node.dir());
+    std::fs::create_dir(&marker).unwrap();
+
+    let (status, log) = node.run_expecting_refusal();
+    assert_refused(&node, status, &log, "could not be read");
+    assert!(marker.is_dir(), "the entry is kept");
+}
+
 // ── the daemon process ──────────────────────────────────────────────────────────────────────────
 
 fn free_tcp_port() -> u16 {
