@@ -368,9 +368,7 @@ fn verify_accepts_only_the_committed_triple() {
 fn same_fields_under_another_tag_hash_differently() {
     use icn_kernel_api::canonical::{CanonicalHasher, DomainTag};
     let c = commit(&BASE).unwrap();
-    let mut h = CanonicalHasher::new(DomainTag::new(
-        b"icn:gov:proposal-commitment:treasury-spend:v2",
-    ));
+    let mut h = CanonicalHasher::new(DomainTag::new(b"icn:gov:decision:v1"));
     h.str(BASE.domain)
         .str(BASE.proposal)
         .str(BASE.treasury)
@@ -401,7 +399,8 @@ fn commitment_is_not_the_legacy_json_payload_hash() {
     assert_ne!(legacy.as_bytes(), commit(&BASE).unwrap().commitment_hash());
 }
 
-// Fails if committing mutates or reshapes the existing payload serde form (legacy compat).
+// Pins the legacy serde_json shape of the payload (the input to the legacy payload hash) so a
+// change to it is a visible, deliberate break. It does not call `commit`.
 #[test]
 fn legacy_payload_json_shape_is_unchanged() {
     let json = serde_json::to_string(&payload(&BASE)).unwrap();
@@ -410,5 +409,90 @@ fn legacy_payload_json_shape_is_unchanged() {
         format!(
             "{{\"Treasury\":{{\"operation\":{{\"Spend\":{{\"treasury_did\":\"{DID_A}\",\"amount\":100,\"currency\":\"HOURS\",\"recipient\":\"{DID_B}\",\"memo\":\"sprint-26 provenance proof\",\"nonce\":0}}}}}}}}"
         )
+    );
+}
+
+// Fails if any sibling treasury operation stops being refused, or its pinned name changes.
+#[test]
+fn remaining_treasury_operations_are_refused_by_name() {
+    use icn_governance::proposal::TreasuryApprovalType;
+    let t = || Did::from_str(DID_A).unwrap();
+    let ops = vec![
+        (
+            "modify_spending_rule",
+            TreasuryProposalOperation::ModifySpendingRule {
+                treasury_did: t(),
+                rule_id: None,
+                name: "n".into(),
+                threshold_amount: 1,
+                currency: "HOURS".into(),
+                approval_type: TreasuryApprovalType::SimpleMajority,
+                is_active: true,
+            },
+        ),
+        (
+            "transfer_between_budgets",
+            TreasuryProposalOperation::TransferBetweenBudgets {
+                treasury_did: t(),
+                from_budget: "a".into(),
+                to_budget: "b".into(),
+                amount: 1,
+                currency: "HOURS".into(),
+                reason: "r".into(),
+            },
+        ),
+        (
+            "cancel_budget",
+            TreasuryProposalOperation::CancelBudget {
+                budget_id: "a".into(),
+                reason: "r".into(),
+                return_to_treasury: true,
+            },
+        ),
+        (
+            "reclaim_budget",
+            TreasuryProposalOperation::ReclaimBudget {
+                budget_id: "a".into(),
+                amount: 1,
+                currency: "HOURS".into(),
+                reason: "r".into(),
+            },
+        ),
+    ];
+    for (name, operation) in ops {
+        let p = ProposalPayload::Treasury { operation };
+        assert_eq!(
+            SemanticProposalCommitmentV1::commit("d", "p", &p).unwrap_err(),
+            CommitmentRefusal::UnsupportedTreasuryOperation { operation: name }
+        );
+    }
+}
+
+// Fails if an equal-principal DID spelling is committed as if it were the same bytes: the
+// commitment is over the exact spelling the executor passes on, the fail-safe direction.
+#[test]
+fn another_spelling_of_the_same_principal_commits_differently() {
+    let hex_spelling = format!("did:icn:f{}", "11".repeat(32));
+    assert_eq!(
+        Did::from_str(&hex_spelling).unwrap(),
+        Did::from_str(DID_A).unwrap()
+    );
+    let alt_payload = ProposalPayload::Treasury {
+        operation: TreasuryProposalOperation::Spend {
+            treasury_did: Did::from_str(&hex_spelling).unwrap(),
+            amount: BASE.amount,
+            currency: BASE.currency.to_string(),
+            recipient: Did::from_str(BASE.recipient).unwrap(),
+            memo: BASE.memo.to_string(),
+            nonce: BASE.nonce,
+        },
+    };
+    let alt =
+        SemanticProposalCommitmentV1::commit(BASE.domain, BASE.proposal, &alt_payload).unwrap();
+    let committed = commit(&BASE).unwrap();
+    assert_ne!(alt.commitment_hash(), committed.commitment_hash());
+    assert_eq!(
+        committed.verify(BASE.domain, BASE.proposal, &alt_payload),
+        Err(CommitmentRefusal::Mismatch)
     );
 }

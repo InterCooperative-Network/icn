@@ -46,7 +46,7 @@
 //!   a different commitment).
 //! * `currency` and `memo` are committed verbatim. No `CurrencyId` normalisation is applied: the
 //!   executor passes the string through unchanged, and the rehearsed code uses bare symbols that
-//!   `CANONICAL_ENCODING.md` §5.2 would not accept (see the handoff's open decisions).
+//!   `CANONICAL_ENCODING.md` §5.2 would not accept (an open owner decision: whether committed currency must be normalised first).
 //! * `amount` must be strictly positive, then is committed as its u64 value.
 
 use icn_kernel_api::canonical::DomainTag;
