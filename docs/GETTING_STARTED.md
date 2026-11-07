@@ -1,128 +1,129 @@
-# Getting Started with ICN
+# Start contributing to ICN
 
-This guide is the contributor and evaluator entrypoint for the ICN repo. It is written for people who want to understand the project, build the codebase, run the main checks, and choose an initial way to help without guessing their way through the repository.
+ICN is shared infrastructure for cooperatives, communities, and federations. It is active, experimental, and uneven in maturity. You do **not** need to understand the whole system, know Rust, or finish a course to make a useful contribution.
 
-If you are looking for institutional engagement, non-technical contribution, or financial support, use the public [Get Involved](https://intercooperative.network/get-involved) page first.
+**The shortest path:** choose one task below, do it, and share the result. If you get stuck, that can be a useful result too.
 
-## Choose Your Starting Path
+For the project's purpose, read [What is ICN](https://intercooperative.network/what-is-icn). For current capabilities and limitations, check [What's Real Now](https://intercooperative.network/whats-real-now); a design document does not prove a feature is operational.
 
-- **I want to understand the project before building anything**: start with [intercooperative.network/what-is-icn](https://intercooperative.network/what-is-icn), [intercooperative.network/for-developers](https://intercooperative.network/for-developers), and [intercooperative.network/whats-real-now](https://intercooperative.network/whats-real-now)
-- **I want to contribute code**: keep reading this guide, then read [CONTRIBUTING.md](../CONTRIBUTING.md)
-- **I want a deeper technical curriculum**: use [docs/onboarding/README.md](onboarding/README.md)
-- **I want to run a node locally and inspect the daemon**: follow the local-node section below after you build the workspace
+## 1. Pick a first contribution
 
-## Developer Quickstart
+| If you're interested in... | Try this first | Share it as... |
+| --- | --- | --- |
+| **Testing and onboarding** | Follow this guide from a clean checkout. Report the first unclear, missing, or broken step, with enough detail to reproduce it. | [Discussion](https://github.com/InterCooperative-Network/icn/discussions) or a scoped issue |
+| **Writing and documentation** | Choose one sentence or instruction on the site or in these docs. Check it against the code or current project-status evidence, then propose a clearer and more accurate version. | Small documentation PR or Discussion |
+| **UI, UX, and accessibility** | Review one public or member-facing flow. Record what a person cannot find, understand, or do, including device and accessibility details where relevant. | Annotated report or design Discussion |
+| **Cooperative organizing and governance** | Describe one real coordination problem: who is involved, who has authority, what decision or commitment must be made, and what record must survive afterward. | [Discussion](https://github.com/InterCooperative-Network/icn/discussions) |
+| **Code** | Build and test one crate, then choose a bounded issue or reproduce one small defect before changing anything. | Reproduction, test, or focused PR |
+
+The [Get Involved page](https://intercooperative.network/get-involved) describes additional routes. You can also ask in the [ICN Discord](https://discord.gg/sAEFCnEahn) without a GitHub account. Tell us what you are interested in and what kind of task you would like; you do not need a proposal ready.
+
+### Three concrete first tasks
+
+Pick one of these live, scoped starter issues and **comment before beginning** so another contributor knows what you are taking on:
+
+- **[Test this onboarding guide — #2826](https://github.com/InterCooperative-Network/icn/issues/2826):** no coding required. Follow one path, capture a success or a specific obstruction, and suggest a fix. This task is testing the draft changes in [PR #2825](https://github.com/InterCooperative-Network/icn/pull/2825), which are **not yet merged**.
+- **[Mobile member-shell usability — #2827](https://github.com/InterCooperative-Network/icn/issues/2827):** use the local *fixture-backed* demo on a phone-sized screen, then report two specific interaction findings. No live node, real credentials, or production claim.
+- **[First code task — #2828](https://github.com/InterCooperative-Network/icn/issues/2828):** add two focused Python regression tests for the `icnctl` inventory parser. No full Rust build.
+
+Each issue includes instructions, an expected deliverable, boundaries, and a place to report progress. If it's already claimed or completed, ask on the issue or in Discord for another bounded task rather than duplicating someone else's work. The [good-first-issue search](https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue) may be empty; these linked starter tasks are maintained separately.
+
+**If you want to start immediately without choosing an issue,** use the onboarding walkthrough below and share what you found.
+
+## 2. First task: test the onboarding
+
+**Goal:** find one specific improvement that would make the next newcomer's experience easier. This task does not require Rust or a full build.
+
+1. Read this page and [the repository README](../README.md) as someone new to ICN.
+2. Choose one entry point: documentation, a public-facing page, the technical setup below, or a real cooperative use case.
+3. Try that step. Note what you expected, what happened, and where you got stuck or had to guess.
+4. Share the result in [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions), here on Discord, or as a focused issue/PR where appropriate.
+
+A useful report can be as simple as:
+
+```text
+Starting point: [link or file path]
+Goal: [what I was trying to do]
+Environment: [OS, shell, relevant tool versions; omit if not applicable]
+Steps I tried: [...]
+Expected: [...]
+Observed: [...]
+Suggested fix or open question: [...]
+```
+
+**Done when:** another contributor could repeat what you tried or act on your suggestion. A successful setup confirmation is useful too; include your environment and which steps you actually verified. Don't post passphrases, tokens, private keys, or sensitive logs.
+
+For a reproducible defect, open a [GitHub issue](https://github.com/InterCooperative-Network/icn/issues) after checking for duplicates. The repository's issue forms require project classification; if you are unsure which area owns the problem, start with a Discussion or Discord rather than guessing labels.
+
+## 3. Technical path: get a development environment working
+
+This section is for people who want to work on Rust, networking, identity, APIs, testing, or the CLI. **You do not need to complete it to contribute documentation, designs, research, or institutional examples.**
 
 ### Prerequisites
 
-- Rust toolchain from `icn/rust-toolchain.toml`
-- Git
-- Enough disk for a full workspace build and incremental cache
+- Git and basic terminal familiarity.
+- [rustup](https://rustup.rs/) to manage Rust. Use the version pinned in [`icn/rust-toolchain.toml`](../icn/rust-toolchain.toml), not an arbitrary latest version.
+- A supported development shell appropriate to your OS. Linux is the most direct path; on Windows, WSL2 is a practical option. If setup fails on another environment, report the exact platform.
+- Sufficient disk space and memory for Rust dependencies and build artifacts. This is a large workspace; start with a focused crate instead of assuming you must build everything.
 
-### Clone and build
+For system dependencies and optional tooling, inspect [`scripts/bootstrap.sh`](../scripts/bootstrap.sh) before running it. It can install packages and download dependencies. Its `--ci` option skips optional Cargo development tools; `--no-sysdeps` skips system package installation. The script automatically installs system packages only on Debian/Ubuntu-like systems.
+
+### Clone and run one focused test
 
 ```bash
 git clone https://github.com/InterCooperative-Network/icn.git
-cd icn/icn
-cargo build
-cargo test --workspace --lib
+cd icn
+
+# Confirm your starting checkout is clean
+git status --short
+
+# Rust workspace is nested under icn/, not at repository root
+cd icn
+rustup show active-toolchain
+cargo test -p icn-kernel-api --lib
 ```
 
-Important: the Rust workspace is in the `icn/` subdirectory, not at the repo root.
+This tests the `icn-kernel-api` crate, **not** the whole system. It may still download and compile transitive dependencies. If it fails, capture the command, OS, relevant tool versions, and the first useful error. Don't silently change the pinned toolchain or disable checks.
 
-### Read these next
-
-1. [README.md](../README.md) — repo map and role-based routing
-2. [AGENTS.md](../AGENTS.md) — verification rules, invariants, and crate layout
-3. [CONTRIBUTING.md](../CONTRIBUTING.md) — PR expectations and architectural guardrails
-4. [docs/onboarding/README.md](onboarding/README.md) — structured contributor path
-
-### Repo orientation
-
-- `icn/` — Rust workspace
-- `icn/crates/` — core crates and shared subsystems
-- `icn/apps/` — runtime-integrated application crates
-- `icn/bins/` — binaries such as `icnd` and `icnctl`
-- `website/` — public site for `intercooperative.network`
-- `docs/` — architecture, guides, reference material, and onboarding
-
-### Choose an initial area
-
-- Start with [good first issues](https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue) if you want a scoped first PR
-- Use [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions) if the work is exploratory, architectural, institutional, or not yet issue-shaped
-- If you want to read first and patch later, follow the reading order on [For Developers](https://intercooperative.network/for-developers)
-
-### If you are helping without writing Rust
-
-- Documentation work: use [docs/INDEX.md](INDEX.md) to find the right surface, then open a scoped docs issue or PR
-- Design, research, testing, and ecosystem work: use [intercooperative.network/get-involved](https://intercooperative.network/get-involved) for the current public routing, then move concrete proposals into [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions)
-- Institutional questions: start with [intercooperative.network/for-cooperatives](https://intercooperative.network/for-cooperatives) and [intercooperative.network/whats-real-now](https://intercooperative.network/whats-real-now), then open a Discussion with the real use case
-- Financial support: the live path today is [GitHub Sponsors](https://github.com/sponsors/InterCooperative-Network)
-
-### Verify before you push
+If you want to work with the CLI and daemon binaries, the next bounded step is:
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --lib
+cargo build -p icnctl -p icnd
+./target/debug/icnctl --help
+./target/debug/icnd --help
 ```
 
-Run the checks that match the area you touched from `icn/`, the workspace directory you entered in the build step. `AGENTS.md` is the routing table for workspace crates, website work, SDK work, and docs.
+These commands build and inspect local tools; they do **not** demonstrate that a multi-node deployment, federation, or member-facing workflow is ready. Running and configuring a node is a separate exercise.
 
-## Running a Local Node
+For deeper exploration, see the [optional developer curriculum](onboarding/README.md) and the [architecture overview](ARCHITECTURE.md).
 
-If you want to inspect the daemon and CLI directly after building:
+## 4. Turn the result into a contribution
 
-### Create an identity
+**For a small fix:**
 
-```bash
-./target/debug/icnctl --data-dir ~/.icn id init
-./target/debug/icnctl --data-dir ~/.icn id show
-```
+1. Read [CONTRIBUTING.md](../CONTRIBUTING.md) for scope, security, and architectural expectations. For nontrivial code work, also follow [AGENTS.md](../AGENTS.md) and the relevant domain owner.
+2. Confirm the issue still exists, and keep the change to one reviewable problem.
+3. Work on a branch such as `docs/clarify-first-build`, `fix/your-bug`, or `chore/your-test`. Fork the repo first if you do not have push access.
+4. Run verification appropriate to **the files you changed**. For documentation, start at the repository root with:
 
-### Start the daemon
+   ```bash
+   git diff --check
+   python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
+   ```
 
-```bash
-./target/debug/icnd --data-dir ~/.icn
-```
+   For Rust, choose the focused crate checks and relevant [AGENTS.md](../AGENTS.md) validation rather than treating a single passing test as evidence for the whole project.
+5. Open a pull request against `main`. Explain **what** changed, **why**, **risk or limits**, and **what you verified**. Link the issue or Discussion if there is one.
 
-### Check status from another terminal
+**For observations or ideas:** a Discussion is a valid contribution. Describe the problem, the people affected, what you tried or observed, and what would need to change. Nobody needs to write code just to be heard.
 
-```bash
-./target/debug/icnctl --data-dir ~/.icn status
-./target/debug/icnctl --data-dir ~/.icn network peers
-```
+If a task is larger than advertised or you cannot tell which part of ICN owns it, say so before widening the work. We can split it into something manageable.
 
-### Useful local endpoints
+## 5. Where to go next
 
-- Gateway health: `http://localhost:8080/v1/health`
-- Metrics: `http://localhost:9100/metrics`
+- **Find another task:** [open issues](https://github.com/InterCooperative-Network/icn/issues) or [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions). The good-first-issue list is not a promise that a suitable issue is always available.
+- **Understand the structure:** [repository README](../README.md), [Ecosystem Atlas](ATLAS.md), and [Architecture](ARCHITECTURE.md).
+- **Study the internals systematically:** [developer onboarding curriculum](onboarding/README.md). Its Reader/Fixer/Builder/Maintainer exercises are optional learning paths, **not requirements for contributing or permissions to work on ICN**.
+- **Bring an institutional problem:** [For Cooperatives](https://intercooperative.network/for-cooperatives), then describe the use case in [Discussions](https://github.com/InterCooperative-Network/icn/discussions).
+- **Ask for help informally:** [Discord](https://discord.gg/sAEFCnEahn).
 
-## Other Real Ways to Help
-
-If you are not contributing Rust code, there are still real paths:
-
-- docs, design, testing, research, governance, and ecosystem work are routed through [intercooperative.network/get-involved](https://intercooperative.network/get-involved)
-- institutional use cases and partnership questions belong in [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions)
-- financial support goes through [GitHub Sponsors](https://github.com/sponsors/InterCooperative-Network)
-
-## What This Guide Does Not Promise
-
-- a polished non-technical onboarding flow for ordinary members
-- a hosted sign-up path or managed pilot program
-- a finished member-facing product surface
-
-Those are still in progress. This guide is for building, reading, testing, and contributing against the repo as it exists today.
-
-## Next Documents
-
-- [README.md](../README.md) for the repo map and public-routing layer
-- [CONTRIBUTING.md](../CONTRIBUTING.md) for PR expectations and architectural guardrails
-- [onboarding/README.md](onboarding/README.md) for the longer contributor curriculum
-- [ARCHITECTURE.md](ARCHITECTURE.md) and [STATE.md](STATE.md) if you need deeper technical and project-status context
-
-## Where To Ask Or Contribute Next
-
-- Use [GitHub Issues](https://github.com/InterCooperative-Network/icn/issues) for scoped implementation and documentation work
-- Use [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions) for design questions, institutional use cases, and broader project conversation
-- Use [intercooperative.network/get-involved](https://intercooperative.network/get-involved) if you are deciding how to help across technical, non-technical, institutional, or financial paths
+The goal of this guide is not to make everyone learn the entire project first. It is to help someone take a useful step, make that work visible, and find another step if they want one.
