@@ -14,7 +14,8 @@
 //! proposal that has ALREADY been accepted. Voting, quorum, proposer standing and the gateway's
 //! proposal-creation checks are NOT exercised here. Every spend in these tests is a distinct
 //! accepted proposal with a distinct receipt id, so a rejection cannot be a duplicate-receipt
-//! short-circuit, and the first spend of each test proves the fixture itself is valid.
+//! short-circuit. Tests that need one open with a legitimate spend (a positive control) that
+//! proves the fixture applies a valid spend before the case under test is attempted.
 //!
 //! The ledger is wired as production wires it (`new_with_receipt_index`, persistent nonce index).
 //!
@@ -261,12 +262,18 @@ async fn invariant_alias_spelling_must_not_reset_the_treasury_nonce() {
         stale.receipt_id, first.receipt_id,
         "distinct receipts: not a duplicate"
     );
+    // Outcome, not mechanism: a safe fix may refuse this at a binding check with another message.
     assert!(
-        rejected_by_nonce(&stale),
-        "alias-spelled stale nonce must be rejected: {:?}",
+        !stale.result.success,
+        "alias-spelled spend at an already-used expected nonce must not apply: {:?}",
         stale.result
     );
     assert_eq!(h.balance(&treasury).await, AMOUNT, "no second debit");
+    assert_eq!(
+        h.journal().await.1,
+        vec![first.receipt_id],
+        "only the first receipt journaled"
+    );
 }
 
 // Invariant: the nonce a client reads is the same for every spelling of the treasury.
@@ -298,16 +305,37 @@ async fn invariant_payload_treasury_must_match_the_configured_treasury() {
     assert_ne!(other, h.configured);
     let recipient = KeyPair::generate().unwrap().did().clone();
 
+    // Positive control: a spend naming the configured treasury applies, so the fixture is valid.
+    let configured = h.configured.clone();
+    let control = h.accept_spend(&configured, &recipient, 0).await;
+    assert!(
+        control.result.success,
+        "fixture must apply a legitimate spend: {:?}",
+        control.result
+    );
+
+    // The case under test: same expected nonce, but the payload names a different treasury.
+    // Outcome, not mechanism: any refusal satisfies the invariant.
     let spend = h.accept_spend(&other, &recipient, 0).await;
+    assert_ne!(
+        spend.receipt_id, control.receipt_id,
+        "distinct receipts: not a duplicate"
+    );
     assert!(
         !spend.result.success,
         "spend naming a non-configured treasury must be refused: {:?}",
         spend.result
     );
     assert_eq!(
-        h.balance(&h.configured.clone()).await,
-        0,
-        "configured treasury untouched"
+        h.balance(&configured).await,
+        AMOUNT,
+        "configured treasury debited only by the control"
+    );
+    assert!(
+        h.nonce_rows()
+            .iter()
+            .all(|(id, _)| id != &other.to_string()),
+        "no nonce lane may be created for a treasury that is not the configured one"
     );
 }
 
