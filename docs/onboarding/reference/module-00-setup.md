@@ -1,253 +1,92 @@
-# Module 0: Setup and Tooling
+# Setup and troubleshooting reference
 
-## Overview
-This module gets your development environment ready for ICN work. By the end,
-you'll have built the ICN daemon and CLI tools, understand the repository layout,
-and be ready to explore the codebase.
+This is a **supporting reference**, not a second quickstart or a promise that every environment works identically.
 
-## Objectives
-- Install required development tools
-- Build ICN binaries locally
-- Run tests and linting
-- Understand repo layout and key directories
-- Verify your setup with a simple test
+**Start with [Getting Started](../../GETTING_STARTED.md#3-technical-path-get-a-development-environment-working).** It owns the newcomer workflow and a focused first test. This page helps you diagnose failures without copying stale toolchain versions or setup commands into another place.
 
-## Prerequisites
-- A Unix-like environment (Linux, macOS, or WSL2)
-- Basic command-line familiarity
-- Git installed
+## What you need for Rust work
 
-## System Requirements
+- Git, a terminal, and [rustup](https://rustup.rs/).
+- The toolchain specified in [`icn/rust-toolchain.toml`](../../../icn/rust-toolchain.toml). **Do not switch to a newer or older Rust version just to silence a failure.**
+- System libraries and build tools needed by the crate you are working on.
+- Disk space for downloaded Rust dependencies and incremental compilation. The full workspace is large.
 
-### Minimum
-- 8 GB RAM (16 GB recommended for faster builds)
-- 10 GB disk space (for dependencies and build artifacts)
-- Rust 1.75+ (install via rustup)
+Linux is the most direct environment; WSL2 is a practical Windows development route. Other environments may need different system packages. If a platform is unverified, document what happens instead of calling it supported by assumption.
 
-### Required Tools
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| Rust toolchain | Build ICN | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
-| Git | Version control | Package manager |
-| Node.js 20+ | SDK and UI | `nvm install 20` or package manager |
-| Make | Build automation | Package manager |
+### Check your starting environment
 
-### Optional Tools
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| cargo-watch | Auto-rebuild on changes | `cargo install cargo-watch` |
-| cargo-nextest | Faster test runner | `cargo install cargo-nextest` |
-| pre-commit | Git hooks | `pip install pre-commit` |
+From the cloned repository:
 
-## Key Reading
-- `README.md` - Project overview
-- `CLAUDE.md` - Developer guidance and conventions
-- `CONTRIBUTING.md` - How to contribute
-- `docs/guides/developer/DEV_ENVIRONMENT.md` - Detailed environment setup
-
-## Walkthrough
-
-ICN is a multi-crate Rust workspace with supporting SDK and web UI. The core
-system is built in Rust, with TypeScript SDKs for client applications and a
-web UI for cooperative members.
-
-### What You're Building
-
-| Binary | Purpose |
-|--------|---------|
-| `icnd` | The ICN daemon - runs a node in the network |
-| `icnctl` | CLI tool for managing identity and interacting with nodes |
-
-> **Note**: The workspace also builds `icn-console` (interactive debugging console),
-> but it's not required for normal development.
-
-## Step-by-Step Setup
-
-### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/InterCooperative-Network/icn.git
+git status --short
 cd icn
-```
-
-### Step 2: Install Rust (if not already installed)
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source ~/.cargo/env
-
-# Verify installation
-rustc --version
+rustup show active-toolchain
 cargo --version
 ```
 
-### Step 3: Install Rust Components
-```bash
-rustup component add rustfmt clippy
-```
+The second `icn/` is the Rust workspace inside the repository. Cargo commands run there.
 
-### Step 4: Build the Project
-```bash
-cd icn
-cargo build
-```
+For the smallest documented initial Rust exercise, follow the focused crate test in [Getting Started](../../GETTING_STARTED.md#3-technical-path-get-a-development-environment-working). You do not need a whole-workspace build to report an onboarding defect.
 
-First build will take 5-15 minutes depending on your system.
+## Optional bootstrap helper
 
-### Step 5: Run Tests
-```bash
-cargo test --workspace --lib
-```
+The repo contains [`scripts/bootstrap.sh`](../../../scripts/bootstrap.sh), which fetches Rust dependencies and can install system packages, Node.js dependencies, and optional development tools. **Read the script before running it**: it modifies the local development environment.
 
-### Step 6: Verify Binaries Exist
-```bash
-ls -la target/debug/icnd target/debug/icnctl
-```
-
-### Step 7: Initialize an Identity (Optional)
-```bash
-export ICN_PASSPHRASE="test-passphrase-for-development"
-./target/debug/icnctl id init
-./target/debug/icnctl id show
-```
-
-## Repository Layout
-
-```
-icn/                          # Root directory
-├── icn/                      # Rust workspace (core system)
-│   ├── Cargo.toml            # Workspace manifest
-│   ├── bins/                 # Binary crates
-│   │   ├── icnd/             # Daemon binary
-│   │   ├── icnctl/           # CLI tool
-│   │   └── icn-console/      # Interactive TUI console
-│   └── crates/               # Library crates
-│       ├── icn-core/         # Runtime, supervisor, orchestration
-│       ├── icn-identity/     # DID, keystore, key management
-│       ├── icn-trust/        # Trust graph, scoring
-│       ├── icn-net/          # QUIC transport, mDNS
-│       ├── icn-gossip/       # Topic-based gossip protocol
-│       ├── icn-ledger/       # Mutual credit ledger
-│       ├── icn-ccl/          # Contract language
-│       ├── icn-gateway/      # REST/WebSocket API
-│       ├── icn-federation/   # Inter-cooperative federation
-│       └── ...               # Other subsystems
-├── sdk/                      # Client SDKs
-│   └── typescript/           # TypeScript SDK
-├── web/                      # Web interfaces
-│   └── pilot-ui/             # Member dashboard
-├── config/                   # Configuration examples
-├── deploy/                   # Deployment manifests (K8s, Docker)
-├── docs/                     # Documentation
-│   └── onboarding/           # This curriculum
-└── examples/                 # Runnable examples
-```
-
-### Key Files to Know
-| File | Purpose |
-|------|---------|
-| `icn/Cargo.toml` | Workspace manifest - lists all crates |
-| `config/icn.toml.example` | Configuration reference |
-| `CLAUDE.md` | Developer guidance and conventions |
-| `docs/ARCHITECTURE.md` | System design documentation |
-
-## Repository Structure Diagram
-
-```mermaid
-flowchart TD
-    root[Repository Root] --> icnDir[icn/ - Rust Workspace]
-    root --> sdkDir[sdk/ - Client SDKs]
-    root --> webDir[web/ - Web UIs]
-    root --> deployDir[deploy/ - Deployment]
-    root --> configDir[config/ - Configs]
-    root --> docsDir[docs/ - Documentation]
-
-    icnDir --> bins[bins/ - Binaries]
-    icnDir --> crates[crates/ - Libraries]
-
-    bins --> icnd[icnd - Daemon]
-    bins --> icnctl[icnctl - CLI]
-
-    crates --> core[icn-core]
-    crates --> identity[icn-identity]
-    crates --> trust[icn-trust]
-    crates --> net[icn-net]
-    crates --> gossip[icn-gossip]
-    crates --> ledger[icn-ledger]
-```
-
-## Common Commands
+From the repository root, if you choose to use it:
 
 ```bash
-# Build (debug)
-cargo build
+# Skips extra Cargo developer-tool installation
+./scripts/bootstrap.sh --ci
 
-# Build (release)
-cargo build --release
-
-# Run all tests
-cargo test --workspace
-
-# Run specific crate tests
-cargo test -p icn-gossip
-
-# Format code
-cargo fmt --all
-
-# Lint code
-cargo clippy --workspace --all-targets
-
-# Check without building
-cargo check --workspace
+# Also skips automatic system-package installation
+./scripts/bootstrap.sh --ci --no-sysdeps
 ```
 
-## Troubleshooting
+System-package auto-installation is written for Debian/Ubuntu-like systems; other platforms need their own dependency setup. The `--no-sysdeps` flag does **not** mean the script is read-only: it still performs other setup actions.
 
-### "linker `cc` not found"
-Install build essentials:
-```bash
-# Ubuntu/Debian
-sudo apt install build-essential
+Node.js and npm are relevant to SDK and website paths, not required merely to read docs or open a design Discussion.
 
-# macOS (install Xcode command line tools)
-xcode-select --install
+## Diagnosing a failure
+
+### Toolchain not found or wrong version
+
+Install rustup, enter the `icn/` workspace, and check `rustup show active-toolchain`. Confirm it agrees with `icn/rust-toolchain.toml`. If automatic toolchain installation fails, preserve the error and investigate your rustup/network state; don't silently change the pin.
+
+### Linker, compiler, or system library missing
+
+Capture the **first** missing executable or library named by Cargo. On Linux, common dependencies include a C toolchain, `pkg-config`, OpenSSL headers, and Protocol Buffers tools. See `scripts/bootstrap.sh` for the repository's current dependency setup and install the equivalents appropriate to your OS.
+
+### A test fails
+
+Record whether the failure is compilation, test assertion, permissions, networking, timeout, or an external service. Re-run the smallest failing test you can identify, without modifying implementation or weakening checks merely to make it pass. Include the exact command and error in your report.
+
+### Port already in use
+
+Find which process owns the port and decide whether it is safe to stop **your own** test process or choose a different test environment. Do not run bulk kill commands copied from old tutorials; they may terminate unrelated services.
+
+### Identity, passphrase, or node startup fails
+
+CLI and daemon experiments are separate from a first contributor build. Use isolated development data, read the current CLI help and applicable operations docs, and do not paste credentials, private keys, signing material, or secrets into GitHub or Discord. A running process alone is not evidence of federation or production readiness.
+
+### Build uses too many resources
+
+Prefer a targeted package/test rather than `cargo build --release` or `cargo test --workspace` as a default first step. Record available memory, disk space, and the command that exhausted resources. Release builds can demand *more* time and space; they are not a general cache fix.
+
+## Report useful evidence
+
+For reproducible setup problems, share:
+
+```text
+OS and version:
+Shell / environment (including WSL2 if applicable):
+Git revision (git rev-parse --short HEAD):
+Rust toolchain (rustup show active-toolchain):
+Command:
+Expected result:
+Actual result / first relevant error:
+What I already tried:
 ```
 
-### "error: failed to run rustc"
-Update your Rust toolchain:
-```bash
-rustup update stable
-```
+Use [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions) or [Discord](https://discord.gg/sAEFCnEahn) when you are unsure where a problem belongs. For a scoped reproducible defect, check for an existing issue before creating one. For a correction PR, see [CONTRIBUTING.md](../../../CONTRIBUTING.md) and [AGENTS.md](../../../AGENTS.md).
 
-### Build is very slow
-- Ensure you have enough RAM (close other applications)
-- Use a release profile cache: `cargo build --release` (slower first time, faster incremental)
-- Consider using `sccache` for distributed caching
-
-### Tests fail with "port already in use"
-Previous test run may have left a process running:
-```bash
-# Find and kill processes on common test ports
-lsof -i :8080 | awk 'NR>1 {print $2}' | xargs kill
-```
-
-### Keystore errors
-Ensure `ICN_PASSPHRASE` environment variable is set:
-```bash
-export ICN_PASSPHRASE="your-test-passphrase"
-```
-
-## Exercises
-1. Build `icnd` in both debug and release modes
-2. Run `icnctl --help` and explore available commands
-3. List the crates in `icn/crates/` and match them to the architecture diagram
-4. Find and read `config/icn.toml.example`
-
-## Checkpoints
-- [ ] Rust toolchain installed (rustc 1.75+)
-- [ ] `cargo build` completes without errors
-- [ ] `cargo test --workspace --lib` passes
-- [ ] You can locate `target/debug/icnd` and `target/debug/icnctl`
-- [ ] You understand the difference between `icn/bins/` and `icn/crates/`
-
-## Next Steps
-Proceed to **Module 1: Rust Fundamentals** to learn ICN's Rust patterns, or
-skip to **Module 2: Architecture** if you're already comfortable with Rust.
+**Next:** return to [Getting Started](../../GETTING_STARTED.md) and complete one small contribution. More extensive learning is available in [the onboarding curriculum](../README.md).
