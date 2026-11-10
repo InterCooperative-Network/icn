@@ -245,6 +245,7 @@ fn rp(w: &World) -> Rp {
         w.alice.subject,
         TrustedAuthorityView {
             position: 2,
+            head: w.alice.facts[2].body.event_id(),
             observed_at: NOW - 30,
         },
     );
@@ -252,6 +253,7 @@ fn rp(w: &World) -> Rp {
         w.bob.subject,
         TrustedAuthorityView {
             position: 1,
+            head: w.bob.facts[1].body.event_id(),
             observed_at: NOW - 30,
         },
     );
@@ -688,6 +690,7 @@ fn a10_revocation_inside_the_rp_view_refuses() {
         w.alice.subject,
         TrustedAuthorityView {
             position: 3,
+            head: alice_with_revocation(&w)[3].body.event_id(),
             observed_at: NOW - 5,
         },
     );
@@ -705,6 +708,7 @@ fn a10_stale_bundle_from_before_a_known_revocation_refuses() {
         w.alice.subject,
         TrustedAuthorityView {
             position: 3,
+            head: alice_with_revocation(&w)[3].body.event_id(),
             observed_at: NOW - 5,
         },
     );
@@ -718,8 +722,25 @@ fn a10_revocation_the_rp_has_not_seen_is_not_visible_and_the_allow_says_so() {
     // bundle (by N4-B construction) cannot carry facts above 2. The act is allowed — and the
     // audit record states the horizon instead of implying currentness.
     let w = world();
-    let _revocation_exists = alice_with_revocation(&w);
-    let d = decide_default(&mut rp(&w), &alice_bundle(&w, &payload(&w)));
+    // The holder retains the revocation, and assembles from that full store at E = 2.
+    let full = alice_with_revocation(&w);
+    let act = sign_raw(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        DeviceCapability::Present,
+        2,
+        payload(&w).encode().unwrap(),
+    );
+    let bytes = bundle(&full, &act);
+    let carried = EvidenceBundle::decode(&bytes).unwrap();
+    assert_eq!(
+        carried.facts().len(),
+        3,
+        "the revoke at 3 cannot ride in an E=2 bundle"
+    );
+    assert!(carried.summarize().iter().all(|f| f.position <= 2));
+    let d = decide_default(&mut rp(&w), &bytes);
     assert!(d.allowed());
     let caveats = d.audit.json()["caveats"].clone();
     let caveats: Vec<&str> = caveats
@@ -749,6 +770,7 @@ fn a10_an_authority_view_older_than_policy_refuses() {
         w.alice.subject,
         TrustedAuthorityView {
             position: 2,
+            head: w.alice.facts[2].body.event_id(),
             observed_at: NOW - 3601,
         },
     );
@@ -759,6 +781,7 @@ fn a10_an_authority_view_older_than_policy_refuses() {
         w.alice.subject,
         TrustedAuthorityView {
             position: 2,
+            head: w.alice.facts[2].body.event_id(),
             observed_at: NOW + 61,
         },
     );
@@ -1170,6 +1193,174 @@ fn x_signature_validity_alone_never_allows() {
         );
         assert_refused(&decide_default(&mut rp(&w), &bytes), expected);
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Review-driven tests (independent review of 4b643bd0f; mutation survivor)
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn r_two_subjects_with_the_same_nonce_do_not_collide() {
+    // Killed the surviving mutant `replay-key-includes-only-nonce`: if the replay key dropped the
+    // Subject, Bob (who can read Alice's nonce from her bundle) could pre-burn her slot.
+    let w = world();
+    let mut rp = rp(&w);
+    let mut bob_p = payload(&w);
+    bob_p.resource_id = "note-0002".to_string();
+    bob_p.context_id = *w.bob.subject.as_bytes();
+    assert_eq!(bob_p.nonce, payload(&w).nonce, "same nonce on purpose");
+    let bob_act = sign_raw(
+        w.bob.subject,
+        w.bob_phone,
+        &w.bob_phone_key,
+        DeviceCapability::Present,
+        1,
+        bob_p.encode().unwrap(),
+    );
+    let bob_req_bytes = bundle(&w.bob.facts, &bob_act);
+    assert!(rp
+        .decide(&request(
+            &bob_req_bytes,
+            ResourceKey::new("note", "note-0002"),
+            "read"
+        ))
+        .allowed());
+    assert!(decide_default(&mut rp, &alice_bundle(&w, &payload(&w))).allowed());
+}
+
+#[test]
+fn r_disclosed_limit_the_act_is_a_bearer_credential() {
+    // DISCLOSED LIMITATION (review S1), asserted so it cannot be forgotten: whoever presents
+    // Alice's bytes first is allowed, and Alice's own presentation is then a replay. Nothing
+    // here binds the act to the presenter; N4-D channel binding is the existing primitive for it.
+    let w = world();
+    let mut rp = rp(&w);
+    let alices_bytes = alice_bundle(&w, &payload(&w));
+    let observer_copy = alices_bytes.clone();
+    let first = decide_default(&mut rp, &observer_copy);
+    assert!(first.allowed());
+    assert!(first.audit.json()["caveats"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|c| c == "bearer_act_not_bound_to_presenter"));
+    assert_refused(&decide_default(&mut rp, &alices_bytes), Refusal::Replayed);
+}
+
+/// A body at position 3 on a branch the RP never saw: the establishment key authorizes Mallory
+/// at 3 instead of revoking the phone. Requires the establishment key (compromise scenario).
+fn alice_fork_at_3(w: &World) -> Vec<SignedAuthorityEvent> {
+    let (_, mallory) = key(0x69);
+    let mut facts = w.alice.facts.clone();
+    let alt = authorize_event(
+        &w.alice.establishment,
+        w.alice.subject,
+        3,
+        facts[2].body.event_id(),
+        mallory,
+        CapabilitySet::new([DeviceCapability::Sign]),
+        None,
+    );
+    facts.push(alt);
+    facts
+}
+
+#[test]
+fn r_presenter_cannot_choose_the_branch_the_verifier_folds() {
+    // Review S2. The RP's head at 3 is the revoke. The presenter carries only its preferred
+    // branch (no revoke; an alternative body at 3), so the fold is Live and N4-A authorizes the
+    // revoked phone. Only the RP's pinned head refuses it.
+    let w = world();
+    let act = sign_raw(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        DeviceCapability::Present,
+        3,
+        payload(&w).encode().unwrap(),
+    );
+    let bytes = bundle(&alice_fork_at_3(&w), &act);
+    let mut rp = rp(&w);
+    rp.authority_views.insert(
+        w.alice.subject,
+        TrustedAuthorityView {
+            position: 3,
+            head: alice_with_revocation(&w)[3].body.event_id(),
+            observed_at: NOW - 5,
+        },
+    );
+    let d = decide_default(&mut rp, &bytes);
+    assert_refused(&d, Refusal::AuthorityHeadMismatch);
+    assert_eq!(
+        d.audit.json()["verified_act"],
+        serde_json::Value::Null,
+        "an act verified against the presenter's facts is not recorded as verified"
+    );
+}
+
+#[test]
+fn r_omitting_the_known_revoke_is_a_gap_not_an_allow() {
+    // The presenter drops the revoke at 3 and signs at 3 over facts 0..=2: N4-A sees a gap.
+    let w = world();
+    let act = sign_raw(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        DeviceCapability::Present,
+        3,
+        payload(&w).encode().unwrap(),
+    );
+    let mut rp = rp(&w);
+    rp.authority_views.insert(
+        w.alice.subject,
+        TrustedAuthorityView {
+            position: 3,
+            head: alice_with_revocation(&w)[3].body.event_id(),
+            observed_at: NOW - 5,
+        },
+    );
+    let d = decide_default(&mut rp, &bundle(&w.alice.facts, &act));
+    assert_refused(&d, Refusal::N4("PrefixIncomplete"));
+}
+
+#[test]
+fn r_a_real_channel_binding_act_is_not_an_access_act() {
+    // Review N6: the realistic cross-family case. A genuine N4-D channel binding is a `Present`
+    // act by an authorized device; its payload must never be read as an access act.
+    let w = world();
+    let act = icn_identity::device_channel_binding::bind_channel(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        2,
+        [0x07; 32],
+        [0x08; 32],
+    )
+    .unwrap();
+    assert_eq!(act.act.capability, DeviceCapability::Present);
+    let d = decide_default(&mut rp(&w), &bundle(&w.alice.facts, &act));
+    assert_refused(&d, Refusal::PayloadMalformed);
+}
+
+#[test]
+fn r_malformed_request_labels_are_refused_and_not_logged_raw() {
+    let w = world();
+    let bytes = alice_bundle(&w, &payload(&w));
+    let huge = "X".repeat(10_000);
+    let d = rp(&w).decide(&request(&bytes, ResourceKey::new("note", &huge), "read"));
+    assert_refused(&d, Refusal::RequestMalformed);
+    let text = String::from_utf8(d.audit.bytes.clone()).unwrap();
+    assert!(!text.contains("XXXX"));
+    assert!(d.audit.json()["requested"]["invalid_labels_sha256"].is_string());
+}
+
+#[test]
+fn r_the_payload_separator_is_application_namespaced() {
+    // ICN never interprets this payload, so it must not claim the `icn` namespace (that would
+    // require a domain_separation_audit REGISTRY row). Pinned so a rename cannot drift back.
+    assert!(!SCOPED_ACCESS_DOMAIN
+        .to_ascii_lowercase()
+        .starts_with(b"icn"));
 }
 
 // ---------------------------------------------------------------------------------------------

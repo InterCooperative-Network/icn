@@ -48,20 +48,46 @@
 //!
 //! # Known limits (deliberately surfaced, not hidden)
 //!
+//! - **The act is a bearer credential.** Nothing binds it to the party presenting it: no
+//!   relying-party challenge, no channel binding, and a signer-chosen nonce. Whoever holds the
+//!   bundle bytes first (log, proxy, shared screen) and names the same resource and action is
+//!   allowed. The owner's own later presentation is then refused as `Replayed`. The window is at
+//!   most `max_lifetime + 2 × skew`. N4-D channel binding (`device_channel_binding.rs`) is the
+//!   existing ICN primitive for binding an act to a connection; it is not wired here.
 //! - `not_before`/`not_after` are **signer-asserted**. They bound how long a captured act is
 //!   useful; they do not prove when it was signed. A compromised device can mint fresh windows.
-//! - Revocation is visible only through the relying party's own authority view: a Revoke at a
-//!   position above the relying party's evaluation position cannot be seen (N4-B bundles refuse
-//!   facts above `E`). An allow carries that caveat in its audit record.
+//! - Revocation is visible only through the relying party's own authority view, which pins a
+//!   position **and the head `event_id` at that position**. The `prev_digest` chain then pins the
+//!   whole prefix, so a presenter cannot pick a fork branch or omit a known revoke. A Revoke above
+//!   the pinned position cannot be seen (N4-B bundles refuse facts above `E`), and an allow
+//!   carries that caveat. How the relying party obtains a trustworthy head is outside this
+//!   fixture. Fail-closed cost: a bundle that honestly carries an unselectable extra body at `E` is
+//!   refused.
 //! - The replay seen-set is [`InMemoryReplayStore`]: lost on restart, not shared between
 //!   independent verifiers. Two relying parties, or one restarted, can each accept the same act
-//!   once. A production relying party needs a durable, shared, or audience-partitioned store.
+//!   once. It never prunes, so a clock rollback cannot re-admit an act; the trade is unbounded
+//!   growth. A production store must be durable and shared (or audience-partitioned), and must
+//!   prune against a monotonic high-water mark, never the current clock reading.
+//! - `Present` is the capability N4-D also uses for channel admission. A device granted `Present`
+//!   for that purpose can also sign access acts for every personal resource of its Subject. The
+//!   payload domains are separated; the authority is not. A narrower capability would be an N1
+//!   change and is out of scope.
+//! - Refusal classes are detailed for the audit record. Returning them to an unauthenticated
+//!   caller would leak which resources exist and their scope. A production relying party should
+//!   answer the caller with a uniform refusal.
+//!
+//! # Namespace
+//!
+//! [`SCOPED_ACCESS_DOMAIN`] is deliberately **not** `icn`-namespaced. ICN never interprets this
+//! payload (the Meaning Firewall), so its separator belongs to the application layer. If the
+//! convention is ever promoted into ICN, it must take an `icn.` separator **and** a row in
+//! `icn-kernel-api/tests/domain_separation_audit.rs` `REGISTRY`.
 
 #![allow(dead_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use icn_identity::authority_log::{DeviceCapability, SubjectId};
+use icn_identity::authority_log::{DeviceCapability, EventId, SubjectId};
 use icn_identity::device_authority::{DeviceActVerifyError, DeviceAuthorityRefusal};
 use icn_identity::evidence_bundle::{
     verify_evidence_bundle, BundleError, EvidenceBundle, EvidenceVerifyError,
@@ -69,9 +95,9 @@ use icn_identity::evidence_bundle::{
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-/// Domain separator of the payload. Distinct from every ICN separator (`icn.authority-log*`,
-/// `icn.n4.*`, GEN); the `fixture` segment marks it as non-production.
-pub const SCOPED_ACCESS_DOMAIN: &[u8] = b"icn.fixture.scoped-access-act";
+/// Domain separator of the payload. Application-layer, not `icn`-namespaced (see "Namespace");
+/// LP-framed, so it cannot be mistaken for any ICN separator. `fixture` marks it non-production.
+pub const SCOPED_ACCESS_DOMAIN: &[u8] = b"app-fixture.scoped-access-act";
 /// The only accepted payload version.
 pub const SCOPED_ACCESS_VERSION: u16 = 0;
 /// Upper bound on any label field.
@@ -324,11 +350,14 @@ pub struct OwnershipEvidence {
 }
 
 /// The relying party's own last-observed view of a Subject's authority log: the position it
-/// evaluates at, and when (by its own clock) it last confirmed nothing newer was retained. It is
-/// the relying party's revocation horizon. Not taken from the bundle.
+/// evaluates at, the `event_id` of the selected body at that position, and when (by its own
+/// clock) it last confirmed nothing newer was retained. Its revocation horizon. Never taken from
+/// the bundle. Pinning `head` (not only `position`) is what stops a presenter from choosing which
+/// facts at or below `E` the verifier folds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TrustedAuthorityView {
     pub position: u64,
+    pub head: EventId,
     pub observed_at: u64,
 }
 
@@ -380,23 +409,25 @@ pub struct ReplayUnavailable;
 
 /// A relying party's replay seen-set.
 pub trait ReplayStore {
-    /// Atomically: if `key` is present and unexpired, `Seen`; otherwise record it until
-    /// `expires_at` and return `Fresh`. Entries whose expiry is before `now` may be pruned: an act
-    /// past its window is refused as expired before replay is consulted.
+    /// Atomically: if `key` is present, `Seen`; otherwise record it (with the time after which
+    /// the act would be refused as expired anyway) and return `Fresh`.
     fn consume(
         &mut self,
         key: ReplayKey,
         expires_at: u64,
-        now: u64,
     ) -> Result<ReplayOutcome, ReplayUnavailable>;
+
+    /// The audit caveat naming this store's durability and sharing scope.
+    fn caveat(&self) -> &'static str;
 }
 
 /// **Limitation, disclosed:** process memory only. Lost on restart; not shared with any other
-/// verifier. Sufficient to demonstrate the rule, insufficient for production.
+/// verifier. Never prunes (see the module's known limits). Sufficient to demonstrate the rule,
+/// insufficient for production.
 #[derive(Debug, Default)]
 pub struct InMemoryReplayStore {
     pub seen: BTreeMap<ReplayKey, u64>,
-    /// When false, every call reports [`ReplayUnavailable`] (models a store that cannot be read).
+    /// When true, every call reports [`ReplayUnavailable`] (models a store that cannot be read).
     pub unavailable: bool,
 }
 
@@ -405,17 +436,19 @@ impl ReplayStore for InMemoryReplayStore {
         &mut self,
         key: ReplayKey,
         expires_at: u64,
-        now: u64,
     ) -> Result<ReplayOutcome, ReplayUnavailable> {
         if self.unavailable {
             return Err(ReplayUnavailable);
         }
-        self.seen.retain(|_, expiry| *expiry >= now);
         if self.seen.contains_key(&key) {
             return Ok(ReplayOutcome::Seen);
         }
         self.seen.insert(key, expires_at);
         Ok(ReplayOutcome::Fresh)
+    }
+
+    fn caveat(&self) -> &'static str {
+        "replay_state:in_memory_single_verifier"
     }
 }
 
@@ -427,6 +460,8 @@ impl ReplayStore for InMemoryReplayStore {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Refusal {
     // ---- malformed (cannot be evaluated) ----
+    /// The caller's requested resource or action is not a valid label.
+    RequestMalformed,
     /// The presented bytes are not a strict canonical N4-B bundle.
     BundleMalformed,
     /// The verified act's payload is not a strict canonical v0 payload.
@@ -445,6 +480,8 @@ pub enum Refusal {
     // ---- N1 / N4-A (unchanged ICN verdicts) ----
     InadmissibleFact,
     N4(&'static str),
+    /// N4-A verified, but the bundle's body at `E` is not exactly the relying party's pinned head.
+    AuthorityHeadMismatch,
     // ---- payload policy ----
     WrongCapability,
     UnsupportedVersion,
@@ -475,7 +512,9 @@ impl Refusal {
     /// `malformed` for bytes that could not be evaluated, `refused` for everything else.
     pub fn verdict(&self) -> &'static str {
         match self {
-            Refusal::BundleMalformed | Refusal::PayloadMalformed => "malformed",
+            Refusal::RequestMalformed | Refusal::BundleMalformed | Refusal::PayloadMalformed => {
+                "malformed"
+            }
             _ => "refused",
         }
     }
@@ -507,7 +546,10 @@ impl Decision {
 }
 
 /// A deterministic, append-only, hash-chained audit record. Contains digests, identifiers and
-/// classes only: never key material, never the raw payload, never the nonce.
+/// classes only: never secret key material or signatures, never the raw payload, never the nonce.
+/// It does carry the device's public key. Requested labels are logged only if they are valid
+/// labels; otherwise only their digest is logged. The chain detects a rewrite only relative to a
+/// trusted head; this fixture's log is an unanchored `Vec`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuditRecord {
     /// Canonical JSON bytes of the record body.
@@ -575,6 +617,10 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
     /// view, clock) is established before the bundle's act is trusted for anything; the act's
     /// payload is read only from the bytes whose signature and authority N4-A just verified.
     fn evaluate(&mut self, request: &AccessRequest<'_>, trace: &mut Trace) -> Result<(), Refusal> {
+        // 0. The caller's own request must be well-formed labels (bounds what the audit logs).
+        if !request_labels_ok(request) {
+            return Err(Refusal::RequestMalformed);
+        }
         // 1. Structure: a strict canonical N4-B bundle (unchanged ICN decoder).
         let bundle =
             EvidenceBundle::decode(request.bundle).map_err(|_| Refusal::BundleMalformed)?;
@@ -619,6 +665,19 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
             Err(EvidenceVerifyError::Bundle(_)) => return Err(Refusal::BundleMalformed),
             Err(EvidenceVerifyError::Act(err)) => return Err(Refusal::N4(n4_class(&err))),
         };
+        // 4b. The facts N4-A folded must be the RP's facts, not the presenter's choice. The bundle
+        //     must carry exactly one body at E and it must be the pinned head. N4-A just proved
+        //     the prefix is Live through E, so the fold selected that body at E. `prev_digest`
+        //     linkage then pins every position below it to the RP's own chain.
+        let at_e: Vec<EventId> = bundle
+            .summarize()
+            .into_iter()
+            .filter(|fact| fact.position == view.position)
+            .map(|fact| fact.event_id)
+            .collect();
+        if at_e != [view.head] {
+            return Err(Refusal::AuthorityHeadMismatch);
+        }
         let act = verified.act();
         trace.verified = Some(VerifiedSummary {
             act_id: verified.act_id(),
@@ -680,10 +739,7 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
         // 7. Replay, last: only an otherwise-allowed act consumes its nonce, so a refused
         //    presentation (e.g. by an observer, against the wrong action) cannot burn it.
         let key = (*owner.as_bytes(), p.nonce);
-        match self
-            .replay
-            .consume(key, p.not_after.saturating_add(skew), now)
-        {
+        match self.replay.consume(key, p.not_after.saturating_add(skew)) {
             Err(ReplayUnavailable) => Err(Refusal::ReplayStateUnavailable),
             Ok(ReplayOutcome::Seen) => Err(Refusal::Replayed),
             Ok(ReplayOutcome::Fresh) => Ok(()),
@@ -705,8 +761,9 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
             (Ok(()), Some(position)) => vec![
                 format!("authority_as_of_position:{position}"),
                 "revocation_above_position_not_visible".to_string(),
-                "replay_state:in_memory_single_verifier".to_string(),
+                self.replay.caveat().to_string(),
                 "window_is_signer_asserted".to_string(),
+                "bearer_act_not_bound_to_presenter".to_string(),
             ],
             _ => Vec::new(),
         };
@@ -720,10 +777,19 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
             "class": class,
             "presented_sha256": hex::encode(sha256(request.bundle)),
             "bundle_id": trace.bundle_id.as_ref().map(hex32),
-            "requested": {
-                "resource_kind": request.resource.kind,
-                "resource_id": request.resource.id,
-                "action": request.action,
+            "requested": if request_labels_ok(request) {
+                json!({
+                    "resource_kind": request.resource.kind,
+                    "resource_id": request.resource.id,
+                    "action": request.action,
+                })
+            } else {
+                let mut joined = Vec::new();
+                for field in [&request.resource.kind, &request.resource.id, &request.action] {
+                    joined.extend_from_slice(&(field.len() as u64).to_be_bytes());
+                    joined.extend_from_slice(field.as_bytes());
+                }
+                json!({ "invalid_labels_sha256": hex::encode(sha256(&joined)) })
             },
             "evaluated_subject": trace.evaluated_subject.as_ref().map(|s| hex32(s.as_bytes())),
             "evaluation_position": trace.evaluation_position,
@@ -749,6 +815,10 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
         self.audit_log.push(record.clone());
         record
     }
+}
+
+fn request_labels_ok(request: &AccessRequest<'_>) -> bool {
+    label_ok(&request.resource.kind) && label_ok(&request.resource.id) && label_ok(&request.action)
 }
 
 /// The stable N4-A class name, matching `icnctl device-authority verify`'s vocabulary.
