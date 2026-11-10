@@ -2062,3 +2062,147 @@ fn m2_audit_is_deterministic_and_carries_digests_not_secrets() {
     // Already consumed by the allow above: consumption is reported before the channel.
     assert_eq!(one[1].json()["class"], "ChallengeConsumed");
 }
+
+// ---- review round (M2 independent review) -------------------------------------------------
+
+#[test]
+fn m2_presenter_binding_under_signer_nonces_is_refused_not_ignored() {
+    // Review SHOULD-FIX 1: {SignerNonce, DeviceChannelBinding} used to silently drop binding.
+    let w = world();
+    let mut rp = rp(&w);
+    rp.policy.presenter = PresenterBinding::DeviceChannelBinding;
+    rp.challenge_source = Box::new(FixedChallengeSource(vec![C1]));
+    assert_eq!(
+        rp.issue_challenge(Some(ch("alice"))),
+        Err(Refusal::PolicyInconsistent)
+    );
+    let d = decide_default(&mut rp, &alice_bundle(&w, &payload(&w)));
+    assert_refused(&d, Refusal::PolicyInconsistent);
+    assert!(rp.replay.seen.is_empty());
+}
+
+#[test]
+fn m2_disclosed_a_per_server_channel_digest_reopens_interception() {
+    // DISCLOSED LIMITATION (review SHOULD-FIX 4). If the transport's "channel" is a per-server
+    // value (e.g. the server certificate digest), every client's connection has the same digest.
+    // An interceptor holding Alice's access act AND her channel binding then presents on its own
+    // connection and is allowed, even under DeviceChannelBinding. The rung requires a
+    // per-connection digest (e.g. a TLS exporter); no ICN profile states that today.
+    let w = world();
+    let cert = ch("server-certificate");
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(cert)).unwrap();
+    let m = alice_m2(&w, C1, cert);
+    let interceptor_connection = cert; // same digest: the profile cannot tell connections apart
+    assert!(rp
+        .decide(&present(&m, Some(interceptor_connection), true))
+        .allowed());
+    assert_refused(
+        &rp.decide(&present(&m, Some(cert), true)),
+        Refusal::ChallengeConsumed,
+    );
+}
+
+#[test]
+fn m2_a_binding_signed_at_another_position_is_refused() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    let at1 = icn_identity::device_channel_binding::bind_channel(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        1,
+        ch("alice"),
+        m.act_id,
+    )
+    .unwrap();
+    let at1_bytes = bundle(&w.alice.facts, &at1);
+    let req = AccessRequest {
+        presenter_binding: Some(&at1_bytes),
+        ..present(&m, Some(ch("alice")), true)
+    };
+    assert_refused(
+        &rp.decide(&req),
+        Refusal::PresenterN4("EvaluationPositionMismatch"),
+    );
+}
+
+#[test]
+fn m2_domain_confusion_is_refused_in_both_directions() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    // The channel-binding bundle presented as the access act.
+    let swapped = AccessRequest {
+        bundle: &m.binding,
+        presenter_binding: Some(&m.access),
+        ..present(&m, Some(ch("alice")), true)
+    };
+    assert_refused(&rp.decide(&swapped), Refusal::PayloadMalformed);
+    // A channel-binding payload signed under Sign, not Present.
+    let sign_binding = sign_raw(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        DeviceCapability::Sign,
+        2,
+        icn_identity::device_channel_binding::ChannelBindingV1::new(ch("alice"), m.act_id)
+            .canonical_bytes(),
+    );
+    let sign_bytes = bundle(&w.alice.facts, &sign_binding);
+    let req = AccessRequest {
+        presenter_binding: Some(&sign_bytes),
+        ..present(&m, Some(ch("alice")), true)
+    };
+    assert_refused(&rp.decide(&req), Refusal::PresenterWrongCapability);
+}
+
+/// First identifier of a `Debug` rendering, independent of any hand-written mapping table.
+fn debug_variant(rendered: &str) -> String {
+    rendered
+        .split(|c: char| !c.is_alphanumeric())
+        .find(|s| !s.is_empty())
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn n4_class_mapping_matches_the_library_variant_names_exhaustively() {
+    // Review: the fixture's `n4_class` was a third copy of the N4 vocabulary that nothing checked.
+    // Every variant is constructed directly (all are public), so this is exhaustive.
+    use icn_identity::device_authority::{
+        DeviceActError, DeviceActVerifyError as E, DeviceAuthorityRefusal as R,
+    };
+    let refusals = [
+        R::PositionOutOfRange(0),
+        R::SubjectUnknown,
+        R::AuthorityHalted { disputed_at: 1 },
+        R::PrefixIncomplete {
+            frontier: 1,
+            required: 2,
+        },
+        R::DeviceIsEstablishmentAuthority,
+        R::DeviceNotAuthorized,
+        R::GrantNotInForce {
+            granted_at: 1,
+            validity: None,
+        },
+        R::CapabilityNotGranted(DeviceCapability::Sign),
+    ];
+    for r in refusals {
+        let expected = debug_variant(&format!("{r:?}"));
+        assert_eq!(n4_class(&E::Refused(r)), expected);
+    }
+    let others = [
+        E::MalformedAct(DeviceActError::PayloadTooLarge(0)),
+        E::ActSubjectMismatch,
+        E::EvaluationPositionMismatch { act: 1, relying: 2 },
+        E::BadSignature,
+    ];
+    for e in others {
+        assert_eq!(n4_class(&e), debug_variant(&format!("{e:?}")));
+    }
+}
