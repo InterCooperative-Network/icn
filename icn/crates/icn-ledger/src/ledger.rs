@@ -199,6 +199,7 @@ use crate::fork_resolution::{
 use crate::freeze::{FreezeManager, FrozenMember};
 use crate::membership::MembershipStore;
 use crate::merge::{MergeDecision, QuarantineItem};
+use crate::operation::OperationAppend;
 use crate::progressive_limits::ProgressiveLimitManager;
 use crate::quarantine::QuarantineStore;
 use crate::sync::{serialize_sync_message, LedgerSyncMessage};
@@ -371,6 +372,10 @@ pub struct Ledger {
     /// Witness configuration for requiring co-signatures on entries
     /// When set, entries above threshold require witness signatures (Issue #676)
     pub(crate) witness_config: Option<crate::types::WitnessConfig>,
+
+    /// Which journal entries carry which nonce (derived from the journal, never persisted).
+    /// Backs [`Ledger::append_operation`]; see [`crate::operation`].
+    pub(crate) operation_index: crate::operation::OperationIndex,
 }
 
 impl Ledger {
@@ -409,6 +414,7 @@ impl Ledger {
             oracle_manager: None,            // Set via set_oracle_manager()
             fx_config: None,                 // Set via set_fx_config()
             witness_config: None,            // Set via set_witness_config()
+            operation_index: crate::operation::OperationIndex::default(), // Filled below
         };
 
         // Set store on fork resolver for witness signature lookups (Issue #688)
@@ -425,6 +431,10 @@ impl Ledger {
 
         // Index existing entries for fork detection
         ledger.rebuild_fork_index()?;
+
+        // Rebuild the operation index from the journal, so an operation journaled before a
+        // restart is still recognised after it.
+        crate::operation::rebuild_index(&mut ledger)?;
 
         // Build the decision-hash secondary index (migrates pre-index ledgers;
         // marker-gated so this runs at most once per store).
@@ -1233,6 +1243,92 @@ impl Ledger {
         self.append_entry_internal(entry, false).await
     }
 
+    /// The journaled entry that already carries `entry`'s operation, if there is one.
+    ///
+    /// Read-only. `Ok(None)` means no journaled entry carries the operation id. `Ok(Some(id))`
+    /// means exactly one does and it is this operation: it equals `entry` in everything the
+    /// entry id covers except the timestamp (author, contract, account deltas, parents and the
+    /// operation id itself).
+    /// Provenance is outside the entry id and is not compared; an author that needs the
+    /// authorisation bound to the operation derives the operation id from it.
+    ///
+    /// Callers that gate an operation on something outside the ledger (a budget, a quota) check
+    /// this first, under the same ledger borrow as the append, so that a retry of an operation
+    /// that was already applied is answered from the journal instead of being re-gated.
+    ///
+    /// # Errors
+    ///
+    /// - [`LedgerError::OperationIdMissing`] if `entry` has no operation id.
+    /// - [`LedgerError::OperationConflict`] if the id is journaled with different content, or
+    ///   by more than one entry.
+    pub fn operation_entry(&self, entry: &JournalEntry) -> Result<Option<ContentHash>> {
+        let nonce = entry.nonce.ok_or(LedgerError::OperationIdMissing)?;
+
+        // The journal is the record. An index row whose entry was removed names nothing.
+        let mut journaled = Vec::new();
+        for id in self.operation_index.entries_for(&nonce) {
+            if let Some(stored) = self.get_entry(id)? {
+                journaled.push((id, stored));
+            }
+        }
+        // The index holds ids in append order while the ledger runs and in journal-key order
+        // after a reopen. Sort, so the entry a refusal names does not depend on which it is.
+        journaled.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+
+        let conflict = |existing: &ContentHash, entries: usize| LedgerError::OperationConflict {
+            operation: hex::encode(nonce),
+            existing: existing.to_hex(),
+            entries,
+        };
+
+        match journaled.as_slice() {
+            [] => Ok(None),
+            [(id, stored)] => {
+                if crate::operation::content_digest(stored)?
+                    == crate::operation::content_digest(entry)?
+                {
+                    Ok(Some((*id).clone()))
+                } else {
+                    Err(conflict(id, 1).into())
+                }
+            }
+            [(first, _), ..] => Err(conflict(first, journaled.len()).into()),
+        }
+    }
+
+    /// Append the entry for one economic operation, at most once.
+    ///
+    /// The operation is named by the entry's operation id (see
+    /// [`JournalEntryBuilder::operation`](crate::entry::JournalEntryBuilder::operation)).
+    ///
+    /// - New operation: the entry is appended exactly as [`append_entry`](Self::append_entry)
+    ///   would append it, and [`OperationAppend::Applied`] carries its id.
+    /// - Same operation again (a retry, typically built in a later millisecond and so under a
+    ///   different entry id): nothing is appended and nothing is validated or changed;
+    ///   [`OperationAppend::Replayed`] carries the id of the entry appended the first time.
+    /// - Same operation id with different content: refused with
+    ///   [`LedgerError::OperationConflict`]. Nothing is appended.
+    ///
+    /// This holds across a restart: the index it consults is rebuilt from the journal on open.
+    /// `Replayed` means the entry is journaled. If the first attempt failed after its journal
+    /// write, projections of that entry may still be incomplete; see [`crate::operation`].
+    ///
+    /// # Errors
+    ///
+    /// The two typed refusals of [`operation_entry`](Self::operation_entry), plus every error
+    /// `append_entry` can return for a new operation.
+    pub async fn append_operation(&mut self, entry: JournalEntry) -> Result<OperationAppend> {
+        if let Some(existing) = self.operation_entry(&entry)? {
+            debug!(
+                entry_hash = %existing,
+                "Operation already journaled; answering the retry with the original entry"
+            );
+            return Ok(OperationAppend::Replayed(existing));
+        }
+        let id = self.append_entry_internal(entry, true).await?;
+        Ok(OperationAppend::Applied(id))
+    }
+
     /// Append multiple journal entries, pre-validating all of them before appending any.
     ///
     /// Every entry is validated against the current (pre-batch) ledger state *before any
@@ -1543,6 +1639,13 @@ impl Ledger {
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
         let value = serde_json::to_vec(&entry)?;
         self.store.put(key.as_bytes(), &value)?;
+
+        // The entry is journaled from here on, whatever fails below. Record its operation
+        // before anything else can return, so a retry in this process is recognised even when
+        // a later step of this append (timestamp index, balance cache) reports an error.
+        if let Some(nonce) = entry.nonce {
+            self.operation_index.record(nonce, &hash);
+        }
 
         // Add to timestamp index for efficient pagination
         // Key format: ledger:journal_ts:{timestamp:020}:{hash}
