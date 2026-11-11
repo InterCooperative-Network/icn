@@ -165,8 +165,8 @@ Ordinary scoped commits and non-force pushes of a feature branch to its approved
 1. Confirm the repository, worktree, and branch are the intended ones, and that the worktree is yours (§2).
 2. Inspect the full staged and unstaged diff, and the commits about to be published.
 3. Run the verification the changed paths require (§5). Rust changes go through the `push` skill's scoped gates.
-4. Review the diff **and the commit history being published** for secrets, credentials, private or real-person data, restricted operational detail, and unintended files. That includes commit author and committer metadata: a machine-local Git identity can carry a personal address that a public remote would publish. Stage named paths; never `git add .` in a tree that holds unrelated changes.
-5. Commit with a descriptive, scoped message.
+4. Stage named paths (never `git add .` in a tree that holds unrelated changes) and commit with a descriptive, scoped message.
+5. Review the diff **and the exact commits being published**, including the one just created, for secrets, credentials, private or real-person data, restricted operational detail, and unintended files. That includes commit author and committer metadata: a machine-local Git identity can carry a personal address that a public remote would publish. Run this review after committing, so it covers the metadata the push will carry; if it finds a problem, fix the commit locally before anything is pushed.
 6. Confirm the remote is approved for this content, considering repository visibility and §6/§8 private-source boundaries.
 7. Push the feature branch with an ordinary, non-force push.
 8. Verify that the remote branch exists and points at the commit you intended (`git ls-remote`), not merely that the push exited 0.
