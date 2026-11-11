@@ -1,5 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-//! Journal entry identity (O-6): what `Ledger::append_entry` does when two entries share an id.
+//! Journal entry identity (icn#2871): what `Ledger::append_entry` does when two entries share an id.
 //!
 //! `compute_entry_hash` covers `timestamp` (milliseconds), `author`, `contract_ref`, `accounts`,
 //! `parents` and `nonce`. It does NOT cover `provenance`, `signature` or memo-like fields, and
@@ -8,21 +8,26 @@
 //! different governance receipts.
 //!
 //! `append_entry_internal` writes the journal key with `put` (overwrite), then applies the balance
-//! deltas, and has no check for an id that already exists (the gossip merge path does skip known
-//! ids; the local append path does not). These tests establish what that does.
+//! deltas. Before icn#2871 it had no check for an id that already exists, so a colliding append
+//! replaced the journal record and applied its deltas a second time. It now refuses any id that is
+//! already journaled, before any side effect, and `append_entries` refuses such a batch before it
+//! commits anything.
 //!
-//! Test classes: `control_*` passes today. `invariant_*` states the safe behaviour, FAILS today and
-//! is `#[ignore]`d with the reason (run with `--ignored`). The oracle is the ledger's own
-//! `verify_integrity()` (cached balances == balances recomputed from the journal).
+//! Test classes: `control_*` pins a premise. `invariant_*` states the safe behaviour; one invariant
+//! still fails and is `#[ignore]`d with the reason (run with `--ignored`): distinct entries built in
+//! one millisecond still share an id, and are now refused instead of corrupting state. Making them
+//! all succeed changes the canonical entry hash and is an owner decision (icn#2871 part 2). The
+//! oracle is the ledger's own `verify_integrity()` (cached balances == balances recomputed from the
+//! journal).
 //!
 //! Atomicity of the journal write versus the balance update across a crash is NOT tested here: it
-//! needs a fault-injection point that does not exist (see the O-6 acceptance tests in the handoff).
+//! needs a fault-injection point that does not exist.
 
 use icn_identity::{Did, IdentityBundle};
 use icn_ledger::{
     entry::JournalEntryBuilder,
     types::{JournalEntry, ProvenanceRef},
-    Ledger,
+    Ledger, LedgerSyncMessage,
 };
 use icn_store::SledStore;
 use std::sync::Arc;
@@ -93,7 +98,6 @@ async fn control_spaced_identical_shapes_get_distinct_ids_and_verify() {
 
 // Appending the exact same entry twice must not apply it twice.
 #[tokio::test]
-#[ignore = "fails today: local append has no existing-id check (O-6)"]
 async fn invariant_the_same_entry_appended_twice_is_applied_once() {
     let tmp = tempfile::tempdir().unwrap();
     let mut ledger = open(tmp.path());
@@ -117,7 +121,6 @@ async fn invariant_the_same_entry_appended_twice_is_applied_once() {
 // Two entries with the same id but DIFFERENT governance receipts must not silently replace one
 // another: the first receipt's journal entry must survive, and balances must match the journal.
 #[tokio::test]
-#[ignore = "fails today: same id, different provenance overwrites the journal entry (O-6)"]
 async fn invariant_same_id_different_receipt_does_not_overwrite_the_journal() {
     let tmp = tempfile::tempdir().unwrap();
     let mut ledger = open(tmp.path());
@@ -148,7 +151,7 @@ async fn invariant_same_id_different_receipt_does_not_overwrite_the_journal() {
 // The real builder, in a tight loop, with distinct receipts: every authorised entry must be
 // journaled and the ledger must verify. Same-millisecond builds collide on id today.
 #[tokio::test]
-#[ignore = "fails today: same-millisecond identical-shape entries share an id (O-6)"]
+#[ignore = "fails today: same-millisecond identical-shape entries share an id; the second is refused (icn#2871 part 2, owner decision on entry identity)"]
 async fn invariant_rapid_distinct_receipts_are_all_journaled() {
     let tmp = tempfile::tempdir().unwrap();
     let mut ledger = open(tmp.path());
@@ -190,44 +193,127 @@ async fn control_restart_without_a_collision_verifies() {
     reopened.verify_integrity().unwrap();
 }
 
-// Characterization (passes today, not an endorsement). I expected a restart to silently MOVE
-// balances (cache rebuilt from the journal). It does not: the cached balances are persisted and
-// reloaded as they were, so after an id collision the disagreement between the cache and the journal
-// is durable across a restart, and `verify_integrity` keeps failing. The collision is built
-// deterministically (same id, different provenance), not by racing the clock.
+// A refused collision leaves nothing behind: the first entry is the only journal record, its
+// deltas are applied once, and that agreement is what a restart reloads. (Before icn#2871 the
+// second append succeeded, the cache held both deltas against one journal record, and the
+// persisted disagreement survived a restart.) The collision is built deterministically (same id,
+// different provenance), not by racing the clock.
 #[tokio::test]
-async fn characterization_restart_keeps_cached_balances_that_disagree_with_the_journal() {
+async fn invariant_a_refused_collision_leaves_a_ledger_that_verifies_across_restart() {
     let tmp = tempfile::tempdir().unwrap();
     let (a, b) = (did(), did());
     let first = gov_entry(&a, &b, "gov:coop:1:receipt");
-    let mut second = first.clone();
-    second.provenance = ProvenanceRef::Governance {
-        receipt_id: "gov:coop:2:receipt".to_string(),
-        decision_hash: "sha256:other".to_string(),
-    };
+    let second = with_other_receipt(&first);
     {
         let mut ledger = open(tmp.path());
         ledger.append_entry(first).await.unwrap();
-        ledger.append_entry(second).await.unwrap();
-        assert_eq!(
-            ledger.get_all_entries().unwrap().len(),
-            1,
-            "premise: one journal entry"
+        let err = ledger.append_entry(second).await.unwrap_err();
+        assert!(
+            err.to_string().contains("already journaled"),
+            "refused as a collision, not for another reason: {err}"
         );
-        assert_eq!(
-            ledger.get_balance(&b, CURRENCY),
-            -2 * AMOUNT,
-            "the cache applied both deltas"
-        );
+        assert_eq!(ledger.get_all_entries().unwrap().len(), 1);
+        assert_eq!(ledger.get_balance(&b, CURRENCY), -AMOUNT, "applied once");
+        ledger.verify_integrity().unwrap();
     } // dropped: in-memory cache gone
     let reopened = open(tmp.path());
+    assert_eq!(reopened.get_balance(&b, CURRENCY), -AMOUNT);
+    reopened.verify_integrity().unwrap();
+}
+
+/// The same entry under a different governance receipt: identical id, different provenance.
+fn with_other_receipt(entry: &JournalEntry) -> JournalEntry {
+    let mut other = entry.clone();
+    other.provenance = ProvenanceRef::Governance {
+        receipt_id: "gov:coop:2:receipt".to_string(),
+        decision_hash: "sha256:other".to_string(),
+    };
+    other
+}
+
+// ---------------------------------------------------------------------------------------------
+// Batch append: a collision is refused in pre-validation, so no leg of the batch is committed.
+
+#[tokio::test]
+async fn invariant_a_batch_containing_an_already_journaled_id_commits_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut ledger = open(tmp.path());
+    let (a, b, c) = (did(), did(), did());
+    let journaled = gov_entry(&a, &b, "gov:coop:1:receipt");
+    ledger.append_entry(journaled.clone()).await.unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let fresh = gov_entry(&a, &c, "gov:coop:3:receipt");
+    assert_ne!(fresh.id, journaled.id, "premise: the first leg is new");
+
+    let err = ledger
+        .append_entries(vec![fresh, with_other_receipt(&journaled)])
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("already journaled"), "{err}");
     assert_eq!(
-        reopened.get_balance(&b, CURRENCY),
-        -2 * AMOUNT,
-        "restart reloads the persisted cache"
+        ledger.get_all_entries().unwrap().len(),
+        1,
+        "no leg committed"
+    );
+    assert_eq!(
+        ledger.get_balance(&c, CURRENCY),
+        0,
+        "the new leg was not applied"
+    );
+    ledger.verify_integrity().unwrap();
+}
+
+#[tokio::test]
+async fn invariant_a_batch_repeating_an_id_commits_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut ledger = open(tmp.path());
+    let (a, b) = (did(), did());
+    let first = gov_entry(&a, &b, "gov:coop:1:receipt");
+    let second = with_other_receipt(&first);
+
+    let err = ledger
+        .append_entries(vec![first, second])
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("more than once in this batch"),
+        "{err}"
     );
     assert!(
-        reopened.verify_integrity().is_err(),
-        "the cache still disagrees with the one journaled entry after a restart"
+        ledger.get_all_entries().unwrap().is_empty(),
+        "no leg committed"
     );
+    assert_eq!(ledger.get_balance(&b, CURRENCY), 0);
+    ledger.verify_integrity().unwrap();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Gossip: an `EntryResponse` is accepted without a known-id pre-check (unlike `NewEntry`). A peer
+// replaying the response for an entry this node already holds must not re-apply its deltas.
+
+#[tokio::test]
+async fn invariant_a_replayed_entry_response_does_not_reapply_balances() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut ledger = open(tmp.path());
+    let (a, b) = (did(), did());
+    let entry = gov_entry(&a, &b, "gov:coop:1:receipt");
+    let hash = ledger.append_entry(entry.clone()).await.unwrap();
+
+    for replayed in [entry.clone(), with_other_receipt(&entry)] {
+        ledger
+            .handle_sync_message(LedgerSyncMessage::EntryResponse {
+                hash: hash.clone(),
+                entry: Some(replayed),
+            })
+            .await
+            .unwrap(); // the handler logs a refused store and returns Ok
+    }
+
+    let stored = ledger.get_entry(&hash).unwrap().unwrap();
+    assert_eq!(
+        stored.provenance, entry.provenance,
+        "journal record unchanged"
+    );
+    assert_eq!(ledger.get_balance(&b, CURRENCY), -AMOUNT, "applied once");
+    ledger.verify_integrity().unwrap();
 }
