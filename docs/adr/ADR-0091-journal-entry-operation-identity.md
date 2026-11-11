@@ -8,7 +8,7 @@ tags: ["ledger", "identity", "idempotency", "settlement", "canonical-encoding"]
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "proposed. Executable contract only: icn/crates/icn-ledger/tests/journal_operation_identity.rs (deterministic characterizations + golden vector, passing) and icn/crates/icn-gateway/tests/settlement_operation_identity.rs (control passing; invariant #[ignore]d RED). No production code implements this ADR."
+implementation_status: "proposed. In this tree, executable contract only: icn/crates/icn-ledger/tests/journal_operation_identity.rs (deterministic characterizations + golden vector, passing) and icn/crates/icn-gateway/tests/settlement_operation_identity.rs (control passing; invariant #[ignore]d RED). Draft icn#2879 carries an opt-in implementation of N3 as amended below (Ledger::append_operation, journal-derived index) with no production caller. No production author is migrated."
 references:
   - "icn#2871 (journal entry identity and duplicate application), icn#2872 (treasury nonce keying and retry safety), icn#2873 (draft: refuse an already-journaled id)"
   - "ADR-0090 (proposed, not yet in this tree): per-effect identity for governance-authorised treasury effects. This ADR covers every OTHER ledger author and the ledger-side contract both rely on."
@@ -50,8 +50,10 @@ Production authors that set no nonce (`origin/main` dfc561f48):
 | DID recovery migration | `icn-ledger` `transfer_balances_for_recovery` | the recovery record |
 | Cross-currency transfer | `icn-ledger` `prepare_cross_currency_transfer[_with_rate]` | none |
 
-Commons credits already set a nonce (the receipt id). Treasury entries do not on `main`; an
-unpublished local line binds them to the governance receipt (see "Relation to other work").
+Commons credits already set a nonce (the receipt hash). The two entries of one commons settlement
+(earn and spend, `settlement.rs`) carry the **same** nonce, so a nonce does not name a single
+entry today. Treasury entries set none on `main`; an unpublished local line binds them to the
+governance receipt (see "Relation to other work").
 
 Two distinct, legitimate operations of the same shape built in the same millisecond have the same
 id (`distinct_operations_without_nonce_in_one_millisecond_share_an_id`), even when their
@@ -117,11 +119,26 @@ class, each pinned by a golden vector:
 | gateway HTTP settlement / deposit | coop id, authenticated subject, client idempotency key (API addition, D2) |
 | cross-currency transfer | transfer/quote id (gap) |
 
-**N3. Exactly-once is enforced by a create-only operation index, not by id equality.** On append,
-an entry with a nonce claims `nonce -> entry id` create-only. A second entry with a claimed nonce
-is refused; when it is the same operation (same nonce, same accounts and contract, differing only
-in timestamp) the original entry is returned so a lost response is recoverable. The claim and the
-journal record must commit atomically or be reconciled on open from the journal (D3).
+**N3. Exactly-once is enforced by an operation index, not by id equality.** An author that names
+an operation appends through an operation-aware path. One operation id names exactly one journal
+entry; an operation that needs several entries derives one id per entry.
+
+- A new operation id: the entry is appended.
+- The same operation again (equal in everything the entry id covers except the timestamp): nothing
+  is appended and the original entry id is returned, so a lost response is recoverable. This
+  answer means the entry is journaled. It does not mean every projection of it was written
+  (ADR-0090 I3).
+- The same operation id with different content, or an id already carried by more than one entry:
+  refused.
+
+The rule binds authors that opt in. It is **not** "any second entry with a claimed nonce is
+refused": the commons pair shares one nonce across its two entries and must keep appending through
+the plain path until it is migrated to one id per entry. (An earlier draft of this ADR stated the
+broader rule; it would have refused the second entry of every commons settlement.)
+
+The index is derivable from the journal, because the operation id is in the entry. It can
+therefore be rebuilt on open and needs no persisted format of its own; persisting it is an
+optimisation (D3).
 
 **N4. Nonce-less entries stay valid.** Historical entries are never re-hashed or re-keyed. Once
 every production author is migrated, a new nonce-less production append may be refused (D4).
@@ -173,8 +190,10 @@ Before acceptance can be claimed as implemented:
 - **D1** Accept N1-N3 (operation identity lives in `nonce` + operation index; the id stays a digest).
 - **D2** HTTP idempotency: header name, scope (coop, authenticated subject), retention window,
   behaviour on key reuse with a different body. Touches the public API (OpenAPI + SDK).
-- **D3** Operation index format and atomicity with the journal record (same store batch vs
-  reconcile-on-open).
+- **D3** Operation index: derived from the journal on open (needs no format; one extra journal
+  scan on open) or persisted (new keyspace, atomicity with the journal record). Also whether an
+  entry removed from the journal leaves a permanent refusal for its operation, which only a
+  persisted record can give.
 - **D4** Interim gateway policy until D2 ships: keep #2873's refusal (identical same-millisecond
   requests fail) or authorise a server-assigned request nonce as distinctness-only.
 - **D5** Whether the governance-receipt nonce binding on the unpublished O-6 line is adopted as the
@@ -186,7 +205,11 @@ Before acceptance can be claimed as implemented:
   D4, because without an operation nonce it turns a silent corruption into a visible refusal of
   legitimate same-millisecond requests.
 - **ADR-0090** decides the identity of governance-authorised effects; this ADR supplies the
-  ledger-side contract those identities feed (N2 row 1, N3).
+  ledger-side contract those identities feed (N2 row 1, N3). The two do not compete: ADR-0090
+  owns the decision commitment, the effect list and the receipt claim state machine; this ADR owns
+  "at most one journal entry per operation id". The receipt-bound nonce on the unpublished O-6
+  line is a third derivation (SHA-256, receipt-scoped) that matches neither ADR; ADR-0090 I4 rules
+  out a receipt-scoped key for one effect of a multi-effect proposal (see D5).
 - **icn#2872**: the treasury spend nonce is a sequence, not an operation identity; exactly-once
   for treasury still comes from the receipt claim / ADR-0090 effect id, and the sequence lane
   must be keyed by the debited account (discussed on #2872).
