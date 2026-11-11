@@ -207,7 +207,7 @@ use anyhow::{Context, Result};
 use icn_gossip::GossipHandle;
 use icn_identity::Did;
 use icn_store::Store;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{debug, error, info, instrument, warn};
@@ -1272,7 +1272,22 @@ impl Ledger {
         // Returning here, before any append, prevents a one-sided commit when a later
         // entry fails validation against the pre-batch state. (It does not cover the
         // re-validation / store-I/O residuals documented on this method.)
+        //
+        // An id that is already journaled, or that two entries in this batch share, would
+        // be refused by `append_entry_internal` partway through phase 2, after earlier
+        // entries were committed. Refuse it here instead.
+        let mut batch_ids = HashSet::with_capacity(entries.len());
         for entry in &entries {
+            let id = entry
+                .id
+                .as_ref()
+                .context("Entry must have a computed hash before appending")?;
+            if !batch_ids.insert(id.clone()) {
+                anyhow::bail!(
+                    "Journal entry id collision: {id} appears more than once in this batch"
+                );
+            }
+            self.ensure_entry_id_unused(id)?;
             self.validate_entry(entry)?;
         }
 
@@ -1403,6 +1418,23 @@ impl Ledger {
         crate::ledger_impl::witness_ops::effective_witness_policy(self, entry)
     }
 
+    /// Refuse an entry id that already names a journal record.
+    ///
+    /// This refuses an identical re-append too, rather than treating it as an idempotent
+    /// success: two genuinely separate transfers with the same shape, built in the same
+    /// millisecond, are byte-identical, and reporting success for the second would drop it
+    /// silently. A refusal is visible and the caller can rebuild the entry. Callers that
+    /// deliberately skip known entries (the gossip merge path) check before appending.
+    fn ensure_entry_id_unused(&self, id: &ContentHash) -> Result<()> {
+        if self.get_entry(id)?.is_some() {
+            warn!(entry_hash = %id, "Refusing journal entry: id already journaled");
+            anyhow::bail!(
+                "Journal entry id collision: {id} is already journaled; refusing to overwrite it"
+            );
+        }
+        Ok(())
+    }
+
     /// Internal append method with control over gossip publishing
     ///
     /// # Arguments
@@ -1419,6 +1451,14 @@ impl Ledger {
             .as_ref()
             .context("Entry must have a computed hash before appending")?
             .clone();
+
+        // An entry id names exactly one journal record. The journal write below is an
+        // overwriting `put` followed by a balance update, so appending under an id that is
+        // already journaled would replace the stored record and apply the deltas a second
+        // time, leaving cached balances that the journal cannot reproduce. The id does not
+        // cover provenance, and the builder stamps milliseconds, so two distinct entries can
+        // share one. Refuse before any side effect (quarantine, decision index, journal).
+        self.ensure_entry_id_unused(&hash)?;
 
         // Trust-based entry validation (H5 fix)
         // Skip trust check if no trust source configured (allows local-only operation)
