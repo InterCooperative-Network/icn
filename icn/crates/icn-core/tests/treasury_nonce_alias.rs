@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Treasury-nonce identity on the real post-acceptance governance -> ledger execution path.
 //!
-//! Two separate invariants are examined; they must not be conflated.
+//! Two separate invariants are examined (both tracked in icn#2872); they must not be conflated.
 //!
 //! * **Issue 1 (aliasing).** The ledger keys `ledger:treasury_nonce:<treasury_id>` by the raw string a
 //!   `Spend` payload names, while `Did` equality (N2 I7) treats several multibase spellings as one
@@ -233,7 +233,7 @@ async fn control_same_spelling_stale_nonce_is_rejected() {
 
 // Invariant: one treasury principal has one nonce, whatever multibase spelling names it.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "fails today: nonce is keyed by the raw spelling (issue 1, open owner decision O-3)"]
+#[ignore = "fails today: nonce is keyed by the raw spelling (icn#2872, owner decision on nonce keying)"]
 async fn invariant_alias_spelling_must_not_reset_the_treasury_nonce() {
     let mut h = Harness::new();
     let treasury = h.configured.clone();
@@ -278,7 +278,7 @@ async fn invariant_alias_spelling_must_not_reset_the_treasury_nonce() {
 
 // Invariant: the nonce a client reads is the same for every spelling of the treasury.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "fails today: nonce is keyed by the raw spelling (issue 1, open owner decision O-3)"]
+#[ignore = "fails today: nonce is keyed by the raw spelling (icn#2872, owner decision on nonce keying)"]
 async fn invariant_nonce_read_is_spelling_independent() {
     let mut h = Harness::new();
     let treasury = h.configured.clone();
@@ -298,7 +298,7 @@ async fn invariant_nonce_read_is_spelling_independent() {
 // Invariant: a Spend naming a treasury other than the configured one must not debit the configured
 // one (and so must not obtain a private nonce lane for it).
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "fails today: payload treasury is not bound to the configured treasury (issue 2, owner decision O-5)"]
+#[ignore = "fails today: payload treasury is not bound to the configured treasury (icn#2872, owner decision on the payload treasury binding)"]
 async fn invariant_payload_treasury_must_match_the_configured_treasury() {
     let mut h = Harness::new();
     let other = KeyPair::generate().unwrap().did().clone();
