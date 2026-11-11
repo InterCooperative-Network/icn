@@ -210,6 +210,9 @@ fn policy() -> RelyingPartyPolicy {
         max_lifetime_secs: 300,
         clock_skew_secs: 60,
         max_authority_view_age_secs: 3600,
+        freshness: Freshness::SignerNonce,
+        presenter: PresenterBinding::Unbound,
+        challenge_ttl_secs: 120,
     }
 }
 
@@ -263,6 +266,8 @@ fn rp(w: &World) -> Rp {
         authority_views,
         clock: FixedClock(Some(NOW)),
         replay: InMemoryReplayStore::default(),
+        challenges: InMemoryChallengeTable::default(),
+        challenge_source: Box::new(FixedChallengeSource::default()),
         audit_log: Vec::new(),
     }
 }
@@ -272,6 +277,8 @@ fn request<'a>(bytes: &'a [u8], resource: ResourceKey, action: &str) -> AccessRe
         bundle: bytes,
         resource,
         action: action.to_string(),
+        observed_channel: None,
+        presenter_binding: None,
     }
 }
 
@@ -1391,4 +1398,811 @@ fn replace_label(bytes: &[u8], old: &[u8], new: &[u8]) -> Vec<u8> {
     out.extend_from_slice(new);
     out.extend_from_slice(&bytes[at + old.len()..]);
     out
+}
+
+// =============================================================================================
+// M2 — RP-issued single-use challenge and presenter binding (test-only)
+// =============================================================================================
+//
+// Three presenter rungs, each demonstrated against the attack it does and does not stop:
+//   Unbound               challenge is a bearer value            → interception succeeds (disclosed)
+//   SessionChannel        challenge tied to the RP's channel     → interception refused; relay succeeds (disclosed)
+//   DeviceChannelBinding  + N4-D binding over the DEVICE's view  → interception and relay refused
+// "Channels" are synthetic 32-byte digests standing in for a transport profile's value (e.g. a TLS
+// exporter). No such profile exists for application connections; see the M0 decision record, D2.
+
+const C1: Challenge = [0xc1; NONCE_LEN];
+const C2: Challenge = [0xc2; NONCE_LEN];
+
+fn ch(label: &str) -> [u8; 32] {
+    sha256(format!("fixture-channel:{label}").as_bytes())
+}
+
+fn rp_m2(w: &World, presenter: PresenterBinding, source: Vec<Challenge>) -> Rp {
+    let mut rp = rp(w);
+    rp.policy.freshness = Freshness::IssuedChallenge;
+    rp.policy.presenter = presenter;
+    rp.challenge_source = Box::new(FixedChallengeSource(source));
+    rp
+}
+
+/// What a device produces for one request: the access act (over the challenge) and an N4-D
+/// channel binding over the channel the DEVICE sees, whose nonce is the access act's `act_id`.
+struct M2Req {
+    access: Vec<u8>,
+    binding: Vec<u8>,
+    act_id: [u8; 32],
+}
+
+fn device_request(
+    w: &World,
+    p: &ScopedAccessActV0,
+    device: (PrincipalKey, &SigningKey),
+    binder: (PrincipalKey, &SigningKey),
+    facts: &[SignedAuthorityEvent],
+    position: u64,
+    device_sees: [u8; 32],
+) -> M2Req {
+    let act = sign_raw(
+        w.alice.subject,
+        device.0,
+        device.1,
+        DeviceCapability::Present,
+        position,
+        p.encode().unwrap(),
+    );
+    let act_id = act.act.act_id();
+    let binding = icn_identity::device_channel_binding::bind_channel(
+        w.alice.subject,
+        binder.0,
+        binder.1,
+        position,
+        device_sees,
+        act_id,
+    )
+    .unwrap();
+    M2Req {
+        access: bundle(facts, &act),
+        binding: bundle(facts, &binding),
+        act_id,
+    }
+}
+
+/// Alice's phone answers `challenge`, seeing `device_sees`.
+fn alice_m2(w: &World, challenge: Challenge, device_sees: [u8; 32]) -> M2Req {
+    let mut p = payload(w);
+    p.nonce = challenge;
+    device_request(
+        w,
+        &p,
+        (w.phone, &w.phone_key),
+        (w.phone, &w.phone_key),
+        &w.alice.facts,
+        2,
+        device_sees,
+    )
+}
+
+fn present<'a>(m: &'a M2Req, on: Option<[u8; 32]>, with_binding: bool) -> AccessRequest<'a> {
+    AccessRequest {
+        bundle: &m.access,
+        resource: note(),
+        action: "read".to_string(),
+        observed_channel: on,
+        presenter_binding: with_binding.then_some(&m.binding[..]),
+    }
+}
+
+fn caveats(d: &Decision) -> Vec<String> {
+    d.audit.json()["caveats"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap().to_string())
+        .collect()
+}
+
+// ---- happy path, single use, freshness ---------------------------------------------------
+
+#[test]
+fn m2_honest_device_bound_request_is_allowed_once() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    let c = rp.issue_challenge(Some(ch("alice"))).unwrap();
+    assert_eq!(c, C1);
+    let m = alice_m2(&w, c, ch("alice"));
+    let d = rp.decide(&present(&m, Some(ch("alice")), true));
+    assert!(d.allowed(), "audit: {}", d.audit.json());
+    let cv = caveats(&d);
+    assert!(cv.contains(&"channel_binding_depends_on_transport_profile".to_string()));
+    assert!(!cv.iter().any(|c| c.contains("bearer")), "{cv:?}");
+    assert!(rp.challenges.records[&C1].consumed);
+    // Single use.
+    assert_refused(
+        &rp.decide(&present(&m, Some(ch("alice")), true)),
+        Refusal::ChallengeConsumed,
+    );
+}
+
+#[test]
+fn m2_signer_chosen_nonce_is_not_a_challenge() {
+    // Challenge substitution: the device picks its own nonce instead of the RP's.
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, [0x42; NONCE_LEN], ch("alice"));
+    assert_refused(
+        &rp.decide(&present(&m, Some(ch("alice")), true)),
+        Refusal::ChallengeUnknown,
+    );
+}
+
+#[test]
+fn m2_a_challenge_issued_to_another_session_is_refused() {
+    // Challenge substitution across sessions: C2 was issued on Mallory's channel.
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::SessionChannel, vec![C1, C2]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    rp.issue_challenge(Some(ch("mallory"))).unwrap();
+    let m = alice_m2(&w, C2, ch("alice"));
+    assert_refused(
+        &rp.decide(&present(&m, Some(ch("alice")), false)),
+        Refusal::ChallengeChannelMismatch,
+    );
+}
+
+#[test]
+fn m2_challenge_expiry_is_inclusive_and_enforced() {
+    let w = world();
+    for (at, allowed) in [(NOW + 120, true), (NOW + 121, false)] {
+        let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+        rp.issue_challenge(Some(ch("alice"))).unwrap();
+        rp.clock = FixedClock(Some(at));
+        let d = rp.decide(&present(
+            &alice_m2(&w, C1, ch("alice")),
+            Some(ch("alice")),
+            true,
+        ));
+        if allowed {
+            assert!(d.allowed(), "at {at}: {}", d.audit.json());
+        } else {
+            assert_refused(&d, Refusal::ChallengeExpired);
+            assert!(!rp.challenges.records[&C1].consumed);
+        }
+    }
+}
+
+#[test]
+fn m2_clock_moved_back_before_issuance_refuses() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    rp.clock = FixedClock(Some(NOW - 1));
+    assert_refused(
+        &rp.decide(&present(
+            &alice_m2(&w, C1, ch("alice")),
+            Some(ch("alice")),
+            true,
+        )),
+        Refusal::ChallengeNotYetIssued,
+    );
+}
+
+#[test]
+fn m2_a_consumed_challenge_survives_clock_rollback() {
+    // Unlike M1's pruned seen-set, a consumed record is never removed: rollback cannot re-admit.
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    rp.clock = FixedClock(Some(NOW + 100));
+    assert!(rp.decide(&present(&m, Some(ch("alice")), true)).allowed());
+    rp.clock = FixedClock(Some(NOW + 1));
+    assert_refused(
+        &rp.decide(&present(&m, Some(ch("alice")), true)),
+        Refusal::ChallengeConsumed,
+    );
+}
+
+#[test]
+fn m2_a_refused_presentation_does_not_consume_the_challenge() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    let mut wrong = present(&m, Some(ch("alice")), true);
+    wrong.action = "annotate".to_string();
+    assert_refused(&rp.decide(&wrong), Refusal::ActionMismatch);
+    assert!(
+        !rp.challenges.records[&C1].consumed,
+        "a refusal consumed the challenge"
+    );
+    assert!(rp.decide(&present(&m, Some(ch("alice")), true)).allowed());
+    assert!(rp.challenges.records[&C1].consumed);
+}
+
+// ---- audience and verifier isolation -------------------------------------------------------
+
+#[test]
+fn m2_cross_audience_and_cross_verifier_challenges_are_refused() {
+    let w = world();
+    let mut a = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    a.issue_challenge(Some(ch("alice"))).unwrap();
+    // RP-B is another application. Alice signs for B over A's challenge.
+    let mut b = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![]);
+    b.policy.audience = "other-app".to_string();
+    let mut p = payload(&w);
+    p.audience = "other-app".to_string();
+    p.nonce = C1;
+    let m = device_request(
+        &w,
+        &p,
+        (w.phone, &w.phone_key),
+        (w.phone, &w.phone_key),
+        &w.alice.facts,
+        2,
+        ch("alice"),
+    );
+    assert_refused(
+        &b.decide(&present(&m, Some(ch("alice")), true)),
+        Refusal::ChallengeUnknown,
+    );
+    // Even if B's table were (wrongly) shared with A's records, the record's audience refuses.
+    b.challenges
+        .records
+        .insert(C1, a.challenges.records[&C1].clone());
+    assert_refused(
+        &b.decide(&present(&m, Some(ch("alice")), true)),
+        Refusal::ChallengeAudienceMismatch,
+    );
+}
+
+#[test]
+fn m2_m1_cross_verifier_limit_is_closed_by_issued_challenges() {
+    // M1's a5_replay_limit test shows a second verifier accepting a signer-nonce act once more.
+    // With issued challenges, a fresh or restarted verifier does not know the challenge.
+    let w = world();
+    let mut first = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    first.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    assert!(first
+        .decide(&present(&m, Some(ch("alice")), true))
+        .allowed());
+    let mut restarted = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![]);
+    assert_refused(
+        &restarted.decide(&present(&m, Some(ch("alice")), true)),
+        Refusal::ChallengeUnknown,
+    );
+}
+
+#[test]
+fn m2_unavailable_challenge_state_refuses_issuance_and_decision() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1, C2]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    rp.challenges.unavailable = true;
+    assert_eq!(
+        rp.issue_challenge(Some(ch("alice"))),
+        Err(Refusal::ChallengeStateUnavailable)
+    );
+    assert_refused(
+        &rp.decide(&present(
+            &alice_m2(&w, C1, ch("alice")),
+            Some(ch("alice")),
+            true,
+        )),
+        Refusal::ChallengeStateUnavailable,
+    );
+}
+
+#[test]
+fn m2_issuance_refuses_without_channel_exhausted_source_or_duplicate() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::SessionChannel, vec![C1, C1]);
+    assert_eq!(rp.issue_challenge(None), Err(Refusal::ChannelUnavailable));
+    assert_eq!(rp.issue_challenge(Some(ch("alice"))), Ok(C1));
+    assert_eq!(
+        rp.issue_challenge(Some(ch("alice"))),
+        Err(Refusal::ChallengeIssuanceFailed),
+        "a repeated value is refused, never re-issued"
+    );
+    assert_eq!(
+        rp.issue_challenge(Some(ch("alice"))),
+        Err(Refusal::ChallengeIssuanceFailed),
+        "an exhausted source is refused"
+    );
+}
+
+#[test]
+fn m2_os_challenges_are_full_width_and_distinct() {
+    // A smoke check of the OS CSPRNG wiring, not a proof of unpredictability.
+    let mut source = OsChallengeSource;
+    let mut seen = BTreeSet::new();
+    for _ in 0..512 {
+        let c = source.next_challenge().unwrap();
+        assert_ne!(c, [0u8; NONCE_LEN]);
+        assert!(seen.insert(c), "OS source repeated a 128-bit value");
+    }
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![]);
+    rp.challenge_source = Box::new(OsChallengeSource);
+    let c = rp.issue_challenge(Some(ch("alice"))).unwrap();
+    assert!(rp
+        .decide(&present(
+            &alice_m2(&w, c, ch("alice")),
+            Some(ch("alice")),
+            true
+        ))
+        .allowed());
+}
+
+// ---- the presenter-binding ladder: what each rung stops ----------------------------------
+
+#[test]
+fn m2_disclosed_challenge_only_is_vulnerable_to_first_presenter_interception() {
+    // DISCLOSED LIMITATION. Unbound mode: whoever presents the signed act first is allowed; the
+    // device's own presentation is then refused. Challenges alone do not bind a presenter.
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::Unbound, vec![C1]);
+    rp.issue_challenge(None).unwrap();
+    let m = alice_m2(&w, C1, ch("unused"));
+    let interceptor = rp.decide(&present(&m, None, false));
+    assert!(interceptor.allowed());
+    assert!(caveats(&interceptor).contains(&"challenge_is_bearer:first_presenter_wins".to_string()));
+    assert_refused(
+        &rp.decide(&present(&m, None, false)),
+        Refusal::ChallengeConsumed,
+    );
+}
+
+#[test]
+fn m2_session_channel_stops_capture_and_present_elsewhere() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::SessionChannel, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    assert_refused(
+        &rp.decide(&present(&m, Some(ch("interceptor")), false)),
+        Refusal::ChallengeChannelMismatch,
+    );
+    let d = rp.decide(&present(&m, Some(ch("alice")), false));
+    assert!(d.allowed());
+    assert!(caveats(&d).contains(&"session_channel_only:relay_not_prevented".to_string()));
+}
+
+#[test]
+fn m2_disclosed_session_channel_does_not_stop_a_relay() {
+    // DISCLOSED LIMITATION. The relay opens its own session (channel "relay<->rp"), obtains the
+    // challenge, forwards it to Alice's device (which believes it is talking to the RP over
+    // "alice<->relay"), and presents the signed act on its own channel. The RP sees a consistent
+    // session and allows it.
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::SessionChannel, vec![C1]);
+    let c = rp.issue_challenge(Some(ch("relay<->rp"))).unwrap();
+    let m = alice_m2(&w, c, ch("alice<->relay"));
+    assert!(rp
+        .decide(&present(&m, Some(ch("relay<->rp")), false))
+        .allowed());
+    assert!(
+        rp.challenges.records[&C1].consumed,
+        "the relay really consumed Alice's challenge"
+    );
+}
+
+#[test]
+fn m2_device_channel_binding_exposes_the_relay() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    let c = rp.issue_challenge(Some(ch("relay<->rp"))).unwrap();
+    let m = alice_m2(&w, c, ch("alice<->relay"));
+    assert_refused(
+        &rp.decide(&present(&m, Some(ch("relay<->rp")), true)),
+        Refusal::PresenterChannelMismatch,
+    );
+    assert!(!rp.challenges.records[&C1].consumed);
+}
+
+#[test]
+fn m2_device_channel_binding_also_refuses_interception() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    assert_refused(
+        &rp.decide(&present(&m, Some(ch("interceptor")), true)),
+        Refusal::ChallengeChannelMismatch,
+    );
+    assert!(rp.decide(&present(&m, Some(ch("alice")), true)).allowed());
+}
+
+// ---- wrong presenter / malformed binding ---------------------------------------------------
+
+/// Alice's facts plus `3 authorize tablet {Present}`; returns (facts, tablet key, tablet).
+fn alice_with_tablet(w: &World) -> (Vec<SignedAuthorityEvent>, SigningKey, PrincipalKey) {
+    let (tablet_key, tablet) = key(0x13);
+    let mut facts = w.alice.facts.clone();
+    let auth = authorize_event(
+        &w.alice.establishment,
+        w.alice.subject,
+        3,
+        facts[2].body.event_id(),
+        tablet,
+        CapabilitySet::new([DeviceCapability::Present]),
+        None,
+    );
+    facts.push(auth);
+    (facts, tablet_key, tablet)
+}
+
+fn rp_m2_at3(w: &World, facts: &[SignedAuthorityEvent]) -> Rp {
+    let mut rp = rp_m2(w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.authority_views.insert(
+        w.alice.subject,
+        TrustedAuthorityView {
+            position: 3,
+            head: facts[3].body.event_id(),
+            observed_at: NOW - 5,
+        },
+    );
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    rp
+}
+
+fn challenged_payload(w: &World) -> ScopedAccessActV0 {
+    let mut p = payload(w);
+    p.nonce = C1;
+    p
+}
+
+#[test]
+fn m2_binding_by_another_authorized_device_of_the_same_subject_is_refused() {
+    let w = world();
+    let (facts, tablet_key, tablet) = alice_with_tablet(&w);
+    let m = device_request(
+        &w,
+        &challenged_payload(&w),
+        (w.phone, &w.phone_key),
+        (tablet, &tablet_key),
+        &facts,
+        3,
+        ch("alice"),
+    );
+    assert_refused(
+        &rp_m2_at3(&w, &facts).decide(&present(&m, Some(ch("alice")), true)),
+        Refusal::PresenterDeviceMismatch,
+    );
+}
+
+#[test]
+fn m2_binding_for_another_act_is_refused() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    let other = alice_m2(&w, [0x07; NONCE_LEN], ch("alice"));
+    assert_ne!(m.act_id, other.act_id);
+    let req = AccessRequest {
+        presenter_binding: Some(&other.binding),
+        ..present(&m, Some(ch("alice")), true)
+    };
+    assert_refused(&rp.decide(&req), Refusal::PresenterBindingNotForThisAct);
+}
+
+#[test]
+fn m2_binding_by_unauthorized_or_foreign_devices_is_refused_by_n4() {
+    let w = world();
+    let cases: Vec<(PrincipalKey, SigningKey, Refusal)> = vec![
+        (
+            w.watch,
+            SigningKey::from_bytes(&[0x12; 32]),
+            Refusal::PresenterN4("CapabilityNotGranted"),
+        ),
+        (
+            key(0x6a).1,
+            key(0x6a).0,
+            Refusal::PresenterN4("DeviceNotAuthorized"),
+        ),
+    ];
+    for (device, device_key, expected) in cases {
+        let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+        rp.issue_challenge(Some(ch("alice"))).unwrap();
+        let m = device_request(
+            &w,
+            &challenged_payload(&w),
+            (w.phone, &w.phone_key),
+            (device, &device_key),
+            &w.alice.facts,
+            2,
+            ch("alice"),
+        );
+        assert_refused(&rp.decide(&present(&m, Some(ch("alice")), true)), expected);
+    }
+    // Bob's genuinely authorized phone binds the channel for Alice's act: wrong Subject.
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    let bob_binding = icn_identity::device_channel_binding::bind_channel(
+        w.bob.subject,
+        w.bob_phone,
+        &w.bob_phone_key,
+        1,
+        ch("alice"),
+        m.act_id,
+    )
+    .unwrap();
+    let bob_bytes = bundle(&w.bob.facts, &bob_binding);
+    let req = AccessRequest {
+        presenter_binding: Some(&bob_bytes),
+        ..present(&m, Some(ch("alice")), true)
+    };
+    assert_refused(&rp.decide(&req), Refusal::PresenterN4("ActSubjectMismatch"));
+}
+
+#[test]
+fn m2_missing_or_malformed_binding_and_missing_channel_refuse() {
+    let w = world();
+    let fresh = || {
+        let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+        rp.issue_challenge(Some(ch("alice"))).unwrap();
+        rp
+    };
+    let m = alice_m2(&w, C1, ch("alice"));
+    assert_refused(
+        &fresh().decide(&present(&m, Some(ch("alice")), false)),
+        Refusal::PresenterBindingMissing,
+    );
+    assert_refused(
+        &fresh().decide(&present(&m, None, true)),
+        Refusal::ChannelUnavailable,
+    );
+    for bad in [b"garbage".to_vec(), m.access.clone()] {
+        let req = AccessRequest {
+            presenter_binding: Some(&bad),
+            ..present(&m, Some(ch("alice")), true)
+        };
+        assert_refused(&fresh().decide(&req), Refusal::PresenterBindingMalformed);
+    }
+}
+
+#[test]
+fn m2_presenter_binding_bundle_is_head_pinned_too() {
+    // The binding bundle carries a forked body at 3 (the tablet authorized with different caps):
+    // the binding verifies under the fork, but not at the RP's pinned head.
+    let w = world();
+    let (facts, _, tablet) = alice_with_tablet(&w);
+    let mut fork = w.alice.facts.clone();
+    fork.push(authorize_event(
+        &w.alice.establishment,
+        w.alice.subject,
+        3,
+        fork[2].body.event_id(),
+        tablet,
+        CapabilitySet::new([DeviceCapability::Sign, DeviceCapability::Present]),
+        None,
+    ));
+    let act = sign_raw(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        DeviceCapability::Present,
+        3,
+        challenged_payload(&w).encode().unwrap(),
+    );
+    let binding = icn_identity::device_channel_binding::bind_channel(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        3,
+        ch("alice"),
+        act.act.act_id(),
+    )
+    .unwrap();
+    let access = bundle(&facts, &act);
+    let forked_binding = bundle(&fork, &binding);
+    let req = AccessRequest {
+        bundle: &access,
+        resource: note(),
+        action: "read".to_string(),
+        observed_channel: Some(ch("alice")),
+        presenter_binding: Some(&forked_binding),
+    };
+    assert_refused(
+        &rp_m2_at3(&w, &facts).decide(&req),
+        Refusal::PresenterHeadMismatch,
+    );
+    // Control: the honest binding bundle over the RP's facts is allowed.
+    let honest = bundle(&facts, &binding);
+    let req = AccessRequest {
+        presenter_binding: Some(&honest),
+        ..req
+    };
+    assert!(rp_m2_at3(&w, &facts).decide(&req).allowed());
+}
+
+// ---- audit ------------------------------------------------------------------------------
+
+#[test]
+fn m2_audit_is_deterministic_and_carries_digests_not_secrets() {
+    let w = world();
+    let run = || {
+        let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+        rp.issue_challenge(Some(ch("alice"))).unwrap();
+        let m = alice_m2(&w, C1, ch("alice"));
+        rp.decide(&present(&m, Some(ch("alice")), true));
+        rp.decide(&present(&m, Some(ch("relay")), true));
+        (rp.audit_log, m)
+    };
+    let (one, m) = run();
+    let (two, _) = run();
+    assert_eq!(one, two);
+    let a = one[0].json();
+    assert_eq!(a["verdict"], "allow");
+    assert_eq!(a["freshness"], "issued_challenge");
+    assert_eq!(a["presenter_binding"], "device_channel_binding");
+    assert_eq!(a["challenge_sha256"], hex::encode(sha256(&C1)));
+    assert_eq!(
+        a["observed_channel_sha256"],
+        hex::encode(sha256(&ch("alice")))
+    );
+    let binding_act_id = hex::encode(
+        EvidenceBundle::decode(&m.binding)
+            .unwrap()
+            .act()
+            .act
+            .act_id(),
+    );
+    assert_eq!(a["presenter_binding_act_id"], binding_act_id);
+    let text = String::from_utf8(one[0].bytes.clone()).unwrap();
+    assert!(!text.contains(&hex::encode(C1)), "raw challenge logged");
+    assert!(
+        !text.contains(&hex::encode(ch("alice"))),
+        "raw channel logged"
+    );
+    assert!(!text.contains(&hex::encode(w.phone_key.to_bytes())));
+    // Already consumed by the allow above: consumption is reported before the channel.
+    assert_eq!(one[1].json()["class"], "ChallengeConsumed");
+}
+
+// ---- review round (M2 independent review) -------------------------------------------------
+
+#[test]
+fn m2_presenter_binding_under_signer_nonces_is_refused_not_ignored() {
+    // Review SHOULD-FIX 1: {SignerNonce, DeviceChannelBinding} used to silently drop binding.
+    let w = world();
+    let mut rp = rp(&w);
+    rp.policy.presenter = PresenterBinding::DeviceChannelBinding;
+    rp.challenge_source = Box::new(FixedChallengeSource(vec![C1]));
+    assert_eq!(
+        rp.issue_challenge(Some(ch("alice"))),
+        Err(Refusal::PolicyInconsistent)
+    );
+    let d = decide_default(&mut rp, &alice_bundle(&w, &payload(&w)));
+    assert_refused(&d, Refusal::PolicyInconsistent);
+    assert!(rp.replay.seen.is_empty());
+}
+
+#[test]
+fn m2_disclosed_a_per_server_channel_digest_reopens_interception() {
+    // DISCLOSED LIMITATION (review SHOULD-FIX 4). If the transport's "channel" is a per-server
+    // value (e.g. the server certificate digest), every client's connection has the same digest.
+    // An interceptor holding Alice's access act AND her channel binding then presents on its own
+    // connection and is allowed, even under DeviceChannelBinding. The rung requires a
+    // per-connection digest (e.g. a TLS exporter); no ICN profile states that today.
+    let w = world();
+    let cert = ch("server-certificate");
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(cert)).unwrap();
+    let m = alice_m2(&w, C1, cert);
+    let interceptor_connection = cert; // same digest: the profile cannot tell connections apart
+    assert!(rp
+        .decide(&present(&m, Some(interceptor_connection), true))
+        .allowed());
+    assert_refused(
+        &rp.decide(&present(&m, Some(cert), true)),
+        Refusal::ChallengeConsumed,
+    );
+}
+
+#[test]
+fn m2_a_binding_signed_at_another_position_is_refused() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    let at1 = icn_identity::device_channel_binding::bind_channel(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        1,
+        ch("alice"),
+        m.act_id,
+    )
+    .unwrap();
+    let at1_bytes = bundle(&w.alice.facts, &at1);
+    let req = AccessRequest {
+        presenter_binding: Some(&at1_bytes),
+        ..present(&m, Some(ch("alice")), true)
+    };
+    assert_refused(
+        &rp.decide(&req),
+        Refusal::PresenterN4("EvaluationPositionMismatch"),
+    );
+}
+
+#[test]
+fn m2_domain_confusion_is_refused_in_both_directions() {
+    let w = world();
+    let mut rp = rp_m2(&w, PresenterBinding::DeviceChannelBinding, vec![C1]);
+    rp.issue_challenge(Some(ch("alice"))).unwrap();
+    let m = alice_m2(&w, C1, ch("alice"));
+    // The channel-binding bundle presented as the access act.
+    let swapped = AccessRequest {
+        bundle: &m.binding,
+        presenter_binding: Some(&m.access),
+        ..present(&m, Some(ch("alice")), true)
+    };
+    assert_refused(&rp.decide(&swapped), Refusal::PayloadMalformed);
+    // A channel-binding payload signed under Sign, not Present.
+    let sign_binding = sign_raw(
+        w.alice.subject,
+        w.phone,
+        &w.phone_key,
+        DeviceCapability::Sign,
+        2,
+        icn_identity::device_channel_binding::ChannelBindingV1::new(ch("alice"), m.act_id)
+            .canonical_bytes(),
+    );
+    let sign_bytes = bundle(&w.alice.facts, &sign_binding);
+    let req = AccessRequest {
+        presenter_binding: Some(&sign_bytes),
+        ..present(&m, Some(ch("alice")), true)
+    };
+    assert_refused(&rp.decide(&req), Refusal::PresenterWrongCapability);
+}
+
+/// First identifier of a `Debug` rendering, independent of any hand-written mapping table.
+fn debug_variant(rendered: &str) -> String {
+    rendered
+        .split(|c: char| !c.is_alphanumeric())
+        .find(|s| !s.is_empty())
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn n4_class_mapping_matches_the_library_variant_names_exhaustively() {
+    // Review: the fixture's `n4_class` was a third copy of the N4 vocabulary that nothing checked.
+    // Every variant is constructed directly (all are public), so this is exhaustive.
+    use icn_identity::device_authority::{
+        DeviceActError, DeviceActVerifyError as E, DeviceAuthorityRefusal as R,
+    };
+    let refusals = [
+        R::PositionOutOfRange(0),
+        R::SubjectUnknown,
+        R::AuthorityHalted { disputed_at: 1 },
+        R::PrefixIncomplete {
+            frontier: 1,
+            required: 2,
+        },
+        R::DeviceIsEstablishmentAuthority,
+        R::DeviceNotAuthorized,
+        R::GrantNotInForce {
+            granted_at: 1,
+            validity: None,
+        },
+        R::CapabilityNotGranted(DeviceCapability::Sign),
+    ];
+    for r in refusals {
+        let expected = debug_variant(&format!("{r:?}"));
+        assert_eq!(n4_class(&E::Refused(r)), expected);
+    }
+    let others = [
+        E::MalformedAct(DeviceActError::PayloadTooLarge(0)),
+        E::ActSubjectMismatch,
+        E::EvaluationPositionMismatch { act: 1, relying: 2 },
+        E::BadSignature,
+    ];
+    for e in others {
+        assert_eq!(n4_class(&e), debug_variant(&format!("{e:?}")));
+    }
 }

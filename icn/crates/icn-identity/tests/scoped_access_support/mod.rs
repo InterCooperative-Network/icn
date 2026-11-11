@@ -48,12 +48,23 @@
 //!
 //! # Known limits (deliberately surfaced, not hidden)
 //!
-//! - **The act is a bearer credential.** Nothing binds it to the party presenting it: no
-//!   relying-party challenge, no channel binding, and a signer-chosen nonce. Whoever holds the
-//!   bundle bytes first (log, proxy, shared screen) and names the same resource and action is
-//!   allowed. The owner's own later presentation is then refused as `Replayed`. The window is at
-//!   most `max_lifetime + 2 × skew`. N4-D channel binding (`device_channel_binding.rs`) is the
-//!   existing ICN primitive for binding an act to a connection; it is not wired here.
+//! - **Presenter binding depends on the configured rung** (see [`Freshness`], [`PresenterBinding`]).
+//!   Under M1's `SignerNonce`, and under M2's `IssuedChallenge` + `Unbound`, the act is a **bearer
+//!   credential**: whoever presents it first is allowed, and the owner's own later presentation is
+//!   refused. `SessionChannel` stops capture-and-present-elsewhere but not a relaying
+//!   man-in-the-middle. `DeviceChannelBinding` (existing N4-D `bind_channel`, nonce = the access
+//!   act's `act_id`) also exposes the relay. Each rung is demonstrated by a test.
+//! - **The channel rungs rest on transport assumptions that no ICN profile states today:**
+//!   (1) every connection has its OWN channel digest (e.g. a TLS exporter value). A per-server
+//!   value such as a certificate digest is identical for every client, so an interceptor's
+//!   connection matches the victim's and interception succeeds again (demonstrated by a test);
+//!   (2) `observed_channel` must come from the RP's transport, never from the caller (in this
+//!   fixture it is a request field); (3) the RP must observe the channel at the TLS endpoint the
+//!   device talks to, not behind a terminating proxy. Same-channel injection (malicious client
+//!   code on the device's own connection) and a compromised device are not addressed by any rung.
+//! - **Challenge issuance is unauthenticated and unbounded here.** The table is never pruned, so
+//!   any caller can grow it without limit (memory exhaustion). A real RP needs issuance rate limits
+//!   and expiry-based pruning against a monotonic high-water mark.
 //! - `not_before`/`not_after` are **signer-asserted**. They bound how long a captured act is
 //!   useful; they do not prove when it was signed. A compromised device can mint fresh windows.
 //! - Revocation is visible only through the relying party's own authority view, which pins a
@@ -88,10 +99,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use icn_identity::authority_log::{DeviceCapability, EventId, SubjectId};
-use icn_identity::device_authority::{DeviceActVerifyError, DeviceAuthorityRefusal};
+use icn_identity::device_authority::{
+    DeviceActVerifyError, DeviceAuthorityRefusal, VerifiedDeviceAct,
+};
+use icn_identity::device_channel_binding::{
+    verify_channel_binding_at, ChannelBindingError, ChannelBindingV1,
+};
 use icn_identity::evidence_bundle::{
     verify_evidence_bundle, BundleError, EvidenceBundle, EvidenceVerifyError,
 };
+use rand_core::{OsRng, RngCore};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
@@ -376,6 +393,123 @@ pub struct RelyingPartyPolicy {
     pub clock_skew_secs: u64,
     /// How old the relying party's authority view may be before it refuses (revocation horizon).
     pub max_authority_view_age_secs: u64,
+    /// How freshness is established (M1 signer nonce, or M2 RP-issued challenge).
+    pub freshness: Freshness,
+    /// What ties the act to its presenter (meaningful only with [`Freshness::IssuedChallenge`]).
+    pub presenter: PresenterBinding,
+    /// Lifetime of an issued challenge, by the RP's own clock (M2 experiment: 120 s).
+    pub challenge_ttl_secs: u64,
+}
+
+/// How the relying party establishes that an access act is fresh and single-use.
+///
+/// **[EXPERIMENT]** Both modes are test policies. `SignerNonce` is kept only as the M1 baseline the
+/// M2 attacks are measured against; it is not a recommended production mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Freshness {
+    /// M1: the signer chooses the nonce; a per-verifier seen-set rejects repeats.
+    SignerNonce,
+    /// M2: the payload nonce must be a challenge THIS relying party issued, still outstanding and
+    /// unexpired. The challenge table is the replay state; a challenge is consumed only on allow.
+    IssuedChallenge,
+}
+
+/// What ties an access act to the party presenting it. Three rungs, each closing one more attack;
+/// the tests demonstrate what each rung leaves open rather than asserting a rung is sufficient.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PresenterBinding {
+    /// The challenge is a bearer value issued to any caller: the first presenter of a signed act
+    /// over it wins (interception).
+    Unbound,
+    /// The RP ties each challenge to the channel it issued it on and accepts the act only on that
+    /// channel. Stops capture-and-present-elsewhere. Does NOT stop a relaying man-in-the-middle,
+    /// which obtains its own challenge on its own channel and relays it to the device.
+    SessionChannel,
+    /// `SessionChannel`, plus an existing N4-D channel binding (`bind_channel`) by the SAME device,
+    /// over the channel the DEVICE sees, whose nonce is the access act's `act_id`. A relay is
+    /// exposed because the device's channel differs from the RP's. Only as strong as the transport
+    /// profile that defines the channel digest (none exists for application connections).
+    DeviceChannelBinding,
+}
+
+impl Freshness {
+    pub fn name(self) -> &'static str {
+        match self {
+            Freshness::SignerNonce => "signer_nonce",
+            Freshness::IssuedChallenge => "issued_challenge",
+        }
+    }
+}
+
+impl PresenterBinding {
+    pub fn name(self) -> &'static str {
+        match self {
+            PresenterBinding::Unbound => "unbound",
+            PresenterBinding::SessionChannel => "session_channel",
+            PresenterBinding::DeviceChannelBinding => "device_channel_binding",
+        }
+    }
+
+    fn requires_channel(self) -> bool {
+        !matches!(self, PresenterBinding::Unbound)
+    }
+}
+
+/// An RP-issued challenge: carried in the payload's 16-byte nonce slot (v0 codec unchanged).
+pub type Challenge = [u8; NONCE_LEN];
+
+/// Where challenges come from. Production-like issuance uses [`OsChallengeSource`]; deterministic
+/// audit tests inject [`FixedChallengeSource`]. `None` means the source cannot produce a value.
+pub trait ChallengeSource {
+    fn next_challenge(&mut self) -> Option<Challenge>;
+}
+
+/// 128 bits from the operating system CSPRNG (`rand_core::OsRng`). No scheme of its own.
+#[derive(Debug, Default)]
+pub struct OsChallengeSource;
+
+impl ChallengeSource for OsChallengeSource {
+    fn next_challenge(&mut self) -> Option<Challenge> {
+        let mut c = [0u8; NONCE_LEN];
+        OsRng.try_fill_bytes(&mut c).ok()?;
+        Some(c)
+    }
+}
+
+/// A fixed sequence, for deterministic tests only. **Predictable by construction.**
+#[derive(Debug, Default)]
+pub struct FixedChallengeSource(pub Vec<Challenge>);
+
+impl ChallengeSource for FixedChallengeSource {
+    fn next_challenge(&mut self) -> Option<Challenge> {
+        if self.0.is_empty() {
+            None
+        } else {
+            Some(self.0.remove(0))
+        }
+    }
+}
+
+/// One issued challenge, as the issuing RP recorded it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChallengeRecord {
+    /// The audience that issued it. A record from another audience is never accepted.
+    pub audience: String,
+    /// The channel the RP issued it on, when the presenter mode binds sessions.
+    pub channel: Option<[u8; 32]>,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub consumed: bool,
+}
+
+/// **Limitation, disclosed:** in-memory challenge table. Lost on restart, which invalidates every
+/// outstanding challenge (fail-closed). Never pruned. Not shared with any other verifier, which
+/// is exactly why another verifier refuses an act over this verifier's challenge.
+#[derive(Debug, Default)]
+pub struct InMemoryChallengeTable {
+    pub records: BTreeMap<Challenge, ChallengeRecord>,
+    /// When true, the table cannot be read or written (models an unavailable durable store).
+    pub unavailable: bool,
 }
 
 /// An explicitly injected verifier clock. `None` means no trustworthy reading is available.
@@ -498,12 +632,50 @@ pub enum Refusal {
     Expired,
     ReplayStateUnavailable,
     Replayed,
+    // ---- M2: issued challenge ----
+    /// The challenge table cannot be consulted.
+    ChallengeStateUnavailable,
+    /// The challenge source could not produce a value, or produced one already issued.
+    ChallengeIssuanceFailed,
+    /// The payload nonce is not a challenge this RP issued (includes signer-chosen nonces).
+    ChallengeUnknown,
+    /// The challenge was already consumed by an allowed request.
+    ChallengeConsumed,
+    /// The record was issued under another audience.
+    ChallengeAudienceMismatch,
+    /// The RP's clock is past the challenge's expiry.
+    ChallengeExpired,
+    /// The RP's clock reads earlier than the challenge's issuance (clock moved back).
+    ChallengeNotYetIssued,
+    /// The presenter mode needs the channel the request arrived on, and none was supplied.
+    ChannelUnavailable,
+    /// The policy asks for presenter binding under signer-chosen nonces, which cannot provide it.
+    /// Refused rather than silently ignored.
+    PolicyInconsistent,
+    /// The request arrived on a channel other than the one the challenge was issued on.
+    ChallengeChannelMismatch,
+    // ---- M2: device channel binding ----
+    PresenterBindingMissing,
+    PresenterBindingMalformed,
+    PresenterInadmissibleFact,
+    /// The binding act is not a `Present` act.
+    PresenterWrongCapability,
+    /// N4-A refused the binding act (class name as N4).
+    PresenterN4(&'static str),
+    PresenterHeadMismatch,
+    /// The device bound a channel other than the one this RP sees (relay / MITM).
+    PresenterChannelMismatch,
+    /// The binding was signed by a different device than the access act.
+    PresenterDeviceMismatch,
+    /// The binding's nonce is not this access act's `act_id`.
+    PresenterBindingNotForThisAct,
 }
 
 impl Refusal {
     pub fn class(&self) -> String {
         match self {
             Refusal::N4(name) => (*name).to_string(),
+            Refusal::PresenterN4(name) => format!("Presenter:{name}"),
             Refusal::ScopeNotSupported(scope) => format!("ScopeNotSupported:{}", scope.name()),
             other => format!("{other:?}"),
         }
@@ -512,9 +684,10 @@ impl Refusal {
     /// `malformed` for bytes that could not be evaluated, `refused` for everything else.
     pub fn verdict(&self) -> &'static str {
         match self {
-            Refusal::RequestMalformed | Refusal::BundleMalformed | Refusal::PayloadMalformed => {
-                "malformed"
-            }
+            Refusal::RequestMalformed
+            | Refusal::BundleMalformed
+            | Refusal::PayloadMalformed
+            | Refusal::PresenterBindingMalformed => "malformed",
             _ => "refused",
         }
     }
@@ -526,6 +699,10 @@ pub struct AccessRequest<'a> {
     pub bundle: &'a [u8],
     pub resource: ResourceKey,
     pub action: String,
+    /// The channel digest THIS relying party observes the request on (transport-supplied).
+    pub observed_channel: Option<[u8; 32]>,
+    /// A canonical N4-B bundle carrying the device's N4-D channel-binding act.
+    pub presenter_binding: Option<&'a [u8]>,
 }
 
 /// One decision with its audit record.
@@ -578,6 +755,8 @@ struct Trace {
     evaluation_position: Option<u64>,
     clock_reading: Option<u64>,
     verified: Option<VerifiedSummary>,
+    challenge_sha256: Option<[u8; 32]>,
+    presenter_act_id: Option<[u8; 32]>,
 }
 
 #[derive(Debug)]
@@ -601,6 +780,8 @@ pub struct RelyingParty<C: VerifierClock, R: ReplayStore> {
     pub authority_views: BTreeMap<SubjectId, TrustedAuthorityView>,
     pub clock: C,
     pub replay: R,
+    pub challenges: InMemoryChallengeTable,
+    pub challenge_source: Box<dyn ChallengeSource>,
     pub audit_log: Vec<AuditRecord>,
 }
 
@@ -669,13 +850,7 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
         //     must carry exactly one body at E and it must be the pinned head. N4-A just proved
         //     the prefix is Live through E, so the fold selected that body at E. `prev_digest`
         //     linkage then pins every position below it to the RP's own chain.
-        let at_e: Vec<EventId> = bundle
-            .summarize()
-            .into_iter()
-            .filter(|fact| fact.position == view.position)
-            .map(|fact| fact.event_id)
-            .collect();
-        if at_e != [view.head] {
+        if !head_pinned(&bundle, view) {
             return Err(Refusal::AuthorityHeadMismatch);
         }
         let act = verified.act();
@@ -736,13 +911,178 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
             return Err(Refusal::Expired);
         }
 
-        // 7. Replay, last: only an otherwise-allowed act consumes its nonce, so a refused
-        //    presentation (e.g. by an observer, against the wrong action) cannot burn it.
-        let key = (*owner.as_bytes(), p.nonce);
-        match self.replay.consume(key, p.not_after.saturating_add(skew)) {
-            Err(ReplayUnavailable) => Err(Refusal::ReplayStateUnavailable),
-            Ok(ReplayOutcome::Seen) => Err(Refusal::Replayed),
-            Ok(ReplayOutcome::Fresh) => Ok(()),
+        // 7. Freshness and presenter binding, last: only an otherwise-allowed act consumes its
+        //    nonce or challenge, so a refused presentation (e.g. by an observer, against the wrong
+        //    action) cannot burn it.
+        match self.policy.freshness {
+            Freshness::SignerNonce if self.policy.presenter != PresenterBinding::Unbound => {
+                Err(Refusal::PolicyInconsistent)
+            }
+            Freshness::SignerNonce => {
+                let key = (*owner.as_bytes(), p.nonce);
+                match self.replay.consume(key, p.not_after.saturating_add(skew)) {
+                    Err(ReplayUnavailable) => Err(Refusal::ReplayStateUnavailable),
+                    Ok(ReplayOutcome::Seen) => Err(Refusal::Replayed),
+                    Ok(ReplayOutcome::Fresh) => Ok(()),
+                }
+            }
+            Freshness::IssuedChallenge => {
+                trace.challenge_sha256 = Some(sha256(&p.nonce));
+                self.check_challenge(&p.nonce, request, now)?;
+                if self.policy.presenter == PresenterBinding::DeviceChannelBinding {
+                    self.check_presenter_binding(request, owner, view, &verified, trace)?;
+                }
+                self.consume_challenge(&p.nonce)
+            }
+        }
+    }
+
+    /// Issue a fresh challenge. `session_channel` is the channel this RP sees the requesting
+    /// session on; it is required (and recorded) when the presenter mode binds sessions.
+    pub fn issue_challenge(
+        &mut self,
+        session_channel: Option<[u8; 32]>,
+    ) -> Result<Challenge, Refusal> {
+        let now = self
+            .clock
+            .now_unix_secs()
+            .ok_or(Refusal::ClockUnavailable)?;
+        if self.policy.freshness != Freshness::IssuedChallenge {
+            return Err(Refusal::PolicyInconsistent);
+        }
+        if self.challenges.unavailable {
+            return Err(Refusal::ChallengeStateUnavailable);
+        }
+        if self.policy.presenter.requires_channel() && session_channel.is_none() {
+            return Err(Refusal::ChannelUnavailable);
+        }
+        let challenge = self
+            .challenge_source
+            .next_challenge()
+            .ok_or(Refusal::ChallengeIssuanceFailed)?;
+        if self.challenges.records.contains_key(&challenge) {
+            return Err(Refusal::ChallengeIssuanceFailed);
+        }
+        let channel = if self.policy.presenter.requires_channel() {
+            session_channel
+        } else {
+            None
+        };
+        self.challenges.records.insert(
+            challenge,
+            ChallengeRecord {
+                audience: self.policy.audience.clone(),
+                channel,
+                issued_at: now,
+                expires_at: now.saturating_add(self.policy.challenge_ttl_secs),
+                consumed: false,
+            },
+        );
+        Ok(challenge)
+    }
+
+    fn check_challenge(
+        &self,
+        challenge: &Challenge,
+        request: &AccessRequest<'_>,
+        now: u64,
+    ) -> Result<(), Refusal> {
+        if self.challenges.unavailable {
+            return Err(Refusal::ChallengeStateUnavailable);
+        }
+        let record = self
+            .challenges
+            .records
+            .get(challenge)
+            .ok_or(Refusal::ChallengeUnknown)?;
+        if record.audience != self.policy.audience {
+            return Err(Refusal::ChallengeAudienceMismatch);
+        }
+        if record.consumed {
+            return Err(Refusal::ChallengeConsumed);
+        }
+        if now < record.issued_at {
+            return Err(Refusal::ChallengeNotYetIssued);
+        }
+        if now > record.expires_at {
+            return Err(Refusal::ChallengeExpired);
+        }
+        if self.policy.presenter.requires_channel() {
+            let observed = request
+                .observed_channel
+                .ok_or(Refusal::ChannelUnavailable)?;
+            if record.channel != Some(observed) {
+                return Err(Refusal::ChallengeChannelMismatch);
+            }
+        }
+        Ok(())
+    }
+
+    /// Existing primitives only: N4-B decode + N1 admission, N4-D `verify_channel_binding_at` at
+    /// the RP's pinned position (which runs N4-A and the channel equality), the same head pin as
+    /// the access act, then two equalities linking the binding to THIS access act.
+    fn check_presenter_binding(
+        &self,
+        request: &AccessRequest<'_>,
+        owner: SubjectId,
+        view: TrustedAuthorityView,
+        access: &VerifiedDeviceAct,
+        trace: &mut Trace,
+    ) -> Result<(), Refusal> {
+        let observed = request
+            .observed_channel
+            .ok_or(Refusal::ChannelUnavailable)?;
+        let bytes = request
+            .presenter_binding
+            .ok_or(Refusal::PresenterBindingMissing)?;
+        let binding_bundle =
+            EvidenceBundle::decode(bytes).map_err(|_| Refusal::PresenterBindingMalformed)?;
+        let store = binding_bundle
+            .admit()
+            .map_err(|_| Refusal::PresenterInadmissibleFact)?;
+        let verified = verify_channel_binding_at(
+            binding_bundle.act(),
+            owner,
+            &store,
+            view.position,
+            &observed,
+        )
+        .map_err(|e| match e {
+            ChannelBindingError::ChannelMismatch => Refusal::PresenterChannelMismatch,
+            ChannelBindingError::NotAPresentation => Refusal::PresenterWrongCapability,
+            ChannelBindingError::Payload(_) => Refusal::PresenterBindingMalformed,
+            ChannelBindingError::Act(err) => Refusal::PresenterN4(n4_class(&err)),
+            ChannelBindingError::Admission(_) => Refusal::PresenterN4("Admission"),
+        })?;
+        if !head_pinned(&binding_bundle, view) {
+            return Err(Refusal::PresenterHeadMismatch);
+        }
+        if verified.act().device != access.act().device {
+            return Err(Refusal::PresenterDeviceMismatch);
+        }
+        let binding = ChannelBindingV1::decode(&verified.act().payload)
+            .map_err(|_| Refusal::PresenterBindingMalformed)?;
+        if binding.nonce != access.act_id() {
+            return Err(Refusal::PresenterBindingNotForThisAct);
+        }
+        trace.presenter_act_id = Some(verified.act_id());
+        Ok(())
+    }
+
+    /// Atomic only because this fixture is single-threaded and in-memory (`&mut self` for the whole
+    /// decision). A durable or shared store needs ONE compare-and-set over the record state,
+    /// committed with the audit append; this re-check of `consumed` is that shape, not that guarantee.
+    fn consume_challenge(&mut self, challenge: &Challenge) -> Result<(), Refusal> {
+        if self.challenges.unavailable {
+            return Err(Refusal::ChallengeStateUnavailable);
+        }
+        match self.challenges.records.get_mut(challenge) {
+            None => Err(Refusal::ChallengeUnknown),
+            Some(record) if record.consumed => Err(Refusal::ChallengeConsumed),
+            Some(record) => {
+                record.consumed = true;
+                Ok(())
+            }
         }
     }
 
@@ -758,13 +1098,37 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
             Err(refusal) => (refusal.verdict(), Value::String(refusal.class())),
         };
         let caveats: Vec<String> = match (outcome, trace.evaluation_position) {
-            (Ok(()), Some(position)) => vec![
-                format!("authority_as_of_position:{position}"),
-                "revocation_above_position_not_visible".to_string(),
-                self.replay.caveat().to_string(),
-                "window_is_signer_asserted".to_string(),
-                "bearer_act_not_bound_to_presenter".to_string(),
-            ],
+            (Ok(()), Some(position)) => {
+                let mut c = vec![
+                    format!("authority_as_of_position:{position}"),
+                    "revocation_above_position_not_visible".to_string(),
+                    "window_is_signer_asserted".to_string(),
+                ];
+                match (self.policy.freshness, self.policy.presenter) {
+                    (Freshness::SignerNonce, _) => {
+                        c.push(self.replay.caveat().to_string());
+                        c.push("bearer_act_not_bound_to_presenter".to_string());
+                    }
+                    (Freshness::IssuedChallenge, presenter) => {
+                        c.push("challenge_state:in_memory_single_verifier".to_string());
+                        c.push(
+                            match presenter {
+                                PresenterBinding::Unbound => {
+                                    "challenge_is_bearer:first_presenter_wins"
+                                }
+                                PresenterBinding::SessionChannel => {
+                                    "session_channel_only:relay_not_prevented"
+                                }
+                                PresenterBinding::DeviceChannelBinding => {
+                                    "channel_binding_depends_on_transport_profile"
+                                }
+                            }
+                            .to_string(),
+                        );
+                    }
+                }
+                c
+            }
             _ => Vec::new(),
         };
         let hex32 = |b: &[u8; 32]| Value::String(hex::encode(b));
@@ -801,6 +1165,11 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
                 "generation": v.generation,
                 "payload_sha256": hex::encode(v.payload_sha256),
             })),
+            "freshness": self.policy.freshness.name(),
+            "presenter_binding": self.policy.presenter.name(),
+            "challenge_sha256": trace.challenge_sha256.as_ref().map(hex32),
+            "observed_channel_sha256": request.observed_channel.as_ref().map(|c| hex::encode(sha256(c))),
+            "presenter_binding_act_id": trace.presenter_act_id.as_ref().map(hex32),
             "caveats": caveats,
         });
         // serde_json serialization of a fixed-shape Value is deterministic for identical inputs.
@@ -815,6 +1184,19 @@ impl<C: VerifierClock, R: ReplayStore> RelyingParty<C, R> {
         self.audit_log.push(record.clone());
         record
     }
+}
+
+/// The bundle carries exactly one body at the RP's position, and it is the RP's pinned head. With
+/// N4-A having proved the prefix Live through `E`, the fold therefore selected that body, and
+/// `prev_digest` linkage pins every earlier position to the RP's own chain.
+fn head_pinned(bundle: &EvidenceBundle, view: TrustedAuthorityView) -> bool {
+    let at_e: Vec<EventId> = bundle
+        .summarize()
+        .into_iter()
+        .filter(|fact| fact.position == view.position)
+        .map(|fact| fact.event_id)
+        .collect();
+    at_e == [view.head]
 }
 
 fn request_labels_ok(request: &AccessRequest<'_>) -> bool {
