@@ -8,7 +8,7 @@
 //! ICN calls are the existing public `EvidenceBundle` / `verify_evidence_bundle` /
 //! `sign_device_act` / authority-log constructors.
 //!
-//! Acceptance tests A1–A13 follow the 2026-11-09 proposal, with A10 restated: N4-B bundles refuse
+//! Acceptance tests A1–A13 (contract in the introducing PR; spec anchor icn#2599), with A10 restated: N4-B bundles refuse
 //! facts above the evaluation position, so a "later revocation carried in the bundle" cannot exist.
 //! A10 instead tests revocation through the relying party's own authority view.
 

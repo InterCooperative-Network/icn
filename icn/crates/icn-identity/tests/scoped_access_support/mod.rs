@@ -2,8 +2,8 @@
 //!
 //! `ScopedAccessActV0`: an application-layer payload convention carried inside an existing N4-A
 //! [`DeviceActV1`](icn_identity::device_authority::DeviceActV1) (capability `Present`), and an
-//! offline relying-party checker that interprets it. Proposal:
-//! `INTEGRATION-CONTRACT-scoped-access-act-v0.md` (2026-11-09 handoff; not a repository document).
+//! offline relying-party checker that interprets it. Anchored to the N4 device-authorization spec
+//! (icn#2599); the A1–A13 acceptance contract is stated in the pull request that introduced it.
 //!
 //! This file lives under `tests/` and is compiled only into integration-test binaries. It adds no
 //! module, type, route or behavior to `icn-identity`. It consumes the existing public API exactly as
