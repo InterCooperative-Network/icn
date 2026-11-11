@@ -13,7 +13,10 @@
 //! `canonical_payload_hash`, BLAKE3 over `serde_json::to_string` of the payload's
 //! `serde_json::Value`, which no contract defines as a canonical encoding. This commitment is the byte-exact, versioned replacement a
 //! future frozen `VotingProcessSnapshotV1` can bind (domain id, proposal id, **this hash**), so an
-//! accepted decision names the exact action voters approved.
+//! accepted decision names the exact payload voters approved. It does **not** yet name the account
+//! the ledger debits: the ledger debits its configured treasury, not the payload's `treasury_did`
+//! (open item 3, icn#2872). Until that is settled, the commitment binds the payload, not the full
+//! economic effect.
 //!
 //! # Not in scope
 //!
@@ -71,7 +74,8 @@
 //!    string; that keyspace is not among the N2 alias-scan keyspaces (`n2a_keyspaces()`), and the
 //!    ledger always debits its configured treasury rather than the payload's `treasury_did`. Two
 //!    spellings of one treasury therefore get independent nonce slots against one account. This
-//!    is an unregistered alias hazard in the ledger, not settled design. If owners key the nonce
+//!    is an unregistered alias hazard in the ledger, not settled design; it is tracked as a
+//!    reproduced defect with an owner decision in icn#2872. If owners key the nonce
 //!    by principal, the spelling rationale for `treasury_did` lapses; committing the spelling then
 //!    stays safe, only stricter.
 //!
