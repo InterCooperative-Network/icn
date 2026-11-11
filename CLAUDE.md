@@ -62,6 +62,16 @@ Run Cargo from `${RUST_ROOT}`. Run monorepo scripts, docs tooling, SDK tooling, 
 - Do not upgrade `icn/rust-toolchain.toml` unless explicitly requested.
 - If a local incremental Rust cache is demonstrably corrupted, `cargo clean` may be appropriate; do not make it a reflexive first response to ordinary build failures.
 
+## Publishing completed work
+
+The publication contract is `AGENTS.md` §9; this section only maps it onto Claude Code.
+
+- Claude Code's built-in caution to commit or push only when asked is satisfied by an authorized development task: within that task, follow §9.1 without asking again for each scoped commit or non-force feature-branch push. Everything §9.2 excludes still needs its own explicit authorization.
+- Pushing Rust changes goes through the `push` skill; opening a PR goes through `pr-create`. Do not pass `--force-with-lease` unless the maintainer explicitly asked for a force-push.
+- Stage with explicit paths (`git add -- <paths>`), and read `git diff --cached` before committing.
+- Confirm the remote with `git ls-remote origin refs/heads/<branch>` and compare it with `git rev-parse HEAD`.
+- A PR whose base is another feature branch receives no required CI. Say so in the report rather than reading its green checks as verification.
+
 ## Scope overlays
 
 When a task touches an area with scoped instructions, load the narrowest relevant overlay after `AGENTS.md` and the truth owner. Examples include `.claude/rules/`, path-level `AGENTS.md`/`CLAUDE.md`, and specialist agent definitions.
