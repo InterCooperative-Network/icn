@@ -4909,6 +4909,16 @@ last_updated = "2026-10-27"
 owner = "matt"
 audiences = ["architects", "developers", "operators"]
 
+
+[docs."docs/adr/ADR-0091-journal-entry-operation-identity.md"]
+# PROPOSED 2026-11-11, not accepted (ADR-0018). Draft truth class until the maintainers decide D1-D5.
+category = "architecture"
+status = "living"
+truth_class = "draft"
+title = "ADR-0091: Journal Entry Identity versus Economic Operation Identity"
+description = "PROPOSED, not accepted. The journal entry id stays a content digest over its existing preimage (pinned by a golden vector); operation identity moves into the existing nonce field, derived per operation class, and exactly-once is enforced by a create-only operation index rather than id equality, because a retry built in a later millisecond is a different entry. Inventories the six nonce-less production ledger authors, rejects random nonces, provenance-in-hash, parent chaining and a preimage version change for this defect, and lists human decisions D1-D5 (incl. the HTTP idempotency key and the interim gateway policy for icn#2873). Executable contract only; no production change."
+last_updated = "2026-11-11"
+owner = "matt"
 [docs."docs/ci/GATE_RATCHET_PLAN.md"]
 category = "reference"
 status = "living"
