@@ -1266,6 +1266,15 @@ impl Ledger {
     /// recomputable from it, so the state is reconcilable rather than silently wrong. A
     /// fully transactional batch append is tracked as a follow-up.
     ///
+    /// # Journal ids
+    ///
+    /// The up-front phase also refuses the whole batch, before anything is appended, when two
+    /// entries share an id ([`LedgerError::EntryIdRepeatedInBatch`]) or an id is already
+    /// journaled ([`LedgerError::EntryAlreadyJournaled`] / [`LedgerError::EntryIdCollision`]).
+    /// A different writer on the same store can still journal an id between this check and the
+    /// append; the create-only journal write then refuses that entry mid-batch, which is
+    /// residual 2 above (earlier entries stay committed, nothing is overwritten).
+    ///
     /// [`append_entry`]: Self::append_entry
     pub async fn append_entries(&mut self, entries: Vec<JournalEntry>) -> Result<Vec<ContentHash>> {
         // Phase 1 — validate every entry up front (read-only; no durable mutation).
@@ -1283,11 +1292,11 @@ impl Ledger {
                 .as_ref()
                 .context("Entry must have a computed hash before appending")?;
             if !batch_ids.insert(id.clone()) {
-                anyhow::bail!(
-                    "Journal entry id collision: {id} appears more than once in this batch"
-                );
+                warn!(entry_hash = %id, "Refusing batch: journal entry id repeated in it");
+                return Err(LedgerError::EntryIdRepeatedInBatch(id.to_hex()).into());
             }
-            self.ensure_entry_id_unused(id)?;
+            self.ensure_entry_id_unused(id, entry)
+                .inspect_err(|e| warn!(entry_hash = %id, error = %e, "Refusing batch"))?;
             self.validate_entry(entry)?;
         }
 
@@ -1418,21 +1427,96 @@ impl Ledger {
         crate::ledger_impl::witness_ops::effective_witness_policy(self, entry)
     }
 
-    /// Refuse an entry id that already names a journal record.
+    /// Refuse an entry id that already names a journal record. Read-only.
+    ///
+    /// `Ok(())` iff no journal record exists under `id`. Otherwise the typed refusal from
+    /// [`Self::journaled_id_refusal`]. A store read error propagates unchanged, so a failed read
+    /// is never mistaken for "not journaled".
     ///
     /// This refuses an identical re-append too, rather than treating it as an idempotent
     /// success: two genuinely separate transfers with the same shape, built in the same
     /// millisecond, are byte-identical, and reporting success for the second would drop it
     /// silently. A refusal is visible and the caller can rebuild the entry. Callers that
     /// deliberately skip known entries (the gossip merge path) check before appending.
-    fn ensure_entry_id_unused(&self, id: &ContentHash) -> Result<()> {
-        if self.get_entry(id)?.is_some() {
-            warn!(entry_hash = %id, "Refusing journal entry: id already journaled");
-            anyhow::bail!(
-                "Journal entry id collision: {id} is already journaled; refusing to overwrite it"
-            );
+    ///
+    /// This is the early check that keeps a refusal ahead of every side effect. The guarantee
+    /// that a record is never replaced is the create-only journal write in
+    /// `append_entry_internal`.
+    fn ensure_entry_id_unused(&self, id: &ContentHash, entry: &JournalEntry) -> Result<()> {
+        let key = format!("{}{}", JOURNAL_PREFIX, id.to_hex());
+        match self.store.get(key.as_bytes())? {
+            None => Ok(()),
+            Some(stored) => {
+                let wanted = serde_json::to_vec(entry)?;
+                // Logged at debug: the gossip arm uses this to skip ordinary duplicates. The
+                // append paths log their refusals at warn.
+                let refusal = Self::journaled_id_refusal(id, Some(&stored), &wanted);
+                debug!(entry_hash = %id, refusal = %refusal, "Journal entry id already journaled");
+                Err(refusal.into())
+            }
         }
-        Ok(())
+    }
+
+    /// Classify a journal record found under `id` against the bytes an append would write.
+    ///
+    /// The stored record is parsed and re-serialized before the comparison, so a record written
+    /// under an older field spelling still compares by content. Same content gives
+    /// [`LedgerError::EntryAlreadyJournaled`]; different content, an unparseable record, or no
+    /// record at all (`stored: None`, which a caller only passes when a write was refused, so
+    /// something was there) gives [`LedgerError::EntryIdCollision`]. Both are refusals.
+    fn journaled_id_refusal(id: &ContentHash, stored: Option<&[u8]>, wanted: &[u8]) -> LedgerError {
+        let same_record = stored
+            .and_then(|bytes| serde_json::from_slice::<JournalEntry>(bytes).ok())
+            .and_then(|record| serde_json::to_vec(&record).ok())
+            .is_some_and(|canonical| canonical == wanted);
+        if same_record {
+            LedgerError::EntryAlreadyJournaled(id.to_hex())
+        } else {
+            LedgerError::EntryIdCollision(id.to_hex())
+        }
+    }
+
+    /// Remove the decision-index row a refused append wrote, when it is provably not the
+    /// journaled record's own.
+    ///
+    /// The row for `(decision, entry id)` is written before the journal record (see the
+    /// comment at that write), so an append whose create-only journal write was refused has
+    /// already written it. If the record that is journaled under the id carries the same
+    /// decision hash, the row is that record's row (same key) and stays. If the record cannot be
+    /// read or parsed, ownership cannot be ruled out and the row stays: a hint with no matching
+    /// record is harmless because lookups re-read the journal, while deleting the only hint of a
+    /// journaled governance entry would hide it from decision lookups.
+    ///
+    /// Best effort: a failed delete is logged and leaves a harmless hint. The delete is
+    /// unconditional, so a rollback of the journaled record plus another writer re-creating this
+    /// exact row between the refusal and this delete could lose that row; that window is not
+    /// closed here.
+    fn discard_refused_decision_index_row(
+        &self,
+        entry: &JournalEntry,
+        id: &ContentHash,
+        journaled: Option<&[u8]>,
+    ) {
+        let crate::types::ProvenanceRef::Governance { decision_hash, .. } = &entry.provenance
+        else {
+            return;
+        };
+        let Some(journaled) =
+            journaled.and_then(|bytes| serde_json::from_slice::<JournalEntry>(bytes).ok())
+        else {
+            return;
+        };
+        let journaled_owns_row = matches!(
+            &journaled.provenance,
+            crate::types::ProvenanceRef::Governance { decision_hash: d, .. } if d == decision_hash
+        );
+        if journaled_owns_row {
+            return;
+        }
+        let key = format!("{}{}:{}", DECISION_INDEX_PREFIX, decision_hash, id.to_hex());
+        if let Err(e) = self.store.delete(key.as_bytes()) {
+            warn!(entry_hash = %id, error = %e, "Failed to remove a refused append's decision index row");
+        }
     }
 
     /// Internal append method with control over gossip publishing
@@ -1452,13 +1536,14 @@ impl Ledger {
             .context("Entry must have a computed hash before appending")?
             .clone();
 
-        // An entry id names exactly one journal record. The journal write below is an
-        // overwriting `put` followed by a balance update, so appending under an id that is
-        // already journaled would replace the stored record and apply the deltas a second
-        // time, leaving cached balances that the journal cannot reproduce. The id does not
-        // cover provenance, and the builder stamps milliseconds, so two distinct entries can
-        // share one. Refuse before any side effect (quarantine, decision index, journal).
-        self.ensure_entry_id_unused(&hash)?;
+        // An entry id names exactly one journal record. Appending under an id that is already
+        // journaled would replace the stored record and apply the deltas a second time,
+        // leaving cached balances that the journal cannot reproduce. The id does not cover
+        // provenance, and the builder stamps milliseconds, so two distinct entries can share
+        // one. Refuse before any side effect (quarantine, decision index, journal, balances).
+        // The create-only journal write below enforces the same rule against other writers.
+        self.ensure_entry_id_unused(&hash, &entry)
+            .inspect_err(|e| warn!(entry_hash = %hash, error = %e, "Refusing journal entry"))?;
 
         // Trust-based entry validation (H5 fix)
         // Skip trust check if no trust source configured (allows local-only operation)
@@ -1579,10 +1664,28 @@ impl Ledger {
             self.index_entry_by_decision(decision_hash, &hash)?;
         }
 
-        // Serialize and store the journal entry.
+        // Serialize and store the journal entry, CREATE-ONLY. The check at the top of this
+        // function refuses a known id before any side effect; this write is what guarantees an
+        // existing record is never replaced, including by another `Ledger` over the same store
+        // that journaled the id after that check. The comparison and the write are one atomic
+        // store step. A store that cannot do that refuses (`CompareAndPutUnsupported`) rather
+        // than falling back to an overwriting `put`. Nothing below this point has run when the
+        // write is refused, so no balance moves.
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
         let value = serde_json::to_vec(&entry)?;
-        self.store.put(key.as_bytes(), &value)?;
+        match self.store.compare_and_put(key.as_bytes(), None, &value)? {
+            icn_store::CompareAndPut::Applied => {}
+            icn_store::CompareAndPut::Conflict { current } => {
+                self.discard_refused_decision_index_row(&entry, &hash, current.as_deref());
+                let refusal = Self::journaled_id_refusal(&hash, current.as_deref(), &value);
+                warn!(
+                    entry_hash = %hash,
+                    refusal = %refusal,
+                    "Journal write refused: the id was journaled by another writer after the check"
+                );
+                return Err(refusal.into());
+            }
+        }
 
         // Add to timestamp index for efficient pagination
         // Key format: ledger:journal_ts:{timestamp:020}:{hash}
@@ -2142,6 +2245,35 @@ impl Ledger {
                 if let Some(e) = entry {
                     observe_sync_lag(e.timestamp);
                     debug!("Received entry {} response", hash);
+
+                    // A response for an id this node already journals is skipped, never
+                    // re-applied, and a different record under that id is logged as a
+                    // collision. Only those two refusals are skipped; a store error from the
+                    // check propagates, as the sibling arms' known-entry checks do. The append
+                    // below refuses a journaled id as well; this arm only classifies the case
+                    // before attempting it. An append failure is still logged, not propagated.
+                    if let Some(id) = e.id.as_ref() {
+                        if let Err(err) = self.ensure_entry_id_unused(id, &e) {
+                            return match err.downcast_ref::<LedgerError>() {
+                                Some(LedgerError::EntryAlreadyJournaled(_)) => {
+                                    debug!(
+                                        entry_hash = %id,
+                                        "Already have entry, skipping duplicate EntryResponse"
+                                    );
+                                    Ok(())
+                                }
+                                Some(LedgerError::EntryIdCollision(_)) => {
+                                    warn!(
+                                        entry_hash = %id,
+                                        "EntryResponse differs from the journaled entry under its id; not stored"
+                                    );
+                                    Ok(())
+                                }
+                                _ => Err(err),
+                            };
+                        }
+                    }
+
                     // Use append_entry_from_sync to avoid re-broadcasting entries we received
                     let result = self.append_entry_from_sync(e).await;
 
