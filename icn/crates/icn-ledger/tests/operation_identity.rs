@@ -472,6 +472,12 @@ impl Store for FaultStore {
         expected: Option<&[u8]>,
         new: &[u8],
     ) -> anyhow::Result<CompareAndPut> {
+        // The journal write is a create-only compare_and_put (#2873); inject here too.
+        if let Some(prefix) = *self.fail_put_prefix.lock().unwrap() {
+            if key.starts_with(prefix) {
+                anyhow::bail!("injected put failure");
+            }
+        }
         self.inner.compare_and_put(key, expected, new)
     }
     fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
