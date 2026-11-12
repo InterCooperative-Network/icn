@@ -2761,8 +2761,29 @@ impl Ledger {
     /// # Safety
     /// This is a destructive operation. Entries are moved to archive storage
     /// but not deleted, allowing potential recovery if needed.
-    #[instrument(skip(self), fields(target_hash = %target_hash))]
+    ///
+    /// # Disabled (icn#2880)
+    /// Fails closed. Until journal ids were restored on read this method
+    /// silently archived nothing and returned `Ok(vec![])`; restoring them
+    /// would make it a live, non-atomic, timestamp-selected delete reachable
+    /// from the unauthenticated `RollbackNotification` gossip handler. Its
+    /// authority/atomicity contract is unowned, so it is refused, not enabled.
     pub async fn rollback_to_entry(
+        &mut self,
+        _target_hash: &ContentHash,
+        _reason: &str,
+        _broadcast: bool,
+    ) -> Result<Vec<ContentHash>> {
+        anyhow::bail!(
+            "rollback_to_entry is disabled: its authority and atomicity contract is not owned (icn#2880)"
+        )
+    }
+
+    /// Pre-#2880 rollback body, retained unchanged and unreachable pending an
+    /// owner-approved contract. Not called from anywhere.
+    #[allow(dead_code)]
+    #[instrument(skip(self), fields(target_hash = %target_hash))]
+    async fn rollback_to_entry_disabled(
         &mut self,
         target_hash: &ContentHash,
         reason: &str,
