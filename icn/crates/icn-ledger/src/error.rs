@@ -98,6 +98,31 @@ pub enum LedgerError {
     /// Arithmetic overflow in balance calculation
     #[error("arithmetic overflow: {0}")]
     ArithmeticOverflow(String),
+
+    /// An operation append was given an entry that carries no operation id.
+    ///
+    /// Nothing was appended. Appending it through the plain path instead would give it no
+    /// retry protection, so this is refused rather than downgraded.
+    #[error("entry carries no operation id; refusing to append it as an operation")]
+    OperationIdMissing,
+
+    /// The operation id is already journaled, but not as this operation.
+    ///
+    /// Either the journaled entry has different content (other accounts, amounts, author,
+    /// contract or parents), or more than one journaled entry carries the id, so which one a
+    /// retry refers to cannot be decided. Nothing was appended and no state was changed.
+    #[error(
+        "operation {operation} is already journaled as a different operation \
+         (journaled entries carrying the id: {entries}, first: {existing}); refusing to append"
+    )]
+    OperationConflict {
+        /// The operation id, hex.
+        operation: String,
+        /// The id of the first journaled entry that carries it, hex.
+        existing: String,
+        /// How many journaled entries carry it.
+        entries: usize,
+    },
 }
 
 impl From<serde_json::Error> for LedgerError {
