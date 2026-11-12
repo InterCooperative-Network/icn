@@ -12,6 +12,28 @@ pub enum LedgerError {
     #[error("entry not found: {0}")]
     EntryNotFound(String),
 
+    /// The entry id already names a journal record with the same content.
+    ///
+    /// A refusal, not an idempotent success. The id covers no provenance and only a millisecond
+    /// timestamp, so two separate events can produce byte-identical entries; applying the second
+    /// would double its deltas, and answering `Ok` without applying it would drop it silently.
+    /// Same record is not same operation: recognising a retry of one operation needs an
+    /// operation identity chosen by the author, which this check does not provide. Nothing was
+    /// written.
+    #[error("journal entry {0} is already journaled; refusing to append it again")]
+    EntryAlreadyJournaled(String),
+
+    /// The entry id already names a journal record with different content (or one that does
+    /// not parse). The journaled record is left as it is; nothing was written.
+    #[error(
+        "journal entry id {0} is already journaled with different content; refusing to overwrite it"
+    )]
+    EntryIdCollision(String),
+
+    /// Two entries of one batch share an id. Nothing in the batch was written.
+    #[error("journal entry id {0} appears more than once in this batch; refusing the batch")]
+    EntryIdRepeatedInBatch(String),
+
     /// Invalid entry (double-entry invariant violated)
     #[error("invalid entry: {0}")]
     InvalidEntry(String),
