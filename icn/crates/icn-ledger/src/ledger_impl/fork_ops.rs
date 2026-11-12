@@ -71,7 +71,12 @@ pub(crate) fn has_fork(ledger: &Ledger, parent: &ContentHash) -> bool {
 /// Detect and resolve all forks in the ledger
 ///
 /// Returns a list of resolved forks with their resolutions.
-/// Entries that should be discarded are quarantined.
+///
+/// **Fails closed (icn#2880):** if resolving a fork would discard (quarantine,
+/// i.e. delete the journal row of) a losing entry, this returns `Err` before
+/// any write and leaves the fork intact. Forks that need manual resolution, or
+/// have no loser to discard, behave as before. Use `detect_forks` /
+/// `has_fork` to observe forks.
 ///
 /// # Arguments
 /// * `ledger` - The ledger instance (mutable to allow quarantining)
@@ -181,7 +186,29 @@ pub(crate) fn detect_and_resolve_forks(ledger: &mut Ledger) -> Result<Vec<(Fork,
                 continue;
             }
 
-            // Quarantine all losing entries
+            // FAIL CLOSED (icn#2880). Choosing a loser is observation; removing
+            // its journal row is erasure of economic history and releases
+            // anything derived from that row (e.g. an operation id rebuilt
+            // from the journal). No owner has approved that, so a resolution
+            // that would delete refuses before any write. Detection
+            // (`detect_forks`, `has_fork`, `get_fork_stats`) is unaffected.
+            if !losers.is_empty() {
+                let loser_ids: Vec<String> = losers
+                    .iter()
+                    .filter_map(|i| entries[*i].id.as_ref().map(|h| h.to_hex()))
+                    .collect();
+                anyhow::bail!(
+                    "fork resolution refused: parent {} has {} losing entr{} that would be quarantined \
+                     (journal rows deleted); destructive fork resolution is disabled and the fork is \
+                     left intact (losers: {})",
+                    parent.to_hex(),
+                    losers.len(),
+                    if losers.len() == 1 { "y" } else { "ies" },
+                    loser_ids.join(",")
+                );
+            }
+
+            // Quarantine all losing entries (unreachable while the guard above holds)
             for loser_idx in &losers {
                 let loser_entry = &entries[*loser_idx];
                 if let Some(hash) = &loser_entry.id {

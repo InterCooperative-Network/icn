@@ -2356,7 +2356,10 @@ impl Ledger {
     /// Detect and resolve all forks in the ledger
     ///
     /// Returns a list of resolved forks with their resolutions.
-    /// Entries that should be discarded are quarantined.
+    ///
+    /// Fails closed (icn#2880): a resolution that would quarantine (delete the
+    /// journal row of) a losing entry returns `Err` and changes nothing. To
+    /// observe forks without that risk use [`Self::detect_forks`].
     #[instrument(skip(self))]
     pub fn detect_and_resolve_forks(&mut self) -> Result<Vec<(Fork, ForkResolution)>> {
         crate::ledger_impl::fork_ops::detect_and_resolve_forks(self)
