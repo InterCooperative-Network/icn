@@ -1886,6 +1886,20 @@ fn m_operation_ids_are_scoped_to_their_context() {
             .unwrap_err(),
         AdmissionRefusal::UntrustedContext
     );
+    // Within one context, a different operation id is a different operation.
+    let log = vec![a.genesis()];
+    let other_op = a.authorize_op(
+        &log,
+        checkpoint(&a.state(&log)),
+        &a.writer,
+        &[a.m(0), a.m(1)],
+        VoteChoice::For,
+        Verdict::Pass,
+        [0x0a; 32],
+    );
+    assert!(a
+        .admit(&other_op, &a.frontier(1, None), NOW, &mut consumed)
+        .is_ok());
 }
 
 /// N: a backend failure yields no admission, and is not mistaken for a replay or a conflict.
