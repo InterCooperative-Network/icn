@@ -10,6 +10,10 @@ blake3 = "1.8"
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 icn-kernel-api = { path = "../icn-kernel-api" }
+# effect_v0: reuse N1/N4 attribution unchanged. Substrate -> substrate; no storage/network.
+icn-identity = { path = "../icn-identity" }
+sha2.workspace = true
+ed25519-dalek.workspace = true
 
 [dev-dependencies]
 serde_json = "1.0"

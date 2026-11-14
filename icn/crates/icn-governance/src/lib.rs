@@ -33,6 +33,8 @@ pub mod actor_model;
 pub mod amendment;
 #[allow(missing_docs)]
 pub mod appeal;
+/// EXPERIMENTAL: governance act payload and threshold rule for `icn_authz::effect_v0`.
+pub mod authz_threshold;
 #[allow(missing_docs)]
 pub mod charter;
 #[allow(missing_docs)]

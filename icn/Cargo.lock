@@ -2896,9 +2896,12 @@ name = "icn-authz"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "ed25519-dalek",
+ "icn-identity",
  "icn-kernel-api",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.18",
 ]
 
@@ -3359,6 +3362,7 @@ dependencies = [
  "blake3",
  "ed25519-dalek",
  "hex",
+ "icn-authz",
  "icn-encoding",
  "icn-entity",
  "icn-federation",
