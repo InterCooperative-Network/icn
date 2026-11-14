@@ -298,6 +298,24 @@ const NOT_REGISTERED: &[(&str, &str, &str)] = &[
         "never leads a preimage: the binding is the LP-framed payload of an `icn.n4.device-act` \
          act, so it is hashed and signed only after that act's own domain (N4-D)",
     ),
+    (
+        "icn.authz.v0.inception",
+        "icn/crates/icn-authz/src/effect_v0/statements.rs",
+        "never leads a preimage: the inception is hashed only after the `icn.authz.v0.context` \
+         domain (ContextRef), and nothing signs it",
+    ),
+    (
+        "icn.authz.v0.evidence",
+        "icn/crates/icn-authz/src/effect_v0/statements.rs",
+        "transport container only: evidence bytes are decoded, never hashed or signed; each \
+         carried statement is verified under its own domain",
+    ),
+    (
+        "icn.governance.authz-act.v0",
+        "icn/crates/icn-governance/src/authz_threshold.rs",
+        "never leads a preimage: the vote is the LP-framed payload of an `icn.n4.device-act` act, \
+         so it is hashed and signed only after that act's own domain (N4-D)",
+    ),
 ];
 
 const CANONICAL_RS: &str = "icn/crates/icn-kernel-api/src/canonical.rs";
@@ -393,9 +411,21 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.authority-log.commit", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/authority_log/mod.rs", "icn/crates/icn-identity/src/authority_log/derive.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.authority-log.kdf", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/authority_log/mod.rs", "icn/crates/icn-identity/src/authority_log/construct.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.authority-log.sig", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-identity/src/authority_log/mod.rs", "icn/crates/icn-identity/src/authority_log/body.rs", "icn/crates/icn-identity/src/authority_log/construct.rs", "icn/crates/icn-identity/src/authority_log/admission.rs", "icn/crates/icn-identity/tests/authority_log_adversarial_orders.rs", "icn/crates/icn-identity/tests/authority_log_derived.rs", "icn/crates/icn-identity/tests/authority_log_durable.rs", "icn/crates/icn-identity/tests/gen_subject_context.rs", "icn/crates/icn-identity/tests/authority_log_encoding.rs"]),
+    d(b"icn.authz.v0.authorization", Sha256, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.authorization", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.context", Sha256, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.designation", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.outcome", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.roster", Sha256, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.rule-adoption", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.standing", Sha256, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.standing", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.subject-matter", Sha256, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz.v0.target", Sha256, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
     d(b"icn.gen.initial-device-binding-ref", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.gen.subject-context", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.gen.subject-context-ref", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
+    d(b"icn.governance.threshold-rule.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/authz_threshold.rs"]),
     d(b"icn.n1.authority-receipt.decisions.v1\0", Sha256, Raw, Production, &["icn/crates/icn-core/src/authority_registry.rs"]),
     // `segment_id` hashes the segment; nothing signs it (ADR-0089 §3).
     d(b"icn.n1.history-segment", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/history_segment.rs", "icn/crates/icn-identity/tests/reference/history_segment_reference.py"]),
