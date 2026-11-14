@@ -51,17 +51,17 @@ pub const MAX_RULE_ARTIFACT: usize = 4096;
 /// Maximum bytes of one carried vote bundle.
 pub const MAX_VOTE_BUNDLE: usize = 1 << 20;
 /// Maximum bytes of one carried signed statement.
-const MAX_STATEMENT: usize = 64 * 1024;
+pub(crate) const MAX_STATEMENT: usize = 64 * 1024;
 
 pub(crate) fn sha256(bytes: &[u8]) -> [u8; 32] {
     Sha256::digest(bytes).into()
 }
 
-fn write_principal(w: &mut Writer, key: &PrincipalKey) {
+pub(crate) fn write_principal(w: &mut Writer, key: &PrincipalKey) {
     w.b32(&key.as_bytes());
 }
 
-fn read_principal(
+pub(crate) fn read_principal(
     r: &mut Reader<'_>,
     field: &'static str,
 ) -> Result<PrincipalKey, AuthzCodecError> {
@@ -437,14 +437,14 @@ pub enum Verdict {
 }
 
 impl Verdict {
-    fn tag(self) -> u8 {
+    pub(crate) fn tag(self) -> u8 {
         match self {
             Verdict::Pass => 1,
             Verdict::Fail => 2,
         }
     }
 
-    fn from_tag(tag: u8) -> Result<Self, AuthzCodecError> {
+    pub(crate) fn from_tag(tag: u8) -> Result<Self, AuthzCodecError> {
         match tag {
             1 => Ok(Verdict::Pass),
             2 => Ok(Verdict::Fail),
