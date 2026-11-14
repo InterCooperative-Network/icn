@@ -36,6 +36,7 @@ members = [
     "crates/icn-api",
     "crates/icn-naming",
     "crates/icn-authz",
+    "crates/icn-authz-store",
     "crates/icn-baseline-lock",
     "crates/icn-boundary",
     "crates/icn-appliance",

@@ -13,12 +13,12 @@ use icn_identity::device_authority::VerifiedDeviceAct;
 use icn_identity::evidence_bundle::{verify_evidence_bundle, EvidenceBundle, EvidenceVerifyError};
 use thiserror::Error;
 
-use super::codec::AuthzCodecError;
+use super::codec::{AuthzCodecError, Reader, Writer};
 use super::log::{CheckpointedAuthorizationV0, LogRefusal};
 use super::statements::{
-    roster_hash, sha256, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
-    ContextInceptionV0, ContextRef, InputActV0, OutcomeReceiptV0, Signed, SignedDesignation,
-    StandingV0, Verdict,
+    read_principal, roster_hash, sha256, target_id, write_principal, AuthorizationEvidenceV0,
+    AuthorizationV0, CanonicalV0, ContextInceptionV0, ContextRef, InputActV0, OutcomeReceiptV0,
+    Signed, SignedDesignation, StandingV0, Verdict, AUTHZ_V0_VERSION, MAX_STATEMENT,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -536,6 +536,16 @@ impl ConsumedAuthorization {
     }
 }
 
+/// Domain of an encoded [`ConsumedEntry`] (the record a durable consumed set persists).
+pub const CONSUMED_ENTRY_DOMAIN: &[u8] = b"icn.authz.v0.consumed-entry";
+
+/// `kind` byte of an encoded [`ConsumedEntry`].
+const CONSUMED_LEGACY: u8 = 1;
+const CONSUMED_CHECKPOINTED: u8 = 2;
+
+/// Upper bound of an encoded `Signed<_>` statement: `lp(body ≤ MAX_STATEMENT) || signature`.
+const MAX_SIGNED_STATEMENT: usize = 4 + MAX_STATEMENT + 64;
+
 /// What a target remembers about a consumed operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsumedEntry {
@@ -545,10 +555,71 @@ pub struct ConsumedEntry {
     pub writer: PrincipalKey,
 }
 
-/// A consumed-set backend failed.
+impl ConsumedEntry {
+    /// Canonical bytes: `lp(CONSUMED_ENTRY_DOMAIN) || u16 version || u8 kind || writer (32) ||
+    /// lp(Signed::encode)`, where `kind` is 1 (legacy) or 2 (checkpointed). The signed statement
+    /// is kept byte-for-byte, so the writer's signature can be re-checked after a restart.
+    pub fn encode(&self) -> Vec<u8> {
+        let (kind, signed) = match &self.authorization {
+            ConsumedAuthorization::Legacy(s) => (CONSUMED_LEGACY, s.encode()),
+            ConsumedAuthorization::Checkpointed(s) => (CONSUMED_CHECKPOINTED, s.encode()),
+        };
+        let mut w = Writer::new();
+        w.lp(CONSUMED_ENTRY_DOMAIN);
+        w.u16(AUTHZ_V0_VERSION);
+        w.u8(kind);
+        write_principal(&mut w, &self.writer);
+        w.lp(&signed);
+        w.finish()
+    }
+
+    /// Strict decode: domain, version, a known kind, a valid principal, a bounded statement that
+    /// decodes as that kind, and no trailing bytes. Does **not** check the signature; see
+    /// [`ConsumedEntry::is_authentic`].
+    pub fn decode(bytes: &[u8]) -> Result<Self, AuthzCodecError> {
+        let mut r = Reader::new(bytes);
+        r.expect_domain(CONSUMED_ENTRY_DOMAIN, "domain")?;
+        r.expect_version(AUTHZ_V0_VERSION)?;
+        let kind = r.u8("kind")?;
+        let writer = read_principal(&mut r, "writer")?;
+        let signed = r.lp("authorization", MAX_SIGNED_STATEMENT)?;
+        r.finish()?;
+        let authorization = match kind {
+            CONSUMED_LEGACY => ConsumedAuthorization::Legacy(Signed::decode(signed)?),
+            CONSUMED_CHECKPOINTED => ConsumedAuthorization::Checkpointed(Signed::decode(signed)?),
+            _ => return Err(AuthzCodecError::InvalidValue { field: "kind" }),
+        };
+        Ok(ConsumedEntry {
+            authorization,
+            writer,
+        })
+    }
+
+    /// The recorded writer's signature verifies over the recorded statement.
+    pub fn is_authentic(&self) -> bool {
+        self.authorization.verifies_under(&self.writer)
+    }
+}
+
+/// A consumed-set backend could not consume. Every variant means **no admission**; they differ
+/// in what may have been recorded.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("consumed-set backend failure: {0}")]
-pub struct ConsumedSetError(pub String);
+pub enum ConsumedSetError {
+    /// The backend could not answer, or refused to write. Nothing was recorded.
+    #[error("consumed-set backend unavailable (nothing recorded): {0}")]
+    Unavailable(String),
+    /// The entry was refused before any write. Nothing was recorded.
+    #[error("consumed-set entry refused (nothing recorded): {0}")]
+    InvalidEntry(String),
+    /// The consumption was written but its durability barrier failed: it may or may not survive
+    /// a restart. It is not rolled back, so a retry may be refused as already consumed; the
+    /// operation can be stranded but never admitted twice.
+    #[error("consumption commit uncertain (may persist): {0}")]
+    CommitUncertain(String),
+    /// A stored record failed strict validation. Fail closed until an operator repairs it.
+    #[error("consumed-set record corrupt: {0}")]
+    Corrupt(String),
+}
 
 /// Operation ids a target has consumed, keyed by `(context, operation_id)`.
 pub trait ConsumedSet {

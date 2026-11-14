@@ -34,6 +34,7 @@ tracing.workspace = true
 utoipa = { version = "5.4.0", optional = true }
 
 [dev-dependencies]
+icn-authz-store = { path = "../icn-authz-store" }
 icn-store = { path = "../icn-store" }
 serde_yaml = "0.9"
 tempfile = "3"
