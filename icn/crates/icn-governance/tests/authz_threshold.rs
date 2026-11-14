@@ -11,11 +11,11 @@
 
 use ed25519_dalek::SigningKey;
 use icn_authz::effect_v0::{
-    admit, issue_outcome_receipt, target_id, verify_authorization, verify_authorization_bytes,
-    verify_outcome_receipt, AdmissionRefusal, AdoptedRule, AuthorizationEvidenceV0,
-    AuthorizationV0, AuthzRefusal, ContextInceptionV0, ContextRef, EffectV0, InMemoryConsumedSet,
-    InputActV0, OutcomeReceiptV0, ReceiptRefusal, RuleAdoptionV0, RuleError, Signed,
-    SignedDesignation, StandingV0, StatementKind, Verdict, WriterDesignationV0,
+    admit, issue_outcome_receipt, roster_hash, target_id, verify_authorization,
+    verify_authorization_bytes, verify_outcome_receipt, AdmissionRefusal, AdoptedRule,
+    AuthorizationEvidenceV0, AuthorizationV0, AuthzRefusal, ContextInceptionV0, ContextRef,
+    EffectV0, InMemoryConsumedSet, InputActV0, OutcomeReceiptV0, ReceiptRefusal, RuleAdoptionV0,
+    RuleError, Signed, SignedDesignation, StandingV0, StatementKind, Verdict, WriterDesignationV0,
 };
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::vote::VoteChoice;
@@ -38,6 +38,7 @@ const STANDING_UNTIL: u64 = 2_000;
 const AUTH_UNTIL: u64 = 1_500;
 const PROPOSAL: [u8; 32] = [0x50; 32];
 const OTHER_PROPOSAL: [u8; 32] = [0x51; 32];
+const DEFAULT_OP: [u8; 32] = [0x09; 32];
 const ROLE: &str = "member";
 
 fn key(seed: u8) -> SigningKey {
@@ -214,7 +215,10 @@ struct Draft {
     bundles: Vec<EvidenceBundle>,
     inputs: Vec<InputActV0>,
     verdict: Verdict,
-    subject_matter: [u8; 32],
+    /// `None`: the honest commitment to `effect` and `operation_id`.
+    subject_matter: Option<[u8; 32]>,
+    /// `None`: the honest roster hash over `standing`.
+    roster: Option<[u8; 32]>,
     effect: EffectV0,
     operation_id: [u8; 32],
     not_after: u64,
@@ -245,8 +249,28 @@ impl World {
         }
     }
 
+    fn effect(&self) -> EffectV0 {
+        EffectV0 {
+            target: self.target,
+            action: "noop".into(),
+            params_hash: [0xee; 32],
+        }
+    }
+
+    /// The subject matter voters vote on: the commitment to the default effect and operation id.
+    fn proposal(&self) -> [u8; 32] {
+        self.effect().commitment(self.ctx, DEFAULT_OP)
+    }
+
     fn vote(&self, member: usize, choice: VoteChoice) -> EvidenceBundle {
-        self.members[member].vote(self.ctx, PROPOSAL, choice, 0, 1, DeviceCapability::Sign)
+        self.members[member].vote(
+            self.ctx,
+            self.proposal(),
+            choice,
+            0,
+            1,
+            DeviceCapability::Sign,
+        )
     }
 
     /// The honest draft over `bundles`: standing for all three members, verdict Pass.
@@ -267,13 +291,10 @@ impl World {
             inputs: inputs_of(&bundles),
             bundles,
             verdict: Verdict::Pass,
-            subject_matter: PROPOSAL,
-            effect: EffectV0 {
-                target: self.target,
-                action: "noop".into(),
-                params_hash: [0xee; 32],
-            },
-            operation_id: [0x09; 32],
+            subject_matter: None,
+            roster: None,
+            effect: self.effect(),
+            operation_id: DEFAULT_OP,
             not_after: AUTH_UNTIL,
             auth_rule_hash: None,
         }
@@ -305,6 +326,10 @@ impl World {
 impl Draft {
     fn seal(self) -> AuthorizationEvidenceV0 {
         let ctx = self.designation.body.context;
+        let subject_matter = self
+            .subject_matter
+            .unwrap_or_else(|| self.effect.commitment(ctx, self.operation_id));
+        let roster = self.roster.unwrap_or_else(|| roster_hash(&self.standing));
         let mut ev = AuthorizationEvidenceV0 {
             inception: self.inception,
             standing: self
@@ -326,10 +351,11 @@ impl Draft {
                 AuthorizationV0 {
                     context: ctx,
                     epoch: self.epoch,
-                    subject_matter: self.subject_matter,
+                    subject_matter,
                     rule_hash: self.auth_rule_hash.unwrap_or(self.adopted_hash),
                     verdict: self.verdict,
                     inputs: self.inputs,
+                    roster_hash: roster,
                     effect: self.effect,
                     operation_id: self.operation_id,
                     not_after: self.not_after,
@@ -443,10 +469,23 @@ fn p4_outcome_receipt_verifies_against_authorization() {
         verify_outcome_receipt(&altered, &verified),
         Err(ReceiptRefusal::BadSignature)
     );
-    // A receipt for another authorization.
-    let other = w.passing();
-    let mut other = other;
-    other.operation_id = [0x0a; 32];
+    // A receipt for another authorization (another operation, voted on separately).
+    let other_op = [0x0a; 32];
+    let other_matter = w.effect().commitment(w.ctx, other_op);
+    let votes = (0..2)
+        .map(|i| {
+            w.members[i].vote(
+                w.ctx,
+                other_matter,
+                VoteChoice::For,
+                0,
+                1,
+                DeviceCapability::Sign,
+            )
+        })
+        .collect();
+    let mut other = w.draft(votes);
+    other.operation_id = other_op;
     let other = verify_authorization(&other.seal(), &w.rule, NOW).unwrap();
     assert_eq!(
         verify_outcome_receipt(&receipt, &other),
@@ -613,7 +652,7 @@ fn a2_device_without_sign_or_revoked_is_refused() {
     let present_only = Member::new(0x01, CapabilitySet::new([DeviceCapability::Present]));
     let bundle = present_only.vote(
         w.ctx,
-        PROPOSAL,
+        w.proposal(),
         VoteChoice::For,
         0,
         1,
@@ -633,7 +672,7 @@ fn a2_device_without_sign_or_revoked_is_refused() {
     // Granted Present, signs as Present → N4 accepts, the spine refuses: votes need Sign.
     let bundle = present_only.vote(
         w.ctx,
-        PROPOSAL,
+        w.proposal(),
         VoteChoice::For,
         0,
         1,
@@ -648,7 +687,7 @@ fn a2_device_without_sign_or_revoked_is_refused() {
     revoked.revoke_device();
     let bundle = revoked.vote(
         w.ctx,
-        PROPOSAL,
+        w.proposal(),
         VoteChoice::For,
         0,
         2,
@@ -709,7 +748,7 @@ fn a4_double_vote_is_refused() {
     let m = &w.members[0];
     let first = m.vote(
         w.ctx,
-        PROPOSAL,
+        w.proposal(),
         VoteChoice::For,
         1,
         1,
@@ -717,7 +756,7 @@ fn a4_double_vote_is_refused() {
     );
     let second = m.vote(
         w.ctx,
-        PROPOSAL,
+        w.proposal(),
         VoteChoice::For,
         2,
         1,
@@ -758,7 +797,7 @@ fn a5_cross_proposal_and_cross_context_replay_is_refused() {
     let other_ctx = ContextRef([0x77; 32]);
     let foreign = m.vote(
         other_ctx,
-        PROPOSAL,
+        w.proposal(),
         VoteChoice::For,
         0,
         1,
@@ -923,14 +962,18 @@ fn a12_wrong_target_is_refused() {
     );
 }
 
-/// A13: two authorizations with one operation id and different effects. The second is refused with
-/// a third-party-verifiable proof; afterwards neither is admissible at this custodian.
+/// A13: two different authorizations claiming one operation id. The second is refused with a
+/// third-party-verifiable proof; afterwards neither is admissible at this custodian.
+///
+/// Since the subject matter commits to the effect and operation id (A16), two authorizations
+/// with one operation id and *different effects* cannot both verify; the equivocation that remains
+/// is over the other writer-chosen fields — here `not_after`.
 #[test]
 fn a13_equivocation_yields_a_proof() {
     let w = world();
     let first = w.passing().seal();
     let mut d = w.passing();
-    d.effect.params_hash = [0xef; 32];
+    d.not_after = AUTH_UNTIL - 1;
     let second = d.seal();
     let mut consumed = InMemoryConsumedSet::default();
     assert_eq!(w.admit(&first, NOW, 1, &mut consumed), Ok(()));
@@ -945,7 +988,7 @@ fn a13_equivocation_yields_a_proof() {
     );
     // A forged proof (bodies swapped under the wrong signature) is not valid.
     let mut forged = (*proof).clone();
-    forged.second.authorization.body.effect.params_hash = [0xee; 32];
+    forged.second.authorization.body.not_after = AUTH_UNTIL;
     assert!(!forged.is_valid());
     // Neither is admissible again here.
     assert_eq!(
@@ -1017,4 +1060,64 @@ fn rule_hash_is_the_artifact_hash() {
     let expected: [u8; 32] = Sha256::digest(r.artifact()).into();
     assert_eq!(AdoptedRule::rule_hash(&r), expected);
     assert_eq!(world().inception.threshold, 2);
+}
+
+/// A16 (security review): a passing vote set authorizes exactly one effect under exactly one
+/// operation id. The writer cannot attach another effect or mint a fresh operation id.
+#[test]
+fn a16_votes_bind_the_effect_and_operation_id() {
+    let w = world();
+
+    // Another effect, keeping the voted subject matter: the commitment check refuses.
+    let mut d = w.passing();
+    d.effect.params_hash = [0xef; 32];
+    d.subject_matter = Some(w.proposal());
+    assert_eq!(
+        w.verify(&d.seal()),
+        Err(AuthzRefusal::SubjectMatterNotBoundToEffect)
+    );
+
+    // Another effect with an honest commitment: the votes are for another matter.
+    let mut d = w.passing();
+    d.effect.params_hash = [0xef; 32];
+    let first_vote = d.inputs[0].act_id;
+    assert!(matches!(
+        w.verify(&d.seal()),
+        Err(AuthzRefusal::RuleRefused(RuleError::ActNotBound { act_id })) if act_id == first_vote
+    ));
+
+    // The same effect under a fresh operation id (a second execution): refused the same way.
+    let mut d = w.passing();
+    d.operation_id = [0x0b; 32];
+    assert!(matches!(
+        w.verify(&d.seal()),
+        Err(AuthzRefusal::RuleRefused(RuleError::ActNotBound { .. }))
+    ));
+}
+
+/// A17 (security review): the eligible set is committed. A relayer cannot strip a non-voter's
+/// standing to ease quorum, and an omitted member's standing attached to the evidence is refused.
+#[test]
+fn a17_roster_is_committed() {
+    let w = world();
+
+    // Stripped after signing.
+    let mut ev = w.passing().seal();
+    let s2 = w.members[2].subject;
+    ev.standing.retain(|s| s.body.subject != s2);
+    assert_eq!(w.verify(&ev), Err(AuthzRefusal::RosterMismatch));
+
+    // The writer signs a roster without member 2 (quorum then 2/2) ...
+    let mut d = w.passing();
+    d.standing.retain(|s| s.subject != s2);
+    let curated = d.seal();
+    // ... which verifies on its own: completeness is NOT provable in v0 (documented gap) ...
+    assert_eq!(w.verify(&curated), Ok(Verdict::Pass));
+    // ... but member 2's own writer-signed standing, attached, is refused.
+    let mut contested = curated.clone();
+    contested
+        .standing
+        .push(Signed::sign(w.standing_for(s2), &w.writer));
+    contested.canonicalize();
+    assert_eq!(w.verify(&contested), Err(AuthzRefusal::RosterMismatch));
 }

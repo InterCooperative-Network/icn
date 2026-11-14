@@ -7,9 +7,9 @@
 
 use ed25519_dalek::SigningKey;
 use icn_authz::effect_v0::{
-    target_id, AuthorizationV0, AuthzCodecError, CanonicalV0, ContextInceptionV0, ContextRef,
-    EffectV0, InputActV0, OutcomeReceiptV0, RuleAdoptionV0, Signed, SignedDesignation, StandingV0,
-    Verdict, WriterDesignationV0,
+    roster_hash, target_id, AuthorizationV0, AuthzCodecError, CanonicalV0, ContextInceptionV0,
+    ContextRef, EffectV0, InputActV0, OutcomeReceiptV0, RuleAdoptionV0, Signed, SignedDesignation,
+    StandingV0, Verdict, WriterDesignationV0,
 };
 use icn_identity::authority_log::{PrincipalKey, SubjectId};
 use sha2::{Digest, Sha256};
@@ -89,6 +89,7 @@ fn authorization() -> AuthorizationV0 {
                 position: 3,
             },
         ],
+        roster_hash: [0x40; 32],
         effect: EffectV0 {
             target: target_id(&principal(0xC1)),
             action: "noop".into(),
@@ -148,6 +149,12 @@ fn p5_golden_vectors_and_roundtrip() {
     }
     assert_eq!(hex(&ctx().0), GOLDEN_CONTEXT_REF);
     assert_eq!(hex(&target_id(&principal(0xC1))), GOLDEN_TARGET_ID);
+    let commitment = authorization().effect.commitment(ctx(), [0x09; 32]);
+    let roster = roster_hash(&[standing()]);
+    eprintln!("subject_matter_commitment: {}", hex(&commitment));
+    eprintln!("roster_hash: {}", hex(&roster));
+    assert_eq!(hex(&commitment), GOLDEN_COMMITMENT);
+    assert_eq!(hex(&roster), GOLDEN_ROSTER);
 }
 
 const GOLDEN_INCEPTION: &str = "89157bf0ccf76c3ba8c5a8022b4cff978193fcfca6a5a2444bd2460d192a0484";
@@ -155,9 +162,11 @@ const GOLDEN_DESIGNATION: &str = "363514c28c2d29d0e0c7226bd228000607a3f5f3916584
 const GOLDEN_STANDING: &str = "8b1fa50420daaf296d9a66f10c4a9cf22af24968839474b607f60a43657bebbd";
 const GOLDEN_ADOPTION: &str = "17eda2e6fabc1b33cfd9fcc48d1e1c5be7efa8547a9d756d62998ba487ef2d25";
 const GOLDEN_AUTHORIZATION: &str =
-    "85a59bc2135a879e07434426b7e8f91f3f6792d70c06468c12241da03e0c2aab";
-const GOLDEN_RECEIPT: &str = "b850ebe9940b492c7eb2eda2de53b491882200ed88d0f763d4e8dbc5a29ef12c";
+    "2c5a1beda5e8683698f9df56668ea9c2436be05ae418a1340a1dd6fa81050d03";
+const GOLDEN_RECEIPT: &str = "330b2f5ea03ed4196b98155faea8ac0fed308227ec8c94ac0fd37e29db811392";
 const GOLDEN_CONTEXT_REF: &str = "2c2bbef23bc25517ee855dee68c17aa8e83459405d5d04ecbacae9e862c92e25";
+const GOLDEN_COMMITMENT: &str = "71330935128bae2a44acb67a385b07aa52dbacd034bbfc043c31c3108122f8c3";
+const GOLDEN_ROSTER: &str = "aec9f99c10181201d4fd6c4f62aa5a05e4f33413c2cd7b70a09ba5aa2e722b52";
 const GOLDEN_TARGET_ID: &str = "fc85bfcec4faa7b0ec82d393b492174c798f4dc1b669a263309181327c2131f7";
 
 /// The standing layout, built by hand without calling any v0 encoder, so the golden above is

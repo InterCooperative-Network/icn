@@ -33,6 +33,10 @@ pub const OUTCOME_DOMAIN: &[u8] = b"icn.authz.v0.outcome";
 pub const EVIDENCE_DOMAIN: &[u8] = b"icn.authz.v0.evidence";
 /// Domain of [`target_id`] derivation.
 pub const TARGET_DOMAIN: &[u8] = b"icn.authz.v0.target";
+/// Domain of [`EffectV0::commitment`].
+pub const SUBJECT_MATTER_DOMAIN: &[u8] = b"icn.authz.v0.subject-matter";
+/// Domain of [`roster_hash`].
+pub const ROSTER_DOMAIN: &[u8] = b"icn.authz.v0.roster";
 
 /// Maximum founders of one context.
 pub const MAX_FOUNDERS: usize = 64;
@@ -453,11 +457,54 @@ pub struct EffectV0 {
     pub params_hash: [u8; 32],
 }
 
+impl EffectV0 {
+    /// The subject matter voters must vote on for this effect to be authorized:
+    /// `SHA-256(lp(SUBJECT_MATTER_DOMAIN) || context || target || lp(action) || params_hash ||
+    /// operation_id)`.
+    ///
+    /// [`super::verify_authorization`] requires `AuthorizationV0.subject_matter` to equal this, and
+    /// rules bind every act to `subject_matter`. So a vote set authorizes exactly one effect under
+    /// exactly one operation id: a writer cannot reuse a passing vote set for another effect, or
+    /// for the same effect again under a fresh operation id.
+    pub fn commitment(&self, context: ContextRef, operation_id: [u8; 32]) -> [u8; 32] {
+        let mut w = Writer::new();
+        w.lp(SUBJECT_MATTER_DOMAIN);
+        w.b32(&context.0);
+        w.b32(&self.target);
+        w.lp(self.action.as_bytes());
+        w.b32(&self.params_hash);
+        w.b32(&operation_id);
+        sha256(&w.finish())
+    }
+}
+
+/// The commitment to a context's full standing roster for one authorization:
+/// `SHA-256(lp(ROSTER_DOMAIN) || count || (StandingV0 hash)*)`, ordered by Subject.
+///
+/// The eligible set (the quorum denominator) is derived from the roster, so the authorization
+/// commits to it: nobody can drop or add a standing statement after the writer signs. It does
+/// **not** prove the roster is complete — a writer can sign a roster that omits a member; the
+/// omitted member's own standing statement, attached to the evidence, is then refused as a roster
+/// mismatch. Completeness needs a sequenced membership log (not in v0).
+pub fn roster_hash(standing: &[StandingV0]) -> [u8; 32] {
+    let mut sorted: Vec<&StandingV0> = standing.iter().collect();
+    sorted.sort_by_key(|s| s.subject);
+    let mut w = Writer::new();
+    w.lp(ROSTER_DOMAIN);
+    w.count(sorted.len());
+    for s in sorted {
+        w.b32(&s.hash());
+    }
+    sha256(&w.finish())
+}
+
 /// One vote the writer counted: which act, for which Subject, evaluated at which N1 position.
 ///
 /// The position is the **relying-party position** handed to the existing N4 verifier. It comes
-/// from the writer's signed statement, never from the voter's own bytes, so a voter cannot choose
-/// an evaluation window that predates a revocation without the writer attesting to it.
+/// from the writer's signed statement, not from the voter's own bytes. Its **freshness is
+/// writer-attested, not verified**: a bundle carries facts only up to the position, so a revocation
+/// after it is invisible to the verifier. A writer that names a stale position can count a vote
+/// from a device revoked since. Verified freshness needs the Subject's current head (not in v0).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InputActV0 {
     /// `DeviceActV1::act_id` of the vote.
@@ -484,7 +531,9 @@ pub struct AuthorizationV0 {
     pub verdict: Verdict,
     /// Counted inputs, strictly ascending by `act_id`.
     pub inputs: Vec<InputActV0>,
-    /// The effect authorized.
+    /// [`roster_hash`] of the standing statements the eligible set is derived from.
+    pub roster_hash: [u8; 32],
+    /// The effect authorized. `subject_matter` must equal [`EffectV0::commitment`].
     pub effect: EffectV0,
     /// A writer-chosen id for this authorization's one admission.
     pub operation_id: [u8; 32],
@@ -515,6 +564,7 @@ impl CanonicalV0 for AuthorizationV0 {
             w.b32(i.subject.as_bytes());
             w.u64(i.position);
         }
+        w.b32(&self.roster_hash);
         w.b32(&self.effect.target);
         w.lp(self.effect.action.as_bytes());
         w.b32(&self.effect.params_hash);
@@ -541,6 +591,7 @@ impl CanonicalV0 for AuthorizationV0 {
                 position: r.u64("input_position")?,
             });
         }
+        let roster_hash = r.b32("roster_hash")?;
         let target = r.b32("target")?;
         let action = r.text("action", MAX_ACTION_LEN)?;
         let params_hash = r.b32("params_hash")?;
@@ -554,6 +605,7 @@ impl CanonicalV0 for AuthorizationV0 {
             rule_hash,
             verdict,
             inputs,
+            roster_hash,
             effect: EffectV0 {
                 target,
                 action,

@@ -29,12 +29,13 @@ mod verify;
 
 pub use codec::AuthzCodecError;
 pub use statements::{
-    target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0, ContextInceptionV0,
-    ContextRef, EffectV0, FounderSignature, InputActV0, OutcomeReceiptV0, RuleAdoptionV0, Signed,
-    SignedDesignation, StandingV0, Verdict, WriterDesignationV0, AUTHORIZATION_DOMAIN,
-    AUTHZ_V0_VERSION, CONTEXT_REF_DOMAIN, DESIGNATION_DOMAIN, EVIDENCE_DOMAIN, INCEPTION_DOMAIN,
-    MAX_ACTION_LEN, MAX_FOUNDERS, MAX_INPUTS, MAX_ROLE_LEN, MAX_RULE_ARTIFACT, MAX_VOTE_BUNDLE,
-    OUTCOME_DOMAIN, RULE_ADOPTION_DOMAIN, STANDING_DOMAIN, TARGET_DOMAIN,
+    roster_hash, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
+    ContextInceptionV0, ContextRef, EffectV0, FounderSignature, InputActV0, OutcomeReceiptV0,
+    RuleAdoptionV0, Signed, SignedDesignation, StandingV0, Verdict, WriterDesignationV0,
+    AUTHORIZATION_DOMAIN, AUTHZ_V0_VERSION, CONTEXT_REF_DOMAIN, DESIGNATION_DOMAIN,
+    EVIDENCE_DOMAIN, INCEPTION_DOMAIN, MAX_ACTION_LEN, MAX_FOUNDERS, MAX_INPUTS, MAX_ROLE_LEN,
+    MAX_RULE_ARTIFACT, MAX_VOTE_BUNDLE, OUTCOME_DOMAIN, ROSTER_DOMAIN, RULE_ADOPTION_DOMAIN,
+    STANDING_DOMAIN, SUBJECT_MATTER_DOMAIN, TARGET_DOMAIN,
 };
 pub use verify::{
     admit, issue_outcome_receipt, verify_authorization, verify_authorization_bytes,

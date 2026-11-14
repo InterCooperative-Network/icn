@@ -15,8 +15,8 @@ use thiserror::Error;
 
 use super::codec::AuthzCodecError;
 use super::statements::{
-    sha256, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0, ContextRef,
-    OutcomeReceiptV0, Signed, StandingV0, Verdict,
+    roster_hash, sha256, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
+    ContextRef, OutcomeReceiptV0, Signed, StandingV0, Verdict,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -129,6 +129,14 @@ pub enum AuthzRefusal {
     /// A writer-signed statement's signature does not verify under the designated writer.
     #[error("{0:?} is not signed by the designated writer")]
     BadWriterSignature(StatementKind),
+    /// `subject_matter` is not the commitment to the authorization's effect and operation id, so
+    /// the votes would not bind what is being authorized.
+    #[error("subject matter does not commit to the effect and operation id")]
+    SubjectMatterNotBoundToEffect,
+    /// The supplied standing statements are not the roster the authorization commits to (one was
+    /// stripped, or an uncommitted one — e.g. an omitted member's — was attached).
+    #[error("standing statements do not match the committed roster")]
+    RosterMismatch,
     /// The authorization's rule is not the adopted rule.
     #[error("authorization rule is not the adopted rule")]
     RuleNotAdopted,
@@ -322,6 +330,11 @@ pub fn verify_authorization(
         StatementKind::RuleAdoption,
     )?;
 
+    // The votes must bind the exact effect and operation id being authorized.
+    if auth.subject_matter != auth.effect.commitment(context, auth.operation_id) {
+        return Err(AuthzRefusal::SubjectMatterNotBoundToEffect);
+    }
+
     // Rule hash chain: authorization → adoption → artifact → implementation.
     if auth.rule_hash != adoption.rule_hash {
         return Err(AuthzRefusal::RuleNotAdopted);
@@ -348,6 +361,10 @@ pub fn verify_authorization(
         if standing.insert(s.body.subject, &s.body).is_some() {
             return Err(AuthzRefusal::DuplicateStanding(s.body.subject));
         }
+    }
+    let bodies: Vec<StandingV0> = evidence.standing.iter().map(|s| s.body.clone()).collect();
+    if roster_hash(&bodies) != auth.roster_hash {
+        return Err(AuthzRefusal::RosterMismatch);
     }
 
     // The supplied vote set must equal the signed input set.
