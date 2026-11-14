@@ -8,15 +8,20 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::BTreeSet;
+use std::sync::{Arc, Mutex};
 
 use ed25519_dalek::SigningKey;
 use icn_authz::effect_v0::{
-    find_log_fork, replay_context_log, sign_checkpointed_authorization, target_id,
-    transition_subject_matter, verify_checkpointed_authorization, AdoptedRule, AuthzRefusal,
-    CanonicalV0, CheckpointedAuthorizationV0, CheckpointedEvidenceV0, ContextInceptionV0,
-    ContextRef, ContextStateV0, EffectV0, EntryAuthorityV0, LogCheckpointV0, LogEntryV0,
-    LogForkProofV0, LogRefusal, RelyingFrontierV0, RuleBinding, RuleError, RuleResolver, RuleSlot,
-    SignedLogEntryV0, TransitionV0, Verdict,
+    admit, admit_checkpointed, find_log_fork, replay_context_log, roster_hash,
+    sign_checkpointed_authorization, target_id, transition_subject_matter,
+    verify_checkpointed_authorization, Admission, AdmissionRefusal, AdoptedRule,
+    AuthorizationEvidenceV0, AuthorizationV0, AuthzRefusal, CanonicalV0, CheckpointedAdmission,
+    CheckpointedAuthorizationV0, CheckpointedEvidenceV0, ConflictClass, ConsumedAuthorization,
+    ConsumedEntry, ConsumedSet, ConsumedSetError, ContextInceptionV0, ContextRef, ContextStateV0,
+    EffectV0, EntryAuthorityV0, EquivocationProof, InMemoryConsumedSet, InputActV0,
+    LogCheckpointV0, LogEntryV0, LogForkProofV0, LogRefusal, RelyingFrontierV0, RuleAdoptionV0,
+    RuleBinding, RuleError, RuleResolver, RuleSlot, Signed, SignedDesignation, SignedLogEntryV0,
+    StandingV0, TransitionV0, Verdict, WriterDesignationV0,
 };
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::vote::VoteChoice;
@@ -165,6 +170,12 @@ struct World {
 }
 
 fn world() -> World {
+    world_in([0x1a; 32])
+}
+
+/// A world whose only difference is its context (the inception nonce): same founders, writer,
+/// members and target.
+fn world_in(nonce: [u8; 32]) -> World {
     let founders = [key(0xF1), key(0xF2), key(0xF3)];
     let inception = ContextInceptionV0::new(
         founders
@@ -172,7 +183,7 @@ fn world() -> World {
             .map(|k| PrincipalKey::try_from_verifying_key(k.verifying_key()).unwrap())
             .collect(),
         2,
-        [0x1a; 32],
+        nonce,
     )
     .unwrap();
     World {
@@ -266,14 +277,39 @@ impl World {
         writer: &SigningKey,
         voters: &[&Member],
     ) -> CheckpointedEvidenceV0 {
+        self.authorize_op(
+            log,
+            checkpoint,
+            writer,
+            voters,
+            VoteChoice::For,
+            Verdict::Pass,
+            OP,
+        )
+    }
+
+    /// [`World::authorize`] with the votes' `choice`, the signed `verdict` and the operation id.
+    #[allow(clippy::too_many_arguments)]
+    fn authorize_op(
+        &self,
+        log: &[SignedLogEntryV0],
+        checkpoint: LogCheckpointV0,
+        writer: &SigningKey,
+        voters: &[&Member],
+        choice: VoteChoice,
+        verdict: Verdict,
+        op: [u8; 32],
+    ) -> CheckpointedEvidenceV0 {
         let effect = self.effect();
-        let matter = effect.commitment(self.ctx, OP);
-        let mut vote_bundles: Vec<EvidenceBundle> =
-            voters.iter().map(|m| m.vote(self.ctx, matter)).collect();
+        let matter = effect.commitment(self.ctx, op);
+        let mut vote_bundles: Vec<EvidenceBundle> = voters
+            .iter()
+            .map(|m| m.vote_at(self.ctx, matter, choice, 1))
+            .collect();
         vote_bundles.sort_by_key(|b| b.act().act.act_id());
         let inputs = vote_bundles
             .iter()
-            .map(|b| icn_authz::effect_v0::InputActV0 {
+            .map(|b| InputActV0 {
                 act_id: b.act().act.act_id(),
                 subject: b.subject(),
                 position: b.evaluation_position(),
@@ -284,10 +320,10 @@ impl World {
             checkpoint,
             subject_matter: matter,
             rule_hash: strict().rule_hash(),
-            verdict: Verdict::Pass,
+            verdict,
             inputs,
             effect,
-            operation_id: OP,
+            operation_id: op,
             not_after: NOT_AFTER,
         };
         CheckpointedEvidenceV0 {
@@ -379,8 +415,8 @@ fn p3_checkpointed_authorization_verifies_against_the_frontier() {
     let cp = checkpoint(&w.state(&log));
     let ev = w.authorize(&log, cp, &w.writer, &[w.m(0), w.m(1)]);
     let v = verify_checkpointed_authorization(&ev, &w.frontier(1, Some(cp)), &rules()).unwrap();
-    assert_eq!(v.writer, World::pk(&w.writer));
-    assert_eq!(v.presented_tip, cp);
+    assert_eq!(v.writer(), World::pk(&w.writer));
+    assert_eq!(v.presented_tip(), cp);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1224,4 +1260,797 @@ fn a_fork_proof_needs_a_common_predecessor() {
     assert_eq!(late.equivocators(&w.inception), None);
     let first = find_log_fork(&w.inception, &a, &b).unwrap();
     assert_eq!(first.first.body.seq, 2);
+}
+// ---------------------------------------------------------------------------------------------
+// Admission — `admit_checkpointed` (VERIFIED → ADMITTED; nothing here is executed or durable)
+// ---------------------------------------------------------------------------------------------
+//
+// Each test is one requirement (A–T) of the checkpointed-admission slice. "Without consuming" is
+// asserted twice: the backend's `consume` was never called, and a valid authorization for the
+// same operation id still admits afterwards.
+
+/// The target's clock, inside the authorization window. Admission uses it for expiry only.
+const NOW: u64 = 1_000;
+
+/// [`InMemoryConsumedSet`] that counts `consume` calls.
+#[derive(Default)]
+struct Counting {
+    inner: InMemoryConsumedSet,
+    calls: usize,
+}
+
+impl ConsumedSet for Counting {
+    fn consume(
+        &mut self,
+        context: ContextRef,
+        operation_id: [u8; 32],
+        entry: ConsumedEntry,
+    ) -> Result<Option<ConsumedEntry>, ConsumedSetError> {
+        self.calls += 1;
+        self.inner.consume(context, operation_id, entry)
+    }
+}
+
+/// A backend that always fails.
+struct Failing;
+
+impl ConsumedSet for Failing {
+    fn consume(
+        &mut self,
+        _: ContextRef,
+        _: [u8; 32],
+        _: ConsumedEntry,
+    ) -> Result<Option<ConsumedEntry>, ConsumedSetError> {
+        Err(ConsumedSetError("backend unavailable".into()))
+    }
+}
+
+/// One shared set behind a lock taken **only** inside `consume`, so verification runs
+/// concurrently and only the consumption step is serialized.
+#[derive(Clone, Default)]
+struct Shared(Arc<Mutex<InMemoryConsumedSet>>);
+
+impl ConsumedSet for Shared {
+    fn consume(
+        &mut self,
+        context: ContextRef,
+        operation_id: [u8; 32],
+        entry: ConsumedEntry,
+    ) -> Result<Option<ConsumedEntry>, ConsumedSetError> {
+        self.0
+            .lock()
+            .map_err(|_| ConsumedSetError("poisoned".into()))?
+            .consume(context, operation_id, entry)
+    }
+}
+
+fn inputs_of(bundles: &[EvidenceBundle]) -> Vec<InputActV0> {
+    let mut inputs: Vec<InputActV0> = bundles
+        .iter()
+        .map(|b| InputActV0 {
+            act_id: b.act().act.act_id(),
+            subject: b.subject(),
+            position: b.evaluation_position(),
+        })
+        .collect();
+    inputs.sort_by_key(|i| i.act_id);
+    inputs
+}
+
+impl World {
+    fn admit(
+        &self,
+        ev: &CheckpointedEvidenceV0,
+        frontier: &RelyingFrontierV0,
+        now: u64,
+        consumed: &mut dyn ConsumedSet,
+    ) -> Result<CheckpointedAdmission, AdmissionRefusal> {
+        admit_checkpointed(ev, frontier, &rules(), self.target, now, consumed)
+    }
+
+    /// The honest authorization at genesis (members 0 and 1 For, Pass, [`OP`]).
+    fn honest(&self) -> (Vec<SignedLogEntryV0>, CheckpointedEvidenceV0) {
+        let log = vec![self.genesis()];
+        let ev = self.authorize(
+            &log,
+            checkpoint(&self.state(&log)),
+            &self.writer,
+            &[self.m(0), self.m(1)],
+        );
+        (log, ev)
+    }
+
+    /// The same decision under #2884's designation model: same inception, founders, writer,
+    /// rule, electorate and votes, for `op`.
+    fn legacy(&self, op: [u8; 32], voters: &[&Member]) -> AuthorizationEvidenceV0 {
+        let effect = self.effect();
+        let matter = effect.commitment(self.ctx, op);
+        let mut vote_bundles: Vec<EvidenceBundle> =
+            voters.iter().map(|m| m.vote(self.ctx, matter)).collect();
+        vote_bundles.sort_by_key(|b| b.act().act.act_id());
+        let standing: Vec<StandingV0> = self
+            .members
+            .iter()
+            .map(|m| StandingV0 {
+                context: self.ctx,
+                epoch: 1,
+                subject: m.subject,
+                role: ROLE.into(),
+                not_after: NOT_AFTER,
+            })
+            .collect();
+        let rule_hash = strict().rule_hash();
+        let mut ev = AuthorizationEvidenceV0 {
+            inception: self.inception.clone(),
+            designation: SignedDesignation::sign(
+                WriterDesignationV0 {
+                    context: self.ctx,
+                    epoch: 1,
+                    writer: Self::pk(&self.writer),
+                    start_head: [1; 32],
+                },
+                &[&self.founders[0], &self.founders[1]],
+            )
+            .unwrap(),
+            standing: standing
+                .iter()
+                .map(|s| Signed::sign(s.clone(), &self.writer))
+                .collect(),
+            rule_adoption: Signed::sign(
+                RuleAdoptionV0 {
+                    context: self.ctx,
+                    epoch: 1,
+                    rule_hash,
+                },
+                &self.writer,
+            ),
+            rule_artifact: strict().artifact(),
+            authorization: Signed::sign(
+                AuthorizationV0 {
+                    context: self.ctx,
+                    epoch: 1,
+                    subject_matter: matter,
+                    rule_hash,
+                    verdict: Verdict::Pass,
+                    inputs: inputs_of(&vote_bundles),
+                    roster_hash: roster_hash(&standing),
+                    effect,
+                    operation_id: op,
+                    not_after: NOT_AFTER,
+                },
+                &self.writer,
+            ),
+            vote_bundles,
+        };
+        ev.canonicalize();
+        ev
+    }
+
+    fn admit_legacy(
+        &self,
+        ev: &AuthorizationEvidenceV0,
+        consumed: &mut dyn ConsumedSet,
+    ) -> Result<Admission, AdmissionRefusal> {
+        admit(ev, &strict(), self.ctx, self.target, NOW, 1, consumed)
+    }
+}
+
+/// Q's probe: nothing was consumed for `(context, OP)`, because the honest authorization for
+/// that operation id still admits.
+fn assert_not_consumed(w: &World, consumed: &mut dyn ConsumedSet) {
+    let (_, ev) = w.honest();
+    assert!(
+        w.admit(&ev, &w.frontier(1, None), NOW, consumed).is_ok(),
+        "a refused request consumed the operation id"
+    );
+}
+
+fn equivocation(r: Result<impl std::fmt::Debug, AdmissionRefusal>) -> EquivocationProof {
+    match r {
+        Err(AdmissionRefusal::Equivocation(proof)) => *proof,
+        other => panic!("expected a conflict, got {other:?}"),
+    }
+}
+
+/// A: a verified Pass for this target admits once, and the admission carries the log-derived
+/// writer and the exact authorized operation.
+#[test]
+fn a_valid_checkpointed_pass_admits_once() {
+    let w = world();
+    let (log, ev) = w.honest();
+    let cp = checkpoint(&w.state(&log));
+    let frontier = w.frontier(1, Some(cp));
+    let mut consumed = Counting::default();
+    let admission = w.admit(&ev, &frontier, NOW, &mut consumed).unwrap();
+    let v = admission.verified();
+    assert_eq!(v.writer(), World::pk(&w.writer));
+    assert_eq!(v.signed(), &ev.authorization);
+    assert_eq!(v.authorization().operation_id, OP);
+    assert_eq!(v.authorization().effect, w.effect());
+    assert_eq!(v.presented_tip(), cp);
+    assert_eq!(consumed.calls, 1);
+    assert_eq!(
+        w.admit(&ev, &frontier, NOW, &mut consumed).unwrap_err(),
+        AdmissionRefusal::Replayed
+    );
+}
+
+/// B: an honestly reported Fail is a verified decision, and is still not admitted.
+#[test]
+fn b_fail_verdict_is_refused_without_consuming() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let cp = checkpoint(&w.state(&log));
+    let ev = w.authorize_op(
+        &log,
+        cp,
+        &w.writer,
+        &[w.m(0), w.m(1)],
+        VoteChoice::Against,
+        Verdict::Fail,
+        OP,
+    );
+    assert!(verify_checkpointed_authorization(&ev, &w.frontier(1, None), &rules()).is_ok());
+    let mut consumed = Counting::default();
+    assert_eq!(
+        w.admit(&ev, &w.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::VerdictNotPass
+    );
+    assert_eq!(consumed.calls, 0);
+    assert_not_consumed(&w, &mut consumed);
+}
+
+/// C: the effect names another custodian.
+#[test]
+fn c_wrong_target_is_refused_without_consuming() {
+    let w = world();
+    let (_, ev) = w.honest();
+    let mut consumed = Counting::default();
+    let elsewhere = target_id(&principal(0xC2));
+    assert_eq!(
+        admit_checkpointed(
+            &ev,
+            &w.frontier(1, None),
+            &rules(),
+            elsewhere,
+            NOW,
+            &mut consumed
+        )
+        .unwrap_err(),
+        AdmissionRefusal::WrongTarget
+    );
+    assert_eq!(consumed.calls, 0);
+    assert_not_consumed(&w, &mut consumed);
+}
+
+/// D: a target serves only the context of its own frontier, whatever the evidence claims.
+#[test]
+fn d_wrong_context_is_refused_without_consuming() {
+    let w = world();
+    let other = world_in([0x2b; 32]);
+    let (_, ev) = w.honest();
+    let mut consumed = Counting::default();
+    // A different context's frontier.
+    assert_eq!(
+        w.admit(&ev, &other.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::UntrustedContext
+    );
+    // This context's frontier, the other context's inception.
+    let mut swapped = ev.clone();
+    swapped.inception = other.inception.clone();
+    assert_eq!(
+        w.admit(&swapped, &w.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::UntrustedContext
+    );
+    assert_eq!(consumed.calls, 0);
+    assert_not_consumed(&w, &mut consumed);
+}
+
+/// E: expiry is the target's clock against the signed `not_after`, inclusive.
+#[test]
+fn e_expired_authorization_is_refused_without_consuming() {
+    let w = world();
+    let (_, ev) = w.honest();
+    let mut consumed = Counting::default();
+    assert_eq!(
+        w.admit(&ev, &w.frontier(1, None), NOT_AFTER + 1, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Expired {
+            not_after: NOT_AFTER,
+            now: NOT_AFTER + 1
+        }
+    );
+    assert_eq!(consumed.calls, 0);
+    assert!(w
+        .admit(&ev, &w.frontier(1, None), NOT_AFTER, &mut consumed)
+        .is_ok());
+}
+
+/// F: a checkpoint below the relying party's frontier (`min_seq`, or raised by a pin).
+#[test]
+fn f_checkpoint_below_the_frontier_is_refused() {
+    let w = world();
+    let mut log = vec![w.genesis()];
+    let old = checkpoint(&w.state(&log));
+    log.push(w.next(
+        &log,
+        grant(&Member::new(0x04)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+    ));
+    let pin = checkpoint(&w.state(&log));
+    let ev = w.authorize(&log, old, &w.writer, &[w.m(0), w.m(1)]);
+    let mut consumed = Counting::default();
+    for frontier in [w.frontier(2, None), w.frontier(0, Some(pin))] {
+        assert_eq!(
+            w.admit(&ev, &frontier, NOW, &mut consumed).unwrap_err(),
+            AdmissionRefusal::Log(LogRefusal::CheckpointBelowFrontier {
+                checkpoint: 1,
+                frontier: 2
+            })
+        );
+    }
+    assert_eq!(consumed.calls, 0);
+    // The same authorization is historically valid for a party at the lower frontier.
+    assert!(w
+        .admit(&ev, &w.frontier(1, None), NOW, &mut consumed)
+        .is_ok());
+}
+
+/// G: presented history that stops before the pinned checkpoint.
+#[test]
+fn g_history_missing_the_pinned_checkpoint_is_refused() {
+    let w = world();
+    let mut log = vec![w.genesis()];
+    log.push(w.next(
+        &log,
+        grant(&Member::new(0x04)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+    ));
+    let pin = checkpoint(&w.state(&log));
+    let truncated = &log[..1];
+    let ev = w.authorize(
+        truncated,
+        checkpoint(&w.state(truncated)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+    );
+    let mut consumed = Counting::default();
+    assert_eq!(
+        w.admit(&ev, &w.frontier(1, Some(pin)), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Log(LogRefusal::PinnedCheckpointMissing { seq: 2 })
+    );
+    assert_eq!(consumed.calls, 0);
+}
+
+/// H: presented history from another branch than the one pinned.
+#[test]
+fn h_history_conflicting_with_the_pin_is_refused() {
+    let w = world();
+    let mut a = vec![w.genesis()];
+    a.push(w.next(&a, grant(&Member::new(0x04)), &w.writer, &[w.m(0), w.m(1)]));
+    let mut b = vec![w.genesis()];
+    b.push(w.next(&b, revoke(w.m(2)), &w.writer, &[w.m(0), w.m(1)]));
+    let ev = w.authorize(&b, checkpoint(&w.state(&b)), &w.writer, &[w.m(0), w.m(1)]);
+    let mut consumed = Counting::default();
+    assert_eq!(
+        w.admit(
+            &ev,
+            &w.frontier(1, Some(checkpoint(&w.state(&a)))),
+            NOW,
+            &mut consumed
+        )
+        .unwrap_err(),
+        AdmissionRefusal::Log(LogRefusal::PinnedCheckpointMismatch { seq: 2 })
+    );
+    assert_eq!(consumed.calls, 0);
+    assert_not_consumed(&w, &mut consumed);
+}
+
+/// I: revoked standing, an unauthorized rule change, and a writer-asserted rule all stay refused
+/// through admission.
+#[test]
+fn i_revocation_and_rule_capture_stay_refused_through_admission() {
+    let w = world();
+    let mut consumed = Counting::default();
+
+    // Revoked member's vote at the revocation checkpoint.
+    let mut log = vec![w.genesis()];
+    log.push(w.next(&log, revoke(w.m(2)), &w.writer, &[w.m(0), w.m(1)]));
+    let ev = w.authorize(
+        &log,
+        checkpoint(&w.state(&log)),
+        &w.writer,
+        &[w.m(1), w.m(2)],
+    );
+    assert!(matches!(
+        w.admit(&ev, &w.frontier(2, None), NOW, &mut consumed),
+        Err(AdmissionRefusal::Log(LogRefusal::IneligibleVoter { subject, .. })) if subject == w.m(2).subject
+    ));
+
+    // A writer-sequenced effect-rule replacement without a passing decision.
+    let mut log = vec![w.genesis()];
+    let adopt = TransitionV0::AdoptRule {
+        slot: RuleSlot::Effect,
+        rule_hash: lax().rule_hash(),
+    };
+    log.push(w.next(&log, adopt, &w.writer, &[w.m(0)]));
+    let ev = w.authorize(
+        &log,
+        checkpoint(&w.replay(&log[..1]).unwrap()),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+    );
+    assert_eq!(
+        w.admit(&ev, &w.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Log(LogRefusal::TransitionNotAuthorized { seq: 2 })
+    );
+
+    // The writer asserting the lax rule is in force, with one vote.
+    let (_, mut ev) = w.honest();
+    let mut body = ev.authorization.body.clone();
+    body.rule_hash = lax().rule_hash();
+    ev.authorization = sign_checkpointed_authorization(body, &w.writer);
+    assert_eq!(
+        w.admit(&ev, &w.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Log(LogRefusal::EffectRuleNotInForce)
+    );
+    assert_eq!(consumed.calls, 0);
+    assert_not_consumed(&w, &mut consumed);
+}
+
+/// J: the identical authorization again — from re-encoded bytes, or with a longer presented
+/// history — is a replay, not a new admission.
+#[test]
+fn j_identical_replay_is_refused() {
+    let w = world();
+    let (mut log, ev) = w.honest();
+    let mut consumed = InMemoryConsumedSet::default();
+    w.admit(&ev, &w.frontier(1, None), NOW, &mut consumed)
+        .unwrap();
+
+    let mut decoded = ev.clone();
+    decoded.authorization = Signed::decode(&ev.authorization.encode()).unwrap();
+    assert_eq!(
+        w.admit(&decoded, &w.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Replayed
+    );
+
+    log.push(w.next(
+        &log,
+        grant(&Member::new(0x04)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+    ));
+    let mut longer = ev.clone();
+    longer.log = log;
+    assert_eq!(
+        w.admit(&longer, &w.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Replayed
+    );
+}
+
+/// K: a different authorization by the same writer for a consumed (context, operation id) is a
+/// conflict attributable to that writer; a tampered proof is not one.
+#[test]
+fn k_conflicting_reuse_by_one_writer_is_attributable_equivocation() {
+    let w = world();
+    let (mut log, first) = w.honest();
+    let mut consumed = InMemoryConsumedSet::default();
+    w.admit(&first, &w.frontier(1, None), NOW, &mut consumed)
+        .unwrap();
+
+    log.push(w.next(
+        &log,
+        grant(&Member::new(0x04)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+    ));
+    let second = w.authorize(
+        &log,
+        checkpoint(&w.state(&log)),
+        &w.writer,
+        // Four members after the grant: three votes meet the 2/3 quorum.
+        &[w.m(0), w.m(1), w.m(2)],
+    );
+    let proof = equivocation(w.admit(&second, &w.frontier(1, None), NOW, &mut consumed));
+    assert!(proof.is_valid());
+    assert_eq!(
+        proof.classify(),
+        Some(ConflictClass::Equivocation {
+            signer: World::pk(&w.writer)
+        })
+    );
+    assert_eq!(
+        proof.first.authorization,
+        ConsumedAuthorization::Checkpointed(first.authorization.clone())
+    );
+    assert_eq!(
+        proof.second.authorization,
+        ConsumedAuthorization::Checkpointed(second.authorization.clone())
+    );
+
+    // A proof whose second statement was altered after signing proves nothing.
+    let mut forged = proof.clone();
+    if let ConsumedAuthorization::Checkpointed(s) = &mut forged.second.authorization {
+        s.body.not_after += 1;
+    }
+    assert!(!forged.is_valid());
+    assert_eq!(forged.classify(), None);
+    // Nor does a "proof" of one statement against itself.
+    let mut same = proof.clone();
+    same.second = same.first.clone();
+    assert_eq!(same.classify(), None);
+    // The first admission remains the one consumed.
+    assert_eq!(
+        w.admit(&first, &w.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Replayed
+    );
+}
+
+/// L: legacy and checkpointed admission share one `(context, operation_id)` space, in either
+/// order. One writer key signed both; the kinds differ, so the conflict is reported as
+/// cross-kind, not as equivocation.
+#[test]
+fn l_legacy_and_checkpointed_cannot_both_consume_one_operation() {
+    let w = world();
+    let (_, checkpointed) = w.honest();
+    let legacy = w.legacy(OP, &[w.m(0), w.m(1)]);
+    let frontier = w.frontier(1, None);
+    // Each is admissible on its own: the collision is real, not a fixture artefact.
+    assert!(w
+        .admit_legacy(&legacy, &mut InMemoryConsumedSet::default())
+        .is_ok());
+    assert!(w
+        .admit(
+            &checkpointed,
+            &frontier,
+            NOW,
+            &mut InMemoryConsumedSet::default()
+        )
+        .is_ok());
+
+    // Legacy first.
+    let mut consumed = InMemoryConsumedSet::default();
+    w.admit_legacy(&legacy, &mut consumed).unwrap();
+    let proof = equivocation(w.admit(&checkpointed, &frontier, NOW, &mut consumed));
+    assert!(proof.is_valid());
+    assert_eq!(proof.classify(), Some(ConflictClass::CrossKind));
+    assert!(matches!(
+        proof.first.authorization,
+        ConsumedAuthorization::Legacy(_)
+    ));
+    assert_eq!(
+        w.admit_legacy(&legacy, &mut consumed).unwrap_err(),
+        AdmissionRefusal::Replayed
+    );
+
+    // Checkpointed first.
+    let mut consumed = InMemoryConsumedSet::default();
+    w.admit(&checkpointed, &frontier, NOW, &mut consumed)
+        .unwrap();
+    let proof = equivocation(w.admit_legacy(&legacy, &mut consumed));
+    assert!(proof.is_valid());
+    assert_eq!(proof.classify(), Some(ConflictClass::CrossKind));
+    assert!(matches!(
+        proof.first.authorization,
+        ConsumedAuthorization::Checkpointed(_)
+    ));
+    assert_eq!(
+        w.admit(&checkpointed, &frontier, NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Replayed
+    );
+}
+
+/// M: operation ids are scoped to their context. Two contexts with the same founders, writer,
+/// members, target and operation id are two operations; neither context's evidence is
+/// admitted under the other's frontier.
+#[test]
+fn m_operation_ids_are_scoped_to_their_context() {
+    let a = world();
+    let b = world_in([0x2b; 32]);
+    assert_ne!(a.ctx, b.ctx);
+    assert_eq!(a.target, b.target);
+    let (_, ev_a) = a.honest();
+    let (_, ev_b) = b.honest();
+    assert_eq!(
+        ev_a.authorization.body.operation_id,
+        ev_b.authorization.body.operation_id
+    );
+
+    let mut consumed = InMemoryConsumedSet::default();
+    assert!(a
+        .admit(&ev_a, &a.frontier(1, None), NOW, &mut consumed)
+        .is_ok());
+    assert!(b
+        .admit(&ev_b, &b.frontier(1, None), NOW, &mut consumed)
+        .is_ok());
+    assert_eq!(
+        a.admit(&ev_a, &a.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Replayed
+    );
+    assert_eq!(
+        b.admit(&ev_b, &a.frontier(1, None), NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::UntrustedContext
+    );
+}
+
+/// N: a backend failure yields no admission, and is not mistaken for a replay or a conflict.
+#[test]
+fn n_consumed_set_failure_fails_closed() {
+    let w = world();
+    let (_, ev) = w.honest();
+    assert_eq!(
+        w.admit(&ev, &w.frontier(1, None), NOW, &mut Failing)
+            .unwrap_err(),
+        AdmissionRefusal::ConsumedSet(ConsumedSetError("backend unavailable".into()))
+    );
+}
+
+/// O: stripped, unlisted or relisted N4 evidence.
+#[test]
+fn o_invalid_or_incomplete_vote_evidence_is_refused() {
+    let w = world();
+    let (_, honest) = w.honest();
+    let mut consumed = Counting::default();
+    let refused = |ev: &CheckpointedEvidenceV0, consumed: &mut Counting| match w.admit(
+        ev,
+        &w.frontier(1, None),
+        NOW,
+        consumed,
+    ) {
+        Err(AdmissionRefusal::Log(LogRefusal::Vote { refusal, .. })) => *refusal,
+        other => panic!("expected a vote refusal, got {other:?}"),
+    };
+
+    let mut stripped = honest.clone();
+    stripped.vote_bundles.pop();
+    assert!(matches!(
+        refused(&stripped, &mut consumed),
+        AuthzRefusal::InputActMissing(_)
+    ));
+
+    let mut unlisted = honest.clone();
+    unlisted
+        .vote_bundles
+        .push(w.m(2).vote(w.ctx, w.effect().commitment(w.ctx, OP)));
+    assert!(matches!(
+        refused(&unlisted, &mut consumed),
+        AuthzRefusal::UnlistedAct(_)
+    ));
+
+    let mut duplicated = honest.clone();
+    let again = duplicated.vote_bundles[0].clone();
+    duplicated.vote_bundles.push(again);
+    assert!(matches!(
+        refused(&duplicated, &mut consumed),
+        AuthzRefusal::DuplicateAct(_)
+    ));
+    assert_eq!(consumed.calls, 0);
+    assert_not_consumed(&w, &mut consumed);
+}
+
+/// P: after a succession, the outgoing writer's old authorization is history (refused by a
+/// frontier at the appointment), its new one is not the writer's, and the successor's admits.
+/// A successor reusing an operation id the predecessor consumed conflicts across two keys,
+/// which is not single-signer equivocation.
+#[test]
+fn p_writer_succession_and_stale_writer_through_admission() {
+    let w = world();
+    let w2 = key(0xA2);
+    let mut log = vec![w.genesis()];
+    let before = checkpoint(&w.state(&log));
+    let appoint = TransitionV0::AppointWriter {
+        writer: World::pk(&w2),
+    };
+    log.push(w.next(&log, appoint, &w2, &[w.m(0), w.m(1)]));
+    let after = checkpoint(&w.state(&log));
+    let at_appointment = w.frontier(2, None);
+    let mut consumed = Counting::default();
+
+    let stale_history = w.authorize(&log, before, &w.writer, &[w.m(0), w.m(1)]);
+    assert_eq!(
+        w.admit(&stale_history, &at_appointment, NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Log(LogRefusal::CheckpointBelowFrontier {
+            checkpoint: 1,
+            frontier: 2
+        })
+    );
+    let stale_writer = w.authorize(&log, after, &w.writer, &[w.m(0), w.m(1)]);
+    assert_eq!(
+        w.admit(&stale_writer, &at_appointment, NOW, &mut consumed)
+            .unwrap_err(),
+        AdmissionRefusal::Log(LogRefusal::AuthorizationNotByWriter)
+    );
+    assert_eq!(consumed.calls, 0);
+
+    let successor = w.authorize(&log, after, &w2, &[w.m(0), w.m(1)]);
+    let admitted = w
+        .admit(&successor, &at_appointment, NOW, &mut consumed)
+        .unwrap();
+    assert_eq!(admitted.verified().writer(), World::pk(&w2));
+
+    // A party at the lower frontier admitted the predecessor's authorization first.
+    let mut consumed = InMemoryConsumedSet::default();
+    w.admit(&stale_history, &w.frontier(1, None), NOW, &mut consumed)
+        .unwrap();
+    let proof = equivocation(w.admit(&successor, &w.frontier(1, None), NOW, &mut consumed));
+    assert!(proof.is_valid());
+    assert_eq!(proof.classify(), Some(ConflictClass::DifferentSigners));
+}
+
+/// S: concurrent admissions of the same and of conflicting authorizations, sharing one set, end
+/// with exactly one consumption. Verification runs in parallel; only `consume` is serialized.
+#[test]
+fn s_concurrent_admission_consumes_at_most_once() {
+    let w = world();
+    let (mut log, same) = w.honest();
+    log.push(w.next(
+        &log,
+        grant(&Member::new(0x04)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+    ));
+    let conflicting = w.authorize(
+        &log,
+        checkpoint(&w.state(&log)),
+        &w.writer,
+        // Four members after the grant: three votes meet the 2/3 quorum.
+        &[w.m(0), w.m(1), w.m(2)],
+    );
+    let frontier = w.frontier(1, None);
+    let shared = Shared::default();
+    let target = w.target;
+
+    let results: Vec<Result<CheckpointedAdmission, AdmissionRefusal>> = std::thread::scope(|s| {
+        let handles: Vec<_> = (0..8)
+            .map(|i| {
+                let ev = if i % 2 == 0 { &same } else { &conflicting };
+                let mut set = shared.clone();
+                let frontier = &frontier;
+                s.spawn(move || admit_checkpointed(ev, frontier, &rules(), target, NOW, &mut set))
+            })
+            .collect();
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+    assert!(results.iter().all(|r| matches!(
+        r,
+        Ok(_) | Err(AdmissionRefusal::Replayed) | Err(AdmissionRefusal::Equivocation(_))
+    )));
+}
+
+/// T: a valid admission needs the writer in force at the checkpoint. Re-signing the honest body
+/// under another key — or under a founder — does not admit, and consumes nothing.
+#[test]
+fn t_resigned_authorization_is_refused_without_consuming() {
+    let w = world();
+    let (_, honest) = w.honest();
+    let mut consumed = Counting::default();
+    for impostor in [key(0xEE), w.founders[0].clone()] {
+        let mut ev = honest.clone();
+        ev.authorization =
+            sign_checkpointed_authorization(honest.authorization.body.clone(), &impostor);
+        assert_eq!(
+            w.admit(&ev, &w.frontier(1, None), NOW, &mut consumed)
+                .unwrap_err(),
+            AdmissionRefusal::Log(LogRefusal::AuthorizationNotByWriter)
+        );
+    }
+    assert_eq!(consumed.calls, 0);
+    assert_not_consumed(&w, &mut consumed);
 }

@@ -61,7 +61,10 @@ use super::statements::{
     FounderSignature, InputActV0, Signed, Verdict, AUTHZ_V0_VERSION, MAX_ACTION_LEN, MAX_FOUNDERS,
     MAX_INPUTS, MAX_ROLE_LEN, MAX_STATEMENT, MAX_VOTE_BUNDLE,
 };
-use super::verify::{verify_input_acts, AdoptedRule, AuthzRefusal, RuleBinding, RuleError};
+use super::verify::{
+    consume_once, verify_input_acts, AdmissionRefusal, AdoptedRule, AuthzRefusal,
+    ConsumedAuthorization, ConsumedEntry, ConsumedSet, RuleBinding, RuleError,
+};
 
 /// Domain of [`LogEntryV0`] bytes (signed by founders or the writer; hashed into the chain).
 pub const LOG_ENTRY_DOMAIN: &[u8] = b"icn.authz.v0.log-entry";
@@ -1078,14 +1081,50 @@ pub struct CheckpointedEvidenceV0 {
 
 /// A checkpointed authorization every check passed. Historical validity at `checkpoint`, at or
 /// above the relying party's frontier. Not admitted, not consumed, not executed.
+///
+/// The only way to obtain one is [`verify_checkpointed_authorization`]; its fields are private so
+/// no caller can manufacture an already-verified value.
+///
+/// ```compile_fail
+/// # fn forge(
+/// #     authorization: icn_authz::effect_v0::Signed<icn_authz::effect_v0::CheckpointedAuthorizationV0>,
+/// #     writer: icn_identity::authority_log::PrincipalKey,
+/// #     presented_tip: icn_authz::effect_v0::LogCheckpointV0,
+/// # ) {
+/// let _ = icn_authz::effect_v0::VerifiedCheckpointedAuthorization {
+///     authorization,
+///     writer,
+///     presented_tip,
+/// };
+/// # }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedCheckpointedAuthorization {
-    /// The authorization.
-    pub authorization: Signed<CheckpointedAuthorizationV0>,
+    authorization: Signed<CheckpointedAuthorizationV0>,
+    writer: PrincipalKey,
+    presented_tip: LogCheckpointV0,
+}
+
+impl VerifiedCheckpointedAuthorization {
+    /// The verified authorization body.
+    pub fn authorization(&self) -> &CheckpointedAuthorizationV0 {
+        &self.authorization.body
+    }
+
+    /// The signed authorization.
+    pub fn signed(&self) -> &Signed<CheckpointedAuthorizationV0> {
+        &self.authorization
+    }
+
     /// The writer in force at the checkpoint, who signed it.
-    pub writer: PrincipalKey,
-    /// The tip of the presented log (may be beyond the checkpoint).
-    pub presented_tip: LogCheckpointV0,
+    pub fn writer(&self) -> PrincipalKey {
+        self.writer
+    }
+
+    /// The tip of the presented log (may be beyond the checkpoint; writer-chosen).
+    pub fn presented_tip(&self) -> LogCheckpointV0 {
+        self.presented_tip
+    }
 }
 
 /// Verify `evidence` against the relying party's `frontier`. Order, each fail-closed:
@@ -1163,6 +1202,86 @@ pub fn verify_checkpointed_authorization(
         writer: state.writer,
         presented_tip: log.tip().checkpoint,
     })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Target-side admission of a checkpointed authorization
+// ---------------------------------------------------------------------------------------------
+
+/// A checkpointed authorization a target verified and admitted, consuming its
+/// `(context, operation_id)`. The only way to obtain one is [`admit_checkpointed`].
+///
+/// ADMITTED, not EXECUTED: consumption before any effect is an at-most-once admission boundary,
+/// not exactly-once execution. With [`InMemoryConsumedSet`](super::InMemoryConsumedSet) it is not
+/// DURABLE either.
+///
+/// ```compile_fail
+/// # fn forge(v: icn_authz::effect_v0::VerifiedCheckpointedAuthorization) {
+/// let _ = icn_authz::effect_v0::CheckpointedAdmission { verified: v };
+/// # }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CheckpointedAdmission {
+    verified: VerifiedCheckpointedAuthorization,
+}
+
+impl CheckpointedAdmission {
+    /// The admitted authorization.
+    pub fn verified(&self) -> &VerifiedCheckpointedAuthorization {
+        &self.verified
+    }
+}
+
+/// Target-side admission of a checkpointed authorization.
+///
+/// Every trust input is the target's own: `frontier` (its context, lowest position and optional
+/// pin), `rules` (its rule implementations), `my_target` (its identity) and `now` (its clock).
+/// Nothing the writer presents — log tip, roster, rule or writer claim — is taken on its word.
+///
+/// Order, each fail-closed, and nothing consumed before the last step: evidence for the
+/// frontier's context → [`verify_checkpointed_authorization`] in full (log replay, pin, frontier,
+/// writer at the checkpoint, effect rule in force there, subject matter bound to the effect and
+/// operation id, votes over the electorate there, verdict reproduced) → verdict `Pass` →
+/// `effect.target == my_target` → `now <= not_after` → consume `(context, operation_id)` in the
+/// key space shared with [`admit`](super::admit).
+///
+/// "Fresh enough" is the frontier: `min_seq`, raised to a pinned checkpoint's position. v0 sets no
+/// time-based maximum age; the presented tip is writer-chosen, so a lag bound against it would not
+/// be a trust anchor.
+pub fn admit_checkpointed(
+    evidence: &CheckpointedEvidenceV0,
+    frontier: &RelyingFrontierV0,
+    rules: &dyn RuleResolver,
+    my_target: [u8; 32],
+    now: u64,
+    consumed: &mut dyn ConsumedSet,
+) -> Result<CheckpointedAdmission, AdmissionRefusal> {
+    if evidence.inception.context_ref() != frontier.context {
+        return Err(AdmissionRefusal::UntrustedContext);
+    }
+    let verified = verify_checkpointed_authorization(evidence, frontier, rules)
+        .map_err(AdmissionRefusal::Log)?;
+    let auth = verified.authorization();
+    if auth.verdict != Verdict::Pass {
+        return Err(AdmissionRefusal::VerdictNotPass);
+    }
+    if auth.effect.target != my_target {
+        return Err(AdmissionRefusal::WrongTarget);
+    }
+    if now > auth.not_after {
+        return Err(AdmissionRefusal::Expired {
+            not_after: auth.not_after,
+            now,
+        });
+    }
+    consume_once(
+        consumed,
+        ConsumedEntry {
+            authorization: ConsumedAuthorization::Checkpointed(verified.signed().clone()),
+            writer: verified.writer(),
+        },
+    )?;
+    Ok(CheckpointedAdmission { verified })
 }
 
 // ---------------------------------------------------------------------------------------------

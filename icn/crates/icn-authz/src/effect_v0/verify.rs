@@ -14,6 +14,7 @@ use icn_identity::evidence_bundle::{verify_evidence_bundle, EvidenceBundle, Evid
 use thiserror::Error;
 
 use super::codec::AuthzCodecError;
+use super::log::{CheckpointedAuthorizationV0, LogRefusal};
 use super::statements::{
     roster_hash, sha256, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
     ContextInceptionV0, ContextRef, InputActV0, OutcomeReceiptV0, Signed, SignedDesignation,
@@ -477,12 +478,70 @@ pub fn verify_authorization_bytes(
 // Consumption (v0: trait + in-memory; durable consumption is ADR-0091's, not anticipated here)
 // ---------------------------------------------------------------------------------------------
 
+/// The signed authorization that consumed an operation id.
+///
+/// Legacy ([`admit`]) and checkpointed ([`admit_checkpointed`](super::log::admit_checkpointed))
+/// admission share **one** `(context, operation_id)` key space: both derive the context from the
+/// same [`ContextInceptionV0`](super::statements::ContextInceptionV0), and the same N4 votes can
+/// back an authorization of either kind, so neither may consume an id the other consumed. Each
+/// variant keeps the whole signed statement, so a replay (the same statement) stays
+/// distinguishable from a conflict (a different one).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConsumedAuthorization {
+    /// A designation-model authorization.
+    Legacy(Signed<AuthorizationV0>),
+    /// A log-checkpointed authorization.
+    Checkpointed(Signed<CheckpointedAuthorizationV0>),
+}
+
+impl ConsumedAuthorization {
+    /// The context the statement names.
+    pub fn context(&self) -> ContextRef {
+        match self {
+            Self::Legacy(s) => s.body.context,
+            Self::Checkpointed(s) => s.body.context,
+        }
+    }
+
+    /// The operation id the statement authorizes.
+    pub fn operation_id(&self) -> [u8; 32] {
+        match self {
+            Self::Legacy(s) => s.body.operation_id,
+            Self::Checkpointed(s) => s.body.operation_id,
+        }
+    }
+
+    /// The signature verifies under `key`.
+    pub fn verifies_under(&self, key: &PrincipalKey) -> bool {
+        match self {
+            Self::Legacy(s) => s.verifies_under(key),
+            Self::Checkpointed(s) => s.verifies_under(key),
+        }
+    }
+
+    /// The same kind and the same body: one statement, whatever its signature bytes.
+    pub fn same_statement(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Legacy(a), Self::Legacy(b)) => a.body == b.body,
+            (Self::Checkpointed(a), Self::Checkpointed(b)) => a.body == b.body,
+            _ => false,
+        }
+    }
+
+    fn same_kind(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::Legacy(_), Self::Legacy(_)) | (Self::Checkpointed(_), Self::Checkpointed(_))
+        )
+    }
+}
+
 /// What a target remembers about a consumed operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsumedEntry {
     /// The authorization that consumed it.
-    pub authorization: Signed<AuthorizationV0>,
-    /// The writer that signed it.
+    pub authorization: ConsumedAuthorization,
+    /// The writer that signed it (verified at admission; not part of the signed statement).
     pub writer: PrincipalKey,
 }
 
@@ -526,8 +585,35 @@ impl ConsumedSet for InMemoryConsumedSet {
     }
 }
 
-/// Two different authorizations, each signed by a designated writer of one context, claiming one
-/// operation id. Verifiable by a third party holding the two writer keys.
+/// The last step of every admission: consume `entry`'s `(context, operation_id)`, or refuse as a
+/// replay, a conflict, or a backend failure. Callers run it only after every other check.
+pub(crate) fn consume_once(
+    consumed: &mut dyn ConsumedSet,
+    entry: ConsumedEntry,
+) -> Result<(), AdmissionRefusal> {
+    let (context, operation_id) = (
+        entry.authorization.context(),
+        entry.authorization.operation_id(),
+    );
+    match consumed
+        .consume(context, operation_id, entry.clone())
+        .map_err(AdmissionRefusal::ConsumedSet)?
+    {
+        None => Ok(()),
+        Some(prior) if prior.authorization.same_statement(&entry.authorization) => {
+            Err(AdmissionRefusal::Replayed)
+        }
+        Some(prior) => Err(AdmissionRefusal::Equivocation(Box::new(
+            EquivocationProof {
+                first: prior,
+                second: entry,
+            },
+        ))),
+    }
+}
+
+/// Two different authorizations claiming one `(context, operation_id)`, each with a signature
+/// that verifies under its recorded writer. [`classify`](Self::classify) says what that proves.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EquivocationProof {
     /// The earlier-seen authorization and its writer.
@@ -536,17 +622,52 @@ pub struct EquivocationProof {
     pub second: ConsumedEntry,
 }
 
+/// What a valid [`EquivocationProof`] attributes. Signatures only: whether either signer held
+/// authority needs the designations or the log, which the proof does not carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictClass {
+    /// One key signed two different statements of one kind for one operation: attributable
+    /// equivocation by `signer`.
+    Equivocation {
+        /// The key that signed both.
+        signer: PrincipalKey,
+    },
+    /// Two different keys — e.g. an outgoing and an incoming writer. A conflict, attributable to
+    /// no single key.
+    DifferentSigners,
+    /// A legacy and a checkpointed statement. A conflict between two authorization models, not
+    /// claimed as equivocation even when one key signed both.
+    CrossKind,
+}
+
 impl EquivocationProof {
     /// Both signatures verify under their writers, both name one context and one operation id,
-    /// and the bodies differ. (Whether each writer was designated needs the designations; v0
-    /// leaves that to the holder.)
+    /// and they are not the same statement. (Whether each writer was designated needs the
+    /// designations or the log; v0 leaves that to the holder.)
     pub fn is_valid(&self) -> bool {
         let (a, b) = (&self.first.authorization, &self.second.authorization);
         a.verifies_under(&self.first.writer)
             && b.verifies_under(&self.second.writer)
-            && a.body.context == b.body.context
-            && a.body.operation_id == b.body.operation_id
-            && a.body != b.body
+            && a.context() == b.context()
+            && a.operation_id() == b.operation_id()
+            && !a.same_statement(b)
+    }
+
+    /// What this proof attributes, or `None` if it is not [valid](Self::is_valid).
+    pub fn classify(&self) -> Option<ConflictClass> {
+        if !self.is_valid() {
+            return None;
+        }
+        let (a, b) = (&self.first.authorization, &self.second.authorization);
+        Some(if !a.same_kind(b) {
+            ConflictClass::CrossKind
+        } else if self.first.writer == self.second.writer {
+            ConflictClass::Equivocation {
+                signer: self.first.writer,
+            }
+        } else {
+            ConflictClass::DifferentSigners
+        })
     }
 }
 
@@ -591,6 +712,9 @@ pub enum AdmissionRefusal {
     /// The authorization did not verify.
     #[error("verification refused: {0}")]
     Verify(#[from] AuthzRefusal),
+    /// The checkpointed authorization did not verify against the target's frontier.
+    #[error("checkpointed verification refused: {0}")]
+    Log(LogRefusal),
     /// The evidence is for a context this target does not serve. Anyone can found a context;
     /// only the target's own pinned context may direct it.
     #[error("authorization is for a context this target does not serve")]
@@ -620,7 +744,8 @@ pub enum AdmissionRefusal {
     /// This exact authorization already consumed its operation id.
     #[error("operation already consumed by this authorization")]
     Replayed,
-    /// A different authorization already consumed this operation id.
+    /// A different authorization — of either kind — already consumed this operation id.
+    /// [`EquivocationProof::classify`] says whether that is attributable equivocation.
     #[error("operation id already consumed by a different authorization")]
     Equivocation(Box<EquivocationProof>),
     /// The consumed-set backend failed; fail closed.
@@ -645,7 +770,8 @@ impl Admission {
 /// target is configured to serve, which is its trust anchor — then re-verifies everything
 /// ([`verify_authorization`]) and requires `Pass`, `effect.target == my_target`,
 /// `now <= not_after`, `epoch >= latest_epoch_known` (the latest epoch known **for
-/// `expected_context`**), and only then consumes `(context, operation_id)`. No check consumes on
+/// `expected_context`**), and only then consumes `(context, operation_id)` — in the key space it
+/// shares with [`admit_checkpointed`](super::log::admit_checkpointed). No check consumes on
 /// refusal.
 ///
 /// Without the pin, anyone could found a context with their own founders, writer and members, pass
@@ -683,25 +809,14 @@ pub fn admit(
             latest_known: latest_epoch_known,
         });
     }
-    let entry = ConsumedEntry {
-        authorization: verified.signed().clone(),
-        writer: verified.writer(),
-    };
-    match consumed
-        .consume(auth.context, auth.operation_id, entry.clone())
-        .map_err(AdmissionRefusal::ConsumedSet)?
-    {
-        None => Ok(Admission { verified }),
-        Some(prior) if prior.authorization.body == entry.authorization.body => {
-            Err(AdmissionRefusal::Replayed)
-        }
-        Some(prior) => Err(AdmissionRefusal::Equivocation(Box::new(
-            EquivocationProof {
-                first: prior,
-                second: entry,
-            },
-        ))),
-    }
+    consume_once(
+        consumed,
+        ConsumedEntry {
+            authorization: ConsumedAuthorization::Legacy(verified.signed().clone()),
+            writer: verified.writer(),
+        },
+    )?;
+    Ok(Admission { verified })
 }
 
 // ---------------------------------------------------------------------------------------------
