@@ -543,6 +543,10 @@ pub enum AdmissionRefusal {
     /// The authorization did not verify.
     #[error("verification refused: {0}")]
     Verify(#[from] AuthzRefusal),
+    /// The evidence is for a context this target does not serve. Anyone can found a context;
+    /// only the target's own pinned context may direct it.
+    #[error("authorization is for a context this target does not serve")]
+    UntrustedContext,
     /// It verified, but the verdict is not `Pass`.
     #[error("verdict is not Pass")]
     VerdictNotPass,
@@ -589,17 +593,28 @@ impl Admission {
     }
 }
 
-/// Target-side admission. Re-verifies everything ([`verify_authorization`]), then requires
-/// `Pass`, `effect.target == my_target`, `now <= not_after`, `epoch >= latest_epoch_known`, and
-/// only then consumes `(context, operation_id)`. No check consumes on refusal.
+/// Target-side admission. Requires the evidence to be for `expected_context` — the context this
+/// target is configured to serve, which is its trust anchor — then re-verifies everything
+/// ([`verify_authorization`]) and requires `Pass`, `effect.target == my_target`,
+/// `now <= not_after`, `epoch >= latest_epoch_known` (the latest epoch known **for
+/// `expected_context`**), and only then consumes `(context, operation_id)`. No check consumes on
+/// refusal.
+///
+/// Without the pin, anyone could found a context with their own founders, writer and members, pass
+/// a vote in it, and name this target.
+#[allow(clippy::too_many_arguments)]
 pub fn admit(
     evidence: &AuthorizationEvidenceV0,
     rule: &dyn AdoptedRule,
+    expected_context: ContextRef,
     my_target: [u8; 32],
     now: u64,
     latest_epoch_known: u64,
     consumed: &mut dyn ConsumedSet,
 ) -> Result<Admission, AdmissionRefusal> {
+    if evidence.inception.context_ref() != expected_context {
+        return Err(AdmissionRefusal::UntrustedContext);
+    }
     let verified = verify_authorization(evidence, rule, now)?;
     let auth = verified.authorization();
     if auth.verdict != Verdict::Pass {

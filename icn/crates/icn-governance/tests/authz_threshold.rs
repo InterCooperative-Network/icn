@@ -319,7 +319,16 @@ impl World {
         latest_epoch: u64,
         consumed: &mut InMemoryConsumedSet,
     ) -> Result<(), AdmissionRefusal> {
-        admit(ev, &self.rule, self.target, now, latest_epoch, consumed).map(|_| ())
+        admit(
+            ev,
+            &self.rule,
+            self.ctx,
+            self.target,
+            now,
+            latest_epoch,
+            consumed,
+        )
+        .map(|_| ())
     }
 }
 
@@ -443,6 +452,7 @@ fn p4_outcome_receipt_verifies_against_authorization() {
     let admission = admit(
         &ev,
         &w.rule,
+        w.ctx,
         w.target,
         NOW,
         1,
@@ -952,6 +962,7 @@ fn a12_wrong_target_is_refused() {
         admit(
             &ev,
             &w.rule,
+            w.ctx,
             other_target,
             NOW,
             1,
@@ -1120,4 +1131,57 @@ fn a17_roster_is_committed() {
         .push(Signed::sign(w.standing_for(s2), &w.writer));
     contested.canonicalize();
     assert_eq!(w.verify(&contested), Err(AuthzRefusal::RosterMismatch));
+}
+
+/// A18 (security review): a context the target does not serve. Anyone can found a context with
+/// their own founders, writer and members and pass a vote in it naming this target. The evidence is
+/// internally valid; the target refuses it because it is pinned to its own context.
+#[test]
+fn a18_foreign_context_is_refused() {
+    let w = world();
+    let rogue_founders = [key(0xD1), key(0xD2)];
+    let inception = ContextInceptionV0::new(
+        rogue_founders
+            .iter()
+            .map(|k| PrincipalKey::try_from_verifying_key(k.verifying_key()).unwrap())
+            .collect(),
+        1,
+        [0x66; 32],
+    )
+    .unwrap();
+    let rogue_ctx = inception.context_ref();
+    assert_ne!(rogue_ctx, w.ctx);
+    let rogue_writer = key(0xD9);
+    // The effect names the victim custodian; the votes bind the rogue context.
+    let matter = w.effect().commitment(rogue_ctx, DEFAULT_OP);
+    let bundles = (0..2)
+        .map(|i| {
+            w.members[i].vote(
+                rogue_ctx,
+                matter,
+                VoteChoice::For,
+                0,
+                1,
+                DeviceCapability::Sign,
+            )
+        })
+        .collect();
+    let mut d = w.draft(bundles);
+    d.inception = inception;
+    d.designation = designate(&rogue_founders[..1], rogue_ctx, 1, &rogue_writer);
+    d.writer = rogue_writer;
+    for s in &mut d.standing {
+        s.context = rogue_ctx;
+    }
+    let ev = d.seal();
+
+    // Internally consistent evidence: verification alone does not say whose context it is.
+    assert_eq!(w.verify(&ev), Ok(Verdict::Pass));
+    // The target serves `w.ctx` and refuses, without consuming anything.
+    let mut consumed = InMemoryConsumedSet::default();
+    assert_eq!(
+        w.admit(&ev, NOW, 1, &mut consumed),
+        Err(AdmissionRefusal::UntrustedContext)
+    );
+    assert_eq!(w.admit(&w.passing().seal(), NOW, 1, &mut consumed), Ok(()));
 }
