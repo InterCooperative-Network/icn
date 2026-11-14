@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-09-11T08:34:20+00:00",
-  "source_commit": "fbd337ff3dd1cb08f5896af3a21c94dfe0193b2e",
+  "generated": "2026-11-14T18:23:11+00:00",
+  "source_commit": "172043413c62ebb7927e8ad85a5ee9c0e822a1f6",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -35,7 +35,7 @@
     "verifies"
   ],
   "counts": {
-    "nodes": 145,
+    "nodes": 146,
     "edges": 93
   },
   "nodes": [
@@ -340,6 +340,26 @@
         },
         {
           "source": "icn/crates/icn-authz",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-authz-store",
+      "type": "crate",
+      "name": "icn-authz-store",
+      "group": "crates",
+      "path": "icn/crates/icn-authz-store",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-authz-store",
           "kind": "crate-dir"
         }
       ]

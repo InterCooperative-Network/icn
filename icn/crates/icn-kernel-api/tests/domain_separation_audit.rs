@@ -311,6 +311,12 @@ const NOT_REGISTERED: &[(&str, &str, &str)] = &[
          carried statement is verified under its own domain",
     ),
     (
+        "icn.authz.v0.consumed-entry",
+        "icn/crates/icn-authz/src/effect_v0/verify.rs",
+        "storage record only: a consumed entry is persisted and decoded, never hashed or signed; \
+         the carried statement is verified under its own domain",
+    ),
+    (
         "icn.governance.authz-act.v0",
         "icn/crates/icn-governance/src/authz_threshold.rs",
         "never leads a preimage: the vote is the LP-framed payload of an `icn.n4.device-act` act, \
