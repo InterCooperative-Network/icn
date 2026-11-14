@@ -58,5 +58,5 @@ pub use verify::{
     verify_authorization_bytes, verify_outcome_receipt, Admission, AdmissionRefusal, AdoptedRule,
     AuthzRefusal, ConflictClass, ConsumedAuthorization, ConsumedEntry, ConsumedSet,
     ConsumedSetError, EquivocationProof, InMemoryConsumedSet, ReceiptRefusal, RuleBinding,
-    RuleError, StatementKind, VerifiedAuthorization,
+    RuleError, StatementKind, VerifiedAuthorization, CONSUMED_ENTRY_DOMAIN,
 };

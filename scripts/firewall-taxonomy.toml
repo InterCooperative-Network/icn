@@ -67,7 +67,7 @@ kernel = ["icn-core", "icn-net", "icn-gossip", "icn-store", "icn-kernel-api"]
 substrate = [
   "icn-identity", "icn-time", "icn-snapshot", "icn-encoding", "icn-obs",
   "icn-security", "icn-privacy", "icn-crypto-pq", "icn-naming", "icn-http-kit",
-  "icn-authz", "icn-appliance", "icn-boundary",
+  "icn-authz", "icn-authz-store", "icn-appliance", "icn-boundary",
 ]
 api-shell = ["icn-gateway", "icn-rpc", "icn-api"]
 domain = [
