@@ -317,6 +317,16 @@ const NOT_REGISTERED: &[(&str, &str, &str)] = &[
          the carried statement is verified under its own domain",
     ),
     (
+        "icn.authz-store.v0.resource-pool",
+        "icn/crates/icn-authz-store/src/reservation.rs",
+        "storage record only: a resource pool is strictly encoded and persisted, never hashed or signed",
+    ),
+    (
+        "icn.authz-store.v0.reservation",
+        "icn/crates/icn-authz-store/src/reservation.rs",
+        "storage record only: a reservation is strictly encoded and persisted, never hashed or signed",
+    ),
+    (
         "icn.governance.authz-act.v0",
         "icn/crates/icn-governance/src/authz_threshold.rs",
         "never leads a preimage: the vote is the LP-framed payload of an `icn.n4.device-act` act, \
@@ -419,6 +429,7 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.authority-log.sig", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-identity/src/authority_log/mod.rs", "icn/crates/icn-identity/src/authority_log/body.rs", "icn/crates/icn-identity/src/authority_log/construct.rs", "icn/crates/icn-identity/src/authority_log/admission.rs", "icn/crates/icn-identity/tests/authority_log_adversarial_orders.rs", "icn/crates/icn-identity/tests/authority_log_derived.rs", "icn/crates/icn-identity/tests/authority_log_durable.rs", "icn/crates/icn-identity/tests/gen_subject_context.rs", "icn/crates/icn-identity/tests/authority_log_encoding.rs"]),
     d(b"icn.authz.v0.authorization", Sha256, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
     d(b"icn.authz.v0.authorization", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/statements.rs"]),
+    d(b"icn.authz-store.v0.reservation-request", Sha256, U32BeLen, Production, &["icn/crates/icn-authz-store/src/reservation.rs"]),
     d(b"icn.authz.v0.checkpointed-authorization", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/log.rs"]),
     d(b"icn.authz.v0.log-entry", Sha256, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/log.rs"]),
     d(b"icn.authz.v0.log-entry", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-authz/src/effect_v0/log.rs"]),

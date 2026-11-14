@@ -36,13 +36,13 @@ mod verify;
 
 pub use codec::AuthzCodecError;
 pub use log::{
-    admit_checkpointed, apply_entry, find_log_fork, replay_context_log,
+    admit_checkpointed, apply_entry, find_log_fork, preflight_checkpointed, replay_context_log,
     sign_checkpointed_authorization, transition_subject_matter, verify_checkpointed_authorization,
-    CheckpointedAdmission, CheckpointedAuthorizationV0, CheckpointedEvidenceV0, ContextStateV0,
-    DecisionAuthorityV0, EntryAuthorityV0, LogCheckpointV0, LogEntryV0, LogForkProofV0, LogRefusal,
-    RelyingFrontierV0, RuleResolver, RuleSlot, SignedLogEntryV0, TransitionV0,
-    VerifiedCheckpointedAuthorization, VerifiedContextLog, CHECKPOINTED_AUTHORIZATION_DOMAIN,
-    LOG_ENTRY_DOMAIN, LOG_TRANSITION_DOMAIN,
+    CheckpointedAdmission, CheckpointedAuthorizationV0, CheckpointedEvidenceV0,
+    CheckpointedPreflight, ContextStateV0, DecisionAuthorityV0, EntryAuthorityV0, LogCheckpointV0,
+    LogEntryV0, LogForkProofV0, LogRefusal, RelyingFrontierV0, RuleResolver, RuleSlot,
+    SignedLogEntryV0, TransitionV0, VerifiedCheckpointedAuthorization, VerifiedContextLog,
+    CHECKPOINTED_AUTHORIZATION_DOMAIN, LOG_ENTRY_DOMAIN, LOG_TRANSITION_DOMAIN,
 };
 pub use statements::{
     roster_hash, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
