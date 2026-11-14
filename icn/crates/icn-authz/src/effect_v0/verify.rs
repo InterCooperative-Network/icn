@@ -16,7 +16,8 @@ use thiserror::Error;
 use super::codec::AuthzCodecError;
 use super::statements::{
     roster_hash, sha256, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
-    ContextRef, OutcomeReceiptV0, Signed, StandingV0, Verdict,
+    ContextInceptionV0, ContextRef, OutcomeReceiptV0, Signed, SignedDesignation, StandingV0,
+    Verdict,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -535,6 +536,41 @@ impl EquivocationProof {
             && a.body.operation_id == b.body.operation_id
             && a.body != b.body
     }
+}
+
+/// Founders who signed two different designations for one context and epoch — accountability
+/// evidence for a writer-designation conflict.
+///
+/// Returns the founders (of `inception`) whose signatures verify on **both** bodies; empty when
+/// the designations are not for one context and epoch, are identical, or share no valid signer.
+/// With the inception's intersection rule (`2·threshold > founders`), two threshold-valid
+/// conflicting designations always share at least one such founder. Detecting a conflict needs
+/// someone who holds both designations; this function only attributes it.
+pub fn designation_equivocators(
+    inception: &ContextInceptionV0,
+    a: &SignedDesignation,
+    b: &SignedDesignation,
+) -> Vec<PrincipalKey> {
+    if a.body.context != b.body.context || a.body.epoch != b.body.epoch || a.body == b.body {
+        return Vec::new();
+    }
+    let (a_bytes, b_bytes) = (a.body.canonical_bytes(), b.body.canonical_bytes());
+    let signed = |bytes: &[u8], s: &super::statements::FounderSignature| {
+        s.founder
+            .verifying_key()
+            .verify_strict(bytes, &ed25519_dalek::Signature::from_bytes(&s.signature))
+            .is_ok()
+    };
+    a.signatures
+        .iter()
+        .filter(|sa| inception.is_founder(&sa.founder) && signed(&a_bytes, sa))
+        .filter(|sa| {
+            b.signatures
+                .iter()
+                .any(|sb| sb.founder.as_bytes() == sa.founder.as_bytes() && signed(&b_bytes, sb))
+        })
+        .map(|sa| sa.founder)
+        .collect()
 }
 
 /// Why a target refused to admit.

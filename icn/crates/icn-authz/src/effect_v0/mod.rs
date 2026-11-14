@@ -38,8 +38,9 @@ pub use statements::{
     STANDING_DOMAIN, SUBJECT_MATTER_DOMAIN, TARGET_DOMAIN,
 };
 pub use verify::{
-    admit, issue_outcome_receipt, verify_authorization, verify_authorization_bytes,
-    verify_outcome_receipt, Admission, AdmissionRefusal, AdoptedRule, AuthzRefusal, ConsumedEntry,
-    ConsumedSet, ConsumedSetError, EquivocationProof, InMemoryConsumedSet, ReceiptRefusal,
-    RuleBinding, RuleError, StatementKind, VerifiedAuthorization,
+    admit, designation_equivocators, issue_outcome_receipt, verify_authorization,
+    verify_authorization_bytes, verify_outcome_receipt, Admission, AdmissionRefusal, AdoptedRule,
+    AuthzRefusal, ConsumedEntry, ConsumedSet, ConsumedSetError, EquivocationProof,
+    InMemoryConsumedSet, ReceiptRefusal, RuleBinding, RuleError, StatementKind,
+    VerifiedAuthorization,
 };

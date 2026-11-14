@@ -112,7 +112,8 @@ pub struct ContextRef(pub [u8; 32]);
 pub struct ContextInceptionV0 {
     /// Founder principals, strictly ascending by key bytes, 1..=[`MAX_FOUNDERS`].
     pub founders: Vec<PrincipalKey>,
-    /// Founder signatures required for a writer designation, `1..=founders.len()`.
+    /// Founder signatures required for a writer designation: `founders.len() / 2 < threshold <=
+    /// founders.len()` (any two founder quorums intersect).
     pub threshold: u8,
     /// Hash of an off-protocol label (name, charter text). Bound, never interpreted.
     pub label_hash: [u8; 32],
@@ -149,7 +150,13 @@ impl ContextInceptionV0 {
         {
             return Err(AuthzCodecError::NotStrictlyAscending { field: "founders" });
         }
-        if self.threshold == 0 || usize::from(self.threshold) > self.founders.len() {
+        // Quorum intersection: `2·threshold > founders`. Any two founder quorums then share a
+        // founder, so two conflicting writer designations for one epoch always carry a signature
+        // from someone who signed both (`designation_equivocators`). Without it, disjoint founder
+        // sets designate different writers with nobody misbehaving. Arrangements that want
+        // non-intersecting quorums (e.g. 1-of-2) need a multi-writer model, not this one.
+        let t = usize::from(self.threshold);
+        if t == 0 || t > self.founders.len() || 2 * t <= self.founders.len() {
             return Err(AuthzCodecError::InvalidValue { field: "threshold" });
         }
         Ok(())

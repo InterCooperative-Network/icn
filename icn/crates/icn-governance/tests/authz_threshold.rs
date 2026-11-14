@@ -11,11 +11,12 @@
 
 use ed25519_dalek::SigningKey;
 use icn_authz::effect_v0::{
-    admit, issue_outcome_receipt, roster_hash, target_id, verify_authorization,
-    verify_authorization_bytes, verify_outcome_receipt, AdmissionRefusal, AdoptedRule,
-    AuthorizationEvidenceV0, AuthorizationV0, AuthzRefusal, ContextInceptionV0, ContextRef,
-    EffectV0, InMemoryConsumedSet, InputActV0, OutcomeReceiptV0, ReceiptRefusal, RuleAdoptionV0,
-    RuleError, Signed, SignedDesignation, StandingV0, StatementKind, Verdict, WriterDesignationV0,
+    admit, designation_equivocators, issue_outcome_receipt, roster_hash, target_id,
+    verify_authorization, verify_authorization_bytes, verify_outcome_receipt, AdmissionRefusal,
+    AdoptedRule, AuthorizationEvidenceV0, AuthorizationV0, AuthzCodecError, AuthzRefusal,
+    CanonicalV0, ContextInceptionV0, ContextRef, EffectV0, InMemoryConsumedSet, InputActV0,
+    OutcomeReceiptV0, ReceiptRefusal, RuleAdoptionV0, RuleError, Signed, SignedDesignation,
+    StandingV0, StatementKind, Verdict, WriterDesignationV0,
 };
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::vote::VoteChoice;
@@ -1145,7 +1146,7 @@ fn a18_foreign_context_is_refused() {
             .iter()
             .map(|k| PrincipalKey::try_from_verifying_key(k.verifying_key()).unwrap())
             .collect(),
-        1,
+        2,
         [0x66; 32],
     )
     .unwrap();
@@ -1168,7 +1169,7 @@ fn a18_foreign_context_is_refused() {
         .collect();
     let mut d = w.draft(bundles);
     d.inception = inception;
-    d.designation = designate(&rogue_founders[..1], rogue_ctx, 1, &rogue_writer);
+    d.designation = designate(&rogue_founders, rogue_ctx, 1, &rogue_writer);
     d.writer = rogue_writer;
     for s in &mut d.standing {
         s.context = rogue_ctx;
@@ -1184,4 +1185,144 @@ fn a18_foreign_context_is_refused() {
         Err(AdmissionRefusal::UntrustedContext)
     );
     assert_eq!(w.admit(&w.passing().seal(), NOW, 1, &mut consumed), Ok(()));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Writer designation conflicts (scenario E)
+// ---------------------------------------------------------------------------------------------
+
+/// E1: a founder threshold must make any two founder quorums intersect (`2·t > n`). Otherwise two
+/// disjoint founder sets can each designate a different writer for one epoch with no founder
+/// misbehaving, and the conflict is attributable to nobody.
+#[test]
+fn e1_non_intersecting_founder_threshold_is_refused() {
+    let founders = |n: u8| (1..=n).map(principal).collect::<Vec<_>>();
+    let invalid = Err(AuthzCodecError::InvalidValue { field: "threshold" });
+    assert_eq!(ContextInceptionV0::new(founders(3), 1, [0; 32]), invalid);
+    assert_eq!(ContextInceptionV0::new(founders(2), 1, [0; 32]), invalid);
+    assert_eq!(ContextInceptionV0::new(founders(4), 2, [0; 32]), invalid);
+    assert!(ContextInceptionV0::new(founders(1), 1, [0; 32]).is_ok());
+    assert!(ContextInceptionV0::new(founders(2), 2, [0; 32]).is_ok());
+    assert!(ContextInceptionV0::new(founders(3), 2, [0; 32]).is_ok());
+    assert!(ContextInceptionV0::new(founders(4), 3, [0; 32]).is_ok());
+    // The same rule at decode: bytes for a 1-of-3 inception are refused.
+    let lax = ContextInceptionV0 {
+        founders: {
+            let mut f = founders(3);
+            f.sort_by_key(|k| k.as_bytes());
+            f
+        },
+        threshold: 1,
+        label_hash: [0; 32],
+    };
+    assert_eq!(ContextInceptionV0::decode(&lax.canonical_bytes()), invalid);
+}
+
+/// E2: two threshold-valid designations of different writers for one epoch. Each verifies on its
+/// own, so two custodians that never compare notes both admit (no local detection). Anyone holding
+/// both can name the founder(s) who signed both — and with the intersection rule there is always
+/// at least one. Detecting the conflict needs someone to see both: witnessing, not verification.
+#[test]
+fn e2_conflicting_designations_are_attributable() {
+    let w = world();
+    let (a_writer, b_writer) = (key(0xA1), key(0xB1));
+    let des_a = designate(&w.founders[..2], w.ctx, 1, &a_writer); // F1 + F2
+    let des_b = designate(&w.founders[1..], w.ctx, 1, &b_writer); // F2 + F3
+
+    let mut d = w.passing();
+    d.designation = des_b.clone();
+    d.writer = b_writer.clone();
+    let ev_b = d.seal();
+    let ev_a = w.passing().seal();
+    assert_eq!(
+        w.admit(&ev_a, NOW, 1, &mut InMemoryConsumedSet::default()),
+        Ok(())
+    );
+    assert_eq!(
+        w.admit(&ev_b, NOW, 1, &mut InMemoryConsumedSet::default()),
+        Ok(())
+    );
+
+    assert_eq!(
+        designation_equivocators(&w.inception, &des_a, &des_b),
+        vec![principal(0xF2)]
+    );
+    // Not a conflict: the same designation, or different epochs.
+    assert!(designation_equivocators(&w.inception, &des_a, &des_a).is_empty());
+    let des_a2 = designate(&w.founders[..2], w.ctx, 2, &b_writer);
+    assert!(designation_equivocators(&w.inception, &des_a, &des_a2).is_empty());
+    // A forged "second signature" does not implicate a founder.
+    let mut forged = des_b.clone();
+    for s in &mut forged.signatures {
+        s.signature[0] ^= 1;
+    }
+    assert!(designation_equivocators(&w.inception, &des_a, &forged).is_empty());
+}
+
+// ---------------------------------------------------------------------------------------------
+// Known gaps, pinned executable. Each asserts that an attack SUCCEEDS today, so the slice that
+// closes it must flip the assertion. They document trust in the writer; they are not endorsements.
+// ---------------------------------------------------------------------------------------------
+
+/// Known gap (B): standing is writer-asserted, so the writer defines the electorate. A writer can
+/// issue standing to Subjects it controls, omit the real members, and pass anything. Everything
+/// downstream (votes, binding, tally) is then verified correctly — over the wrong electorate.
+#[test]
+fn known_gap_writer_controls_the_electorate() {
+    let w = world();
+    let puppets = [Member::standard(0x0a), Member::standard(0x0b)];
+    let bundles = puppets
+        .iter()
+        .map(|m| {
+            m.vote(
+                w.ctx,
+                w.proposal(),
+                VoteChoice::For,
+                0,
+                1,
+                DeviceCapability::Sign,
+            )
+        })
+        .collect();
+    let mut d = w.draft(bundles);
+    d.standing = puppets.iter().map(|m| w.standing_for(m.subject)).collect();
+    assert_eq!(
+        w.admit(&d.seal(), NOW, 1, &mut InMemoryConsumedSet::default()),
+        Ok(())
+    );
+}
+
+/// Known gap (D): freshness is writer-attested. A device revoked at position 2 still votes when
+/// the writer names position 1: the bundle carries facts only up to 1, so the revocation is
+/// invisible. Historical validity is not present authority.
+#[test]
+fn known_gap_stale_position_hides_a_revocation() {
+    let w = world();
+    let mut m = Member::standard(0x01);
+    m.revoke_device();
+    let stale = m.vote(
+        w.ctx,
+        w.proposal(),
+        VoteChoice::For,
+        0,
+        1,
+        DeviceCapability::Sign,
+    );
+    let ev = w.draft(vec![stale, w.vote(1, VoteChoice::For)]).seal();
+    assert_eq!(
+        w.admit(&ev, NOW, 1, &mut InMemoryConsumedSet::default()),
+        Ok(())
+    );
+}
+
+/// Known gap (D/E): a custodian that does not know a newer epoch admits the old writer's
+/// authorization. `latest_epoch_known` is an input, not something v0 discovers.
+#[test]
+fn known_gap_epoch_is_only_as_fresh_as_the_custodian() {
+    let w = world();
+    let ev = w.passing().seal();
+    assert_eq!(
+        w.admit(&ev, NOW, 1, &mut InMemoryConsumedSet::default()),
+        Ok(())
+    );
 }
