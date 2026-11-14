@@ -1,4 +1,5 @@
-//! Durable replay consumption for [`icn_authz::effect_v0`] admission. **Experimental.**
+//! Durable replay consumption and atomic local resource reservation for
+//! [`icn_authz::effect_v0`] admission. **Experimental.**
 //!
 //! [`DurableConsumedSet`] is a [`ConsumedSet`] whose consumptions survive a restart of the
 //! target, so a restarted target cannot admit an operation it already admitted. It is an
@@ -9,10 +10,11 @@
 //!
 //! ## Stages
 //!
-//! VERIFIED → ADMITTED → **PERSISTED** (this crate) → RESERVED → EXECUTED → SETTLED. Only the
-//! first three exist. A persisted consumption whose effect later fails is **stranded**: the
-//! operation id stays consumed and the effect never happens. That is the at-most-once side of
-//! the trade, and a known limit, not a solved problem.
+//! VERIFIED → ADMITTED → **PERSISTED** → **RESERVED** (this crate) → EXECUTED → SETTLED.
+//! [`DurableConsumedSet`] provides persistence alone, so a separately persisted consumption whose
+//! effect later fails is **stranded**. [`LocalResourceReservations`] instead commits consumption,
+//! capacity reduction, and a reservation record in one local transaction. Neither path executes
+//! a physical resource action or performs distributed settlement.
 //!
 //! ## Durability model
 //!
@@ -45,6 +47,15 @@ use std::path::Path;
 
 use icn_authz::effect_v0::{ConsumedEntry, ConsumedSet, ConsumedSetError, ContextRef};
 use icn_store::{CompareAndPut, SledStore, Store};
+
+mod reservation;
+
+pub use reservation::{
+    pool_key, reservation_key, DurabilityBarrier, LocalReservationPolicyV0,
+    LocalResourceReservations, ReservationError, ReservationReconciliation, ReservationRecordV0,
+    ReservationRequestV0, ResourcePoolV0, SledDurabilityBarrier, POOL_KEY_PREFIX,
+    RESERVATION_ACTION, RESERVATION_KEY_PREFIX,
+};
 
 /// Key prefix. A key is `KEY_PREFIX || context (32 bytes) || operation_id (32 bytes)`.
 ///

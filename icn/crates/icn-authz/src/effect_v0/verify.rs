@@ -671,15 +671,20 @@ pub(crate) fn consume_once(
         .map_err(AdmissionRefusal::ConsumedSet)?
     {
         None => Ok(()),
-        Some(prior) if prior.authorization.same_statement(&entry.authorization) => {
-            Err(AdmissionRefusal::Replayed)
-        }
-        Some(prior) => Err(AdmissionRefusal::Equivocation(Box::new(
-            EquivocationProof {
-                first: prior,
-                second: entry,
-            },
-        ))),
+        Some(prior) => Err(prior_refusal(prior, entry)),
+    }
+}
+
+/// The refusal owed to `entry` when `prior` already consumed its `(context, operation_id)`:
+/// a replay of the same statement, or a conflict carrying both.
+pub(crate) fn prior_refusal(prior: ConsumedEntry, entry: ConsumedEntry) -> AdmissionRefusal {
+    if prior.authorization.same_statement(&entry.authorization) {
+        AdmissionRefusal::Replayed
+    } else {
+        AdmissionRefusal::Equivocation(Box::new(EquivocationProof {
+            first: prior,
+            second: entry,
+        }))
     }
 }
 

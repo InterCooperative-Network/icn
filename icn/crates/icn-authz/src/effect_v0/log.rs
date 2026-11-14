@@ -62,7 +62,7 @@ use super::statements::{
     MAX_INPUTS, MAX_ROLE_LEN, MAX_STATEMENT, MAX_VOTE_BUNDLE,
 };
 use super::verify::{
-    consume_once, verify_input_acts, AdmissionRefusal, AdoptedRule, AuthzRefusal,
+    consume_once, prior_refusal, verify_input_acts, AdmissionRefusal, AdoptedRule, AuthzRefusal,
     ConsumedAuthorization, ConsumedEntry, ConsumedSet, RuleBinding, RuleError,
 };
 
@@ -1232,30 +1232,81 @@ impl CheckpointedAdmission {
     }
 }
 
-/// Target-side admission of a checkpointed authorization.
+/// A checkpointed authorization that passed **every** target-side admission check except the
+/// last one, consumption. Not admitted, not consumed. The only way to obtain one is
+/// [`preflight_checkpointed`]; its fields are private.
+///
+/// It exists so that a caller which must consume the operation id **together with** another
+/// write (an atomic local effect, e.g. a resource reservation in one storage transaction) runs
+/// exactly the checks [`admit_checkpointed`] runs, without [`admit_checkpointed`]'s own consumed-set
+/// write stranding the operation when the effect then fails. [`admit_checkpointed`] is this
+/// preflight followed by consumption, so the two paths cannot drift apart.
+///
+/// Holding one is not a permission to act: replay protection is the caller's consumption of
+/// [`consumed_entry`](Self::consumed_entry) under its `(context, operation_id)` key.
+///
+/// ```compile_fail
+/// # fn forge(v: icn_authz::effect_v0::VerifiedCheckpointedAuthorization) {
+/// let _ = icn_authz::effect_v0::CheckpointedPreflight { verified: v, target: [0; 32] };
+/// # }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CheckpointedPreflight {
+    verified: VerifiedCheckpointedAuthorization,
+    target: [u8; 32],
+}
+
+impl CheckpointedPreflight {
+    /// The verified authorization.
+    pub fn verified(&self) -> &VerifiedCheckpointedAuthorization {
+        &self.verified
+    }
+
+    /// The target identity the preflight checked `effect.target` against.
+    pub fn target(&self) -> [u8; 32] {
+        self.target
+    }
+
+    /// The record that consumes this authorization's `(context, operation_id)`: the signed
+    /// statement and the writer in force at its checkpoint.
+    pub fn consumed_entry(&self) -> ConsumedEntry {
+        ConsumedEntry {
+            authorization: ConsumedAuthorization::Checkpointed(self.verified.signed().clone()),
+            writer: self.verified.writer(),
+        }
+    }
+
+    /// The refusal owed when `prior` already consumed this `(context, operation_id)`:
+    /// [`AdmissionRefusal::Replayed`] for this same statement, otherwise
+    /// [`AdmissionRefusal::Equivocation`] (any kind, any writer). Exactly what
+    /// [`admit_checkpointed`] returns in that case.
+    pub fn refusal_for_prior(&self, prior: ConsumedEntry) -> AdmissionRefusal {
+        prior_refusal(prior, self.consumed_entry())
+    }
+}
+
+/// Every target-side check of [`admit_checkpointed`], in the same order, **without consuming**.
 ///
 /// Every trust input is the target's own: `frontier` (its context, lowest position and optional
 /// pin), `rules` (its rule implementations), `my_target` (its identity) and `now` (its clock).
 /// Nothing the writer presents — log tip, roster, rule or writer claim — is taken on its word.
 ///
-/// Order, each fail-closed, and nothing consumed before the last step: evidence for the
-/// frontier's context → [`verify_checkpointed_authorization`] in full (log replay, pin, frontier,
-/// writer at the checkpoint, effect rule in force there, subject matter bound to the effect and
-/// operation id, votes over the electorate there, verdict reproduced) → verdict `Pass` →
-/// `effect.target == my_target` → `now <= not_after` → consume `(context, operation_id)` in the
-/// key space shared with [`admit`](super::admit).
+/// Order, each fail-closed: evidence for the frontier's context →
+/// [`verify_checkpointed_authorization`] in full (log replay, pin, frontier, writer at the
+/// checkpoint, effect rule in force there, subject matter bound to the effect and operation id,
+/// votes over the electorate there, verdict reproduced) → verdict `Pass` →
+/// `effect.target == my_target` → `now <= not_after`.
 ///
 /// "Fresh enough" is the frontier: `min_seq`, raised to a pinned checkpoint's position. v0 sets no
 /// time-based maximum age; the presented tip is writer-chosen, so a lag bound against it would not
 /// be a trust anchor.
-pub fn admit_checkpointed(
+pub fn preflight_checkpointed(
     evidence: &CheckpointedEvidenceV0,
     frontier: &RelyingFrontierV0,
     rules: &dyn RuleResolver,
     my_target: [u8; 32],
     now: u64,
-    consumed: &mut dyn ConsumedSet,
-) -> Result<CheckpointedAdmission, AdmissionRefusal> {
+) -> Result<CheckpointedPreflight, AdmissionRefusal> {
     if evidence.inception.context_ref() != frontier.context {
         return Err(AdmissionRefusal::UntrustedContext);
     }
@@ -1274,14 +1325,28 @@ pub fn admit_checkpointed(
             now,
         });
     }
-    consume_once(
-        consumed,
-        ConsumedEntry {
-            authorization: ConsumedAuthorization::Checkpointed(verified.signed().clone()),
-            writer: verified.writer(),
-        },
-    )?;
-    Ok(CheckpointedAdmission { verified })
+    Ok(CheckpointedPreflight {
+        verified,
+        target: my_target,
+    })
+}
+
+/// Target-side admission of a checkpointed authorization: [`preflight_checkpointed`], then — and
+/// only then — consume `(context, operation_id)` in the key space shared with
+/// [`admit`](super::admit). Nothing is consumed on any refusal.
+pub fn admit_checkpointed(
+    evidence: &CheckpointedEvidenceV0,
+    frontier: &RelyingFrontierV0,
+    rules: &dyn RuleResolver,
+    my_target: [u8; 32],
+    now: u64,
+    consumed: &mut dyn ConsumedSet,
+) -> Result<CheckpointedAdmission, AdmissionRefusal> {
+    let preflight = preflight_checkpointed(evidence, frontier, rules, my_target, now)?;
+    consume_once(consumed, preflight.consumed_entry())?;
+    Ok(CheckpointedAdmission {
+        verified: preflight.verified,
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
