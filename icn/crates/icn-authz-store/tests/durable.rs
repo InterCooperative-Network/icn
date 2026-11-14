@@ -20,7 +20,7 @@ use icn_authz::effect_v0::{
     AuthorizationV0, CheckpointedAuthorizationV0, ConsumedAuthorization, ConsumedEntry,
     ConsumedSet, ConsumedSetError, ContextRef, EffectV0, LogCheckpointV0, Signed, Verdict,
 };
-use icn_authz_store::{consumed_key, DurableBackend, DurableConsumedSet, KEY_PREFIX, MAX_RECORD};
+use icn_authz_store::{consumed_key, DurableBackend, DurableConsumedSet, KEY_PREFIX};
 use icn_identity::authority_log::PrincipalKey;
 use icn_store::{CompareAndPut, SledStore, Store};
 
@@ -466,7 +466,8 @@ fn m_damaged_or_misplaced_records_fail_closed() {
     let mut longer = good.clone();
     longer.push(0);
     assert_corrupt(&longer);
-    assert_corrupt(&vec![0u8; MAX_RECORD + 1]);
+    // Larger than any record the codec can produce (one statement is bounded by 64 KiB).
+    assert_corrupt(&vec![0u8; 80 * 1024]);
 
     // Layout: lp(domain) = 4 + len, then u16 version, then u8 kind.
     let domain_len = u32::from_be_bytes(good[..4].try_into().unwrap()) as usize;
@@ -508,8 +509,45 @@ fn invalid_entries_are_refused_before_writing() {
         set.consume(CTX, OP, forged),
         Err(ConsumedSetError::InvalidEntry(_))
     ));
+    // A genuinely signed statement that the codec will not read back (an action label one byte
+    // over `MAX_ACTION_LEN`): persisting it would turn into a permanent `Corrupt`.
+    let mut unreadable = entry();
+    if let ConsumedAuthorization::Checkpointed(s) = &mut unreadable.authorization {
+        let mut body = s.body.clone();
+        body.effect.action = "x".repeat(icn_authz::effect_v0::MAX_ACTION_LEN + 1);
+        *s = Signed::sign(body, &key(0xA1));
+    }
+    assert!(unreadable.is_authentic());
+    assert!(matches!(
+        set.consume(CTX, OP, unreadable),
+        Err(ConsumedSetError::InvalidEntry(_))
+    ));
     assert_eq!(set.inspect(CTX, [0x77; 32]), Ok(None));
     assert_eq!(set.inspect(CTX, OP), Ok(None));
+}
+
+/// A backend that reports a conflict yet no current value (impossible for an insert-if-absent)
+/// is treated as corrupt state, never as an acknowledgement.
+#[test]
+fn impossible_conflict_is_corrupt_not_acknowledged() {
+    struct Liar(SledStore);
+    impl DurableBackend for Liar {
+        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+            DurableBackend::get(&self.0, key)
+        }
+        fn insert_if_absent(&self, _: &[u8], _: &[u8]) -> Result<CompareAndPut, String> {
+            Ok(CompareAndPut::Conflict { current: None })
+        }
+        fn sync(&self) -> Result<(), String> {
+            self.0.sync()
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let mut set = DurableConsumedSet::with_backend(Liar(raw(dir.path())));
+    assert!(matches!(
+        set.consume(CTX, OP, entry()),
+        Err(ConsumedSetError::Corrupt(_))
+    ));
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -52,10 +52,6 @@ use icn_store::{CompareAndPut, SledStore, Store};
 /// key and no key is a prefix of another.
 pub const KEY_PREFIX: &[u8] = b"icn.authz-store.v0.consumed/";
 
-/// Largest record accepted, read or written: a domain, version, kind, writer and one signed
-/// statement of at most `MAX_STATEMENT` (64 KiB) bytes, with generous headroom.
-pub const MAX_RECORD: usize = 80 * 1024;
-
 /// The persistent key for `(context, operation_id)`.
 pub fn consumed_key(context: ContextRef, operation_id: [u8; 32]) -> Vec<u8> {
     let mut key = Vec::with_capacity(KEY_PREFIX.len() + 64);
@@ -167,12 +163,14 @@ impl<B: DurableBackend> DurableConsumedSet<B> {
                 "entry signature does not verify under its writer".into(),
             ));
         }
+        // Exactly what will be read back: an entry whose encoding does not decode to itself (for
+        // example a statement over the codec's bounds) would be persisted and then refused as
+        // `Corrupt` forever, stranding the operation.
         let record = entry.encode();
-        if record.len() > MAX_RECORD {
-            return Err(ConsumedSetError::InvalidEntry(format!(
-                "record of {} bytes exceeds {MAX_RECORD}",
-                record.len()
-            )));
+        if ConsumedEntry::decode(&record).as_ref() != Ok(&entry) {
+            return Err(ConsumedSetError::InvalidEntry(
+                "entry does not survive its own encoding".into(),
+            ));
         }
 
         let key = consumed_key(context, operation_id);
@@ -197,19 +195,14 @@ impl<B: DurableBackend> DurableConsumedSet<B> {
     }
 }
 
-/// Strict read of a stored record: bounded size, canonical decoding, the key it is stored under,
-/// and the writer's signature over the statement. Anything else is `Corrupt`.
+/// Strict read of a stored record: canonical decoding (every length is bounded by the codec, so
+/// no record decodes past them), the key it is stored under, and the writer's signature over the
+/// statement. Anything else is `Corrupt`.
 fn decode_record(
     context: ContextRef,
     operation_id: [u8; 32],
     bytes: &[u8],
 ) -> Result<ConsumedEntry, ConsumedSetError> {
-    if bytes.len() > MAX_RECORD {
-        return Err(ConsumedSetError::Corrupt(format!(
-            "record of {} bytes exceeds {MAX_RECORD}",
-            bytes.len()
-        )));
-    }
     let entry =
         ConsumedEntry::decode(bytes).map_err(|e| ConsumedSetError::Corrupt(e.to_string()))?;
     if entry.authorization.context() != context
