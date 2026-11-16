@@ -784,10 +784,8 @@ mod tests {
             expiration: u64::MAX,
             signature: vec![],
         };
-        let capability_only = PolicyRequest::with_context(
-            core,
-            PolicyContext::new().with_capability(capability),
-        );
+        let capability_only =
+            PolicyRequest::with_context(core, PolicyContext::new().with_capability(capability));
         for contextual_request in [
             resource_only,
             namespace_only,
