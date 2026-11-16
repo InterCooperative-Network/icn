@@ -704,8 +704,11 @@ mod tests {
 
         impl PolicyOracle for ContextAwareOracle {
             fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-                if request.context.resource.as_deref() == Some("private") {
-                    return PolicyDecision::deny("private resource");
+                if request.context.resource.as_deref() == Some("private")
+                    || request.context.namespace.as_deref() == Some("hidden")
+                    || request.context.capability.is_some()
+                {
+                    return PolicyDecision::deny("protected context");
                 }
 
                 let required = request
@@ -755,6 +758,46 @@ mod tests {
         assert!(registry.evaluate(&make("public", "0.2")).is_allowed());
         assert!(!registry.evaluate(&make("private", "0.2")).is_allowed());
         assert!(!registry.evaluate(&make("public", "0.8")).is_allowed());
+
+        // Isolate the other fields, too: a test carrying both resource and
+        // metadata would not detect a future regression that checks only one.
+        let core = PolicyRequestCore::new(actor.clone(), ActionKind::Subscribe, Domain::trust());
+        let resource_only = PolicyRequest::with_context(
+            core.clone(),
+            PolicyContext::new().with_resource("private"),
+        );
+        let namespace_only = PolicyRequest::with_context(
+            core.clone(),
+            PolicyContext::new().with_namespace("hidden"),
+        );
+        let metadata_only = PolicyRequest::with_context(
+            core.clone(),
+            PolicyContext::new().with_metadata("min_trust_threshold", "0.9"),
+        );
+        let capability = crate::authz::Capability {
+            id: "presented-cap".into(),
+            resource: "resource".into(),
+            action: "subscribe".into(),
+            constraints: crate::authz::Constraints::default(),
+            holder: None,
+            issuer: "did:icn:test-issuer".into(),
+            expiration: u64::MAX,
+            signature: vec![],
+        };
+        let capability_only = PolicyRequest::with_context(
+            core,
+            PolicyContext::new().with_capability(capability),
+        );
+        for contextual_request in [
+            resource_only,
+            namespace_only,
+            metadata_only,
+            capability_only,
+        ] {
+            assert!(!registry.evaluate(&contextual_request).is_allowed());
+        }
+
+        // The only cache entry is the original context-free allowance.
         assert_eq!(registry.cache_stats().entries, 1);
     }
 
