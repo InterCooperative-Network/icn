@@ -10,9 +10,7 @@ use std::sync::Arc;
 
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, KeyPair};
-use icn_kernel_api::authz::{
-    Domain, PolicyDecision, PolicyOracle, PolicyRequest,
-};
+use icn_kernel_api::authz::{Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_kernel_api::bootstrap::{BootstrapPhase, OracleRegistry};
 
 /// Mirrors the relevant decision of the trust oracle for a 0.5-scored peer.
