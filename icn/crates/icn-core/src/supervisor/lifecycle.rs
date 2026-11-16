@@ -2301,8 +2301,10 @@ mod core_oracle_registration_tests {
             .collect()
     }
 
-    /// The composition `icnd` builds with an identity: a trust service whose oracle reports
-    /// `Domain::trust()` (as the real trust app's does), and a charter oracle.
+    /// The real `register_core_oracles`, fed stand-ins shaped like the inputs `icnd` supplies
+    /// when it has an identity: a trust service whose oracle reports `Domain::trust()` (as the
+    /// real trust app's does — checked in the icnd witness), and a charter oracle. This is the
+    /// production registration function, not the production daemon assembly.
     fn assembled_registry() -> OracleRegistry {
         let registry = OracleRegistry::new();
         register_core_oracles(

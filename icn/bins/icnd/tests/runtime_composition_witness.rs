@@ -175,21 +175,18 @@ async fn the_daemon_policy_components_report_the_contracted_domains() {
         "the shipped trust oracle must report the domain the gossip consumers query"
     );
 
+    // Charter: `build_services` installs a fresh `CharterPolicyOracle::new()`.
     let charter_domain = icn_charter_app::CharterPolicyOracle::new().domain();
-
-    let reported: BTreeSet<String> = [
-        trust_domain.0,
-        icn_net::NETWORK_DOMAIN.to_string(),
-        charter_domain.0,
-    ]
-    .into_iter()
-    .collect();
-    assert_eq!(
-        reported,
-        contracted_domains(),
-        "the trust and charter components plus the composition root's `net` registration \
-         must make up exactly the contract"
+    assert!(
+        contracted_domains().contains(&charter_domain.0),
+        "the shipped charter oracle reports {charter_domain:?}, which is not a contracted domain"
     );
+    assert_ne!(
+        charter_domain, trust_domain,
+        "the charter and trust components must not claim the same registry domain"
+    );
+    // `net` is not reported by any component: the composition root registers it explicitly
+    // (`icn_net::NETWORK_DOMAIN`), and the binary test above observes that registration.
 }
 
 // ── assertions ──────────────────────────────────────────────────────────────────────────────────
@@ -279,10 +276,14 @@ impl Node {
         self.root.path()
     }
 
-    /// Start a daemon and wait until it has reported its assembled registry.
+    /// Start a daemon and wait until its assembled-registry report has been written in full —
+    /// readiness is "the report parses", not "its prefix appeared", so a read that lands
+    /// mid-line cannot be mistaken for an empty or truncated domain set.
     fn start(&self) -> Daemon {
         let mut daemon = Daemon::spawn(&self.config, self.dir());
-        daemon.wait_for_log(RUNNING_REPORT);
+        daemon.wait_until("a complete Running report", |log| {
+            parse_registered_domains(log).is_some()
+        });
         daemon
     }
 }
@@ -342,22 +343,28 @@ impl Daemon {
         std::fs::read_to_string(&self.log_path).unwrap_or_default()
     }
 
-    /// Block until `needle` is logged. Fails — with the log — if the daemon exits first or the
-    /// deadline passes. No retries: a daemon that never reports is a failure, not a flake.
+    /// Block until `needle` is logged.
     fn wait_for_log(&mut self, needle: &str) {
+        self.wait_until(needle, |log| log.contains(needle));
+    }
+
+    /// Block until `ready` holds for the log. Fails — with the log — if the daemon exits first or
+    /// the deadline passes. No retries: a daemon that never reports is a failure, not a flake.
+    /// The 100 ms poll is a bounded check interval, not a readiness assumption.
+    fn wait_until(&mut self, what: &str, ready: impl Fn(&str) -> bool) {
         let deadline = Instant::now() + DEADLINE;
         while Instant::now() < deadline {
-            if self.log().contains(needle) {
+            if ready(&self.log()) {
                 return;
             }
             assert!(
                 matches!(self.child.try_wait(), Ok(None)),
-                "the daemon exited before logging {needle:?}:\n{}",
+                "the daemon exited before logging {what:?}:\n{}",
                 self.log()
             );
             std::thread::sleep(Duration::from_millis(100));
         }
-        panic!("the daemon never logged {needle:?}:\n{}", self.log());
+        panic!("the daemon never logged {what:?}:\n{}", self.log());
     }
 
     fn registered_domains(&self) -> BTreeSet<String> {
