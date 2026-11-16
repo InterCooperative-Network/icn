@@ -2248,4 +2248,208 @@ mod core_oracle_registration_tests {
              is answering and the oracle decision is not reaching the limiter."
         );
     }
+
+    // ---- Composition contract: the whole registered domain set (#2544, #2500) ----
+    //
+    // The tests above each ask "is domain X served?". None of them asks "is the set of
+    // registered domains exactly what the daemon's consumers need, and nothing more?" —
+    // so an extra permissive registration (for example the placeholder ledger oracle,
+    // which allows every ledger request) or a silently missing input passes all of them.
+    //
+    // Kernel boundary: these stay on stand-in oracles. The real trust and charter app
+    // components are checked against the same contract from the composition root, in
+    // `icn/bins/icnd/tests/runtime_composition_witness.rs`.
+
+    /// Domains that the daemon's assembled consumers query through this registry.
+    ///
+    /// Bound to the symbols the consumers use, not to string literals:
+    /// gossip subscription/pull/protocol build `Domain::trust()`
+    /// (`icn-gossip/src/{subscriptions,protocol,gossip}.rs`, `handlers/pull.rs`), and the
+    /// network rate limiter queries `icn_net::NETWORK_DOMAIN` (`icn-net/src/rate_limit.rs`).
+    fn domains_queried_by_assembled_consumers() -> [Domain; 2] {
+        [Domain::trust(), Domain::new(icn_net::NETWORK_DOMAIN)]
+    }
+
+    /// The registered-domain contract for a daemon with a trust service and a charter
+    /// oracle — the composition `icnd` builds whenever it has an identity.
+    ///
+    /// `ledger` and `governance` are deliberately absent: their app oracles exist, but no
+    /// assembled consumer queries them through this registry, and the ledger one is a
+    /// permissive placeholder. Registering either to "complete" the set would widen
+    /// authorization without a caller that needs it.
+    fn contracted_domains() -> std::collections::BTreeSet<String> {
+        [
+            Domain::trust().0,
+            icn_net::NETWORK_DOMAIN.to_string(),
+            "charter".to_string(),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    fn registered(registry: &OracleRegistry) -> std::collections::BTreeSet<String> {
+        registry.domains().into_iter().map(|d| d.0).collect()
+    }
+
+    /// Queried domains that nothing in `registry` answers, in query order.
+    fn unserved_queried_domains(registry: &OracleRegistry) -> Vec<String> {
+        let present = registered(registry);
+        domains_queried_by_assembled_consumers()
+            .into_iter()
+            .map(|d| d.0)
+            .filter(|d| !present.contains(d))
+            .collect()
+    }
+
+    /// The composition `icnd` builds with an identity: a trust service whose oracle reports
+    /// `Domain::trust()` (as the real trust app's does), and a charter oracle.
+    fn assembled_registry() -> OracleRegistry {
+        let registry = OracleRegistry::new();
+        register_core_oracles(
+            &registry,
+            Some(FakeTrust::arc(Arc::new(UnlimitedOracle), 0.0)),
+            Some(Arc::new(FakeOracle("charter"))),
+            &rate_limiting_with_ceiling(),
+        );
+        registry.set_phase(BootstrapPhase::Running);
+        registry
+    }
+
+    /// Exactly the contracted domains — no fewer (a dropped registration, #2488) and no
+    /// more (an unintended permissive one) — and every queried domain is served.
+    ///
+    /// Built twice from fresh registries: the result must not depend on any state a
+    /// previous registry left behind.
+    #[test]
+    fn the_composition_root_registers_exactly_the_contracted_domains() {
+        for attempt in 0..2 {
+            let registry = assembled_registry();
+            assert_eq!(
+                registered(&registry),
+                contracted_domains(),
+                "attempt {attempt}: register_core_oracles must install exactly the \
+                 contracted policy domains"
+            );
+            assert_eq!(
+                unserved_queried_domains(&registry),
+                Vec::<String>::new(),
+                "attempt {attempt}: every domain an assembled consumer queries must be served"
+            );
+        }
+    }
+
+    /// The domains that have app oracles but no assembled consumer are refused in Running
+    /// with the registry's own missing-oracle reason — never answered by a placeholder.
+    #[test]
+    fn ledger_and_governance_are_refused_as_unregistered_not_answered() {
+        let registry = assembled_registry();
+
+        // Control: a contracted domain is answered by its oracle, not refused.
+        assert!(
+            matches!(
+                registry.evaluate(&request_for(&Domain::trust().0)),
+                PolicyDecision::Allow { .. }
+            ),
+            "control: the trust domain must be answered in the same registry"
+        );
+
+        for domain in [Domain::ledger(), Domain::governance()] {
+            match registry.evaluate(&request_for(&domain.0)) {
+                PolicyDecision::Deny {
+                    reason: icn_kernel_api::authz::PolicyError::Denied(reason),
+                    ..
+                } => assert_eq!(
+                    reason,
+                    format!("No oracle registered for domain: {domain}"),
+                    "'{domain}' must be refused because nothing is registered for it, \
+                     not by some oracle's own rule"
+                ),
+                other => panic!(
+                    "'{domain}' must stay unregistered in the assembled daemon; a decision \
+                     of {other:?} means an oracle was installed for it"
+                ),
+            }
+        }
+    }
+
+    /// Positive control for the next test: with the assembled composition, the real gossip
+    /// subscription path — `GossipActor::subscribe`, which asks the registry about
+    /// `Domain::trust()` — admits a subscriber to a public topic.
+    #[tokio::test]
+    async fn the_real_gossip_subscription_path_is_served_by_the_assembled_registry() {
+        let registry: Arc<dyn PolicyOracle> = Arc::new(assembled_registry());
+        let mut gossip = icn_gossip::gossip::GossipActor::new(gossip_node(), Some(registry));
+        gossip.create_topic(icn_gossip::types::Topic::new(
+            WITNESS_TOPIC.to_string(),
+            icn_gossip::types::AccessControl::Public,
+        ));
+
+        let outcome = gossip.subscribe(WITNESS_TOPIC, limiter_peer()).await;
+
+        assert!(
+            outcome.is_ok(),
+            "the assembled registry must answer the gossip consumer's trust query; got {:#}",
+            outcome.err().map(|e| format!("{e:#}")).unwrap_or_default()
+        );
+    }
+
+    /// A daemon assembled without a trust service is not a healthy composition, and the
+    /// gap is detectable rather than silent.
+    ///
+    /// `register_core_oracles` accepts `None` and returns `()` with nothing logged, so
+    /// nothing at the call site reports the omission. This pins the two observable
+    /// consequences: the queried domains are named as unserved, and the real gossip
+    /// consumer is refused by the registry's missing-oracle rule — the same refusal shape
+    /// as #2488, on the gossip path instead of the network one.
+    #[tokio::test]
+    async fn a_composition_without_a_trust_service_is_detectably_incomplete() {
+        let registry = OracleRegistry::new();
+        register_core_oracles(
+            &registry,
+            None,
+            Some(Arc::new(FakeOracle("charter"))),
+            &rate_limiting_with_ceiling(),
+        );
+        registry.set_phase(BootstrapPhase::Running);
+
+        assert_eq!(
+            unserved_queried_domains(&registry),
+            vec![Domain::trust().0, icn_net::NETWORK_DOMAIN.to_string()],
+            "without a trust service, both domains the consumers query are unserved"
+        );
+        assert_ne!(
+            registered(&registry),
+            contracted_domains(),
+            "a composition missing the trust service must not satisfy the contract"
+        );
+
+        let registry: Arc<dyn PolicyOracle> = Arc::new(registry);
+        let mut gossip = icn_gossip::gossip::GossipActor::new(gossip_node(), Some(registry));
+        gossip.create_topic(icn_gossip::types::Topic::new(
+            WITNESS_TOPIC.to_string(),
+            icn_gossip::types::AccessControl::Public,
+        ));
+
+        let refusal = gossip
+            .subscribe(WITNESS_TOPIC, limiter_peer())
+            .await
+            .expect_err("the gossip consumer must be refused when trust is unregistered");
+        let refusal = format!("{refusal:#}");
+        assert!(
+            refusal.contains("No oracle registered for domain: trust"),
+            "the refusal must come from the registry's missing-oracle rule, not from the \
+             topic ACL or another check; got {refusal:?}"
+        );
+    }
+
+    const WITNESS_TOPIC: &str = "witness:composition:public";
+
+    /// The gossip actor's own node identity — distinct from the subscriber, so the
+    /// subscription is a third party's and not a local self-subscription.
+    fn gossip_node() -> icn_identity::Did {
+        icn_identity::KeyPair::generate()
+            .expect("test keypair")
+            .did()
+            .clone()
+    }
 }
