@@ -462,6 +462,28 @@ jobs:
         run: cargo test --workspace --test '*' -- --test-threads=1
         working-directory: ./icn
 
+      # Default integration tests compile these assertions out; reject missing coverage.
+      - name: Run Wasmtime cache regressions (icn-compute/wasm)
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        run: |
+          set -euo pipefail
+          expected_tests=(
+            cache_does_not_accept_invalid_wasm
+            cache_reopens_in_a_new_process
+            cold_cache_reopens_with_a_fresh_engine
+            compilation_settings_partition_cache_entries
+            invalid_cache_entries_recompile_then_reopen
+          )
+          discovered=$(cargo test --locked -p icn-compute --features wasm --test wasmtime_cache_reopen -- --list)
+          printf '%s\n' "$discovered"
+          diff -u <(printf '%s: test\n' "${expected_tests[@]}") \
+            <(printf '%s\n' "$discovered" | sed -n '/: test$/p' | LC_ALL=C sort)
+          results=$(mktemp)
+          trap 'rm -f "$results"' EXIT
+          cargo test --locked -p icn-compute --features wasm --test wasmtime_cache_reopen -- --test-threads=1 | tee "$results"
+          grep -Eq '^test result: ok\. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;' "$results"
+        working-directory: ./icn
+
       - name: Run sled storage tests
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         run: cargo test -p icn-gateway --features sled-storage
