@@ -288,51 +288,121 @@ impl ClearingManager {
         Ok(transfer_id)
     }
 
-    /// Confirm a transfer
+    /// Confirm a transfer, booking its amount into its agreement's position exactly once.
+    ///
+    /// The durable position record is the authority for whether a transfer has been booked. It
+    /// holds the balances *and* each tracked transfer's status, so one `put` of that record is the
+    /// whole economic effect: the amount and the "booked" marker cannot be persisted apart. The
+    /// transfer row is written afterwards as a derived record.
+    ///
+    /// The decision is made under the manager's position lock, against the durable records read
+    /// under that lock — never against the cache, and never against the transfer row read before
+    /// the lock. So a repeated call, a call racing another on this manager, and a call after a
+    /// restart all find the transfer already booked and change nothing.
+    ///
+    /// # Result
+    ///
+    /// * `Ok(())` when this call books the transfer, and also when it was already booked: a replay
+    ///   is an idempotent no-op that leaves every balance unchanged.
+    /// * [`FederationError::InvalidState`], with nothing written, when booking would contradict a
+    ///   durable record: the transfer or its position entry is `Disputed`, or a `Pending` transfer
+    ///   is not tracked by its agreement's position.
+    /// * Any other error is a failed read or write. Retrying is safe. If the position write failed,
+    ///   nothing was booked and the retry books it once. If only the later transfer-row write
+    ///   failed, the amount is already booked and the retry repairs the row without booking again.
+    ///
+    /// # Ownership
+    ///
+    /// This serializes the callers of *one* `ClearingManager`. It does not coordinate several
+    /// managers over the same store: the other position writers in this type (proposal,
+    /// settlement, netting) write the manager's cached position with a plain `put`, so one manager
+    /// per clearing keyspace is assumed.
     pub fn confirm_transfer(&self, transfer_id: &str) -> Result<()> {
         let key = Self::transfer_key(transfer_id);
-        let value = self
-            .store
-            .get(&key)?
-            .ok_or_else(|| FederationError::TransferNotFound(transfer_id.to_string()))?;
 
-        let mut transfer: CrossCoopTransfer = serde_json::from_slice(&value)?;
-        transfer.confirm();
+        // Identify the agreement. This read happens before the lock and only names the parties;
+        // nothing below trusts the status it saw.
+        let observed = self.load_transfer(&key, transfer_id)?;
+        let agreement_id = self.find_agreement(&observed.from_coop, &observed.to_coop)?;
 
-        let updated_value = serde_json::to_vec(&transfer)?;
-        self.store.put(&key, &updated_value)?;
-
-        // Update position
-        let agreement_id = self.find_agreement(&transfer.from_coop, &transfer.to_coop)?;
         let mut positions = self.positions.write().unwrap_or_else(|poisoned| {
             warn!("Positions lock poisoned, recovering");
             poisoned.into_inner()
         });
-        if let Some(position) = positions.get_mut(&agreement_id) {
-            // Update the owes amount
-            if transfer.from_coop == self.own_coop_id {
-                // We sent, so we owe them
-                position.coop_a_owes_b += transfer.dest_amount;
-            } else {
-                // They sent, so they owe us
-                position.coop_b_owes_a += transfer.dest_amount;
-            }
 
-            // Update pending transfers
-            for t in &mut position.pending_transfers {
-                if t.id == transfer_id {
-                    t.status = TransferStatus::Confirmed;
-                }
-            }
-
-            let pos_key = Self::position_key(&agreement_id);
-            let pos_value = serde_json::to_vec(position)?;
-            self.store.put(&pos_key, &pos_value)?;
+        // Decide from durable state, read under the lock.
+        let mut transfer = self.load_transfer(&key, transfer_id)?;
+        if transfer.from_coop != observed.from_coop || transfer.to_coop != observed.to_coop {
+            return Err(FederationError::InvalidState(format!(
+                "transfer {transfer_id} changed parties while it was being confirmed"
+            )));
         }
+        let pos_key = Self::position_key(&agreement_id);
+        let mut position: ClearingPosition = match self.store.get(&pos_key)? {
+            Some(bytes) => serde_json::from_slice(&bytes)?,
+            None => return Err(FederationError::ClearingAgreementNotFound(agreement_id)),
+        };
 
-        metrics::clearing::transfers_confirmed_inc();
-        info!("Confirmed transfer: {}", transfer_id);
-        Ok(())
+        match decide_confirmation(&transfer, &position) {
+            ConfirmDecision::Refuse(reason) => Err(FederationError::InvalidState(format!(
+                "refusing to confirm transfer {transfer_id}: {reason}"
+            ))),
+            ConfirmDecision::AlreadyBooked => {
+                if transfer.status == TransferStatus::Pending {
+                    // Booked by an earlier call whose row write did not land: repair the row.
+                    transfer.confirm();
+                    self.store.put(&key, &serde_json::to_vec(&transfer)?)?;
+                }
+                debug!(
+                    "Transfer {} already booked; confirmation is a no-op",
+                    transfer_id
+                );
+                Ok(())
+            }
+            ConfirmDecision::Book => {
+                let owes = if transfer.from_coop == self.own_coop_id {
+                    // We sent, so we owe them
+                    &mut position.coop_a_owes_b
+                } else {
+                    // They sent, so they owe us
+                    &mut position.coop_b_owes_a
+                };
+                *owes = owes.checked_add(transfer.dest_amount).ok_or_else(|| {
+                    FederationError::InvalidState(format!(
+                        "booking transfer {transfer_id} would overflow the position"
+                    ))
+                })?;
+                for entry in position
+                    .pending_transfers
+                    .iter_mut()
+                    .filter(|entry| entry.id == transfer_id)
+                {
+                    entry.status = TransferStatus::Confirmed;
+                }
+
+                // The one write that books the transfer. On failure nothing is booked and the
+                // cache is untouched, so the running manager still agrees with the store.
+                self.store.put(&pos_key, &serde_json::to_vec(&position)?)?;
+                positions.insert(agreement_id, position);
+
+                if transfer.status != TransferStatus::Confirmed {
+                    transfer.confirm();
+                    self.store.put(&key, &serde_json::to_vec(&transfer)?)?;
+                }
+
+                metrics::clearing::transfers_confirmed_inc();
+                info!("Confirmed transfer: {}", transfer_id);
+                Ok(())
+            }
+        }
+    }
+
+    fn load_transfer(&self, key: &[u8], transfer_id: &str) -> Result<CrossCoopTransfer> {
+        let value = self
+            .store
+            .get(key)?
+            .ok_or_else(|| FederationError::TransferNotFound(transfer_id.to_string()))?;
+        Ok(serde_json::from_slice(&value)?)
     }
 
     /// Calculate the current position for an agreement
@@ -646,6 +716,61 @@ impl ClearingManager {
     }
 }
 
+/// What confirming a transfer may do to its agreement's position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConfirmDecision {
+    /// Nothing for this transfer is booked yet: book it.
+    Book,
+    /// The position already records the transfer as booked, or settlement has discharged it.
+    AlreadyBooked,
+    /// Booking would contradict a durable record. Refuse without writing.
+    Refuse(&'static str),
+}
+
+/// Decide what confirming `transfer` may do, given its agreement's durable `position`.
+///
+/// The position is the authority because its balances and its per-transfer statuses change in
+/// the same write. The transfer row is consulted only where the position has no entry for the
+/// transfer: settlement removes discharged entries, and the row is written `Confirmed` only after
+/// the position has booked it, so an untracked `Confirmed` row means booked and discharged.
+fn decide_confirmation(
+    transfer: &CrossCoopTransfer,
+    position: &ClearingPosition,
+) -> ConfirmDecision {
+    match transfer.status {
+        TransferStatus::Disputed => return ConfirmDecision::Refuse("the transfer is disputed"),
+        TransferStatus::Settled => return ConfirmDecision::AlreadyBooked,
+        TransferStatus::Pending | TransferStatus::Confirmed => {}
+    }
+
+    let mut tracked = false;
+    let mut booked = false;
+    for entry in position
+        .pending_transfers
+        .iter()
+        .filter(|entry| entry.id == transfer.id)
+    {
+        tracked = true;
+        match entry.status {
+            TransferStatus::Disputed => {
+                return ConfirmDecision::Refuse("the position records the transfer as disputed")
+            }
+            TransferStatus::Confirmed | TransferStatus::Settled => booked = true,
+            TransferStatus::Pending => {}
+        }
+    }
+
+    if booked {
+        ConfirmDecision::AlreadyBooked
+    } else if tracked {
+        ConfirmDecision::Book
+    } else if transfer.status == TransferStatus::Confirmed {
+        ConfirmDecision::AlreadyBooked
+    } else {
+        ConfirmDecision::Refuse("the agreement's position does not track the transfer")
+    }
+}
+
 /// Report generated after a settlement
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -809,5 +934,95 @@ mod tests {
         // After settlement, should not be due anymore
         let due_after = manager.get_due_settlements();
         assert_eq!(due_after.len(), 0);
+    }
+
+    fn transfer_with(status: TransferStatus) -> CrossCoopTransfer {
+        let mut transfer = CrossCoopTransfer::new(
+            "t-1".to_string(),
+            "coop-a".to_string(),
+            test_did(),
+            "coop-b".to_string(),
+            test_did(),
+            4,
+            "CREDIT".to_string(),
+            4,
+            "CREDIT".to_string(),
+        );
+        transfer.status = status;
+        transfer
+    }
+
+    fn position_with(entries: &[TransferStatus]) -> ClearingPosition {
+        let mut position = ClearingPosition::new("agr".to_string());
+        for status in entries {
+            position.add_transfer(transfer_with(*status));
+        }
+        position
+    }
+
+    /// The whole confirmation policy, one row per (transfer row, position entries) case.
+    #[test]
+    fn decide_confirmation_books_only_an_unbooked_tracked_transfer() {
+        use ConfirmDecision::{AlreadyBooked, Book, Refuse};
+        use TransferStatus::{Confirmed, Disputed, Pending, Settled};
+
+        let untracked = "the agreement's position does not track the transfer";
+        let cases: &[(TransferStatus, &[TransferStatus], ConfirmDecision)] = &[
+            // Tracked and not yet booked: the only case that changes a balance.
+            (Pending, &[Pending], Book),
+            // An earlier booking whose row write was lost (or legacy row-first writes): the
+            // position still says Pending, so it is booked now, once.
+            (Confirmed, &[Pending], Book),
+            // Replays: the position already records the booking.
+            (Pending, &[Confirmed], AlreadyBooked),
+            (Confirmed, &[Confirmed], AlreadyBooked),
+            (Confirmed, &[Settled], AlreadyBooked),
+            // A duplicate entry for one id (NB-043) is booked once, never per entry.
+            (Pending, &[Pending, Confirmed], AlreadyBooked),
+            (Pending, &[Pending, Pending], Book),
+            // Discharged by settlement: no entry, row Confirmed.
+            (Confirmed, &[], AlreadyBooked),
+            (Settled, &[], AlreadyBooked),
+            (Settled, &[Pending], AlreadyBooked),
+            // Never overwritten, never booked.
+            (Disputed, &[Pending], Refuse("the transfer is disputed")),
+            (Disputed, &[], Refuse("the transfer is disputed")),
+            (
+                Pending,
+                &[Disputed],
+                Refuse("the position records the transfer as disputed"),
+            ),
+            (
+                Confirmed,
+                &[Confirmed, Disputed],
+                Refuse("the position records the transfer as disputed"),
+            ),
+            // A Pending row the position never recorded (e.g. a proposal whose position write
+            // failed, NB-046): refusing is the only answer that cannot book a phantom.
+            (Pending, &[], Refuse(untracked)),
+        ];
+
+        for (row, entries, expected) in cases {
+            assert_eq!(
+                decide_confirmation(&transfer_with(*row), &position_with(entries)),
+                *expected,
+                "row {row:?}, position entries {entries:?}"
+            );
+        }
+    }
+
+    /// Entries for other transfers never make this one look booked.
+    #[test]
+    fn decide_confirmation_ignores_other_transfers() {
+        let mut position = ClearingPosition::new("agr".to_string());
+        let mut other = transfer_with(TransferStatus::Confirmed);
+        other.id = "t-other".to_string();
+        position.add_transfer(other);
+        position.add_transfer(transfer_with(TransferStatus::Pending));
+
+        assert_eq!(
+            decide_confirmation(&transfer_with(TransferStatus::Pending), &position),
+            ConfirmDecision::Book
+        );
     }
 }
