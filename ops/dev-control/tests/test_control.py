@@ -646,6 +646,13 @@ class LauncherSafety(unittest.TestCase):
         self.assertEqual(self.run_l("--disable-return-key").returncode, 4)
         self.assertIn("someone-elses", keys(), "a foreign binding is never removed")
 
+    def test_inventory_is_forwarded_and_contains_counts_only(self):
+        r = self.run_l("--inventory", "--no-github")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        inv = json.loads(r.stdout)
+        self.assertIn("activities", inv)
+        self.assertIn("view_sizes", inv)
+
     def test_unknown_option(self):
         self.assertEqual(self.run_l("--bogus").returncode, 2)
 

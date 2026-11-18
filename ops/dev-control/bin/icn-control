@@ -6,6 +6,7 @@
 #   icn-control --here       run it directly in this terminal (no tmux)
 #   icn-control --report     print a plain-text report and exit (no terminal UI)
 #   icn-control --json       print the reconciled views as JSON and exit
+#   icn-control --inventory  print counts of sessions, worktrees and activities (JSON) and exit
 #   icn-control --status     say whether the control-center tmux session is running
 #   icn-control --restart    stop ONLY the control center's own tmux session, then open it again
 #   icn-control --return-key-status     is F12 free, already the "back to control center" key, or taken?
@@ -83,7 +84,7 @@ case "${1:-}" in
     fi
     open_tmux ;;
   --here) shift; py "$@" ;;
-  --report|--json) py "$@" ;;
+  --report|--json|--inventory) py "$@" ;;
   --status)
     if tmux has-session -t "=$SESSION" 2>/dev/null && is_ours; then
       echo "running (tmux session '$SESSION', attached clients: $(tmux display-message -p -t "=$SESSION:" '#{session_attached}'))"
@@ -130,6 +131,6 @@ case "${1:-}" in
           taken) echo "refusing: F12 is bound to something else, not by icn-control: $cur" >&2; exit 4 ;;
         esac ;;
     esac ;;
-  -h|--help) sed -n '2,17p' "$self" | sed 's/^# \{0,1\}//' ;;
+  -h|--help) sed -n '2,18p' "$self" | sed 's/^# \{0,1\}//' ;;
   *) echo "icn-control: unknown option '$1' (see icn-control --help)" >&2; exit 2 ;;
 esac
