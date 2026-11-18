@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 from typing import Callable, Optional
 
@@ -84,6 +85,12 @@ def icn_session_bin() -> Optional[str]:
     return None
 
 
+def safe_dir(path, paths: Paths) -> bool:
+    """An absolute, existing directory under the worktrees root with no control characters."""
+    return (isinstance(path, str) and os.path.isabs(path) and not re.search(r"[\x00-\x1f\x7f]", path)
+            and os.path.isdir(path) and under(path, paths.worktrees))
+
+
 def under(path: Optional[str], root: Optional[str]) -> bool:
     if not path or not root:
         return False
@@ -148,8 +155,12 @@ def resume_action(view: dict, sessions: list[dict], paths: Paths) -> dict:
     uuid = view.get("conversation")
     if kind == "registry":
         manual = ""
-        if valid_uuid(uuid) and view.get("cwd") and transcript_for(paths, view["cwd"], uuid):
-            manual = (f" Manual route (check nothing else runs it first): cd {view['cwd']} && claude --resume {uuid}")
+        cwd = view.get("cwd")
+        # The directory comes from a registry row (written by agents): only a validated path is ever shown
+        # as a command, and it is shell-quoted so a copy-paste can never run anything else.
+        if valid_uuid(uuid) and safe_dir(cwd, paths) and transcript_for(paths, cwd, uuid):
+            manual = (" Manual route (check nothing else runs it first): "
+                      f"cd {shlex.quote(cwd)} && claude --resume {shlex.quote(uuid)}")
         return action("resume", label, False, "Only an icn-ops registry entry exists; icn-session can resume only conversations"
                       " it recorded itself, so nothing is started from here." + manual)
     if kind == "tmux":
@@ -198,7 +209,7 @@ def plan_resume(rec: dict, sessions: list[dict], paths: Paths) -> dict:
     confirm = [f"Resume saved conversation {uuid}",
                f"  worktree:   {wt}",
                f"  tmux name:  {name}  (launcher record {rec.get('file', '?')})",
-               f"  command:    {' '.join(argv)}",
+               f"  command:    {shlex.join(argv)}",
                "This starts Claude Code with --resume for that exact conversation through icn-session,",
                "then switches this window to it. No branch or worktree is created; no file is edited."]
     return {"ok": True, "argv": argv, "tmux_name": name, "confirm": confirm,
@@ -262,7 +273,7 @@ def plan_open_in_worktree(wt: dict, sessions: list[dict], records: list[dict], p
                f"  worktree:   {path}",
                f"  branch:     {wt.get('branch')}   head {str(wt.get('head') or '')[:9]}",
                f"  tmux name:  {tmux_name}",
-               f"  command:    {' '.join(argv)}"] + [f"  {w}" for w in warn] + [
+               f"  command:    {shlex.join(argv)}"] + [f"  {w}" for w in warn] + [
                "This starts one Claude Code session through icn-session in the worktree above and",
                "switches this window to it. No branch or worktree is created; no file is edited."]
     return {"ok": True, "argv": argv, "tmux_name": tmux_name, "confirm": confirm, "warnings": warn}

@@ -140,6 +140,19 @@ class Actions(Base):
         self.assertIn(f"claude --resume {U1}", a["reason"], "a manual route is offered instead")
         self.assertNotIn("argv", a)
 
+    def test_manual_route_is_quoted_and_only_for_validated_paths(self):
+        evil = self.wt("x; touch PWNED")
+        self.transcript(evil, U1)
+        view = {"kind": "registry", "status": REGISTERED_NOT_RUNNING, "conversation": U1, "cwd": evil, "name": "r"}
+        reason = {x["id"]: x for x in sessionctl.session_actions(view, [view], self.paths)}["resume"]["reason"]
+        self.assertIn("cd '" + evil + "' && claude --resume", reason, "the path is shell-quoted")
+        outside = os.path.join(self.tmp, "outside")
+        os.makedirs(outside)
+        self.transcript(outside, U1)
+        view2 = dict(view, cwd=outside)
+        reason2 = {x["id"]: x for x in sessionctl.session_actions(view2, [view2], self.paths)}["resume"]["reason"]
+        self.assertNotIn("claude --resume", reason2, "no command is suggested for a path outside the worktrees root")
+
     def test_missing_launcher_binary(self):
         w = self.wt("lane")
         self.transcript(w, U1)
