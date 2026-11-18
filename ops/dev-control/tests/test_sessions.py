@@ -298,10 +298,10 @@ class Picker(unittest.TestCase):
             {"kind": "launcher-record", "name": "old-lane", "status": REGISTERED_NOT_RUNNING, "last_activity": now - 50,
              "program": "nycn", "repo": "nycn", "worktree": "/w/nycn/old-lane", "state_label": "STOPPED"},
             {"kind": "agent", "name": "pr2906-review", "status": LIVE, "last_activity": now - 3000, "program": "icn-core",
-             "repo": "icn", "cwd": "/s/pr2906", "state_label": "IDLE AT PROMPT", "pid": 4242,
+             "repo": "icn", "cwd": "/s/pr2906", "state_label": "IDLE AT PROMPT", "pid": 4242, "tmux": "icn-r",
              "pr": {"repo": "icn", "number": 2906, "how": "inferred from directory name", "title": "clearing"}},
             {"kind": "agent", "name": "compute", "status": LIVE, "last_activity": now - 10, "program": "icn-core",
-             "repo": "icn", "cwd": "/s/compute", "state_label": "WORKING", "pid": 4343},
+             "repo": "icn", "cwd": "/s/compute", "state_label": "WORKING", "pid": 4343, "tmux": "icn-c"},
             {"kind": "tmux", "name": "shell", "status": "IDLE"},
             {"kind": "control-center", "name": "icn-control", "status": LIVE},
         ]
@@ -382,11 +382,13 @@ class EndToEnd(unittest.TestCase):
             pass
 
     def start_agent(self, name):
-        self.tm("new-session", "-d", "-s", f"agent-{name}", "-x", "120", "-y", "30", f"{self.bin}/claude 3600")
+        cwd = os.path.join(self.tmp, f"{name}-dir")   # separate directories: separate pieces of work
+        os.makedirs(cwd, exist_ok=True)
+        self.tm("new-session", "-d", "-s", f"agent-{name}", "-c", cwd, "-x", "120", "-y", "30", f"{self.bin}/claude 3600")
         pid = int(self.tm("list-panes", "-t", f"=agent-{name}", "-F", "#{pane_pid}").stdout.split()[0])
         start = procs.proc_start_ticks(pid)
         with open(os.path.join(self.claude_home, "sessions", f"{pid}.json"), "w") as f:
-            json.dump({"pid": pid, "procStart": start, "sessionId": str(uuidlib.uuid4()), "cwd": self.tmp,
+            json.dump({"pid": pid, "procStart": start, "sessionId": str(uuidlib.uuid4()), "cwd": cwd,
                        "name": f"{name}-task-session", "status": "idle", "statusUpdatedAt": time.time() * 1000,
                        "tmux": f"agent-{name}:@1.%1"}, f)
         self.pids[name] = (pid, start)
@@ -434,7 +436,8 @@ class EndToEnd(unittest.TestCase):
 
     def test_switch_return_switch_and_resume(self):
         # 1. picker from anywhere, filter by a recognisable name, join
-        self.keys("4")   # start from another screen: g must work everywhere
+        self.wait(lambda: "WORK" in self.screen(), "Work is the default screen")
+        self.keys("5")   # start from another screen: g must work everywhere
         self.keys("g")
         self.wait(lambda: "SWITCH TO A CLAUDE SESSION" in self.screen(), "picker")
         self.assertIn("alpha-task-session", self.screen())
@@ -502,7 +505,7 @@ class EndToEnd(unittest.TestCase):
         self.keys("Escape")
 
     def test_stale_target_is_refused_and_resize_survives(self):
-        self.keys("3")
+        self.keys("4")
         self.wait(lambda: "alpha-task-session" in self.screen(), "sessions screen")
         self.tm("kill-session", "-t", "=agent-alpha")   # the target disappears after it was displayed
         self.keys("/")

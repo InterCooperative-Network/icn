@@ -34,15 +34,56 @@ Running the same command again re-attaches; it never starts a second copy. After
 tmux session is gone, and the same command recreates it. The first screen then reads live state
 and marks anything loaded from the local cache as **CACHED/STALE** until it is re-observed.
 
+## Work: one row per piece of work (the default screen)
+
+Screen **1 Work** groups everything that belongs to one piece of work into one **activity**: its open
+PR, its worktrees (author and review checkouts), its Claude/Codex sessions, launcher and registry
+records, review-evidence directories, handoffs and follow-up ledger. Links are made from evidence
+only, and each activity lists them ("How these were linked"):
+
+- a worktree whose branch is the head of an open PR in the same repository (fork PRs never match);
+- a session whose working directory is inside a worktree;
+- a session tied to a PR by a registered `pr_ref`, a branch match, or an explicit PR number;
+- a review checkout that names an open PR (`review-pr-2905`, `review/pr-2905`).
+
+Similar-looking names alone never merge two activities.
+
+| Status | Meaning (derived on every refresh, never stored) |
+|---|---|
+| **Active** | a live agent, a maintainer decision or block on its PR, or PR movement in the last 24 h |
+| **Paused** | unfinished and preserved: an open PR without recent movement, uncommitted work, a resumable conversation, or a fresh worktree |
+| **Completed** | its branch's PR was merged (and nothing uncommitted is left behind) |
+| **Archived** | superseded (PR closed unmerged) or a clean checkout with nothing unique and no PR |
+| **Unresolved** | not enough evidence: e.g. commits on no remote-tracking ref and no PR, merged but still dirty, or PR history unavailable |
+
+Views (`v` cycles): **NOW** — Active, anything that needs you (`!`), and Paused work touched in the
+last 30 days (the default) · **ALL OPEN** — every Active and Paused activity · **ARCHIVE** —
+Completed, Archived and Unresolved, searchable with `/`.
+
+`Enter` on an activity offers every action, and says why any is unavailable: join its live Claude
+session, resume its saved conversation, open Claude Code in its worktree, read its handoff, show
+details, mark it paused/archived, request retirement approval.
+
+- **Marks** (`m`) are a display-only overlay in `~/.local/state/icn-control/activity-marks.json`
+  (0600, `canonical: false`). They move an activity between views. They never delete, stop or clean
+  anything, never remove a protection, and a live agent always keeps its activity Active.
+- **Retirement requests** (`x`) are offered only for Completed/Archived activities with no protection
+  (no uncommitted changes, no commits on no remote ref, no open PR, no live agent, no file locks).
+  They append a reviewable entry with the `wt-clean` dry-run and `--apply --only <name>@<sha>`
+  commands to `~/icn-dev/state/dev-control-consolidation-<date>/retirement-requests.md`. Nothing runs.
+
+The PR history needed to tell finished from unfinished worktrees (merged and closed PRs by branch) is
+fetched hourly and cached; until it loads, those worktrees show as Unresolved, never as Completed.
+
 ## Moving between Claude sessions
 
 | You want to… | Do this |
 |---|---|
-| see every Claude session and pick one | press **`g`** anywhere; type part of a name, task, program, repo or PR to filter; `↑/↓`; `Enter` |
-| enter a running session | `g` → select it → **Join session** (or `a` on screen 3) |
+| see the Claude sessions of current work and pick one | press **`g`** anywhere; type part of a name, task, program, repo or PR to filter; `↑/↓`; `Enter`. `Tab` shows every session record. |
+| enter a running session | `g` → select it → **Join session** (or Work → `Enter` on the task → Join, or `a` on screen 4) |
 | come back to the dashboard | **tmux prefix, then capital `L`** (the prefix on icn-dev is Ctrl-a). Claude keeps running. |
 | continue a stopped conversation | `g` → a row marked `STOPPED · resumable` → **Resume saved conversation** → read the plan → `y` |
-| start Claude in an existing worktree | screen 4 (Worktrees) or a program on screen 2 → **`c`** → read the plan → `y` |
+| start Claude in an existing worktree | Work (1), Lanes (3) or Worktrees (5) → **`c`** → read the plan → `y` |
 | a dedicated "back" key | opt in once: `icn-control --enable-return-key` makes **F12** jump back (see below) |
 
 What each action guarantees:
@@ -63,9 +104,12 @@ What each action guarantees:
   (argv only, no shell; every value validated), show you the exact command first, re-check
   everything again after you press `y`, and only then switch you to the new session.
 
-Sessions that cannot be joined say why in the picker and on the detail screen: Claude running in a
-plain terminal outside tmux, Codex app-server/proxy service processes, registry entries without a
-process, and records whose conversation cannot be identified exactly.
+The switcher's STATE column says exactly what each entry is and what can be done with it:
+`RUNNING · busy|waiting` (joinable), `RUNNING · … · outside tmux (/dev/pts/N)` (use that terminal),
+`STOPPED · resumable`, `STOPPED · no launcher record` (registry-only: a quoted manual
+`claude --resume` command is shown, nothing is started), `STOPPED · transcript unavailable`,
+`OUTDATED record · agent live here` (folded into the live agent by default), `STALE registry entry`.
+By default it lists every live agent plus the session records of Active and Paused work.
 
 ### Optional F12 "back" key
 
@@ -84,16 +128,17 @@ restarts. While enabled, programs inside tmux, Claude Code included, no longer r
 
 | Key | Screen | What it shows |
 |---|---|---|
-| `1` | Overview | live agent sessions, what needs attention, a rule-based "what next", PRs by state, blocked work, merges in the last 7 days, infrastructure warnings |
-| `2` | Lanes | the seven long-lived programs, with their open PRs, sessions, worktrees, handoffs and next action |
-| `3` | Agents & Sessions | every agent process, tmux session, launcher record and registry entry, reconciled into one row per session |
-| `4` | Worktrees | every git worktree with dirty/unpushed state, locks, PRs and why it must be kept (`k`: only must-keep) |
-| `5` | Pull Requests | open PRs across org repos: draft, lifecycle, required CI, reviews, ledger, readiness |
-| `6` | Handoffs | recent handoff documents with their completed / open / decision / next sections |
-| `7` | System Health | disks, memory, load, disk-guard report, build reservations, running builds, MCP updater |
+| `1` | Work | activities of current work (default), all open work, or the searchable archive |
+| `2` | Overview | live agent sessions, what needs attention, a rule-based "what next", PRs by state, blocked work, merges in the last 7 days, infrastructure warnings |
+| `3` | Lanes | the seven long-lived programs, with their open PRs, sessions, worktrees, handoffs and next action |
+| `4` | Agents & Sessions | every agent process, tmux session, launcher record and registry entry, reconciled into one row per session |
+| `5` | Worktrees | every git worktree with dirty/unpushed state, locks, PRs and why it must be kept (`k`: only must-keep) |
+| `6` | Pull Requests | open PRs across org repos: draft, lifecycle, required CI, reviews, ledger, readiness |
+| `7` | Handoffs | recent handoff documents with their completed / open / decision / next sections |
+| `8` | System Health | disks, memory, load, disk-guard report, build reservations, running builds, MCP updater |
 
 **`g` session switcher** (anywhere) · `↑/↓` select · `Enter` details, or the action menu on screen 3 ·
-`a` join (screen 3) · `c` open Claude in a worktree (screens 2 and 4) · `o` open the record (handoff,
+`a` join (screen 4) · `c` open Claude in a worktree (screens 1, 3 and 5) · `v` Work view · `m` mark · `x` retirement request · `o` open the record (handoff,
 design packet, review body) · `/` filter · `r` refresh now · `s` data sources and ages · `?` help ·
 `q` quit (inside tmux it asks first; `prefix d` leaves it running instead). The help screen shows
 *your* tmux prefix key (read from tmux, not assumed).
@@ -142,6 +187,11 @@ source worktree is cleaned up.
 ```bash
 cd ops/dev-control && python3 -m unittest discover -s tests -v
 ```
+
+`test_activities.py` covers activity consolidation: grouping by evidence (and never by similar
+names), every classification rule, the NOW/OPEN/ARCHIVE views, display-only marks (a live agent
+always wins, protections are never removed), duplicate session records folded into one activity and
+one switcher row, retirement requests that run nothing, and the recovery labels.
 
 `test_sessions.py` adds the session manager: join verification (stale targets, pid reuse, agent no
 longer in the target, changed conversation), only-our-client switching, resume/open planning and

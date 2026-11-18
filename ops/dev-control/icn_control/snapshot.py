@@ -25,8 +25,8 @@ from .util import Obs, Paths, observe
 
 OWNER = "InterCooperative-Network"
 CACHE_VERSION = 1
-TIERS = {"fast": 20, "records": 60, "git": 300, "github": 300}
-CACHED_KEYS = ("github_prs", "github_merged", "required_checks", "issues", "worktrees")
+TIERS = {"fast": 20, "records": 60, "git": 300, "github": 300, "history": 3600}
+CACHED_KEYS = ("github_prs", "github_merged", "required_checks", "issues", "worktrees", "github_history")
 
 
 def repo_remotes(paths: Paths) -> dict:
@@ -80,6 +80,23 @@ def collect_records(paths: Paths) -> dict:
 
 def collect_git(paths: Paths) -> dict:
     return {"worktrees": observe("git worktrees", gitwt.collect, paths)}
+
+
+def collect_history(paths: Paths) -> dict:
+    """Merged / closed PR history keyed by local repo key, for classifying old worktrees. Hourly."""
+    remotes = repo_remotes(paths)
+
+    def hist():
+        out, errs = {}, []
+        for key, name in sorted(remotes.items()):
+            try:
+                out[key] = gh.fetch_pr_history(OWNER, name)
+            except gh.GhUnavailable as exc:
+                errs.append(f"{name}: {exc}")
+        if errs:
+            raise gh.GhUnavailable("; ".join(errs)[:400])  # partial history could misclassify: all or nothing
+        return out
+    return {"github_history": observe("GitHub PR history (merged/closed)", hist)}
 
 
 def collect_github(paths: Paths, catalog: Optional[dict] = None) -> dict:
@@ -221,7 +238,7 @@ class Collector:
 
     def _run_tier(self, tier: str) -> None:
         fn = {"fast": collect_fast, "records": collect_records, "git": collect_git,
-              "github": lambda p: collect_github(p, self.catalog)}[tier]
+              "github": lambda p: collect_github(p, self.catalog), "history": collect_history}[tier]
         self.running[tier] = True
         try:
             res = fn(self.paths)
@@ -239,7 +256,7 @@ class Collector:
                     self.snap[k] = o
             self.last_run[tier] = time.time()
             self.version += 1
-        if tier in ("github", "git"):
+        if tier in ("github", "git", "history"):
             try:
                 save_cache(self.paths, self.snap)
             except Exception:

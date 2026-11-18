@@ -33,6 +33,16 @@ def render(snap: dict, views: dict, width: int = 110) -> str:
     if not views["attention"]:
         L.append("  nothing flagged")
     L.append("")
+    acts = views.get("activities", [])
+    if acts:
+        from .activities import in_view, summary
+        c = summary(acts)
+        L.append(f"== WORK ({c['total']} activities) == Active {c['Active']} · Paused {c['Paused']} · needs you {c['attention']}"
+                 f" · Completed {c['Completed']} · Archived {c['Archived']} · Unresolved {c['Unresolved']}")
+        for a in [a for a in acts if in_view(a, "now")][:30]:
+            L.append(f"  {'!' if a['attention'] else ' '} [{a['status']}] {a['program_name']}: {a['title'][:90]}")
+            L.append(f"      next: {a['next'][:150]}")
+        L.append("")
     L.append("== WHAT SHOULD HAPPEN NEXT ==")
     for s in views["next"]:
         L.append(f"  - {s}")

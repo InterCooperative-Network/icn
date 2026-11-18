@@ -224,6 +224,7 @@ def session_views(snap: dict, paths: Paths) -> list[dict]:
         else:
             resume = "OCCUPIED - running in a terminal outside tmux; it cannot be attached from here."
         v.update({"pid": p["pid"], "pid_start": p.get("start"), "agent": p["comm"], "tmux": tmux_name,
+                  "tty": tty_name(p.get("tty_nr")),
                   "tmux_attached": (tmux_sessions.get(tmux_name) or {}).get("attached") if tmux_name else None,
                   "conversation": c.get("sessionId"), "state_label": label, "status": vocab,
                   "last_activity": last, "started": start_epoch(p.get("start"), paths.proc),
@@ -301,6 +302,16 @@ def session_views(snap: dict, paths: Paths) -> list[dict]:
     order = {LIVE: 0, IDLE: 1, REGISTERED_NOT_RUNNING: 2, STALE: 3, UNKNOWN: 4}
     views.sort(key=lambda v: (order.get(v["status"], 5), v["kind"] != "agent", -(v.get("last_activity") or 0)))
     return views
+
+
+def tty_name(tty_nr) -> Optional[str]:
+    """Decode /proc stat tty_nr into /dev/pts/N (Unix98 pty majors 136-143); None if not a pty."""
+    try:
+        n = int(tty_nr)
+    except (TypeError, ValueError):
+        return None
+    major, minor = (n >> 8) & 0xFFF, (n & 0xFF) | ((n >> 12) & 0xFFF00)
+    return f"/dev/pts/{minor + (major - 136) * 256}" if 136 <= major <= 143 and n else None
 
 
 def friendly_name(p: dict, cwd: Optional[str], wt: Optional[dict], service: bool) -> str:
@@ -624,6 +635,13 @@ def build_views(snap: dict, paths: Paths, catalog: dict) -> dict:
     att = attention(snap, prs, sessions, worktrees)
     handoffs = _data(snap, "handoffs", []) or []
     progs = program_views(catalog, prs, sessions, worktrees, handoffs, _data(snap, "issues", {}) or {})
-    return {"prs": prs, "sessions": sessions, "worktrees": worktrees, "attention": att,
+    from . import activities as actmod
+    hist_obs = snap.get("github_history")
+    history = hist_obs.data if (hist_obs is not None and hist_obs.ok) else None
+    gh_ok = snap.get("github_prs") is not None and snap["github_prs"].ok
+    acts = actmod.build({"prs": prs, "sessions": sessions, "worktrees": worktrees,
+                         "handoffs": _data(snap, "handoffs", []) or []},
+                        history, actmod.load_marks(paths), paths, catalog, gh_ok=gh_ok)
+    return {"activities": acts, "prs": prs, "sessions": sessions, "worktrees": worktrees, "attention": att,
             "next": next_steps(prs, sessions, att), "programs": progs,
             "merged": _data(snap, "github_merged", []) or [], "handoffs": handoffs}

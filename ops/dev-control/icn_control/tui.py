@@ -18,6 +18,7 @@ import time
 from typing import Optional
 
 from . import __version__
+from . import activities as actmod
 from . import snapshot as snapmod
 from .picker import build_rows, default_action, filter_rows
 from .reconcile import build_views, latest_review_generation, session_views
@@ -28,15 +29,29 @@ from .snapshot import Collector
 from .util import (AWAITING_MAINTAINER, BLOCKED, COMPLETED, IDLE, IN_PROGRESS, LIVE, REGISTERED_NOT_RUNNING,
                    STALE, UNKNOWN, WARNING, Paths, ago, clean, fmt_ts, redact, run, short)
 
-SCREENS = ["Overview", "Lanes", "Agents & Sessions", "Worktrees", "Pull Requests", "Handoffs", "System Health"]
+SCREENS = ["Overview", "Lanes", "Agents & Sessions", "Worktrees", "Pull Requests", "Handoffs", "System Health", "Work"]
+WORK = 7
+# Display order: the task-centred Work screen comes first and is the default. Internal indexes are unchanged.
+TAB_ORDER = [WORK, 0, 1, 2, 3, 4, 5, 6]
+VIEW_LABELS = {"now": "NOW: active, needs you, recently paused", "open": "ALL OPEN: active + every paused task",
+               "archive": "ARCHIVE: completed, archived, unresolved (searchable with /)"}
 VIEWABLE_EXT = (".md", ".txt", ".log", ".json", ".yaml", ".yml", ".patch", ".diff", ".tsv", ".jsonl")
 MAX_VIEW_BYTES = 2_000_000
 
 HELP = """\
 ICN DEVELOPMENT CONTROL CENTER — HELP
 
+Work (screen 1, the default): one row per piece of work, with its sessions, worktrees, PRs and handoffs
+  v                          cycle the view: NOW (active, needs you, recently paused) -> ALL OPEN -> ARCHIVE
+  /                          search the current view (the archive is where finished and old work lives)
+  Enter                      the task's actions: join / resume its Claude session, open Claude, details, records
+  m                          mark the task paused / archived / clear the mark (display only: deletes nothing)
+  x                          request approval to retire a finished, unprotected checkout (writes a request; runs nothing)
+  Status words: Active (live agent, decision due, or PR moved today) · Paused (unfinished, preserved) ·
+  Completed (PR merged) · Archived (superseded or nothing unique) · Unresolved (needs a human look)
+
 Moving around
-  1-7 or Tab / Shift-Tab     switch screen (Overview, Lanes, Agents, Worktrees, PRs, Handoffs, Health)
+  1-8 or Tab / Shift-Tab     switch screen (Work, Overview, Lanes, Agents, Worktrees, PRs, Handoffs, Health)
   Left / Right               switch screen
   Up / Down, PgUp / PgDn     move the selection (or scroll a page)
   Home / End                 first / last item
@@ -45,9 +60,10 @@ Moving around
 
 Switching between Claude sessions
   g                          SESSION SWITCHER (from any screen): type to filter, Up/Down, Enter to choose, Esc to close
-  Enter (screen 3)           actions for the selected session: Join / Resume saved conversation / Details
-  a  (screen 3)              join the selected session's EXISTING tmux session right away (re-verified first)
-  c  (screens 2 and 4)       open Claude Code in the selected existing worktree (shows the plan, asks first)
+  Tab (in the switcher)      show every session record, not only current work
+  Enter (screen 4)           actions for the selected session: Join / Resume saved conversation / Details
+  a  (screen 4)              join the selected session's EXISTING tmux session right away (re-verified first)
+  c  (screens 1, 3 and 5)    open Claude Code in an existing worktree of the task (shows the plan, asks first)
   Join never starts a process, never types anything for you and never disconnects anyone else.
   Resume and Open run the host launcher (icn-session) only after you confirm, and refuse when the
   conversation or worktree already has a live agent, or when the exact conversation is unknown.
@@ -121,6 +137,9 @@ class UI:
         self.scroll = [0] * len(SCREENS)
         self.filters = [""] * len(SCREENS)
         self.sel_key = [None] * len(SCREENS)
+        self.screen = WORK
+        self.work_view = "now"
+        self.picker_all = False
         self.in_tmux = bool(os.environ.get("TMUX"))
         self.last_join = None
         self.keep_only = False
@@ -145,7 +164,8 @@ class UI:
         try:
             with open(self._prefs_path()) as f:
                 p = json.load(f)
-            self.screen = int(p.get("screen", 0)) % len(SCREENS)
+            self.screen = int(p.get("screen_v4", WORK)) % len(SCREENS)
+            self.work_view = p.get("work_view") if p.get("work_view") in actmod.VIEWS else "now"
             self.keep_only = bool(p.get("keep_only", False))
         except (OSError, ValueError, TypeError):
             # best-effort: UI preferences and terminal capabilities are optional
@@ -156,7 +176,7 @@ class UI:
             os.makedirs(self.paths.control_state, mode=0o700, exist_ok=True)
             tmp = self._prefs_path() + ".tmp"
             with open(tmp, "w") as f:
-                json.dump({"screen": self.screen, "keep_only": self.keep_only}, f)
+                json.dump({"screen_v4": self.screen, "keep_only": self.keep_only, "work_view": self.work_view}, f)
             os.chmod(tmp, 0o600)
             os.replace(tmp, self._prefs_path())
         except OSError:
@@ -225,16 +245,19 @@ class UI:
         self.restore_selection()
 
     @staticmethod
-    def row_key(screen: int, r: dict):
+    def row_key(screen: int, r: dict) -> str:
+        """A stable string identity for a row, the same shape on every screen."""
         if screen == 2:
-            return (r.get("kind"), r.get("name"), r.get("pid"), r.get("tmux"), r.get("cwd"))
-        if screen == 4:
-            return (r.get("repo"), r.get("number"))
-        return r.get("path") or r.get("id")
+            parts = (r.get("kind"), r.get("name"), r.get("pid"), r.get("tmux"), r.get("cwd"))
+        elif screen == 4:
+            parts = (r.get("repo"), r.get("number"))
+        else:
+            parts = (r.get("path") or r.get("id"),)
+        return "|".join(str(x) for x in parts)
 
     def restore_selection(self) -> None:
         """Keep the same item selected when a refresh re-sorts a list (and across tmux switches)."""
-        for s in (1, 2, 3, 4, 5):
+        for s in (1, 2, 3, 4, 5, WORK):
             key = self.sel_key[s]
             if key is None:
                 continue
@@ -280,6 +303,11 @@ class UI:
             rows = v.get("prs", [])
         elif screen == 5:
             rows = v.get("handoffs", [])
+        elif screen == WORK:
+            rows = [a for a in v.get("activities", []) if actmod.in_view(a, self.work_view)]
+            if f:
+                return [a for a in rows if f in self.activity_search_text(a)]
+            return rows
         else:
             return []
         if f:
@@ -295,8 +323,9 @@ class UI:
         self.put(0, 0, title, self.color.get("bar", curses.A_REVERSE) | curses.A_BOLD)
         self.put(0, len(title) + 1, self.tier_status(), self.color.get("bar", curses.A_REVERSE))
         x = 0
-        for i, name in enumerate(SCREENS):
-            label = f" {i + 1} {name} "
+        for pos, i in enumerate(TAB_ORDER):
+            name = SCREENS[i]
+            label = f" {pos + 1} {name} "
             a = (self.color.get("sel", curses.A_REVERSE) | curses.A_BOLD) if i == self.screen else curses.A_DIM
             self.put(1, x, label, a)
             x += len(label) + 1
@@ -305,8 +334,8 @@ class UI:
             self.put(3, 0, "Terminal too small. Please enlarge the window (at least 60x12).", self.attr(WARNING))
         else:
             [self.draw_overview, self.draw_programs, self.draw_sessions, self.draw_worktrees,
-             self.draw_prs, self.draw_handoffs, self.draw_health][self.screen](body_top, body_bottom, w)
-        foot = " g:SWITCH SESSION  ?:help  1-7:screens  ↑↓:select  Enter:actions  a:join  c:open Claude  o:record  r:refresh  /:filter  q:quit "
+             self.draw_prs, self.draw_handoffs, self.draw_health, self.draw_work][self.screen](body_top, body_bottom, w)
+        foot = " g:SWITCH SESSION  ?:help  1-8:screens  ↑↓:select  Enter:actions  v:now/open/archive  /:search  r:refresh  q:quit "
         if self.filters[self.screen]:
             foot = f" filter: '{self.filters[self.screen]}' (/ to change) |" + foot
         self.put(h - 1, 0, foot.ljust(w), self.color.get("bar", curses.A_REVERSE))
@@ -346,13 +375,13 @@ class UI:
         if n > vis:
             self.put(top, w - 18, f" {self.sel[s] + 1}/{n} ", curses.A_DIM)
         dy = top + list_h
-        self.put(dy, 0, "─" * (w - 1), curses.A_DIM)
+        self.put(dy, 0, "-" * (w - 1), curses.A_DIM)
         if n:
             lines = detail(rows[self.sel[s]])
             self.draw_lines(dy + 1, bottom, w, lines, 0)
 
     def empty_reason(self) -> str:
-        key = {1: None, 2: "processes", 3: "worktrees", 4: "github_prs", 5: "handoffs"}.get(self.screen)
+        key = {1: None, 2: "processes", 3: "worktrees", 4: "github_prs", 5: "handoffs", WORK: "github_prs"}.get(self.screen)
         o = self.snap.get(key) if key else None
         if key and o is None:
             return "Not observed yet — collecting…"
@@ -905,6 +934,216 @@ class UI:
         finally:
             self.scr.timeout(1000)
 
+    # ------------------------------------------------------------------ Work: task-centred view
+    STATUS_ATTR = {"Active": LIVE, "Paused": IN_PROGRESS, "Completed": IDLE, "Archived": UNKNOWN, "Unresolved": STALE}
+
+    def activity_search_text(self, a: dict) -> str:
+        parts = [a["title"], a["status"], a["program_name"], a["id"], " ".join(a["why"]), a["next"]]
+        parts += [s.get("name") or "" for s in a["sessions"]] + [w["name"] for w in a["worktrees"]]
+        parts += [f"{p['repo']}#{p['number']} {p.get('branch')}" for p in a["prs"]]
+        parts += [f"#{p['number']}" for p in a["merged_prs"] + a["closed_prs"]] + a["handoffs"]
+        return " ".join(parts).lower()
+
+    def draw_work(self, top, bottom, w):
+        acts = self.views.get("activities", [])
+        c = actmod.summary(acts)
+        hdr = (f"WORK  {VIEW_LABELS[self.work_view]}    Active {c['Active']} · Paused {c['Paused']} · "
+               f"needs you {c['attention']} · archive: Completed {c['Completed']}, Archived {c['Archived']},"
+               f" Unresolved {c['Unresolved']}   (v: change view)")
+        self.put(top, 0, hdr[:w], self.color.get("title", 0) | curses.A_BOLD)
+        hist = self.snap.get("github_history")
+        if hist is None or not hist.ok:
+            self.put(top + 1, 0, "  PR history not yet observed: finished vs unfinished worktrees show as Unresolved until it loads.",
+                     self.attr(UNKNOWN))
+            top += 1
+
+        def fmt(a):
+            flag = "!" if a["attention"] else " "
+            live = sum(1 for s in a["sessions"] if s.get("kind") == "agent")
+            sess = f"{live} live" if live else (f"{len(a['sessions'])} rec" if a["sessions"] else "-")
+            return (f"{flag} {a['status'][:10]:10} {a['program_name'][:18]:18} {sess:7} {ago(a['last_activity']):>10}  "
+                    f"{a['title'][:90]}", self.STATUS_ATTR.get(a["status"], UNKNOWN))
+
+        self.draw_list(top + 1, bottom, w, "  STATUS     PROGRAM            SESSION   ACTIVITY  TASK   "
+                       "(! = needs you · Enter: actions · m: mark · x: retirement request)",
+                       self.items(), fmt, self.activity_detail)
+
+    def activity_detail(self, a) -> list:
+        L = [self.H(a["title"]),
+             (f"  {a['status']}{'  · NEEDS YOU' if a['attention'] else ''} — {'; '.join(a['why'])}",
+              self.attr(self.STATUS_ATTR.get(a["status"], UNKNOWN)) | curses.A_BOLD),
+             (f"  NEXT: {a['next']}", curses.A_BOLD),
+             f"  Program: {a['program_name']}    id: {a['id']}"
+             + (f"    mark: {a['mark']['mark']} ({a['mark'].get('at')}, display only)" if a.get("mark") else "")]
+        for r in a["attention_reasons"]:
+            L.append((f"  needs you: {r}", self.attr(AWAITING_MAINTAINER)))
+        L.append(self.H(f"  Claude / agent sessions ({len(a['sessions'])})"))
+        for s in a["sessions"]:
+            acts = self.actions_for(s)
+            can = [x["label"] for x in acts if x["enabled"] and x["id"] in ("join", "resume")]
+            L.append((f"    {s['name']} — {self.recovery_label(s, acts)}"
+                      + (f"   [{', '.join(can)}]" if can else "   [inspect only]"), self.attr(s["status"])))
+        if not a["sessions"]:
+            L.append("    none observed")
+        L.append(self.H(f"  Pull requests"))
+        for p in a["prs"]:
+            lc = (p.get("lifecycle") or {}).get("state") or "-"
+            L.append((f"    {p['repo']}#{p['number']} open, {'draft' if p['draft'] else 'ready'}, lifecycle {lc},"
+                      f" required CI {p['required']['verdict']} — {p.get('status_reason')}", self.attr(p.get("status") or UNKNOWN)))
+        for p in a["merged_prs"]:
+            L.append(f"    {p['repo']}#{p['number']} merged {str(p.get('at') or '')[:10]} — {p.get('title', '')[:80]}")
+        for p in a["closed_prs"]:
+            L.append(f"    {p['repo']}#{p['number']} closed without merge {str(p.get('at') or '')[:10]}")
+        for led in a["ledgers"]:
+            L.append(f"    follow-up ledger {led}")
+        if not (a["prs"] or a["merged_prs"] or a["closed_prs"]):
+            L.append("    none found")
+        L.append(self.H(f"  Worktrees ({len(a['worktrees'])})"))
+        for wt in a["worktrees"]:
+            st = wt.get("status") or {}
+            L.append(f"    {wt['repo']}/{wt['name']} [{wt.get('branch') or 'detached'}]"
+                     f"{'  DIRTY' if st.get('dirty') else ''}"
+                     f"{'  ' + str(st['local_only_commits']) + ' local-only commit(s)' if st.get('local_only_commits') else ''}")
+        for d in a["dirs"]:
+            L.append(f"    directory {d}")
+        L.append(self.H(f"  Handoffs and evidence ({len(a['handoffs']) + len(a['evidence_dirs'])})"))
+        for h_ in a["handoffs"][:8]:
+            L.append(f"    {h_}")
+        for d in a["evidence_dirs"]:
+            L.append(f"    evidence: {d}")
+        L.append(self.H("  Protection (why physical cleanup is not offered)"))
+        L.append("    " + ("; ".join(a["protections"]) if a["protections"] else "none observed"
+                          + (" — finished; x requests retirement approval" if a["retirable"] else "")))
+        L.append(self.H("  How these were linked (evidence)"))
+        for ln in a["links"][:10]:
+            L.append(f"    {ln}")
+        if not a["links"]:
+            L.append("    single item")
+        return L
+
+    def recovery_label(self, s: dict, acts: Optional[list] = None) -> str:
+        from .picker import run_state
+        return run_state(s, acts if acts is not None else self.actions_for(s), self.paths)
+
+    def activity_menu(self, a: dict) -> None:
+        """Every action for one task. Unavailable actions say why."""
+        while True:
+            items = []   # (label, enabled, reason, callable)
+            for s in a["sessions"]:
+                for act in self.actions_for(s):
+                    if act["id"] == "join" and (act["enabled"] or s.get("kind") == "agent"):
+                        items.append((f"Join '{s['name']}'", act["enabled"], act["reason"], lambda s=s: self.join_view(s)))
+                    if act["id"] == "resume" and (act["enabled"] or s.get("kind") in ("launcher-record", "registry")):
+                        items.append((f"Resume saved conversation '{s['name']}'", act["enabled"], act["reason"],
+                                      lambda s=s: self.launch("resume", s)))
+            if a["worktrees"] and not any(s.get("kind") == "agent" for s in a["sessions"]):
+                items.append(("Open Claude Code in this task's worktree", True,
+                              "Shows the exact plan and asks first; refused for review/protected/occupied checkouts.",
+                              lambda: self.open_in_activity(a)))
+            recs = list(a["handoffs"]) + [os.path.join(d, n) for d in a["evidence_dirs"] for n in ("review-body.md", "HANDOFF.md")]
+            items.append(("Open handoff / record", bool([r for r in recs if os.path.isfile(r)]),
+                          "Read-only reader." if recs else "No handoff or record is linked to this task.",
+                          lambda: self.open_records(recs)))
+            items.append(("Show details", True, "Read-only.", lambda: self.viewer(self.activity_detail(a), a["title"][:80])))
+            items.append(("Mark paused / archived (display only)", True,
+                          "Changes only this dashboard's view; nothing is deleted or stopped.", lambda: self.mark_menu(a)))
+            items.append(("Request retirement approval", a["retirable"],
+                          "Writes a reviewable request with the wt-clean command; runs nothing." if a["retirable"]
+                          else "Not offered: " + ("; ".join(a["protections"]) or f"status is {a['status']}"),
+                          lambda: self.request_retirement(a)))
+            choice = self.menu(a["title"][:100], items)
+            if choice is None:
+                return
+            result = items[choice][3]()
+            if result is True:
+                return
+            self.refresh_views(force=True)
+            a = next((x for x in self.views.get("activities", []) if x["id"] == a["id"]), a)
+
+    def menu(self, title: str, items: list) -> Optional[int]:
+        enabled = [i for i, it in enumerate(items) if it[1]]
+        sel = enabled[0] if enabled else 0
+        while True:
+            self.scr.erase()
+            h, w = self.scr.getmaxyx()
+            bar = self.color.get("bar", curses.A_REVERSE)
+            self.put(0, 0, f" {title} ".ljust(w), bar | curses.A_BOLD)
+            y = 2
+            for i, (label, ok, reason, _) in enumerate(items):
+                if y >= h - 2:
+                    break
+                attr = (self.color.get("sel", curses.A_REVERSE) | curses.A_BOLD) if i == sel else (0 if ok else curses.A_DIM)
+                self.put(y, 0, f"{'▶ ' if i == sel else '  '}{label}{'' if ok else '   (unavailable)'}", attr, w)
+                self.put(y + 1, 4, reason, 0 if ok else curses.A_DIM, w - 4)
+                y += 2
+            self.put(h - 1, 0, f" ↑↓ choose · Enter do it · Esc back · from any Claude session, {self.back_hint} returns here ".ljust(w), bar)
+            self.scr.refresh()
+            k = self.scr.getch()
+            if k in (-1, curses.KEY_RESIZE):
+                continue
+            if k in (27, curses.KEY_LEFT):
+                return None
+            if k == curses.KEY_DOWN:
+                sel = min(sel + 1, len(items) - 1)
+            elif k == curses.KEY_UP:
+                sel = max(sel - 1, 0)
+            elif k in (10, 13, curses.KEY_ENTER):
+                if not items[sel][1]:
+                    self.flash(items[sel][2])
+                    continue
+                return sel
+
+    def open_in_activity(self, a: dict) -> bool:
+        cands = [w for w in a["worktrees"] if (w.get("status") or {}).get("exists")]
+        if not cands:
+            self.flash("This task has no existing worktree.")
+            return False
+        if len(cands) == 1:
+            return self.launch("open", cands[0])
+        choice = self.choose("Open Claude Code in which worktree?", [f"{w['repo']}/{w['name']} [{w.get('branch')}]" for w in cands])
+        return self.launch("open", cands[choice]) if choice is not None else False
+
+    def mark_menu(self, a: dict) -> None:
+        items = [("Mark paused", True, "Shown under Paused. Display only.", "paused"),
+                 ("Mark archived", True, "Moves it to the archive view. Nothing is deleted, stopped or cleaned.", "archived"),
+                 ("Clear mark", bool(a.get("mark")), "Back to the status derived from evidence." if a.get("mark") else "No mark set.", None)]
+        choice = self.menu(f"Mark: {a['title'][:80]}", [(x[0], x[1], x[2], None) for x in items])
+        if choice is None:
+            return
+        if items[choice][3] == "archived" and any(s.get("kind") == "agent" for s in a["sessions"]):
+            if not self.confirm(["An agent is live in this task. It will keep running and the task stays visible",
+                                 "as Active while it runs. Record the archived mark anyway?"]):
+                return
+        actmod.set_mark(self.paths, a["id"], items[choice][3])
+        self.flash(f"{items[choice][0]}: {a['title'][:60]} (display only; nothing changed on disk except the marks file).")
+        self.views = build_views(self.snap, self.paths, self.catalog)
+        self.restore_selection()
+
+    def request_retirement(self, a: dict) -> None:
+        if not a["retirable"]:
+            self.flash("Not retirable: " + ("; ".join(a["protections"]) or f"status is {a['status']}"))
+            return
+        lines = [f"Request approval to retire: {a['title'][:90]}"] + \
+                [f"  worktree {w['path']} (branch {w.get('branch')})" for w in a["worktrees"]] + \
+                ["This writes a reviewable request (with the wt-clean commands) to", f"  {self.request_dir()}/retirement-requests.md",
+                 "Nothing is removed. The branch, transcripts and records are kept either way."]
+        if not self.confirm(lines):
+            self.flash("Cancelled.")
+            return
+        path = actmod.retirement_request(a, self.request_dir())
+        self.flash(f"Request recorded in {path}")
+
+    def request_dir(self) -> str:
+        return os.path.join(self.paths.state, "dev-control-consolidation-" + time.strftime("%Y%m%d", time.gmtime()))
+
+    def picker_sessions(self) -> list:
+        """Default: sessions of current work (Active/Paused) plus every live agent. Tab shows all records."""
+        from .picker import scope_sessions
+        return scope_sessions(self.views.get("sessions", []), self.views.get("activities", []), self.picker_all)
+
+    def session_activity_titles(self) -> dict:
+        return {id(s): a["title"] for a in self.views.get("activities", []) for s in a["sessions"]}
+
     # ------------------------------------------------------------------ session switching
     def program_names(self) -> dict:
         return {p["id"]: p["name"] for p in self.catalog.get("programs", [])}
@@ -915,7 +1154,8 @@ class UI:
         sel_key = None
         while True:
             self.refresh_views()
-            rows = filter_rows(build_rows(self.views.get("sessions", []), self.program_names(), self.actions_for), text)
+            rows = filter_rows(build_rows(self.picker_sessions(), self.program_names(), self.actions_for,
+                                          self.paths, self.session_activity_titles()), text)
             if sel_key is not None:
                 for i, r in enumerate(rows):
                     if self.row_key(2, r["view"]) == sel_key:
@@ -925,10 +1165,12 @@ class UI:
             self.scr.erase()
             h, w = self.scr.getmaxyx()
             bar = self.color.get("bar", curses.A_REVERSE)
-            self.put(0, 0, " SWITCH TO A CLAUDE SESSION   type to filter · ↑↓ select · Enter choose · Esc close ".ljust(w), bar | curses.A_BOLD)
+            scope = "ALL session records" if self.picker_all else "current work only (Tab: all records)"
+            self.put(0, 0, f" SWITCH TO A CLAUDE SESSION   {scope} · type to filter · ↑↓ · Enter choose · Esc close ".ljust(w),
+                     bar | curses.A_BOLD)
             self.put(1, 0, f" filter: {text}_", curses.A_BOLD)
             self.put(1, max(30, w - 60), f"{len(rows)} shown · running first, then most recent", curses.A_DIM)
-            hdr = f"  {'STATE':21} {'SESSION / TASK':34} {'PROGRAM':20} {'REPO / WORKTREE':34} {'PR':11} {'ACTIVITY':>10}  CAN"
+            hdr = f"  {'STATE':28} {'SESSION':30} {'PROGRAM':20} {'REPO / WORKTREE':30} {'PR':11} {'ACTIVITY':>10}  CAN"
             self.put(2, 0, hdr, curses.A_BOLD | curses.A_UNDERLINE)
             list_h = max(3, h - 10)
             if sel < top:
@@ -940,8 +1182,8 @@ class UI:
                 if idx >= len(rows):
                     break
                 r = rows[idx]
-                line = (f"{r['state'][:21]:21} {r['name'][:34]:34} {r['program'][:20]:20} "
-                        f"{(r['repo'] + '/' + r['where'])[:34]:34} {r['pr'][:11]:11} {r['activity']:>10}  {r['can']}")
+                line = (f"{r['state'][:28]:28} {r['name'][:30]:30} {r['program'][:20]:20} "
+                        f"{(r['repo'] + '/' + r['where'])[:30]:30} {r['pr'][:11]:11} {r['activity']:>10}  {r['can']}")
                 st = LIVE if r["live"] else (REGISTERED_NOT_RUNNING if r["can"] == "resume" else UNKNOWN)
                 a = (self.color.get("sel", curses.A_REVERSE) | curses.A_BOLD) if idx == sel else self.attr(st)
                 self.put(3 + i, 0, ("▶ " if idx == sel else "  ") + line, a, w)
@@ -949,7 +1191,7 @@ class UI:
                 self.put(3, 2, "No sessions match." if text else "No agent sessions observed yet (press r on the main screen to refresh).",
                          self.attr(UNKNOWN))
             dy = 3 + list_h
-            self.put(dy, 0, "─" * (w - 1), curses.A_DIM)
+            self.put(dy, 0, "-" * (w - 1), curses.A_DIM)
             if rows:
                 r = rows[sel]
                 sel_key = self.row_key(2, r["view"])
@@ -969,6 +1211,10 @@ class UI:
                 continue
             if k == 27:
                 return
+            if k == 9:
+                self.picker_all = not self.picker_all
+                sel_key, sel = None, 0
+                continue
             if k in (10, 13, curses.KEY_ENTER):
                 if rows and self.action_menu(rows[sel]["view"], preselect=default_action(rows[sel])):
                     return
@@ -1125,6 +1371,11 @@ class UI:
             if rows:
                 self.launch("open", rows[self.sel[self.screen]])
             return
+        if self.screen == WORK:
+            rows = self.items()
+            if rows:
+                self.open_in_activity(rows[self.sel[self.screen]])
+            return
         if self.screen == 1:
             rows = self.items()
             if not rows:
@@ -1145,7 +1396,7 @@ class UI:
             if choice is not None:
                 self.launch("open", cands[choice])
             return
-        self.flash("Open Claude works on the Worktrees screen (4) or a program on Lanes (2).")
+        self.flash("Open Claude works on Work (1), Lanes (3) or Worktrees (5).")
 
     def open_records(self, paths_: list) -> None:
         cands = [c for c in paths_ if os.path.isfile(c)]
@@ -1222,12 +1473,19 @@ class UI:
             return False
         if k == ord("g"):
             self.session_picker()
-        elif ord("1") <= k <= ord("7"):
-            self.screen = k - ord("1")
+        elif ord("1") <= k <= ord("8"):
+            self.screen = TAB_ORDER[k - ord("1")]
         elif k in (9, curses.KEY_RIGHT):
-            self.screen = (s + 1) % len(SCREENS)
+            self.screen = TAB_ORDER[(TAB_ORDER.index(s) + 1) % len(TAB_ORDER)]
         elif k in (curses.KEY_BTAB, curses.KEY_LEFT):
-            self.screen = (s - 1) % len(SCREENS)
+            self.screen = TAB_ORDER[(TAB_ORDER.index(s) - 1) % len(TAB_ORDER)]
+        elif k == ord("v") and s == WORK:
+            self.work_view = actmod.VIEWS[(actmod.VIEWS.index(self.work_view) + 1) % len(actmod.VIEWS)]
+            self.sel[s] = 0
+        elif k == ord("m") and s == WORK and rows_n:
+            self.mark_menu(self.items()[self.sel[s]])
+        elif k == ord("x") and s == WORK and rows_n:
+            self.request_retirement(self.items()[self.sel[s]])
         elif k in (curses.KEY_DOWN, ord("j")):
             if scrolling:
                 self.scroll[s] += 1
@@ -1253,7 +1511,9 @@ class UI:
         elif k == curses.KEY_END:
             self.sel[s] = max(0, rows_n - 1)
         elif k in (10, 13, curses.KEY_ENTER):
-            if s == 2 and rows_n:
+            if s == WORK and rows_n:
+                self.activity_menu(self.items()[self.sel[s]])
+            elif s == 2 and rows_n:
                 self.action_menu(self.items()[self.sel[s]])
             else:
                 self.enter_details()

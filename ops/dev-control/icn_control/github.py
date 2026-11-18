@@ -104,6 +104,26 @@ def fetch_recent_merged(owner: str, repos: list[str], days: int = 7) -> list[dic
     return out
 
 
+def fetch_pr_history(owner: str, name: str, limit: int = 5000) -> dict:
+    """Merged and closed-unmerged PRs by head branch (same-repository only; forks reuse branch names)."""
+    out = {"merged": {}, "closed": {}}
+    for state in ("merged", "closed"):
+        r = run(["gh", "pr", "list", "-R", f"{owner}/{name}", "--state", state, "--limit", str(limit),
+                 "--json", "number,title,headRefName,isCrossRepository,state,mergedAt,closedAt"], timeout=90)
+        if r.rc == 127:
+            raise GhUnavailable("gh CLI not installed")
+        if r.rc != 0:
+            raise GhUnavailable(f"gh pr list {state} failed for {name}: {(r.err or r.out).strip()[-200:]}")
+        for p in json.loads(r.out or "[]"):
+            if p.get("isCrossRepository") is not False:
+                continue
+            if state == "closed" and p.get("state") != "CLOSED":
+                continue  # 'closed' also lists merged PRs
+            out[state].setdefault(p["headRefName"], []).append(
+                {"number": p["number"], "title": p.get("title") or "", "at": p.get("mergedAt") or p.get("closedAt")})
+    return out
+
+
 def fetch_issue(owner: str, name: str, number: int) -> dict:
     data = _gh_graphql(ISSUE_QUERY, {"owner": owner, "name": name, "n": int(number)})
     return (data.get("repository") or {}).get("issueOrPullRequest") or {}
