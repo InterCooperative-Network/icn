@@ -55,9 +55,12 @@ class Base(unittest.TestCase):
                            control_state=os.path.join(self.tmp, "ctl"), proc=os.path.join(self.tmp, "proc"))
         os.makedirs(self.paths.proc)
 
-    def build(self, prs=(), worktrees=(), sessions=(), history=None, marks=None, gh_ok=True, handoffs=()):
+    def build(self, prs=(), worktrees=(), sessions=(), history=None, marks=None, gh_ok=True, handoffs=(), pr_observed=None):
         views = {"prs": list(prs), "worktrees": list(worktrees), "sessions": list(sessions), "handoffs": list(handoffs)}
-        return A.build(views, {} if history is None else history, marks or {}, self.paths, CATALOG, gh_ok=gh_ok, now=NOW)
+        if pr_observed is None:  # gh_ok: every repository in the fixture had its open-PR list observed
+            pr_observed = frozenset({w["repo"] for w in worktrees} | {p["repo"] for p in prs}) if gh_ok else frozenset()
+        return A.build(views, {} if history is None else history, marks or {}, self.paths, CATALOG,
+                       pr_observed=pr_observed, now=NOW)
 
     def one(self, acts, key):
         found = [a for a in acts if a["id"] == key]
@@ -146,12 +149,12 @@ class Classification(Base):
             ("unpublished commits, no PR", dict(worktrees=[wt("lost", local_only=2)]), A.UNRESOLVED),
             ("fresh, empty", dict(worktrees=[wt("new", mtime=NOW - 3600)]), A.PAUSED),
             ("clean, old, nothing unique", dict(worktrees=[wt("ref")]), A.ARCHIVED),
-            ("no PR history", dict(worktrees=[wt("ref")], history=None, gh_ok=False), A.UNRESOLVED),
+            ("no PR history", dict(worktrees=[wt("ref")], history=None), A.UNRESOLVED),
         ]
         for label, kw, want in cases:
             if label == "no PR history":
                 acts = A.build({"prs": [], "worktrees": kw["worktrees"], "sessions": [], "handoffs": []}, None, {},
-                               self.paths, CATALOG, gh_ok=False, now=NOW)
+                               self.paths, CATALOG, pr_observed=frozenset({"icn"}), now=NOW)
                 self.assertEqual(acts[0]["status"], want, label)
                 continue
             a = self.status(**kw)

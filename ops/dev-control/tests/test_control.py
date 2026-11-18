@@ -236,6 +236,8 @@ Follow-up ledger:     #2907
 <!-- ICN-DELIVERY-LIFECYCLE:END -->
 """
 REQ = ["Build Release", "Test"]
+# The real merge-policy owner, not a copy: a test must fail if the policy and the display drift apart.
+POLICY_READY_WHEN = snapshot.merge_policy()["ready_when"]
 
 
 def pr(**kw):
@@ -292,12 +294,13 @@ class GitHubReconciliation(unittest.TestCase):
 
     def test_readiness_never_ready_when_anything_unknown(self):
         p = pr()
-        self.assertTrue(gh.merge_readiness(p, gh.required_check_status(p, REQ))["verdict"].startswith("MERGE-ELIGIBLE"))
-        self.assertEqual(gh.merge_readiness(p, gh.required_check_status(p, None))["verdict"], "NOT READY")
-        self.assertEqual(gh.merge_readiness(pr(lifecycle=None), gh.required_check_status(p, REQ))["verdict"], "NOT READY")
-        self.assertEqual(gh.merge_readiness(pr(mergeable=None), gh.required_check_status(p, REQ))["verdict"], "NOT READY")
+        rw = POLICY_READY_WHEN
+        self.assertTrue(gh.merge_readiness(p, gh.required_check_status(p, REQ), rw)["verdict"].startswith("MERGE-ELIGIBLE"))
+        self.assertEqual(gh.merge_readiness(p, gh.required_check_status(p, None), rw)["verdict"], "NOT READY")
+        self.assertEqual(gh.merge_readiness(pr(lifecycle=None), gh.required_check_status(p, REQ), rw)["verdict"], "NOT READY")
+        self.assertEqual(gh.merge_readiness(pr(mergeable=None), gh.required_check_status(p, REQ), rw)["verdict"], "NOT READY")
         moved = pr(head="ffff" * 10)
-        r = gh.merge_readiness(moved, gh.required_check_status(moved, REQ))
+        r = gh.merge_readiness(moved, gh.required_check_status(moved, REQ), rw)
         self.assertIn("head moved after freeze (lifecycle block is stale)", r["reasons"])
 
     def test_pr_status_frozen_moved_and_review_pending(self):
@@ -440,7 +443,8 @@ class Ownership(Fixture):
     def wsnap(self, wts, prs=(), merged=(), gh_ok=True, locks=()):
         return {"worktrees": obs({"worktrees": wts}), "active_worktrees": obs({"rows": {}}),
                 "file_locks": obs({"locks": list(locks)}), "github_merged": obs(list(merged)),
-                "github_prs": obs({}) if gh_ok else obs(None, ok=False, error="offline"), "_pr_views": list(prs)}
+                "github_prs": obs({w["repo"]: [] for w in wts}) if gh_ok else obs(None, ok=False, error="offline"),
+                "_pr_views": list(prs)}
 
     def test_keep_reasons_and_candidates(self):
         clean = {"exists": True, "dirty": False, "local_only_commits": 0}
@@ -476,7 +480,7 @@ class Ownership(Fixture):
         wts = [{"repo": "icn", "path": "/w/m", "branch": "m", "status": {"exists": True, "dirty": False, "local_only_commits": 0}}]
         v = reconcile.worktree_views(self.wsnap(wts, gh_ok=False), [], CATALOG)
         self.assertEqual(v[0]["verdict"], "KEEP")
-        self.assertIn("GitHub state unknown", v[0]["keep_reasons"])
+        self.assertIn("open-PR state unknown for icn", v[0]["keep_reasons"])
 
     def test_same_name_worktrees_in_two_repos_stay_distinct(self):
         st = {"exists": True, "dirty": False, "local_only_commits": 0}

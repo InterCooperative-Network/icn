@@ -153,7 +153,8 @@ def collect_github(paths: Paths, catalog: Optional[dict] = None) -> dict:
     return snap
 
 
-def _policy_required() -> Optional[list]:
+def merge_policy() -> Optional[dict]:
+    """The `merge` object of ops/state/truth/policy.json (the merge-policy owner), or None if unreadable."""
     here = os.path.dirname(os.path.abspath(__file__))
     cands = [os.path.join(here, "..", "..", "..", "ops", "state", "truth", "policy.json"),  # repo checkout
              os.path.join(here, "..", "policy.json")]  # installed release (snapshot taken at install)
@@ -162,10 +163,16 @@ def _policy_required() -> Optional[list]:
     for p in cands:
         try:
             with open(p) as f:
-                return json.load(f)["merge"]["required_checks"]
-        except (OSError, KeyError, ValueError):
+                merge = json.load(f)["merge"]
+        except (OSError, KeyError, ValueError, TypeError):
             continue
+        if isinstance(merge, dict):
+            return merge
     return None
+
+
+def _policy_required() -> Optional[list]:
+    return (merge_policy() or {}).get("required_checks")
 
 
 # --------------------------------------------------------------------------- cache

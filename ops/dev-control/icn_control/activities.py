@@ -55,7 +55,7 @@ def _skey(s: dict) -> str:
 
 
 def build(views: dict, history: Optional[dict], marks: dict, paths: Paths, catalog: dict,
-          gh_ok: bool = True, now: Optional[float] = None) -> list[dict]:
+          pr_observed: frozenset = frozenset(), now: Optional[float] = None) -> list[dict]:
     now = now or time.time()
     prs = views.get("prs", [])
     sessions = views.get("sessions", [])
@@ -123,12 +123,14 @@ def build(views: dict, history: Optional[dict], marks: dict, paths: Paths, catal
             merged += [dict(x, repo=w["repo"], branch=w.get("branch")) for x in (h.get("merged") or {}).get(w.get("branch") or "", [])]
             closed += [dict(x, repo=w["repo"], branch=w.get("branch")) for x in (h.get("closed") or {}).get(w.get("branch") or "", [])]
         act = {"id": anchor, "prs": a_prs, "worktrees": a_wts, "sessions": a_sess, "dirs": dirs,
-               "merged_prs": merged, "closed_prs": closed, "links": sorted(set(links.get(root, [])))}
+               "merged_prs": merged, "closed_prs": closed, "links": sorted(set(links.get(root, []))),
+               # repositories of this activity's worktrees whose open-PR list was not observed (unknown, not "none")
+               "pr_unknown": sorted({w["repo"] for w in a_wts if w["repo"] not in pr_observed})}
         _describe(act, catalog)
         act["handoffs"] = _handoffs_for(act, handoffs)
         act["evidence_dirs"] = sorted({d for p in a_prs for d in p.get("evidence_dirs") or []})
         act["ledgers"] = sorted({f"{p['repo']}#{p['lifecycle']['ledger']}" for p in a_prs if (p.get("lifecycle") or {}).get("ledger")})
-        _classify(act, marks.get(anchor), history is not None and gh_ok, now)
+        _classify(act, marks.get(anchor), history is not None, now)
         act["next"] = _next_action(act, sessions, paths)
         out.append(act)
     order = {ACTIVE: 0, PAUSED: 1, UNRESOLVED: 2, COMPLETED: 3, ARCHIVED: 4}
@@ -182,9 +184,18 @@ def _handoffs_for(act: dict, handoffs: list) -> list:
     return res
 
 
+def _resumable(sessions: list) -> list:
+    """Launcher records whose saved conversation can still be resumed. The one predicate for both the
+    Paused classification and the retirement protection: a STALE record (another agent is live in its
+    worktree) is excluded, and that live agent is itself a protection."""
+    return [s for s in sessions if s.get("kind") == "launcher-record" and s.get("status") != STALE]
+
+
 def _protections(act: dict) -> list:
     """Reasons no physical asset of this activity may be retired (shown on every activity)."""
     prot = []
+    for repo in act.get("pr_unknown", []):
+        prot.append(f"open-PR state unknown for {repo}")
     for w in act["worktrees"]:
         st = w.get("status") or {}
         if st.get("dirty"):
@@ -200,12 +211,15 @@ def _protections(act: dict) -> list:
     for s in act["sessions"]:
         if s.get("kind") == "agent":
             prot.append(f"live agent {s['name']}")
+    for s in _resumable(act["sessions"]):
+        # Retiring the worktree would remove the directory its resume depends on.
+        prot.append(f"resumable conversation {s['name']}")
     return prot
 
 
 def _classify(act: dict, mark: Optional[dict], history_known: bool, now: float) -> None:
     live = [s for s in act["sessions"] if s.get("kind") == "agent" and s.get("status") == LIVE]
-    resumable = [s for s in act["sessions"] if s.get("kind") == "launcher-record" and s.get("status") != STALE]
+    resumable = _resumable(act["sessions"])
     prs, wts = act["prs"], act["worktrees"]
     dirty = any((w.get("status") or {}).get("dirty") for w in wts)
     local_only = any((w.get("status") or {}).get("local_only_commits") for w in wts)
@@ -223,6 +237,9 @@ def _classify(act: dict, mark: Optional[dict], history_known: bool, now: float) 
         status = ACTIVE if recent else PAUSED
         why.append("open PR updated in the last 24 hours" if recent else
                    f"open PR, last updated {ago(max(p.get('updated_ts') or 0 for p in prs))}, no live agent")
+    elif act.get("pr_unknown"):
+        status = UNRESOLVED
+        why.append("open-PR state unknown for " + ", ".join(act["pr_unknown"]) + "; cannot tell finished from unfinished")
     elif not history_known and wts:
         status = UNRESOLVED
         why.append("PR history unavailable; cannot tell finished from unfinished")

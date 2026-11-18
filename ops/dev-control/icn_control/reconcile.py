@@ -18,6 +18,7 @@ from typing import Optional
 from . import github as gh
 from .gitwt import toplevel_for
 from .procs import AGENT_COMMS, ancestors, file_activity, same_process, start_epoch, transcript_activity
+from .snapshot import merge_policy
 from .util import (AWAITING_MAINTAINER, BLOCKED, IDLE, IN_PROGRESS, LIVE, REGISTERED_NOT_RUNNING,
                    STALE, UNKNOWN, WARNING, Obs, Paths, ago, short)
 
@@ -65,6 +66,7 @@ def pr_views(snap: dict, paths: Paths, catalog: dict) -> list[dict]:
     if gh_obs is None or not gh_obs.ok:
         return []
     required = _data(snap, "required_checks", {})
+    ready_when = (merge_policy() or {}).get("ready_when")
     out = []
     for repo, prs in (gh_obs.data or {}).items():
         req_list = required.get(repo) if isinstance(required, dict) else None
@@ -72,7 +74,7 @@ def pr_views(snap: dict, paths: Paths, catalog: dict) -> list[dict]:
             req_list = req_list.get("checks")
         for pr in prs:
             req = gh.required_check_status(pr, req_list)
-            ready = gh.merge_readiness(pr, req)
+            ready = gh.merge_readiness(pr, req, ready_when)
             evidence = review_evidence_dirs(paths, pr["number"])
             v = dict(pr)
             v["required"] = req
@@ -403,6 +405,20 @@ def _base_view(kind, name, cwd, wt, rows, prs, locks, handoffs, reg) -> dict:
 
 
 # --------------------------------------------------------------------------- worktrees
+def open_pr_observed(snap: dict) -> frozenset:
+    """Repository keys whose open-PR list this snapshot observed live and completely.
+
+    The single source for "this worktree has no open PR": the worktree verdicts and the activity
+    classifier both use it. A repository absent here is UNKNOWN (its fetch failed or was truncated, it
+    has no GitHub remote, or only cached data remains); absence of an observation is never an
+    observation of no PRs. A successful empty list is present here, with no PRs.
+    """
+    o = snap.get("github_prs")
+    if o is None or not o.ok or o.from_cache or not isinstance(o.data, dict):
+        return frozenset()
+    return frozenset(k for k, v in o.data.items() if isinstance(v, list))
+
+
 def worktree_views(snap: dict, sessions: list[dict], catalog: dict) -> list[dict]:
     wobs = snap.get("worktrees")
     if wobs is None or not wobs.ok:
@@ -411,7 +427,7 @@ def worktree_views(snap: dict, sessions: list[dict], catalog: dict) -> list[dict
     locks = (_data(snap, "file_locks", {}) or {}).get("locks") or []
     prs = snap.get("_pr_views") or []
     merged = _data(snap, "github_merged", []) or []
-    gh_ok = snap.get("github_prs") is not None and snap["github_prs"].ok
+    observed = open_pr_observed(snap)
     out = []
     for w in wobs.data["worktrees"]:
         st = w.get("status") or {}
@@ -448,8 +464,8 @@ def worktree_views(snap: dict, sessions: list[dict], catalog: dict) -> list[dict
         mpr = branch_pr(merged, w["repo"], w.get("branch"))
         if mpr:
             cand.append(f"PR #{mpr['number']} merged {ago(mpr.get('merged_ts'))}")
-        if not gh_ok:
-            keep.append("GitHub state unknown")
+        if w["repo"] not in observed:
+            keep.append(f"open-PR state unknown for {w['repo']}")
         row = rows.get(os.path.normpath(w["path"]))
         program, rule = classify(w["repo"], f"{w.get('branch') or ''} {name} {(row or {}).get('task', '')}", catalog)
         if keep:
@@ -638,10 +654,9 @@ def build_views(snap: dict, paths: Paths, catalog: dict) -> dict:
     from . import activities as actmod
     hist_obs = snap.get("github_history")
     history = hist_obs.data if (hist_obs is not None and hist_obs.ok) else None
-    gh_ok = snap.get("github_prs") is not None and snap["github_prs"].ok
     acts = actmod.build({"prs": prs, "sessions": sessions, "worktrees": worktrees,
                          "handoffs": _data(snap, "handoffs", []) or []},
-                        history, actmod.load_marks(paths), paths, catalog, gh_ok=gh_ok)
+                        history, actmod.load_marks(paths), paths, catalog, pr_observed=open_pr_observed(snap))
     return {"activities": acts, "prs": prs, "sessions": sessions, "worktrees": worktrees, "attention": att,
             "next": next_steps(prs, sessions, att), "programs": progs,
             "merged": _data(snap, "github_merged", []) or [], "handoffs": handoffs}

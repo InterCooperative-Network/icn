@@ -54,7 +54,7 @@ Similar-looking names alone never merge two activities.
 | **Paused** | unfinished and preserved: an open PR without recent movement, uncommitted work, a resumable conversation, or a fresh worktree |
 | **Completed** | its branch's PR was merged (and nothing uncommitted is left behind) |
 | **Archived** | superseded (PR closed unmerged) or a clean checkout with nothing unique and no PR |
-| **Unresolved** | not enough evidence: e.g. commits on no remote-tracking ref and no PR, merged but still dirty, or PR history unavailable |
+| **Unresolved** | not enough evidence: e.g. commits on no remote-tracking ref and no PR, merged but still dirty, PR history unavailable, or the open-PR list of the worktree's repository not observed |
 
 Views (`v` cycles): **NOW** — Active, anything that needs you (`!`), and Paused work touched in the
 last 30 days (the default) · **ALL OPEN** — every Active and Paused activity · **ARCHIVE** —
@@ -68,7 +68,9 @@ details, mark it paused/archived, request retirement approval.
   (0600, `canonical: false`). They move an activity between views. They never delete, stop or clean
   anything, never remove a protection, and a live agent always keeps its activity Active.
 - **Retirement requests** (`x`) are offered only for Completed/Archived activities with no protection
-  (no uncommitted changes, no commits on no remote ref, no open PR, no live agent, no file locks).
+  (no uncommitted changes, no commits on no remote ref, no open PR, no live agent, no file locks, no
+  resumable launcher conversation, and the repository's open-PR list observed live and completely: a
+  failed, truncated, missing or only-cached list is "open-PR state unknown", never "no PR").
   They append a reviewable entry with the `wt-clean` dry-run and `--apply --only <name>@<sha>`
   commands to `~/icn-dev/state/dev-control-consolidation-<date>/retirement-requests.md`. Nothing runs.
 
@@ -161,6 +163,7 @@ never an empty success. A session is never called active because its worktree st
 | Worktrees | `git worktree list` + `git --no-optional-locks status` per worktree (no fetch, never takes `index.lock`) |
 | Task text, file locks | `~/icn-dev/state/active-worktrees.yaml`, `file-locks.yaml` (shown as historical claims) |
 | PRs, reviews, CI | `gh api graphql` (authenticated `gh`), required checks from live branch protection, else `ops/state/truth/policy.json` |
+| Merge readiness gates | `merge.ready_when` in `ops/state/truth/policy.json` (allowed merge states and review decisions, applied as given; unreadable → NOT READY) |
 | Delivery lifecycle | the `ICN-DELIVERY-LIFECYCLE` block in each PR body (semantics: `ops/state/truth/delivery.json`) |
 | Host health | `statvfs`, `/proc/meminfo`, `/proc/loadavg`, the disk guard's last report, build-admission reservations |
 
@@ -199,6 +202,11 @@ refusals, injection-safe argv, picker ordering and filtering, and an end-to-end 
 in an isolated tmux server with a real attached client: switch → return with prefix+L (agent still
 running) → switch to another session → cancelled resume (nothing started) → confirmed resume →
 no second resume, plus a stale target, resizing and the quit confirmation.
+
+`test_release_blockers.py` covers the three FULL-review blockers: readiness gated by the policy's
+merge-state and review-decision allowlists (exhaustively over every gate), per-repository open-PR
+coverage (partial, failed, truncated and cached fetches protect their worktrees; a successful empty
+list does not), and resumable launcher conversations as a retirement protection in every end state.
 
 `test_control.py` covers process matching (pid reuse), registry read-only access, missing/unreadable sources,
 stale cache labelling, GitHub reconciliation (lifecycle, automated vs human review, required

@@ -85,6 +85,9 @@ def fetch_open_prs(owner: str, name: str, max_pages: int = 8, retries: int = 1) 
         if not prs["pageInfo"]["hasNextPage"]:
             break
         after = prs["pageInfo"]["endCursor"]
+    else:
+        # A truncated list is not an observation of every open PR: the missing ones would read as "no PR".
+        raise GhUnavailable(f"open-PR list for {owner}/{name} truncated after {max_pages} pages")
     return [normalize_pr(p, name) for p in out]
 
 
@@ -280,9 +283,18 @@ def freeze_matches_head(pr: dict) -> Optional[bool]:
     return head.lower().startswith(fh.lower())
 
 
-def merge_readiness(pr: dict, req: dict) -> dict:
+def _allowlist(ready_when: Optional[dict], field: str) -> Optional[list]:
+    """One allowlist from the merge policy's `ready_when`, or None when it is absent or malformed."""
+    v = ready_when.get(field) if isinstance(ready_when, dict) else None
+    return v if isinstance(v, list) else None
+
+
+def merge_readiness(pr: dict, req: dict, ready_when: Optional[dict] = None) -> dict:
     """A conservative, explained readiness verdict. Never says READY when anything is unknown.
 
+    `ready_when` is `merge.ready_when` from ops/state/truth/policy.json, the sole owner of which merge
+    states and review decisions are ready. Its allowlists are applied as given, never restated here;
+    when it is missing or malformed every gate it owns is unknown, so the verdict is NOT READY.
     This is a display aid. The merge primitive and live branch protection remain the authority.
     """
     reasons = []
@@ -295,6 +307,15 @@ def merge_readiness(pr: dict, req: dict) -> dict:
         reasons.append(f"{pr['unresolved_threads']} unresolved review thread(s)")
     if pr.get("mergeable") not in ("MERGEABLE",):
         reasons.append(f"mergeable={pr.get('mergeable') or 'unknown'}")
+    states = _allowlist(ready_when, "merge_state_status_in")
+    decisions = _allowlist(ready_when, "review_decision_allowlist")
+    if states is None or decisions is None:
+        reasons.append("merge policy ready_when unavailable (merge state and review decision cannot be judged)")
+    else:
+        if pr.get("merge_state") not in states:
+            reasons.append(f"merge state {pr.get('merge_state') or 'unknown'} (policy admits {'/'.join(map(str, states))})")
+        if pr.get("review_decision") not in decisions:
+            reasons.append(f"review decision {pr.get('review_decision')}")
     if not lc:
         reasons.append("no delivery lifecycle block")
     elif lc.get("state") != "FROZEN":
