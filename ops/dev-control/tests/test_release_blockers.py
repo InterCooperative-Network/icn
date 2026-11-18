@@ -4,6 +4,7 @@ B1  merge readiness ignored mergeStateStatus and reviewDecision.
 B2  a partial open-PR fetch was treated as a complete observation, so a worktree in the failed
     repository read as "no PR" and could become retirable.
 B3  a resumable launcher conversation was not a retirement protection.
+F1  (late finding after freeze) cached or stale GitHub observations still produced MERGE-ELIGIBLE.
 
 Fixtures only; nothing on the host is read or changed except the repository's own merge policy,
 which is read (never copied) so that a drift between policy and display fails here.
@@ -16,6 +17,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest.mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -302,6 +304,108 @@ class B3ResumableProtection(unittest.TestCase):
             text = f.read()
         self.assertIn("resumable conversation lane-conv", text)
         self.assertNotIn("protections: none observed", text)
+
+
+# --------------------------------------------------------------------------- F1
+def _ready_snap(now, pr_at=None, req_at=None, pr_cache=False, req_cache=False, prs=None, pr_ok=True, req_ok=True,
+                pr_error=None, drop=()):
+    snap = {"github_prs": Obs("GitHub open PRs", now if pr_at is None else pr_at, pr_ok,
+                              ({"icn": prs if prs is not None else [gh_pr(number=1)]} if pr_ok else None),
+                              error=pr_error, from_cache=pr_cache),
+            "required_checks": Obs("required checks", now if req_at is None else req_at, req_ok,
+                                   ({"icn": {"checks": REQ, "source": "test"}} if req_ok else None), from_cache=req_cache)}
+    for k in drop:
+        snap.pop(k)
+    return snap
+
+
+class F1ReadinessFreshness(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="icnctl-f1-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.paths = Paths(icn_dev=os.path.join(self.tmp, "icn-dev"), control_state=os.path.join(self.tmp, "ctl"),
+                           claude_home=os.path.join(self.tmp, "claude"), proc=os.path.join(self.tmp, "proc"))
+        self.now = time.time()
+
+    def readiness(self, snap, number=1):
+        return next(p for p in reconcile.pr_views(snap, self.paths, CATALOG) if p["number"] == number)
+
+    def assert_gap(self, snap, fragment):
+        v = self.readiness(snap)
+        self.assertEqual(v["readiness"]["verdict"], "NOT READY", fragment)
+        gaps = [r for r in v["readiness"]["reasons"] if r.startswith("current GitHub evidence unavailable: ")]
+        self.assertEqual(len(gaps), 1, v["readiness"]["reasons"])
+        self.assertIn(fragment, gaps[0])
+        return v
+
+    def test_fresh_evidence_is_still_eligible(self):
+        v = self.readiness(_ready_snap(self.now))
+        self.assertTrue(v["readiness"]["verdict"].startswith(ELIGIBLE), v["readiness"])
+        self.assertEqual(v["readiness"]["reasons"], [])
+        self.assertIsNone(reconcile.readiness_evidence_gap(_ready_snap(self.now), self.now))
+
+    def test_cached_pr_data_is_not_ready_but_details_stay_visible(self):
+        v = self.assert_gap(_ready_snap(self.now, pr_at=self.now - 6 * 3600, pr_cache=True), "PR data is cached from")
+        # Historical details remain on display; only the verdict refuses to vouch for them.
+        self.assertEqual((v["number"], v["merge_state"], v["required"]["verdict"]), (1, "CLEAN", "GREEN"))
+
+    def test_cached_required_checks_alone_are_not_ready(self):
+        self.assert_gap(_ready_snap(self.now, req_at=self.now - 6 * 3600, req_cache=True), "required-check data is cached")
+
+    def test_live_but_old_observation_is_not_ready(self):
+        old = self.now - reconcile.READINESS_MAX_AGE_S - 5
+        self.assert_gap(_ready_snap(self.now, pr_at=old), "PR data last observed")
+        self.assert_gap(_ready_snap(self.now, req_at=old), "required-check data last observed")
+        edge = self.now - reconcile.READINESS_MAX_AGE_S + 30
+        self.assertTrue(self.readiness(_ready_snap(self.now, pr_at=edge, req_at=edge))["readiness"]["verdict"].startswith(ELIGIBLE))
+
+    def test_missing_or_failed_required_checks_are_not_ready(self):
+        self.assert_gap(_ready_snap(self.now, drop=("required_checks",)), "required-check data not observed")
+        self.assert_gap(_ready_snap(self.now, req_ok=False), "required-check data unavailable")
+        snap = _ready_snap(self.now, pr_ok=False)
+        self.assertEqual(reconcile.pr_views(snap, self.paths, CATALOG), [], "no PR rows without PR data")
+        self.assertIn("PR data unavailable", reconcile.readiness_evidence_gap(snap, self.now))
+        self.assertIn("PR data not observed", reconcile.readiness_evidence_gap({}, self.now))
+
+    def test_malformed_or_missing_observation_time_is_not_ready(self):
+        for bad in (None, "yesterday", float("nan"), 0, -1, True, self.now + 3600):
+            snap = _ready_snap(self.now)
+            snap["github_prs"].observed_at = bad
+            self.assert_gap(snap, "PR data has no usable observation time")
+
+    def test_partial_fresh_observation_keeps_observed_repositories_judged(self):
+        # A partial fetch is coverage-limited (B2), not stale: the repositories it did observe are current.
+        v = self.readiness(_ready_snap(self.now, pr_error="partial: sdk: timeout"))
+        self.assertTrue(v["readiness"]["verdict"].startswith(ELIGIBLE), v["readiness"])
+
+    def test_failed_refresh_then_recovery(self):
+        c = snapshot.Collector(self.paths, CATALOG, use_cache=False)
+        good = _ready_snap(time.time())
+        bad = {"github_prs": Obs("GitHub open PRs", time.time(), False, None, error="offline"),
+               "required_checks": Obs("required checks", time.time(), False, None, error="offline")}
+        with unittest.mock.patch.object(snapshot, "collect_github", side_effect=[good, bad, _ready_snap(time.time())]), \
+                unittest.mock.patch.object(snapshot, "save_cache"):
+            c._run_tier("github")
+            self.assertTrue(self.readiness(c.snapshot())["readiness"]["verdict"].startswith(ELIGIBLE))
+            c._run_tier("github")  # the collector keeps the last good data, marked cached
+            v = self.readiness(c.snapshot())
+            self.assertEqual(v["readiness"]["verdict"], "NOT READY")
+            self.assertTrue(any("PR data is cached" in r for r in v["readiness"]["reasons"]), v["readiness"])
+            c._run_tier("github")  # recovery
+            self.assertTrue(self.readiness(c.snapshot())["readiness"]["verdict"].startswith(ELIGIBLE))
+
+    def test_restart_from_disk_cache_is_not_ready(self):
+        snapshot.save_cache(self.paths, _ready_snap(time.time()))
+        loaded = snapshot.load_cache(self.paths)
+        self.assertTrue(loaded["github_prs"].from_cache and loaded["required_checks"].from_cache)
+        self.assert_gap(loaded, "is cached from")
+
+    def test_gap_is_never_overridden_by_other_gates(self):
+        p = gh_pr()
+        self.assertTrue(verdict(p)["verdict"].startswith(ELIGIBLE))
+        r = gh.merge_readiness(p, gh.required_check_status(p, REQ), READY_WHEN, evidence_gap="PR data is cached")
+        self.assertEqual(r["verdict"], "NOT READY")
+        self.assertEqual(r["reasons"], ["current GitHub evidence unavailable: PR data is cached"])
 
 
 if __name__ == "__main__":

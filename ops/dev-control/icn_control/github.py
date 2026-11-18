@@ -289,15 +289,21 @@ def _allowlist(ready_when: Optional[dict], field: str) -> Optional[list]:
     return v if isinstance(v, list) else None
 
 
-def merge_readiness(pr: dict, req: dict, ready_when: Optional[dict] = None) -> dict:
+def merge_readiness(pr: dict, req: dict, ready_when: Optional[dict] = None,
+                    evidence_gap: Optional[str] = None) -> dict:
     """A conservative, explained readiness verdict. Never says READY when anything is unknown.
 
     `ready_when` is `merge.ready_when` from ops/state/truth/policy.json, the sole owner of which merge
     states and review decisions are ready. Its allowlists are applied as given, never restated here;
     when it is missing or malformed every gate it owns is unknown, so the verdict is NOT READY.
+    `evidence_gap` names why the GitHub observations behind this PR are not current (cached, stale,
+    failed or unobserved; see reconcile.readiness_evidence_gap). Historical data may still be shown,
+    but a verdict built on it is NOT READY.
     This is a display aid. The merge primitive and live branch protection remain the authority.
     """
     reasons = []
+    if evidence_gap:
+        reasons.append(f"current GitHub evidence unavailable: {evidence_gap}")
     lc = pr.get("lifecycle")
     if pr.get("draft"):
         reasons.append("draft")

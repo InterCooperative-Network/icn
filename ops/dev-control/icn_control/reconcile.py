@@ -18,7 +18,7 @@ from typing import Optional
 from . import github as gh
 from .gitwt import toplevel_for
 from .procs import AGENT_COMMS, ancestors, file_activity, same_process, start_epoch, transcript_activity
-from .snapshot import merge_policy
+from .snapshot import TIERS, merge_policy
 from .util import (AWAITING_MAINTAINER, BLOCKED, IDLE, IN_PROGRESS, LIVE, REGISTERED_NOT_RUNNING,
                    STALE, UNKNOWN, WARNING, Obs, Paths, ago, short)
 
@@ -61,12 +61,46 @@ def classify(repo: Optional[str], text: str, catalog: dict) -> tuple[str, str]:
 
 
 # --------------------------------------------------------------------------- PRs
+# Readiness needs GitHub evidence no older than two missed refreshes of the GitHub tier.
+READINESS_MAX_AGE_S = 2 * TIERS["github"] + 60
+READINESS_SOURCES = (("github_prs", "PR data"), ("required_checks", "required-check data"))
+
+
+def readiness_evidence_gap(snap: dict, now: Optional[float] = None) -> Optional[str]:
+    """Why the observations a merge-readiness verdict depends on are not current, or None if they are.
+
+    The single freshness gate for display readiness. Missing, failed, cached (restored from disk or kept
+    after a failed refresh), older than READINESS_MAX_AGE_S, or carrying an unusable timestamp: each is a
+    gap. Absence of a current observation is never treated as a current observation.
+    """
+    now = time.time() if now is None else now
+    gaps = []
+    for key, label in READINESS_SOURCES:
+        o = snap.get(key)
+        if o is None:
+            gaps.append(f"{label} not observed")
+            continue
+        if not getattr(o, "ok", False):
+            gaps.append(f"{label} unavailable")
+            continue
+        ts = getattr(o, "observed_at", None)
+        if isinstance(ts, bool) or not isinstance(ts, (int, float)) or ts != ts or ts <= 0 or ts > now + 60:
+            gaps.append(f"{label} has no usable observation time")
+            continue
+        if getattr(o, "from_cache", True):
+            gaps.append(f"{label} is cached from {ago(ts)}")
+        elif now - ts > READINESS_MAX_AGE_S:
+            gaps.append(f"{label} last observed {ago(ts)}")
+    return "; ".join(gaps) or None
+
+
 def pr_views(snap: dict, paths: Paths, catalog: dict) -> list[dict]:
     gh_obs = snap.get("github_prs")
     if gh_obs is None or not gh_obs.ok:
         return []
     required = _data(snap, "required_checks", {})
     ready_when = (merge_policy() or {}).get("ready_when")
+    gap = readiness_evidence_gap(snap)
     out = []
     for repo, prs in (gh_obs.data or {}).items():
         req_list = required.get(repo) if isinstance(required, dict) else None
@@ -74,7 +108,7 @@ def pr_views(snap: dict, paths: Paths, catalog: dict) -> list[dict]:
             req_list = req_list.get("checks")
         for pr in prs:
             req = gh.required_check_status(pr, req_list)
-            ready = gh.merge_readiness(pr, req, ready_when)
+            ready = gh.merge_readiness(pr, req, ready_when, evidence_gap=gap)
             evidence = review_evidence_dirs(paths, pr["number"])
             v = dict(pr)
             v["required"] = req
