@@ -245,7 +245,8 @@ def pr(**kw):
             "base": "main", "updated_ts": NOW, "author": "me", "mergeable": "MERGEABLE", "merge_state": "CLEAN",
             "checks": [{"name": "Build Release", "status": "COMPLETED", "conclusion": "SUCCESS"},
                        {"name": "Test", "status": "COMPLETED", "conclusion": "SUCCESS"}],
-            "unresolved_threads": 0, "reviews": [], "lifecycle": gh.parse_lifecycle(FROZEN_BODY), "url": "u"}
+            "unresolved_threads": 0, "threads_observed": 0, "threads_total": 0, "threads_complete": True,
+            "reviews": [], "lifecycle": gh.parse_lifecycle(FROZEN_BODY), "url": "u"}
     base.update(kw)
     return base
 

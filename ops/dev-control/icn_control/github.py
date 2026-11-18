@@ -20,7 +20,7 @@ query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$
   nodes{number title url isDraft headRefName headRefOid baseRefName updatedAt createdAt isCrossRepository
    mergeable mergeStateStatus reviewDecision authorAssociation author{login __typename} body
    reviews(last:10){nodes{body state authorAssociation author{login __typename} submittedAt commit{oid}}}
-   reviewThreads(first:100){nodes{isResolved}}
+   reviewThreads(first:100){totalCount pageInfo{hasNextPage} nodes{isResolved}}
    commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:100){nodes{__typename
      ... on CheckRun{name conclusion status} ... on StatusContext{context state}}}}}}}}}}}
 """
@@ -217,7 +217,14 @@ def normalize_pr(p: dict, repo: str) -> dict:
                 checks.append({"name": c.get("name"), "status": c.get("status"), "conclusion": c.get("conclusion")})
             else:
                 checks.append({"name": c.get("context"), "status": "COMPLETED", "conclusion": c.get("state")})
-    threads = (p.get("reviewThreads") or {}).get("nodes") or []
+    tconn = p.get("reviewThreads") or {}
+    threads = tconn.get("nodes") or []
+    t_total = tconn.get("totalCount")
+    t_more = (tconn.get("pageInfo") or {}).get("hasNextPage")
+    # Complete only when GitHub says there is no further page AND the count matches what came back.
+    # Missing metadata is not evidence of completeness.
+    t_complete = (isinstance(t_total, int) and not isinstance(t_total, bool) and t_more is False
+                  and t_total == len(threads))
     reviews = [classify_review(r, author) for r in ((p.get("reviews") or {}).get("nodes") or [])]
     assoc = p.get("authorAssociation")
     lifecycle = parse_lifecycle(p.get("body"))
@@ -232,7 +239,9 @@ def normalize_pr(p: dict, repo: str) -> dict:
         "base": p.get("baseRefName"), "updated_at": p.get("updatedAt"), "updated_ts": parse_iso(p.get("updatedAt")),
         "author": author, "mergeable": p.get("mergeable"), "merge_state": p.get("mergeStateStatus"),
         "review_decision": p.get("reviewDecision"), "checks": checks, "rollup": rollup_state,
-        "unresolved_threads": sum(1 for t in threads if not t.get("isResolved")),
+        "unresolved_threads": sum(1 for t in threads if not t.get("isResolved")),  # among those observed
+        "threads_observed": len(threads), "threads_total": t_total if isinstance(t_total, int) else None,
+        "threads_complete": t_complete,
         "reviews": reviews, "lifecycle": lifecycle, "author_association": assoc,
         "lifecycle_untrusted": untrusted_lifecycle,
     }
@@ -283,6 +292,16 @@ def freeze_matches_head(pr: dict) -> Optional[bool]:
     return head.lower().startswith(fh.lower())
 
 
+def thread_summary(pr: dict) -> str:
+    """Unresolved review threads as observed, marked as a lower bound when the observation is incomplete."""
+    n = pr.get("unresolved_threads") or 0
+    if pr.get("threads_complete") is True:
+        return f"{n} unresolved"
+    total = pr.get("threads_total")
+    return (f"at least {n} unresolved; {pr.get('threads_observed', '?')} of "
+            f"{total if total is not None else 'an unknown number of'} threads observed")
+
+
 def _allowlist(ready_when: Optional[dict], field: str) -> Optional[list]:
     """One allowlist from the merge policy's `ready_when`, or None when it is absent or malformed."""
     v = ready_when.get(field) if isinstance(ready_when, dict) else None
@@ -311,6 +330,8 @@ def merge_readiness(pr: dict, req: dict, ready_when: Optional[dict] = None,
         reasons.append(f"required CI {req['verdict'].lower()} ({req['detail']})")
     if pr.get("unresolved_threads"):
         reasons.append(f"{pr['unresolved_threads']} unresolved review thread(s)")
+    if pr.get("threads_complete") is not True:
+        reasons.append(f"review threads incomplete ({thread_summary(pr)}); unresolved threads may be unobserved")
     if pr.get("mergeable") not in ("MERGEABLE",):
         reasons.append(f"mergeable={pr.get('mergeable') or 'unknown'}")
     states = _allowlist(ready_when, "merge_state_status_in")

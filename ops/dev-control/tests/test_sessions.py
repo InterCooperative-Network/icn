@@ -504,6 +504,61 @@ class EndToEnd(unittest.TestCase):
                   "the resumed conversation shows as running, and a second resume is refused")
         self.keys("Escape")
 
+    def test_switcher_keyboard_navigation_targets_the_highlighted_row(self):
+        # Late blocker N2: every redraw used to restore the previous selection, so Down/End/Home were
+        # undone and Enter opened the first session. Real keys, real client; nothing is joined or started.
+        # The isolated tmux server still sees host agent processes, so filter to the fixtures: three
+        # fake agents share "task-session" (this also covers navigating within a filtered list).
+        self.start_agent("delta")
+        tokens = ("alpha-task-session", "beta-task-session", "delta-task-session")
+        self.wait(lambda: "WORK" in self.screen(), "dashboard")
+        self.keys("g")
+        self.wait(lambda: "SWITCH TO A CLAUDE SESSION" in self.screen(), "picker")
+        self.keys("-l", "task-session")
+        self.wait(lambda: all(t in self.screen() for t in tokens) and "3 shown" in self.screen(),
+                  "exactly the three fixture sessions", timeout=60.0)
+
+        def rows():
+            out = []
+            for line in self.screen().splitlines()[3:]:
+                if line.startswith("----"):
+                    break
+                hit = next((t for t in tokens if t in line), None)
+                if hit:
+                    out.append((hit, line.startswith("▶")))
+            return out
+
+        self.assertEqual(sorted(t for t, _ in rows()), sorted(tokens), self.screen())
+
+        def highlighted():
+            return [t for t, on in rows() if on]
+
+        def nav(key, pick):
+            # The expected row comes from the list as displayed when the key is pressed.
+            shown = [t for t, _ in rows()]
+            cur = highlighted()
+            self.assertEqual(len(cur), 1, self.screen())
+            want = shown[pick(len(shown), shown.index(cur[0]))]
+            self.keys(key)
+            self.wait(lambda: highlighted() == [want], f"highlight on {want} after {key}")
+            time.sleep(1.0)
+            self.pump()
+            self.assertEqual(highlighted(), [want], "the redraw must not undo the navigation")
+            self.keys("Enter")
+            self.wait(lambda: want in self.screen().splitlines()[0], f"action menu for {want}")
+            self.keys("Escape")
+            self.wait(lambda: "SWITCH TO A CLAUDE SESSION" in self.screen(), "back in the picker")
+
+        nav("Home", lambda n, i: 0)
+        nav("Down", lambda n, i: min(i + 1, n - 1))
+        nav("Down", lambda n, i: min(i + 1, n - 1))
+        nav("Up", lambda n, i: max(i - 1, 0))
+        nav("End", lambda n, i: n - 1)
+        nav("Home", lambda n, i: 0)
+        self.keys("Escape")
+        self.assertEqual(self.read_calls(), "", "navigation alone never launches anything")
+        self.assertTrue(self.alive("alpha") and self.alive("beta") and self.alive("delta"))
+
     def test_stale_target_is_refused_and_resize_survives(self):
         self.keys("4")
         self.wait(lambda: "alpha-task-session" in self.screen(), "sessions screen")

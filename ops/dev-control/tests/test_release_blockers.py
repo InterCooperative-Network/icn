@@ -5,6 +5,10 @@ B2  a partial open-PR fetch was treated as a complete observation, so a worktree
     repository read as "no PR" and could become retirable.
 B3  a resumable launcher conversation was not a retirement protection.
 F1  (late finding after freeze) cached or stale GitHub observations still produced MERGE-ELIGIBLE.
+N2  (late finding) the session switcher restored the previous selection on every redraw, so Up/Down/
+    Home/End/Page keys were undone and Enter opened the first session.
+N3  (late finding) only the first 100 review threads were read, so an unresolved later thread was
+    invisible and readiness could read MERGE-ELIGIBLE.
 
 Fixtures only; nothing on the host is read or changed except the repository's own merge policy,
 which is read (never copied) so that a drift between policy and display fails here.
@@ -406,6 +410,194 @@ class F1ReadinessFreshness(unittest.TestCase):
         r = gh.merge_readiness(p, gh.required_check_status(p, REQ), READY_WHEN, evidence_gap="PR data is cached")
         self.assertEqual(r["verdict"], "NOT READY")
         self.assertEqual(r["reasons"], ["current GitHub evidence unavailable: PR data is cached"])
+
+
+# --------------------------------------------------------------------------- N2
+import curses  # noqa: E402  (key constants only; no terminal is initialised)
+
+from icn_control import tui  # noqa: E402
+from icn_control.util import LIVE  # noqa: E402
+
+
+class _ScriptedScreen:
+    """Stands in for the curses window: fixed size, drawing is ignored, keys come from a script."""
+
+    def __init__(self, keys):
+        self.keys = list(keys)
+
+    def getmaxyx(self):
+        return 50, 180
+
+    def erase(self):
+        pass
+
+    def refresh(self):
+        pass
+
+    def addnstr(self, *a):
+        pass
+
+    def getch(self):
+        if not self.keys:
+            raise AssertionError("key script exhausted without the switcher choosing a session")
+        k = self.keys.pop(0)
+        return ord(k) if isinstance(k, str) else k
+
+
+def _agent(name, age):
+    return {"kind": "agent", "name": name, "status": LIVE, "last_activity": time.time() - age, "program": "icn-core",
+            "repo": "icn", "cwd": f"/s/{name}", "state_label": "IDLE AT PROMPT", "pid": 1000 + int(name[1:]), "tmux": f"t-{name}"}
+
+
+class N2SwitcherNavigation(unittest.TestCase):
+    """Drives the real UI.session_picker loop; only the screen and the data source are scripted."""
+
+    def run_picker(self, keys, sessions_per_refresh):
+        ui = tui.UI.__new__(tui.UI)
+        ui.scr, ui.color, ui.picker_all, ui.back_hint = _ScriptedScreen(keys), {}, False, ""
+        ui.catalog, ui.paths = {"programs": []}, Paths(icn_dev=tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, ui.paths.icn_dev, ignore_errors=True)
+        feed = list(sessions_per_refresh)
+        state = {"sessions": feed[0]}
+
+        def refresh_views(force=False):
+            # Redraw n observes feed[n] (the last entry repeats), as the collector delivers new data.
+            state["sessions"] = feed.pop(0) if len(feed) > 1 else feed[0]
+            state["draws"] = state.get("draws", 0) + 1
+        chosen = []
+        ui.refresh_views = refresh_views
+        ui.picker_sessions = lambda: state["sessions"]
+        ui.session_activity_titles = lambda: {}
+        ui.actions_for = lambda v: [{"id": "join", "enabled": True, "label": "Join session", "reason": "test"}]
+        ui.action_menu = lambda view, preselect=None: chosen.append(view["name"]) or True
+        ui.session_picker()
+        self.assertEqual(len(chosen), 1)
+        return chosen[0]
+
+    FOUR = [_agent("s1", 10), _agent("s2", 20), _agent("s3", 30), _agent("s4", 40)]  # displayed s1..s4
+
+    def test_navigation_keys_choose_the_highlighted_row(self):
+        D, U, E = curses.KEY_DOWN, curses.KEY_UP, 10
+        cases = [([E], "s1"), ([D, E], "s2"), ([D, D, E], "s3"), ([curses.KEY_END, E], "s4"),
+                 ([curses.KEY_END, U, E], "s3"), ([curses.KEY_END, curses.KEY_HOME, E], "s1"),
+                 ([curses.KEY_NPAGE, E], "s4"), ([curses.KEY_NPAGE, curses.KEY_PPAGE, E], "s1"),
+                 ([D] * 9 + [E], "s4"), ([U, U, E], "s1")]
+        for keys, want in cases:
+            self.assertEqual(self.run_picker(keys, [self.FOUR]), want, keys)
+
+    def test_filtering_then_navigating(self):
+        self.assertEqual(self.run_picker(["s", "3", 10], [self.FOUR]), "s3")
+        self.assertEqual(self.run_picker(["s", curses.KEY_DOWN, curses.KEY_DOWN, 10], [self.FOUR]), "s3")
+        self.assertEqual(self.run_picker([curses.KEY_DOWN, "s", "4", 127, 127, curses.KEY_DOWN, 10], [self.FOUR]), "s2",
+                         "a filter edit restarts from the top; navigation after it still holds")
+
+    def test_selection_follows_the_session_when_a_refresh_reorders_rows(self):
+        reordered = [_agent("s2", 5), _agent("s1", 10), _agent("s3", 30), _agent("s4", 40)]  # s2 now first
+        # Navigated to s2, then the data refreshed and s2 moved to the top: Enter must still choose s2.
+        self.assertEqual(self.run_picker([curses.KEY_DOWN, 10], [self.FOUR, reordered]), "s2")
+        # No navigation, a redraw (-1 = no key) with reordered data: the highlighted session stays s1.
+        self.assertEqual(self.run_picker([-1, 10], [self.FOUR, reordered]), "s1")
+
+    def test_selection_survives_its_row_disappearing(self):
+        gone = [_agent("s1", 10), _agent("s3", 30), _agent("s4", 40)]
+        # On s2 when s2 vanishes: the index is clamped to a still-visible row and Enter names that row.
+        self.assertIn(self.run_picker([curses.KEY_DOWN, 10], [self.FOUR, gone]), {"s1", "s3"})
+
+
+# --------------------------------------------------------------------------- N3
+import re  # noqa: E402
+
+from test_control import FROZEN_BODY  # noqa: E402
+
+FROZEN_HEAD = gh.parse_lifecycle(FROZEN_BODY)["freeze_head"]
+
+
+class _FakeGraphQL:
+    """Answers OPEN_PRS_QUERY like GitHub would: it honours the query's own reviewThreads(first:N) and returns
+    totalCount / pageInfo only when the query asks for them. `threads` is the PR's full thread list."""
+
+    def __init__(self, threads, drop=()):
+        self.threads, self.drop, self.queries = threads, set(drop), []
+
+    def __call__(self, query, variables, timeout=45.0):
+        self.queries.append(query)
+        m = re.search(r"reviewThreads\(first:(\d+)\)\{(.*?)nodes\{isResolved\}", query, re.S)
+        first, fields = int(m.group(1)), m.group(2)
+        conn = {"nodes": [{"isResolved": r} for r in self.threads[:first]]}
+        if "totalCount" in fields and "totalCount" not in self.drop:
+            conn["totalCount"] = len(self.threads)
+        if "hasNextPage" in fields and "pageInfo" not in self.drop:
+            conn["pageInfo"] = {"hasNextPage": len(self.threads) > first}
+        node = {"number": 7, "title": "t", "url": "u", "isDraft": False, "headRefName": "feat/t", "headRefOid": FROZEN_HEAD,
+                "baseRefName": "main", "updatedAt": "2026-11-18T00:00:00Z", "createdAt": "2026-11-17T00:00:00Z",
+                "isCrossRepository": False, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "reviewDecision": None,
+                "authorAssociation": "OWNER", "author": {"login": "me", "__typename": "User"}, "body": FROZEN_BODY,
+                "reviews": {"nodes": []}, "reviewThreads": conn,
+                "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS", "contexts": {"nodes": [
+                    {"__typename": "CheckRun", "name": n, "status": "COMPLETED", "conclusion": "SUCCESS"} for n in REQ]}}}}]}}
+        return {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [node]}}}
+
+
+class N3ReviewThreadCompleteness(unittest.TestCase):
+    """End to end: fetch_open_prs -> normalize_pr -> pr_views, against a GraphQL fake that paginates like GitHub."""
+
+    def view(self, threads, drop=()):
+        fake = _FakeGraphQL(threads, drop)
+        with unittest.mock.patch.object(gh, "_gh_graphql", fake):
+            prs = gh.fetch_open_prs("o", "icn")
+        snap = {"github_prs": obs({"icn": prs}), "required_checks": obs({"icn": {"checks": REQ, "source": "test"}})}
+        paths = Paths(icn_dev=tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, paths.icn_dev, ignore_errors=True)
+        return reconcile.pr_views(snap, paths, CATALOG)[0]
+
+    def assert_ready(self, v):
+        self.assertTrue(v["readiness"]["verdict"].startswith(ELIGIBLE), v["readiness"])
+
+    def assert_incomplete(self, v):
+        self.assertEqual(v["readiness"]["verdict"], "NOT READY")
+        self.assertTrue(any(r.startswith("review threads incomplete") for r in v["readiness"]["reasons"]), v["readiness"])
+
+    def test_query_asks_for_completeness_metadata(self):
+        self.assertRegex(gh.OPEN_PRS_QUERY, r"reviewThreads\(first:100\)\{totalCount pageInfo\{hasNextPage\}")
+
+    def test_complete_observations_are_judged_normally(self):
+        for n in (0, 99, 100):
+            v = self.view([True] * n)
+            self.assertTrue(v["threads_complete"], n)
+            self.assert_ready(v)
+            self.assertEqual(gh.thread_summary(v), "0 unresolved")
+        v = self.view([True] * 99 + [False])  # an unresolved thread inside the first page is still counted
+        self.assertEqual(v["readiness"]["verdict"], "NOT READY")
+        self.assertIn("1 unresolved review thread(s)", v["readiness"]["reasons"])
+        self.assertTrue(v["threads_complete"])
+
+    def test_unresolved_thread_beyond_the_first_page_is_never_eligible(self):
+        v = self.view([True] * 100 + [False])  # the 101st thread is unresolved
+        self.assertFalse(v["threads_complete"])
+        self.assert_incomplete(v)
+        self.assertEqual(gh.thread_summary(v), "at least 0 unresolved; 100 of 101 threads observed")
+        live_like = self.view([True] * 100 + [False] * 4)  # the shape of the live witness: 104 threads, 4 unresolved on page 2
+        self.assert_incomplete(live_like)
+        self.assertIn("100 of 104 threads observed", gh.thread_summary(live_like))
+
+    def test_more_than_a_page_even_if_all_resolved_is_not_vouched_for(self):
+        self.assert_incomplete(self.view([True] * 150))
+
+    def test_missing_pagination_metadata_is_not_completeness(self):
+        for drop in (("totalCount",), ("pageInfo",), ("totalCount", "pageInfo")):
+            for n in (0, 5):
+                v = self.view([True] * n, drop=drop)
+                self.assertFalse(v["threads_complete"], (drop, n))
+                self.assert_incomplete(v)
+        self.assertIn("an unknown number of", gh.thread_summary(self.view([True] * 3, drop=("totalCount",))))
+
+    def test_inconsistent_metadata_is_not_completeness(self):
+        node = {"number": 1, "reviewThreads": {"totalCount": 104, "pageInfo": {"hasNextPage": False},
+                                               "nodes": [{"isResolved": True}] * 100}}
+        self.assertFalse(gh.normalize_pr(node, "icn")["threads_complete"], "count disagrees with nodes returned")
+        node["reviewThreads"] = {"totalCount": True, "pageInfo": {"hasNextPage": False}, "nodes": [{"isResolved": True}]}
+        self.assertFalse(gh.normalize_pr(node, "icn")["threads_complete"], "a boolean is not a count")
+        self.assertFalse(gh.normalize_pr({"number": 1}, "icn")["threads_complete"], "no connection at all")
 
 
 if __name__ == "__main__":

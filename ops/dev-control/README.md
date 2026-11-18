@@ -165,6 +165,7 @@ never an empty success. A session is never called active because its worktree st
 | PRs, reviews, CI | `gh api graphql` (authenticated `gh`), required checks from live branch protection, else `ops/state/truth/policy.json` |
 | Merge readiness gates | `merge.ready_when` in `ops/state/truth/policy.json` (allowed merge states and review decisions, applied as given; unreadable → NOT READY) |
 | Readiness freshness | the PR and required-check observations must be live and at most two missed GitHub refreshes old; cached, stale, failed, missing or untimestamped evidence → NOT READY (details stay visible as history) |
+| Review threads | the first 100 per PR with `totalCount`/`hasNextPage`; complete only when there is no further page and the count matches. Otherwise the count shows as a lower bound and readiness is NOT READY |
 | Delivery lifecycle | the `ICN-DELIVERY-LIFECYCLE` block in each PR body (semantics: `ops/state/truth/delivery.json`) |
 | Host health | `statvfs`, `/proc/meminfo`, `/proc/loadavg`, the disk guard's last report, build-admission reservations |
 
@@ -209,7 +210,9 @@ merge-state and review-decision allowlists (exhaustively over every gate), per-r
 coverage (partial, failed, truncated and cached fetches protect their worktrees; a successful empty
 list does not), and resumable launcher conversations as a retirement protection in every end state, plus the late
 finding F1: readiness is NOT READY whenever the GitHub evidence behind it is cached, stale, failed, missing
-or has an unusable timestamp, and recovers on the next live observation.
+or has an unusable timestamp, and recovers on the next live observation; late findings N2 (switcher navigation
+survives redraws and reorders, driven through the real loop and a real tmux client) and N3 (review threads
+beyond the first page are never treated as observed).
 
 `test_control.py` covers process matching (pid reuse), registry read-only access, missing/unreadable sources,
 stale cache labelling, GitHub reconciliation (lifecycle, automated vs human review, required

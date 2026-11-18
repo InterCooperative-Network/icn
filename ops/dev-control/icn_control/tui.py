@@ -20,6 +20,7 @@ from typing import Optional
 from . import __version__
 from . import activities as actmod
 from . import snapshot as snapmod
+from .github import thread_summary
 from .picker import build_rows, default_action, filter_rows
 from .reconcile import build_views, latest_review_generation, session_views
 from .sessionctl import (attach_argv, own_client, plan_open_in_worktree, plan_resume, return_key_state,
@@ -655,7 +656,7 @@ class UI:
             L.append(f"    pending: {', '.join(req['pending'])}")
         if req["missing"]:
             L.append(f"    not reported: {', '.join(req['missing'][:8])}")
-        L.append(f"  Unresolved review threads: {p['unresolved_threads']}")
+        L.append(f"  Unresolved review threads: {thread_summary(p)}")
         L.append(self.H("  Delivery lifecycle (PR body block; owner: ops/state/truth/delivery.json)"))
         if lc:
             L.append(f"    state {lc.get('state')}   lane {lc.get('lane')}   freeze head {lc.get('freeze_head') or '-'}"
@@ -1230,7 +1231,13 @@ class UI:
                 sel = 0
             elif k == curses.KEY_END:
                 sel = len(rows) - 1
-            elif k in (curses.KEY_BACKSPACE, 127, 8):
+            if rows and k in (curses.KEY_DOWN, curses.KEY_UP, curses.KEY_NPAGE, curses.KEY_PPAGE,
+                              curses.KEY_HOME, curses.KEY_END):
+                # Re-anchor to the row navigated to in the list just drawn. The redraw restores the
+                # selection by this key, so navigation persists and a reorder keeps the same session.
+                sel = max(0, min(sel, len(rows) - 1))
+                sel_key = self.row_key(2, rows[sel]["view"])
+            if k in (curses.KEY_BACKSPACE, 127, 8):
                 text = text[:-1]
                 sel_key = None
             elif 32 <= k < 127 and len(text) < 40:

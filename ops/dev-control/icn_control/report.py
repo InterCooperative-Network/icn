@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+from .github import thread_summary
 from .util import ago, fmt_ts, short
 
 
@@ -67,7 +68,7 @@ def render(snap: dict, views: dict, width: int = 110) -> str:
         lc = p.get("lifecycle") or {}
         L.append(f"  [{p['status']}] {p['repo']}#{p['number']} {'DRAFT ' if p['draft'] else ''}{p['title'][:80]}")
         L.append(f"      head {short(p['head'])}  lifecycle {lc.get('state') or '-'}  required CI {p['required']['verdict']}"
-                 f" ({p['required']['detail']})  threads unresolved {p['unresolved_threads']}  program {p['program']}")
+                 f" ({p['required']['detail']})  threads {thread_summary(p)}  program {p['program']}")
         L.append(f"      {p['status_reason']}")
         if p.get("evidence_dirs"):
             L.append(f"      local review evidence: {', '.join(p['evidence_dirs'])}")
