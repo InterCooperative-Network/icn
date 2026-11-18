@@ -191,6 +191,9 @@ def session_views(snap: dict, paths: Paths) -> list[dict]:
         if rec is None and wt:
             rec = next((x for x in recs if x.get("worktree") == wt["path"] and
                         same_process(x.get("fg_pid"), x.get("fg_start"), paths.proc)), None)
+        if rec is None and tmux_name:
+            # icn-session names its tmux session after the record; the session is the recorded one.
+            rec = next((x for x in recs if x.get("launch_mode") == "tmux" and x.get("name") == tmux_name), None)
         if rec:
             used_rec.add(rec.get("file"))
         status = c.get("status")
@@ -212,7 +215,7 @@ def session_views(snap: dict, paths: Paths) -> list[dict]:
         else:
             label, vocab = "RUNNING (activity unknown)", LIVE
         v = _base_view(kind="service" if service else "agent",
-                       name=c.get("name") or p.get("agent_name") or f"{p['comm']} {'service' if service else 'agent'} pid {p['pid']}",
+                       name=c.get("name") or p.get("agent_name") or (rec or {}).get("name") or friendly_name(p, cwd, wt, service),
                        cwd=cwd, wt=wt, rows=rows, prs=prs, locks=locks, handoffs=handoffs, reg=r)
         if service:
             resume = "Service process, not a task agent. Its working directory is only where it was started."
@@ -220,7 +223,7 @@ def session_views(snap: dict, paths: Paths) -> list[dict]:
             resume = "OCCUPIED - an agent is running here. Do not start another; attach to watch or talk to it."
         else:
             resume = "OCCUPIED - running in a terminal outside tmux; it cannot be attached from here."
-        v.update({"pid": p["pid"], "agent": p["comm"], "tmux": tmux_name,
+        v.update({"pid": p["pid"], "pid_start": p.get("start"), "agent": p["comm"], "tmux": tmux_name,
                   "tmux_attached": (tmux_sessions.get(tmux_name) or {}).get("attached") if tmux_name else None,
                   "conversation": c.get("sessionId"), "state_label": label, "status": vocab,
                   "last_activity": last, "started": start_epoch(p.get("start"), paths.proc),
@@ -272,7 +275,9 @@ def session_views(snap: dict, paths: Paths) -> list[dict]:
             purpose = rec.get("purpose") or rec.get("name")
             resume = (f"Safe to resume (no live process found): icn-session open {purpose}"
                       if rec.get("claude_session_id") else "No recorded conversation to resume.")
-        v.update({"pid": None, "tmux": None, "state_label": label, "status": vocab,
+        v.update({"pid": None, "tmux": None, "state_label": label, "status": vocab, "agent": "claude",
+                  "record": {k: rec.get(k) for k in ("name", "purpose", "repo", "worktree", "claude_session_id",
+                                                     "launch_mode", "fg_pid", "fg_start", "file", "updated_at")},
                   "last_activity": rec.get("updated_ts"), "conversation": rec.get("claude_session_id"),
                   "resume": resume, "sources": ["icn-session record"]})
         views.append(v)
@@ -288,6 +293,7 @@ def session_views(snap: dict, paths: Paths) -> list[dict]:
         v.update({"pid": None, "tmux": None,
                   "state_label": "REGISTERED, NO MATCHING PROCESS" + (" - POSSIBLY STALE" if stale else ""),
                   "status": STALE if stale else REGISTERED_NOT_RUNNING, "last_activity": hb,
+                  "conversation": r.get("provider_session_id"), "agent": r.get("provider"),
                   "resume": "Registry entry only; no agent process observed. Verify before resuming.",
                   "sources": ["icn-ops registry"]})
         views.append(v)
@@ -295,6 +301,12 @@ def session_views(snap: dict, paths: Paths) -> list[dict]:
     order = {LIVE: 0, IDLE: 1, REGISTERED_NOT_RUNNING: 2, STALE: 3, UNKNOWN: 4}
     views.sort(key=lambda v: (order.get(v["status"], 5), v["kind"] != "agent", -(v.get("last_activity") or 0)))
     return views
+
+
+def friendly_name(p: dict, cwd: Optional[str], wt: Optional[dict], service: bool) -> str:
+    """A recognisable label: the worktree or directory name plus the tool. PIDs stay in the details."""
+    base = os.path.basename((wt or {}).get("path") or (cwd or "").rstrip("/")) or "unknown directory"
+    return f"{base} ({p['comm']}{' service' if service else ''})"
 
 
 def _base_view(kind, name, cwd, wt, rows, prs, locks, handoffs, reg) -> dict:
@@ -600,6 +612,15 @@ def build_views(snap: dict, paths: Paths, catalog: dict) -> dict:
     snap["_pr_views"] = prs
     sessions = session_views(snap, paths)
     worktrees = worktree_views(snap, sessions, catalog)
+    by_path = {w["path"]: w for w in worktrees}
+    for s in sessions:
+        pr = next((p for p in prs if s.get("pr") and p["number"] == s["pr"]["number"] and p["repo"] == s["pr"]["repo"]), None)
+        if pr:
+            s["program"], s["program_rule"] = pr["program"], f"via PR #{pr['number']}"
+        elif s.get("worktree") in by_path:
+            s["program"], s["program_rule"] = by_path[s["worktree"]]["program"], "via worktree"
+        else:
+            s["program"], s["program_rule"] = classify(s.get("repo"), f"{s.get('name')} {s.get('cwd') or ''}", catalog)
     att = attention(snap, prs, sessions, worktrees)
     handoffs = _data(snap, "handoffs", []) or []
     progs = program_views(catalog, prs, sessions, worktrees, handoffs, _data(snap, "issues", {}) or {})

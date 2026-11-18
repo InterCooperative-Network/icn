@@ -3,10 +3,13 @@
 A keyboard-driven terminal dashboard for the ICN development host. It answers one question:
 **what are all the agents and development lanes doing right now, and what needs me?**
 
-It is an *observer*. It reads existing owners and reconciles them. It does not become a
-project-status database, an agent registry or a supervisor, and it never starts, stops,
-deletes or merges anything. The one action that touches anything is a confirmed
-`tmux attach` / `switch-client` to a session that already exists.
+It is an *observer and navigator*. It reads existing owners and reconciles them. It does not
+become a project-status database, an agent registry or a supervisor, and it never stops, deletes
+or merges anything. It acts in only two ways, both explicit:
+
+- **Join**: switch your own terminal to an existing tmux session (nothing is started or typed).
+- **Resume / Open**: after you confirm, ask the host launcher `icn-session` to start Claude Code
+  for an exact recorded conversation, or in an existing worktree (never a new branch or worktree).
 
 ## Open it
 
@@ -31,6 +34,52 @@ Running the same command again re-attaches; it never starts a second copy. After
 tmux session is gone, and the same command recreates it. The first screen then reads live state
 and marks anything loaded from the local cache as **CACHED/STALE** until it is re-observed.
 
+## Moving between Claude sessions
+
+| You want to… | Do this |
+|---|---|
+| see every Claude session and pick one | press **`g`** anywhere; type part of a name, task, program, repo or PR to filter; `↑/↓`; `Enter` |
+| enter a running session | `g` → select it → **Join session** (or `a` on screen 3) |
+| come back to the dashboard | **tmux prefix, then capital `L`** (the prefix on icn-dev is Ctrl-a). Claude keeps running. |
+| continue a stopped conversation | `g` → a row marked `STOPPED · resumable` → **Resume saved conversation** → read the plan → `y` |
+| start Claude in an existing worktree | screen 4 (Worktrees) or a program on screen 2 → **`c`** → read the plan → `y` |
+| a dedicated "back" key | opt in once: `icn-control --enable-return-key` makes **F12** jump back (see below) |
+
+What each action guarantees:
+
+- **Join** re-checks, at the moment you press it, that the tmux session still exists, that the agent
+  process is the same one (pid *and* start time), that it is still inside that tmux session and still
+  on the same conversation. It moves only your terminal (`switch-client -c <your client>`): no
+  process is started, no keys are sent to Claude, nobody else is disconnected. The dashboard keeps
+  running, with its selection and scroll position, while you are away.
+- **Resume saved conversation** is offered only for an `icn-session` launcher record whose exact
+  conversation id has a transcript *for that worktree*. It is refused when that conversation, or any
+  agent in that worktree, is already running. Registry-only conversations are not started from here;
+  the detail screen shows the manual command instead. The conversation id is never guessed.
+- **Open Claude Code in this worktree** is refused for missing, protected (`icn-session check-path`),
+  review / read-only / detached checkouts, and worktrees that already have a live agent. If a launcher
+  record exists for that worktree, the plan says that its conversation will be resumed.
+- Both run `icn-session open <purpose> --repo … --worktree … --name … --no-create --no-attach`
+  (argv only, no shell; every value validated), show you the exact command first, re-check
+  everything again after you press `y`, and only then switch you to the new session.
+
+Sessions that cannot be joined say why in the picker and on the detail screen: Claude running in a
+plain terminal outside tmux, Codex app-server/proxy service processes, registry entries without a
+process, and records whose conversation cannot be identified exactly.
+
+### Optional F12 "back" key
+
+`tmux prefix + L` works out of the box. If you prefer one key:
+
+```bash
+~/icn-dev/bin/icn-control --return-key-status    # free / already ours / taken by something else
+~/icn-dev/bin/icn-control --enable-return-key    # opt in (refuses if F12 is already bound)
+~/icn-dev/bin/icn-control --disable-return-key   # removes it (only if it is ours)
+```
+
+It binds F12 in the running tmux server only (not your `~/.tmux.conf`), so it lasts until tmux
+restarts. While enabled, programs inside tmux, Claude Code included, no longer receive F12.
+
 ## Screens and keys
 
 | Key | Screen | What it shows |
@@ -43,10 +92,11 @@ and marks anything loaded from the local cache as **CACHED/STALE** until it is r
 | `6` | Handoffs | recent handoff documents with their completed / open / decision / next sections |
 | `7` | System Health | disks, memory, load, disk-guard report, build reservations, running builds, MCP updater |
 
-`↑/↓` select · `Enter` full details · `o` open the record (handoff, design packet, review body) ·
-`a` attach to the selected session's tmux (asks first) · `/` filter · `r` refresh now ·
-`s` data sources and ages · `?` help · `q` quit. The help screen shows *your* tmux prefix key
-(read from tmux, not assumed).
+**`g` session switcher** (anywhere) · `↑/↓` select · `Enter` details, or the action menu on screen 3 ·
+`a` join (screen 3) · `c` open Claude in a worktree (screens 2 and 4) · `o` open the record (handoff,
+design packet, review body) · `/` filter · `r` refresh now · `s` data sources and ages · `?` help ·
+`q` quit (inside tmux it asks first; `prefix d` leaves it running instead). The help screen shows
+*your* tmux prefix key (read from tmux, not assumed).
 
 ## Status words
 
@@ -93,7 +143,14 @@ source worktree is cleaned up.
 cd ops/dev-control && python3 -m unittest discover -s tests -v
 ```
 
-Covers process matching (pid reuse), registry read-only access, missing/unreadable sources,
+`test_sessions.py` adds the session manager: join verification (stale targets, pid reuse, agent no
+longer in the target, changed conversation), only-our-client switching, resume/open planning and
+refusals, injection-safe argv, picker ordering and filtering, and an end-to-end run of the real UI
+in an isolated tmux server with a real attached client: switch → return with prefix+L (agent still
+running) → switch to another session → cancelled resume (nothing started) → confirmed resume →
+no second resume, plus a stale target, resizing and the quit confirmation.
+
+`test_control.py` covers process matching (pid reuse), registry read-only access, missing/unreadable sources,
 stale cache labelling, GitHub reconciliation (lifecycle, automated vs human review, required
 checks, readiness), session reconciliation, worktree ownership verdicts, program classification,
 file-viewer containment and launcher safety against an isolated tmux server.

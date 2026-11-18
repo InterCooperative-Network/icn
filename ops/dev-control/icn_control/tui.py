@@ -18,11 +18,15 @@ import time
 from typing import Optional
 
 from . import __version__
-from .reconcile import build_views, latest_review_generation
+from . import snapshot as snapmod
+from .picker import build_rows, default_action, filter_rows
+from .reconcile import build_views, latest_review_generation, session_views
+from .sessionctl import (attach_argv, own_client, plan_open_in_worktree, plan_resume, return_key_state,
+                         session_actions, switch_argv, verify_join)
 from .records import summarize_handoff
 from .snapshot import Collector
 from .util import (AWAITING_MAINTAINER, BLOCKED, COMPLETED, IDLE, IN_PROGRESS, LIVE, REGISTERED_NOT_RUNNING,
-                   STALE, UNKNOWN, WARNING, Paths, ago, clean, fmt_ts, redact, short)
+                   STALE, UNKNOWN, WARNING, Paths, ago, clean, fmt_ts, redact, run, short)
 
 SCREENS = ["Overview", "Lanes", "Agents & Sessions", "Worktrees", "Pull Requests", "Handoffs", "System Health"]
 VIEWABLE_EXT = (".md", ".txt", ".log", ".json", ".yaml", ".yml", ".patch", ".diff", ".tsv", ".jsonl")
@@ -39,19 +43,28 @@ Moving around
   Enter                      open full details for the selected item
   Esc or q (in a viewer)     go back
 
-Actions
+Switching between Claude sessions
+  g                          SESSION SWITCHER (from any screen): type to filter, Up/Down, Enter to choose, Esc to close
+  Enter (screen 3)           actions for the selected session: Join / Resume saved conversation / Details
+  a  (screen 3)              join the selected session's EXISTING tmux session right away (re-verified first)
+  c  (screens 2 and 4)       open Claude Code in the selected existing worktree (shows the plan, asks first)
+  Join never starts a process, never types anything for you and never disconnects anyone else.
+  Resume and Open run the host launcher (icn-session) only after you confirm, and refuse when the
+  conversation or worktree already has a live agent, or when the exact conversation is unknown.
+
+Other actions
   r                          refresh everything now (otherwise: local every 20s, git and GitHub every 5 min)
   o                          open the selected item's handoff / record in the built-in reader
-  a                          attach to the selected session's EXISTING tmux session (asks first)
   /                          filter the current list (empty filter clears)
   k                          Worktrees: toggle 'only worktrees that must be kept'
   s                          show where every piece of data came from and when it was observed
   ?                          this help
-  q                          quit (from the top level)
+  q                          quit (asks first inside tmux; PREFIX then d leaves it running instead)
 
-After attaching to an agent's tmux session (PREFIX is read from your tmux config)
-  PREFIX then d              detach and leave the agent running
-  PREFIX then L (capital)    jump back to this control center (when it runs inside tmux)
+Coming back from a Claude session (PREFIX is read from your tmux config)
+  PREFIX then L (capital)    back to this control center; Claude keeps running (the usual way)
+  PREFIX then s              tmux's own session list, if you lose your way
+  PREFIX then d              (only when this dashboard runs with --here) detach; Claude keeps running
 
 What the status words mean
   VERIFIED LIVE              a process was observed running just now (pid and start time checked)
@@ -107,11 +120,21 @@ class UI:
         self.top = [0] * len(SCREENS)
         self.scroll = [0] * len(SCREENS)
         self.filters = [""] * len(SCREENS)
+        self.sel_key = [None] * len(SCREENS)
+        self.in_tmux = bool(os.environ.get("TMUX"))
+        self.last_join = None
         self.keep_only = False
         self.message = ""
         self.message_ts = 0.0
         self.started = time.time()
         self.prefix = tmux_prefix()
+        self.back_hint = f"{self.prefix} then L"
+        try:
+            if return_key_state()["state"] == "ours":
+                self.back_hint = f"F12 (or {self.prefix} then L)"
+        except Exception:
+            # best-effort: the hint falls back to the prefix key, which always works
+            pass
         self._load_prefs()
 
     # ------------------------------------------------------------------ prefs (non-authoritative UI state)
@@ -199,6 +222,26 @@ class UI:
         self.seen_version = v
         self.snap = self.collector.snapshot()
         self.views = build_views(self.snap, self.paths, self.catalog)
+        self.restore_selection()
+
+    @staticmethod
+    def row_key(screen: int, r: dict):
+        if screen == 2:
+            return (r.get("kind"), r.get("name"), r.get("pid"), r.get("tmux"), r.get("cwd"))
+        if screen == 4:
+            return (r.get("repo"), r.get("number"))
+        return r.get("path") or r.get("id")
+
+    def restore_selection(self) -> None:
+        """Keep the same item selected when a refresh re-sorts a list (and across tmux switches)."""
+        for s in (1, 2, 3, 4, 5):
+            key = self.sel_key[s]
+            if key is None:
+                continue
+            for i, r in enumerate(self.items(s)):
+                if self.row_key(s, r) == key:
+                    self.sel[s] = i
+                    break
 
     def tier_status(self) -> str:
         parts = []
@@ -221,20 +264,21 @@ class UI:
         return "  ·  ".join(parts)
 
     # ------------------------------------------------------------------ lists per screen
-    def items(self) -> list:
+    def items(self, screen: Optional[int] = None) -> list:
         v = self.views
-        f = self.filters[self.screen].lower()
-        if self.screen == 1:
+        screen = self.screen if screen is None else screen
+        f = self.filters[screen].lower()
+        if screen == 1:
             rows = v.get("programs", [])
-        elif self.screen == 2:
+        elif screen == 2:
             rows = v.get("sessions", [])
-        elif self.screen == 3:
+        elif screen == 3:
             rows = v.get("worktrees", [])
             if self.keep_only:
                 rows = [w for w in rows if w["verdict"] == "KEEP"]
-        elif self.screen == 4:
+        elif screen == 4:
             rows = v.get("prs", [])
-        elif self.screen == 5:
+        elif screen == 5:
             rows = v.get("handoffs", [])
         else:
             return []
@@ -262,12 +306,15 @@ class UI:
         else:
             [self.draw_overview, self.draw_programs, self.draw_sessions, self.draw_worktrees,
              self.draw_prs, self.draw_handoffs, self.draw_health][self.screen](body_top, body_bottom, w)
-        foot = " ?:help  1-7/Tab:screens  ↑↓:select  Enter:details  o:open record  a:attach  r:refresh  /:filter  s:sources  q:quit "
+        foot = " g:SWITCH SESSION  ?:help  1-7:screens  ↑↓:select  Enter:actions  a:join  c:open Claude  o:record  r:refresh  /:filter  q:quit "
         if self.filters[self.screen]:
             foot = f" filter: '{self.filters[self.screen]}' (/ to change) |" + foot
         self.put(h - 1, 0, foot.ljust(w), self.color.get("bar", curses.A_REVERSE))
         if self.message and time.time() - self.message_ts < 6:
             self.put(h - 2, 0, " " + self.message, self.attr(AWAITING_MAINTAINER))
+        elif self.last_join:
+            self.put(h - 2, 0, f" Last joined: {self.last_join[0]} ({ago(self.last_join[1])}).  "
+                     f"From any session, {self.back_hint} comes back here.", curses.A_DIM)
         self.scr.noutrefresh()
         curses.doupdate()
 
@@ -283,6 +330,8 @@ class UI:
             self.top[s] = self.sel[s]
         if self.sel[s] >= self.top[s] + vis:
             self.top[s] = self.sel[s] - vis + 1
+        if n:
+            self.sel_key[s] = self.row_key(s, rows[self.sel[s]])
         for i in range(vis):
             idx = self.top[s] + i
             if idx >= n:
@@ -434,32 +483,73 @@ class UI:
         self.draw_list(top, bottom, w, "PROGRAM (long-lived)            counts are live; nothing here is inferred as 'inactive'",
                        self.items(), fmt, detail)
 
+    def actions_for(self, view: dict) -> list:
+        return session_actions(view, self.views.get("sessions", []), self.paths, self.prefix)
+
     def session_detail(self, s) -> list:
-        L = [self.H(f"{s['name']}  —  {s['state_label']}"),
-             (f"  Status: {s['status']}    sources: {', '.join(s['sources'])}", self.attr(s["status"])),
-             f"  Kind: {s['kind']}   pid: {s.get('pid') or '-'}   tmux: {s.get('tmux') or '-'}"
-             f"{' (someone is attached)' if s.get('tmux_attached') else ''}",
-             f"  Directory: {s.get('cwd') or '?'}",
-             f"  Worktree: {s.get('worktree') or '(not a git worktree)'}   branch: {s.get('branch') or '-'}   head: {short(s.get('head'))}",
-             f"  Last activity: {ago(s.get('last_activity'))} ({fmt_ts(s.get('last_activity'))})"
-             + (f"   process started {ago(s.get('started'))}" if s.get("started") else ""),
-             f"  Task: {s.get('task') or 'unknown'}" + (f"   [{s['task_source']}]" if s.get("task_source") else "")]
+        acts = self.actions_for(s)
+        live = s["kind"] == "agent"
+        L = [self.H(f"{s['name']}  —  {s['state_label']}"), ""]
+        L.append(self.H("What is it working on?"))
+        L.append(f"  Task: {s.get('task') or 'unknown'}" + (f"   [{s['task_source']}]" if s.get("task_source") else "   [no source]"))
         if s.get("pr"):
-            L.append(f"  PR: {s['pr']['repo']}#{s['pr']['number']} [{s['pr'].get('status')}] {s['pr']['title'][:80]} ({s['pr']['how']})")
+            L.append(f"  PR: {s['pr']['repo']}#{s['pr']['number']} [{s['pr'].get('status')}] {s['pr']['title'][:80]}"
+                     f"   [{s['pr']['how']}]")
         else:
             L.append("  PR: none associated")
-        L.append(f"  Claimed files: {', '.join(s['claims'][:8]) if s.get('claims') else 'none recorded'}")
+        L.append(f"  Program: {s.get('program') or '?'}   [{s.get('program_rule') or 'rule unknown'}]")
+        L.append("")
+        L.append(self.H("Is Claude actually running?   [live process evidence]"))
+        if live:
+            L.append((f"  YES - {s.get('agent')} process {s.get('pid')} observed now (pid and start time checked)"
+                      + (f", started {ago(s.get('started'))}" if s.get("started") else ""), self.attr(LIVE)))
+            src = "Claude Code's own session status file" if s.get("conversation") else "no status file; from transcript writes"
+            L.append(f"  Busy or waiting: {s['state_label']}   [{src}]")
+            L.append(f"  tmux: {s.get('tmux') or 'NOT in tmux (a plain terminal)'}"
+                     + ("   (another client is attached too)" if s.get("tmux_attached") else ""))
+        elif s["kind"] == "service":
+            L.append(("  A service process (app-server/proxy) is running; it is not an interactive agent.", self.attr(IDLE)))
+        elif s["kind"] == "control-center":
+            L.append(("  This is the control center's own tmux session.", self.attr(LIVE)))
+        else:
+            L.append(("  NO - no agent process was found for this entry when the process table was last read.",
+                      self.attr(s["status"])))
+        L.append("")
+        L.append(self.H("Where   [git]"))
+        L.append(f"  Worktree: {s.get('worktree') or '(not a git worktree)'}")
+        L.append(f"  Branch: {s.get('branch') or '-'}   head: {short(s.get('head'))}   directory: {s.get('cwd') or '?'}")
+        L.append("")
+        L.append(self.H("Last observable progress"))
+        L.append(f"  {ago(s.get('last_activity'))} ({fmt_ts(s.get('last_activity'))})   sources: {', '.join(s['sources'])}")
+        L.append("")
+        L.append(self.H("Recorded metadata   [records; not proof that anything is running]"))
+        rec = s.get("record") or {}
+        if rec:
+            L.append(f"  icn-session record '{rec.get('name')}': conversation {rec.get('claude_session_id') or '-'},"
+                     f" worktree {rec.get('worktree')}, launched {rec.get('launch_mode')}, updated {rec.get('updated_at')}")
+        elif s.get("icn_session_record"):
+            L.append(f"  icn-session record: {s['icn_session_record']}")
+        if s.get("conversation"):
+            L.append(f"  Conversation id: {s['conversation']}")
         if s.get("registry_id"):
-            L.append(f"  Registry: {s['registry_id'][:8]} heartbeat {ago(s.get('registry_heartbeat'))}, activity {s.get('registry_activity') or '-'}")
+            L.append(f"  icn-ops registry: {s['registry_id'][:8]}, heartbeat {ago(s.get('registry_heartbeat'))},"
+                     f" activity {s.get('registry_activity') or '-'}")
+        L.append(f"  Claimed files: {', '.join(s['claims'][:8]) if s.get('claims') else 'none recorded'}")
+        L.append("")
+        L.append(self.H("Handoff / design packet"))
         for hpath in s.get("handoffs") or []:
-            L.append(f"  Handoff: {hpath}   (press o)")
+            L.append(f"  Handoff: {hpath}")
         for e in s.get("evidence") or []:
-            L.append(f"  Record: {e}")
-        if not s.get("handoffs"):
-            L.append("  Handoff: none found")
-        L.append(("  RESUME: " + s["resume"], curses.A_BOLD))
-        if s.get("tmux") and s["kind"] in ("agent", "tmux", "service"):
-            L.append(("  Press a to attach to tmux session '" + s["tmux"] + "' (you will be asked to confirm).", curses.A_DIM))
+            L.append(f"  Record:  {e}")
+        if not (s.get("handoffs") or s.get("evidence")):
+            L.append("  none found")
+        L.append("")
+        L.append(self.H("What can I do?   (Enter on this screen, or g from anywhere)"))
+        for a in acts:
+            if a["enabled"]:
+                L.append((f"  [available]    {a['label']} - {a['reason']}", self.attr(LIVE)))
+            else:
+                L.append((f"  [unavailable]  {a['label']} - {a['reason']}", curses.A_DIM))
         return L
 
     def draw_sessions(self, top, bottom, w):
@@ -467,7 +557,8 @@ class UI:
             where = (s.get("branch") or os.path.basename((s.get("cwd") or "?").rstrip("/")))[:34]
             return (f"{s['status'][:22]:22} {s['name'][:36]:36} {s['state_label'][:34]:34} {ago(s.get('last_activity')):>10}  {where}", s["status"])
 
-        self.draw_list(top, bottom, w, "STATUS                 SESSION                              STATE                              ACTIVITY  WHERE",
+        self.draw_list(top, bottom, w, "STATUS                 SESSION                              STATE                              ACTIVITY  WHERE"
+                       "      (Enter: join / resume / details)",
                        self.items(), fmt, self.session_detail)
 
     def worktree_detail(self, x) -> list:
@@ -798,58 +889,274 @@ class UI:
                 sel = max(sel - 1, 0)
 
     def confirm(self, lines: list[str]) -> bool:
-        self.scr.erase()
-        h, w = self.scr.getmaxyx()
-        for i, line in enumerate(lines):
-            self.put(2 + i, 2, line, curses.A_BOLD if i == 0 else 0)
-        self.put(3 + len(lines), 2, "Press y to continue, any other key to cancel.", self.attr(AWAITING_MAINTAINER))
-        self.scr.refresh()
+        """y continues; any other KEY cancels. A terminal resize is not a key: redraw and keep asking."""
         self.scr.timeout(-1)
         try:
-            return self.scr.getch() in (ord("y"), ord("Y"))
+            while True:
+                self.scr.erase()
+                for i, line in enumerate(lines):
+                    self.put(2 + i, 2, line, curses.A_BOLD if i == 0 else 0)
+                self.put(3 + len(lines), 2, "Press y to continue, any other key to cancel.", self.attr(AWAITING_MAINTAINER))
+                self.scr.refresh()
+                k = self.scr.getch()
+                if k in (curses.KEY_RESIZE, -1):
+                    continue
+                return k in (ord("y"), ord("Y"))
         finally:
             self.scr.timeout(1000)
 
-    def attach_selected(self) -> None:
+    # ------------------------------------------------------------------ session switching
+    def program_names(self) -> dict:
+        return {p["id"]: p["name"] for p in self.catalog.get("programs", [])}
+
+    def session_picker(self) -> None:
+        """The quick switcher: every agent conversation, running first, filter as you type."""
+        text, sel, top = "", 0, 0
+        sel_key = None
+        while True:
+            self.refresh_views()
+            rows = filter_rows(build_rows(self.views.get("sessions", []), self.program_names(), self.actions_for), text)
+            if sel_key is not None:
+                for i, r in enumerate(rows):
+                    if self.row_key(2, r["view"]) == sel_key:
+                        sel = i
+                        break
+            sel = max(0, min(sel, len(rows) - 1))
+            self.scr.erase()
+            h, w = self.scr.getmaxyx()
+            bar = self.color.get("bar", curses.A_REVERSE)
+            self.put(0, 0, " SWITCH TO A CLAUDE SESSION   type to filter · ↑↓ select · Enter choose · Esc close ".ljust(w), bar | curses.A_BOLD)
+            self.put(1, 0, f" filter: {text}_", curses.A_BOLD)
+            self.put(1, max(30, w - 60), f"{len(rows)} shown · running first, then most recent", curses.A_DIM)
+            hdr = f"  {'STATE':21} {'SESSION / TASK':34} {'PROGRAM':20} {'REPO / WORKTREE':34} {'PR':11} {'ACTIVITY':>10}  CAN"
+            self.put(2, 0, hdr, curses.A_BOLD | curses.A_UNDERLINE)
+            list_h = max(3, h - 10)
+            if sel < top:
+                top = sel
+            if sel >= top + list_h:
+                top = sel - list_h + 1
+            for i in range(list_h):
+                idx = top + i
+                if idx >= len(rows):
+                    break
+                r = rows[idx]
+                line = (f"{r['state'][:21]:21} {r['name'][:34]:34} {r['program'][:20]:20} "
+                        f"{(r['repo'] + '/' + r['where'])[:34]:34} {r['pr'][:11]:11} {r['activity']:>10}  {r['can']}")
+                st = LIVE if r["live"] else (REGISTERED_NOT_RUNNING if r["can"] == "resume" else UNKNOWN)
+                a = (self.color.get("sel", curses.A_REVERSE) | curses.A_BOLD) if idx == sel else self.attr(st)
+                self.put(3 + i, 0, ("▶ " if idx == sel else "  ") + line, a, w)
+            if not rows:
+                self.put(3, 2, "No sessions match." if text else "No agent sessions observed yet (press r on the main screen to refresh).",
+                         self.attr(UNKNOWN))
+            dy = 3 + list_h
+            self.put(dy, 0, "─" * (w - 1), curses.A_DIM)
+            if rows:
+                r = rows[sel]
+                sel_key = self.row_key(2, r["view"])
+                self.put(dy + 1, 0, f" {r['name']}: {r['task'][:w - 10]}", curses.A_BOLD)
+                if r["pr"]:
+                    self.put(dy + 2, 0, f"   PR {r['pr']} [{r['pr_how']}]   program: {r['program']}", curses.A_DIM)
+                y = dy + 3
+                for act in r["actions"][:3]:
+                    tag = "available  " if act["enabled"] else "unavailable"
+                    self.put(y, 0, f"   [{tag}] {act['label']}: {act['reason']}",
+                             self.attr(LIVE) if act["enabled"] else curses.A_DIM, w)
+                    y += 1
+            self.put(h - 1, 0, f" Return here from any session: {self.back_hint} ".ljust(w), bar)
+            self.scr.refresh()
+            k = self.scr.getch()
+            if k == -1 or k == curses.KEY_RESIZE:
+                continue
+            if k == 27:
+                return
+            if k in (10, 13, curses.KEY_ENTER):
+                if rows and self.action_menu(rows[sel]["view"], preselect=default_action(rows[sel])):
+                    return
+            elif k == curses.KEY_DOWN:
+                sel += 1
+            elif k == curses.KEY_UP:
+                sel = max(0, sel - 1)
+            elif k == curses.KEY_NPAGE:
+                sel += list_h
+            elif k == curses.KEY_PPAGE:
+                sel = max(0, sel - list_h)
+            elif k == curses.KEY_HOME:
+                sel = 0
+            elif k == curses.KEY_END:
+                sel = len(rows) - 1
+            elif k in (curses.KEY_BACKSPACE, 127, 8):
+                text = text[:-1]
+                sel_key = None
+            elif 32 <= k < 127 and len(text) < 40:
+                text += chr(k)
+                sel_key, sel = None, 0
+            sel = max(0, sel)
+
+    def action_menu(self, view: dict, preselect: Optional[str] = None) -> bool:
+        """Show every action for one session (unavailable ones say why). True if we switched away."""
+        acts = self.actions_for(view)
+        enabled = [i for i, a in enumerate(acts) if a["enabled"]]
+        sel = next((i for i, a in enumerate(acts) if a["id"] == preselect and a["enabled"]), enabled[0] if enabled else 0)
+        while True:
+            self.scr.erase()
+            h, w = self.scr.getmaxyx()
+            bar = self.color.get("bar", curses.A_REVERSE)
+            self.put(0, 0, f" {view['name']} — {view['state_label']} ".ljust(w), bar | curses.A_BOLD)
+            self.put(1, 0, f"  {view.get('task') or ''}"[:w], curses.A_DIM)
+            for i, a in enumerate(acts):
+                y = 3 + i * 2
+                mark = "▶ " if i == sel else "  "
+                attr = (self.color.get("sel", curses.A_REVERSE) | curses.A_BOLD) if i == sel else (0 if a["enabled"] else curses.A_DIM)
+                self.put(y, 0, f"{mark}{a['label']}{'' if a['enabled'] else '   (unavailable)'}", attr, w)
+                self.put(y + 1, 4, a["reason"], curses.A_DIM if not a["enabled"] else 0, w - 4)
+            self.put(h - 1, 0, " ↑↓ choose · Enter do it · Esc back ".ljust(w), bar)
+            self.scr.refresh()
+            k = self.scr.getch()
+            if k == -1 or k == curses.KEY_RESIZE:
+                continue
+            if k in (27, curses.KEY_LEFT):
+                return False
+            if k == curses.KEY_DOWN:
+                sel = min(sel + 1, len(acts) - 1)
+            elif k == curses.KEY_UP:
+                sel = max(sel - 1, 0)
+            elif k in (10, 13, curses.KEY_ENTER):
+                a = acts[sel]
+                if not a["enabled"]:
+                    self.flash(a["reason"])
+                    continue
+                if a["id"] == "details":
+                    self.viewer(self.session_detail(view), view["name"])
+                    continue
+                if a["id"] == "open_record":
+                    self.open_records(view.get("handoffs", []) + view.get("evidence", []))
+                    continue
+                if a["id"] == "join":
+                    return self.join_view(view)
+                if a["id"] == "resume":
+                    return self.launch("resume", view)
+                return False
+
+    def join_selected(self) -> None:
         if self.screen != 2:
-            self.flash("Attach works on the Agents & Sessions screen (3).")
+            self.flash("Press g to pick a session, or go to screen 3.")
             return
         rows = self.items()
-        if not rows:
+        if rows:
+            self.join_view(rows[self.sel[self.screen]])
+
+    def join_view(self, view: dict) -> bool:
+        acts = {a["id"]: a for a in self.actions_for(view)}
+        j = acts.get("join")
+        if not j or not j["enabled"]:
+            self.flash((j or {}).get("reason") or "This session cannot be joined.")
+            return False
+        ok, why = verify_join(view, self.paths)
+        if not ok:
+            self.flash(why)
+            self.collector.refresh_all()
+            return False
+        return self.switch_to(view["tmux"], view["name"])
+
+    def switch_to(self, target: str, label: str) -> bool:
+        """Move only THIS terminal to `target`. The agent and every other client are untouched."""
+        if self.in_tmux:
+            r = run(switch_argv(target, own_client()), timeout=10)
+            if r.rc != 0:
+                self.flash(f"Could not switch: {r.err.strip()[:150]}")
+                return False
+            self.last_join = (label, time.time())
+            return True
+        # Outside tmux (--here): attach in this terminal until the user detaches.
+        curses.def_prog_mode()
+        curses.endwin()
+        print(f"\nJoining '{label}'. Leave it running and come back: {self.prefix} then d.\n", flush=True)
+        subprocess.call(attach_argv(target))
+        curses.reset_prog_mode()
+        self.scr.refresh()
+        self.last_join = (label, time.time())
+        self.flash(f"Back from '{label}'. It is still running.")
+        return True
+
+    def fresh_sessions(self) -> tuple[list, list]:
+        """Re-read processes, tmux and records right now (not the cached view) for a launch decision."""
+        snap = dict(self.snap)
+        snap.update(snapmod.collect_fast(self.paths))
+        snap["_pr_views"] = self.views.get("prs", [])
+        recs = snap["icn_session"].data if snap.get("icn_session") is not None and snap["icn_session"].ok else []
+        return session_views(snap, self.paths), recs
+
+    def launch(self, kind: str, subject: dict) -> bool:
+        """Resume a recorded conversation or open Claude in a worktree, via icn-session. Asks first."""
+        sessions, recs = self.fresh_sessions()
+        plan = plan_resume(subject["record"], sessions, self.paths) if kind == "resume" else \
+            plan_open_in_worktree(subject, sessions, recs, self.paths)
+        if not plan["ok"]:
+            self.flash(plan["reason"])
+            return False
+        if not self.confirm(plan["confirm"] + ["", f"Afterwards: {self.prefix} then L brings you back here."]):
+            self.flash("Cancelled. Nothing was started.")
+            return False
+        # Re-plan once more after the human pause: state may have changed while the prompt was open.
+        sessions, recs = self.fresh_sessions()
+        again = plan_resume(subject["record"], sessions, self.paths) if kind == "resume" else \
+            plan_open_in_worktree(subject, sessions, recs, self.paths)
+        if not again["ok"] or again["argv"] != plan["argv"]:
+            self.flash("State changed while confirming; nothing was started: " + again.get("reason", "plan changed"))
+            return False
+        self.scr.erase()
+        self.put(1, 2, "Starting through icn-session…", curses.A_BOLD)
+        self.scr.refresh()
+        r = run(again["argv"], timeout=120)
+        if r.rc != 0:
+            self.viewer([(f"icn-session exited {r.rc}; nothing else was done.", self.attr(BLOCKED)), ""]
+                        + [(line, 0) for line in redact(r.out + r.err).splitlines()], "icn-session output")
+            return False
+        if run(["tmux", "has-session", "-t", f"={again['tmux_name']}"], timeout=10).rc != 0:
+            self.flash(f"icn-session reported success but tmux session '{again['tmux_name']}' is missing.")
+            return False
+        self.collector.refresh_all()
+        return self.switch_to(again["tmux_name"], again["tmux_name"])
+
+    def open_claude_here(self) -> None:
+        """Open Claude Code in the selected worktree (screen 4) or one of the selected program's (screen 2)."""
+        if self.screen == 3:
+            rows = self.items()
+            if rows:
+                self.launch("open", rows[self.sel[self.screen]])
             return
-        s = rows[self.sel[self.screen]]
-        name = s.get("tmux")
-        if not name:
-            self.flash("This session has no tmux session to attach to (see its RESUME line).")
+        if self.screen == 1:
+            rows = self.items()
+            if not rows:
+                return
+            prog = rows[self.sel[self.screen]]
+            sessions = self.views.get("sessions", [])
+            recs = self.snap["icn_session"].data if self.snap.get("icn_session") is not None and self.snap["icn_session"].ok else []
+            cands = [w for w in prog["worktrees"] if (w.get("status") or {}).get("exists")]
+            if not cands:
+                self.flash("This program has no existing worktrees.")
+                return
+            labels = []
+            for w in cands:
+                plan = plan_open_in_worktree(w, sessions, recs, self.paths, check_path=lambda p: 0)
+                labels.append(f"{w['repo']}/{w['name']}  [{w.get('branch') or 'detached'}]  "
+                              + ("can open" if plan["ok"] else "unavailable: " + plan["reason"][:70]))
+            choice = self.choose(f"Open Claude Code in a {prog['name']} worktree (the full check runs next)", labels)
+            if choice is not None:
+                self.launch("open", cands[choice])
             return
-        if s["kind"] == "control-center":
-            self.flash("That is this control center.")
-            return
-        # Re-verify right now: the session must still exist.
-        if subprocess.run(["tmux", "has-session", "-t", f"={name}"], capture_output=True).returncode != 0:
-            self.flash(f"tmux session '{name}' no longer exists. Press r to refresh.")
-            return
-        inside = bool(os.environ.get("TMUX"))
-        lines = [f"Attach to tmux session '{name}'?",
-                 f"It contains: {s['state_label']}",
-                 "Anything you type there goes to that session (and to the agent, if one is running)."]
-        if s.get("tmux_attached"):
-            lines.append("Someone else is already attached to it; you will share the screen.")
-        lines.append(f"To leave it running and come back here: {self.prefix} then L (capital L)." if inside
-                     else f"To leave it running: {self.prefix} then d. You will return to this screen.")
-        if not self.confirm(lines):
-            self.flash("Attach cancelled.")
-            return
-        if inside:
-            r = subprocess.run(["tmux", "switch-client", "-t", f"={name}"], capture_output=True, text=True)
-            self.flash(f"Switched. {self.prefix} then L returns here." if r.returncode == 0 else f"switch failed: {r.stderr.strip()[:120]}")
+        self.flash("Open Claude works on the Worktrees screen (4) or a program on Lanes (2).")
+
+    def open_records(self, paths_: list) -> None:
+        cands = [c for c in paths_ if os.path.isfile(c)]
+        if not cands:
+            self.flash("No record file is associated with this item.")
+        elif len(cands) == 1:
+            self.open_file(cands[0])
         else:
-            curses.def_prog_mode()
-            curses.endwin()
-            subprocess.call(["tmux", "attach-session", "-t", f"={name}"])
-            curses.reset_prog_mode()
-            self.scr.refresh()
-            self.flash(f"Detached from '{name}'.")
+            choice = self.choose("Open which record?", cands)
+            if choice is not None:
+                self.open_file(cands[choice])
 
     def prompt(self, label: str, initial: str = "") -> str:
         h, w = self.scr.getmaxyx()
@@ -907,8 +1214,15 @@ class UI:
         page = max(1, (h - 5) // 2)
         scrolling = s in (0, 6)
         if k == ord("q"):
+            if self.in_tmux and not self.confirm([
+                    "Quit the control center?",
+                    "Quitting stops it. To leave it running and come back later instead,",
+                    f"press {self.prefix} then d (detach). Claude sessions are not affected either way."]):
+                return True
             return False
-        if ord("1") <= k <= ord("7"):
+        if k == ord("g"):
+            self.session_picker()
+        elif ord("1") <= k <= ord("7"):
             self.screen = k - ord("1")
         elif k in (9, curses.KEY_RIGHT):
             self.screen = (s + 1) % len(SCREENS)
@@ -939,14 +1253,19 @@ class UI:
         elif k == curses.KEY_END:
             self.sel[s] = max(0, rows_n - 1)
         elif k in (10, 13, curses.KEY_ENTER):
-            self.enter_details()
+            if s == 2 and rows_n:
+                self.action_menu(self.items()[self.sel[s]])
+            else:
+                self.enter_details()
         elif k == ord("r"):
             self.collector.refresh_all()
             self.flash("Refreshing all sources (git and GitHub take ~30s)…")
         elif k == ord("o"):
             self.open_selected_record()
         elif k == ord("a"):
-            self.attach_selected()
+            self.join_selected()
+        elif k == ord("c"):
+            self.open_claude_here()
         elif k == ord("k") and s == 3:
             self.keep_only = not self.keep_only
             self.sel[s] = 0

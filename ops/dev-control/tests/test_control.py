@@ -16,7 +16,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest import mock
+import unittest.mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -146,7 +146,7 @@ class RegistryAndRecords(Fixture):
             records.active_worktrees(self.paths)
         with open(os.path.join(self.paths.state, "active-worktrees.yaml"), "w") as f:
             f.write("worktrees: []\n")
-        with mock.patch.object(records, "yaml", None):
+        with unittest.mock.patch.object(records, "yaml", None):
             with self.assertRaises(records.SourceUnavailable):
                 records.active_worktrees(self.paths)
 
@@ -335,10 +335,10 @@ class GitHubReconciliation(unittest.TestCase):
         self.assertEqual(clean(None), "")
 
     def test_gh_missing_is_unavailable_not_zero(self):
-        with mock.patch.object(gh, "run", return_value=CmdResult(127, "", "gh: not found")):
+        with unittest.mock.patch.object(gh, "run", return_value=CmdResult(127, "", "gh: not found")):
             with self.assertRaises(gh.GhUnavailable):
                 gh.fetch_open_prs("o", "r")
-        with mock.patch.object(gh, "run", return_value=CmdResult(1, "", "HTTP 504")):
+        with unittest.mock.patch.object(gh, "run", return_value=CmdResult(1, "", "HTTP 504")):
             with self.assertRaises(gh.GhUnavailable):
                 gh.fetch_open_prs("o", "r", retries=0)
         snap = {"github_prs": obs(None, ok=False, key="GitHub open PRs", error="gh api failed: offline")}
@@ -507,8 +507,8 @@ class StaleState(Fixture):
         c = snapshot.Collector(self.paths, CATALOG, use_cache=False)
         good = obs({"icn": []}, key="GitHub open PRs")
         bad = Obs("GitHub open PRs", NOW + 5, False, None, error="offline")
-        with mock.patch.object(snapshot, "collect_github", side_effect=[{"github_prs": good}, {"github_prs": bad}]), \
-                mock.patch.object(snapshot, "save_cache"):
+        with unittest.mock.patch.object(snapshot, "collect_github", side_effect=[{"github_prs": good}, {"github_prs": bad}]), \
+                unittest.mock.patch.object(snapshot, "save_cache"):
             c._run_tier("github")
             c._run_tier("github")
         o = c.snapshot()["github_prs"]
@@ -626,6 +626,25 @@ class LauncherSafety(unittest.TestCase):
         r = subprocess.run([self.launcher, "--version"], env=env, cwd=planted, capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertNotIn("PLANTED", r.stdout + r.stderr)
+
+    def test_return_key_is_opt_in_and_never_overrides(self):
+        subprocess.run(["tmux", "new-session", "-d", "-s", "probe", "sleep 300"], env=self.env, check=True)
+        keys = lambda: subprocess.run(["tmux", "list-keys", "-T", "root", "F12"], env=self.env,  # noqa: E731
+                                      capture_output=True, text=True).stdout
+        self.assertIn("free", self.run_l("--return-key-status").stdout)
+        self.assertEqual(keys(), "", "status must not bind anything")
+        r = self.run_l("--enable-return-key")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("switch-client -t =icn-control", keys())
+        self.assertIn("already enabled", self.run_l("--enable-return-key").stdout)
+        self.assertEqual(self.run_l("--disable-return-key").returncode, 0)
+        self.assertEqual(keys(), "")
+        subprocess.run(["tmux", "bind-key", "-T", "root", "F12", "display-message", "someone-elses"], env=self.env, check=True)
+        r = self.run_l("--enable-return-key")
+        self.assertEqual(r.returncode, 4)
+        self.assertIn("someone-elses", keys(), "an existing binding is never replaced")
+        self.assertEqual(self.run_l("--disable-return-key").returncode, 4)
+        self.assertIn("someone-elses", keys(), "a foreign binding is never removed")
 
     def test_unknown_option(self):
         self.assertEqual(self.run_l("--bogus").returncode, 2)

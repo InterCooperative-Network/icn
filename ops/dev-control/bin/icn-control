@@ -8,9 +8,13 @@
 #   icn-control --json       print the reconciled views as JSON and exit
 #   icn-control --status     say whether the control-center tmux session is running
 #   icn-control --restart    stop ONLY the control center's own tmux session, then open it again
+#   icn-control --return-key-status     is F12 free, already the "back to control center" key, or taken?
+#   icn-control --enable-return-key     opt in: F12 jumps back to the control center from any tmux session
+#   icn-control --disable-return-key    remove that F12 binding (only if it is ours)
 #   icn-control --help
 #
-# The control center observes; it never starts, stops or deletes agents, worktrees or builds.
+# The control center observes and navigates. It starts a Claude session only through icn-session,
+# only when you choose Resume/Open and confirm, and it never stops, deletes or merges anything.
 set -euo pipefail
 
 SESSION="icn-control"
@@ -94,6 +98,38 @@ case "${1:-}" in
     [[ -t 0 && -t 1 ]] || { echo "stopped; run icn-control from a terminal to reopen"; exit 0; }
     open_tmux ;;
   --version) py --version ;;
-  -h|--help) sed -n '2,13p' "$self" | sed 's/^# \{0,1\}//' ;;
+  --return-key-status|--enable-return-key|--disable-return-key)
+    # Opt-in only. Binds in the RUNNING tmux server (not ~/.tmux.conf); it is gone after tmux restarts.
+    # Refuses to replace any existing F12 binding; removes only the binding this command installed.
+    command -v tmux >/dev/null 2>&1 || { echo "tmux not installed" >&2; exit 2; }
+    tmux has-session 2>/dev/null || { echo "no tmux server is running; open icn-control first" >&2; exit 2; }
+    cur="$(tmux list-keys -T root F12 2>/dev/null || true)"
+    if [[ -z $cur ]]; then state=free
+    elif [[ $cur == *"switch-client -t =$SESSION"* ]]; then state=ours
+    else state=taken; fi
+    case "$1" in
+      --return-key-status)
+        case $state in
+          free)  echo "F12 is free. Opt in with: icn-control --enable-return-key" ;;
+          ours)  echo "F12 returns to the control center (enabled in the running tmux server)." ;;
+          taken) echo "F12 is already bound to something else; it is left alone:"; echo "  $cur" ;;
+        esac ;;
+      --enable-return-key)
+        case $state in
+          ours)  echo "already enabled" ;;
+          taken) echo "refusing: F12 is already bound: $cur" >&2; exit 4 ;;
+          free)  tmux bind-key -T root F12 switch-client -t "=$SESSION"
+                 echo "enabled: F12 now jumps back to the control center from any tmux session."
+                 echo "note: applications inside tmux (including Claude Code) will no longer receive F12."
+                 echo "      This lasts until the tmux server restarts. Undo: icn-control --disable-return-key" ;;
+        esac ;;
+      --disable-return-key)
+        case $state in
+          ours)  tmux unbind-key -T root F12; echo "removed" ;;
+          free)  echo "nothing to remove" ;;
+          taken) echo "refusing: F12 is bound to something else, not by icn-control: $cur" >&2; exit 4 ;;
+        esac ;;
+    esac ;;
+  -h|--help) sed -n '2,17p' "$self" | sed 's/^# \{0,1\}//' ;;
   *) echo "icn-control: unknown option '$1' (see icn-control --help)" >&2; exit 2 ;;
 esac
