@@ -17,7 +17,7 @@ OPEN_PRS_QUERY = """
 query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){
  pullRequests(states:OPEN,first:20,after:$after,orderBy:{field:UPDATED_AT,direction:DESC}){
   pageInfo{hasNextPage endCursor}
-  nodes{number title url isDraft headRefName headRefOid baseRefName updatedAt createdAt
+  nodes{number title url isDraft headRefName headRefOid baseRefName updatedAt createdAt isCrossRepository
    mergeable mergeStateStatus reviewDecision authorAssociation author{login __typename} body
    reviews(last:10){nodes{body state authorAssociation author{login __typename} submittedAt commit{oid}}}
    reviewThreads(first:100){nodes{isResolved}}
@@ -27,7 +27,7 @@ query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$
 
 MERGED_PRS_QUERY = """
 query($q:String!){search(query:$q,type:ISSUE,first:30){nodes{... on PullRequest{
- number title url headRefName mergedAt author{login} repository{name}}}}}
+ number title url headRefName mergedAt isCrossRepository author{login} repository{name}}}}}
 """
 
 ISSUE_QUERY = """
@@ -98,6 +98,7 @@ def fetch_recent_merged(owner: str, repos: list[str], days: int = 7) -> list[dic
             continue
         out.append({"repo": n["repository"]["name"], "number": n["number"], "title": n["title"],
                     "url": n["url"], "branch": n["headRefName"], "merged_at": n["mergedAt"],
+                    "cross_repo": n.get("isCrossRepository") is not False,
                     "merged_ts": parse_iso(n["mergedAt"]), "author": (n.get("author") or {}).get("login")})
     out.sort(key=lambda x: -(x["merged_ts"] or 0))
     return out
@@ -203,6 +204,8 @@ def normalize_pr(p: dict, repo: str) -> dict:
     return {
         "repo": repo, "number": p["number"], "title": p.get("title") or "", "url": p.get("url"),
         "draft": bool(p.get("isDraft")), "branch": p.get("headRefName"), "head": p.get("headRefOid"),
+        # Unknown counts as cross-repo: a fork can reuse any branch name, so only same-repo PRs match by branch.
+        "cross_repo": p.get("isCrossRepository") is not False,
         "base": p.get("baseRefName"), "updated_at": p.get("updatedAt"), "updated_ts": parse_iso(p.get("updatedAt")),
         "author": author, "mergeable": p.get("mergeable"), "merge_state": p.get("mergeStateStatus"),
         "review_decision": p.get("reviewDecision"), "checks": checks, "rollup": rollup_state,

@@ -449,7 +449,8 @@ class Ownership(Fixture):
                {"repo": "icn", "path": "/w/merged", "branch": "m", "status": clean},
                {"repo": "icn", "path": "/w/locked", "branch": "l", "status": clean},
                {"repo": "icn", "path": "/w/unknown", "branch": "k", "status": dict(clean, local_only_commits=None)}]
-        merged = [{"repo": "icn", "branch": "m", "number": 5, "merged_ts": NOW}, {"repo": "icn", "branch": "l", "number": 6, "merged_ts": NOW}]
+        merged = [{"repo": "icn", "branch": "m", "number": 5, "merged_ts": NOW, "cross_repo": False},
+                  {"repo": "icn", "branch": "l", "number": 6, "merged_ts": NOW, "cross_repo": False}]
         locks = [{"repo": "icn", "owner": "locked", "status": "open", "files": ["x"]}]
         v = {w["name"]: w for w in reconcile.worktree_views(self.wsnap(wts, merged=merged, locks=locks), [], CATALOG)}
         self.assertEqual(v["dirty"]["verdict"], "KEEP")
@@ -457,6 +458,19 @@ class Ownership(Fixture):
         self.assertTrue(v["merged"]["verdict"].startswith("CLEANUP CANDIDATE"))
         self.assertEqual(v["locked"]["verdict"], "KEEP", "an open file lock outranks a merged PR")
         self.assertIn("unpushed-commit count unknown", v["unknown"]["keep_reasons"])
+
+    def test_fork_pr_with_same_branch_name_never_matches(self):
+        clean = {"exists": True, "dirty": False, "local_only_commits": 0}
+        wts = [{"repo": "icn", "path": "/w/x", "branch": "fix/x", "status": clean}]
+        fork_open = [{"repo": "icn", "branch": "fix/x", "number": 66, "status": IN_PROGRESS, "cross_repo": True}]
+        fork_merged = [{"repo": "icn", "branch": "fix/x", "number": 67, "merged_ts": NOW, "cross_repo": True}]
+        unknown = [{"repo": "icn", "branch": "fix/x", "number": 68, "merged_ts": NOW}]  # field absent = not trusted
+        v = reconcile.worktree_views(self.wsnap(wts, prs=fork_open, merged=fork_merged + unknown), [], CATALOG)[0]
+        self.assertIsNone(v["pr"])
+        self.assertIsNone(v["merged_pr"])
+        self.assertFalse(v["verdict"].startswith("CLEANUP"), "a fork's merge must not suggest cleaning our worktree")
+        self.assertTrue(gh.normalize_pr({"number": 1, "isCrossRepository": None}, "icn")["cross_repo"])
+        self.assertFalse(gh.normalize_pr({"number": 1, "isCrossRepository": False}, "icn")["cross_repo"])
 
     def test_github_unknown_keeps_everything(self):
         wts = [{"repo": "icn", "path": "/w/m", "branch": "m", "status": {"exists": True, "dirty": False, "local_only_commits": 0}}]
@@ -468,7 +482,7 @@ class Ownership(Fixture):
         st = {"exists": True, "dirty": False, "local_only_commits": 0}
         wts = [{"repo": "icn", "path": "/w/icn/main", "branch": "main", "status": st},
                {"repo": "nycn", "path": "/w/nycn/main", "branch": "main", "status": dict(st, dirty=True)}]
-        prs = [{"repo": "nycn", "branch": "main", "number": 9, "status": IN_PROGRESS}]
+        prs = [{"repo": "nycn", "branch": "main", "number": 9, "status": IN_PROGRESS, "cross_repo": False}]
         v = {w["path"]: w for w in reconcile.worktree_views(self.wsnap(wts, prs=prs), [], CATALOG)}
         self.assertIsNone(v["/w/icn/main"]["pr"])
         self.assertEqual(v["/w/nycn/main"]["pr"]["number"], 9)

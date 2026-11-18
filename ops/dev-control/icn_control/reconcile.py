@@ -142,6 +142,14 @@ def pr_status(pr: dict) -> tuple[str, str]:
     return UNKNOWN, "open, no lifecycle block"
 
 
+def branch_pr(prs: list, repo: Optional[str], branch: Optional[str]) -> Optional[dict]:
+    """The PR whose head is this local branch. Fork PRs never match by name (a fork can reuse any
+    branch name); associating one needs an explicit registry pr_ref."""
+    if not branch:
+        return None
+    return next((p for p in prs if p["repo"] == repo and p["branch"] == branch and p.get("cross_repo") is False), None)
+
+
 # --------------------------------------------------------------------------- sessions
 def session_views(snap: dict, paths: Paths) -> list[dict]:
     now = time.time()
@@ -306,8 +314,8 @@ def _base_view(kind, name, cwd, wt, rows, prs, locks, handoffs, reg) -> dict:
             pr = next((p for p in prs if p["number"] == int(m.group(2)) and (want_repo in (None, p["repo"]))), None)
             pr_how = "registered pr_ref/task_ref" if pr else None
     if pr is None and branch:
-        pr = next((p for p in prs if p["repo"] == repo and p["branch"] == branch), None)
-        pr_how = "branch match" if pr else None
+        pr = branch_pr(prs, repo, branch)
+        pr_how = "branch match (same-repository PR)" if pr else None
     if pr is None and cwd:
         m = PR_DIR.search(os.path.basename(cwd.rstrip("/")))
         if m:
@@ -404,7 +412,7 @@ def worktree_views(snap: dict, sessions: list[dict], catalog: dict) -> list[dict
                         "(unpublished, or squash-merged with the branch deleted; verify before removal)")
         elif st.get("exists") and st.get("local_only_commits") is None and not st.get("error"):
             keep.append("unpushed-commit count unknown")
-        pr = next((p for p in prs if p["repo"] == w["repo"] and p["branch"] == w.get("branch")), None)
+        pr = branch_pr(prs, w["repo"], w.get("branch"))
         if pr:
             keep.append(f"open PR #{pr['number']}")
         open_locks = [lk for lk in locks if lk["status"] == "open" and lk["owner"] == name]
@@ -414,7 +422,7 @@ def worktree_views(snap: dict, sessions: list[dict], catalog: dict) -> list[dict
             keep.append("git worktree lock")
         if any(s["kind"] in ("registry", "launcher-record") and s.get("worktree") == w["path"] for s in sessions):
             keep.append("session record points here")
-        mpr = next((m for m in merged if m["repo"] == w["repo"] and m["branch"] == w.get("branch")), None)
+        mpr = branch_pr(merged, w["repo"], w.get("branch"))
         if mpr:
             cand.append(f"PR #{mpr['number']} merged {ago(mpr.get('merged_ts'))}")
         if not gh_ok:
