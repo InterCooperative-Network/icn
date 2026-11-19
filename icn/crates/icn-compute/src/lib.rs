@@ -88,7 +88,7 @@ pub use policy::{
 };
 pub use receipt::{ExecutionReceipt, ReceiptHash, SettlementMessage, SignatureBytes};
 pub use result_quorum::{
-    CollectedResult, QuorumStatus, ResultAggregator, ResultQuorumManager, TaskValue,
+    CollectedResult, QuorumClock, QuorumStatus, ResultAggregator, ResultQuorumManager, TaskValue,
     TaskVerification, VerificationConfig, CLOCK_SKEW_TOLERANCE_MS, DEFAULT_COLLECTION_WINDOW_MS,
     MAX_CONCURRENT_VERIFICATIONS,
 };

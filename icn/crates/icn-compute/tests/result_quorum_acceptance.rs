@@ -60,6 +60,7 @@
 //!   accusations, dispute-id collisions).
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use ed25519_dalek::SigningKey;
@@ -67,8 +68,8 @@ use icn_compute::{
     ComputeActor, ComputeError, ComputeEvent, ComputeHandle, ComputeMessage, ComputeResult,
     ComputeTask, DeterminismClass, ExecutionOutcome, ExecutorCapability,
     FederationClearingCallback, FederationClearingNotification, FuelLimit, PrivacyClass,
-    QuorumStatus, ResultQuorumManager, TaskCode, TaskHash, TaskPriority, TaskStatus, TaskValue,
-    TaskVerification, TrustCallback, VerificationConfig,
+    QuorumClock, QuorumStatus, ResultQuorumManager, TaskCode, TaskHash, TaskPriority, TaskStatus,
+    TaskValue, TaskVerification, TrustCallback, VerificationConfig, CLOCK_SKEW_TOLERANCE_MS,
 };
 use icn_identity::Did;
 
@@ -206,12 +207,29 @@ struct Node {
 }
 
 fn node() -> Node {
+    build_node(None)
+}
+
+/// A node whose quorum manager reads time from `clock`, so collection windows can be stepped
+/// past deterministically.
+fn clocked_node(clock: Arc<AtomicU64>) -> Node {
+    let source: QuorumClock = Arc::new(move || clock.load(Ordering::SeqCst));
+    build_node(Some(source))
+}
+
+fn build_node(clock: Option<QuorumClock>) -> Node {
     let trust: TrustCallback = Arc::new(|_did: &str| 1.0_f64);
     let mut actor = ComputeActor::new(identity(NODE_SEED).did, trust);
-    actor.set_verification_config(VerificationConfig {
+    let config = VerificationConfig {
         collection_window_ms: COLLECTION_WINDOW_MS,
         ..VerificationConfig::default()
-    });
+    };
+    match clock {
+        None => actor.set_verification_config(config),
+        Some(clock) => {
+            actor.set_quorum_manager(Arc::new(ResultQuorumManager::with_clock(config, clock)))
+        }
+    }
     // Taken after `set_verification_config`, which replaces the manager.
     let quorum = Arc::clone(actor.quorum_manager());
 
@@ -515,5 +533,272 @@ async fn ex003_no_clearing_notification_while_the_quorum_is_collecting() {
         clearings.is_empty(),
         "EX-003: clearing notification emitted before the quorum accepted any result: \
          {clearings:?}"
+    );
+}
+
+// ── C0 acceptance contracts (#2907 F-1, F-3) ─────────────────────────────────────────────────
+//
+// A task registered for quorum verification may complete only from its quorum's canonical
+// result, and only once. Once its quorum has closed, accepted or not, no later result may
+// complete it through the single-executor fallback, and none may add a completion or a clearing.
+
+fn outcome(output: &[u8]) -> ExecutionOutcome {
+    ExecutionOutcome::Success(output.to_vec())
+}
+
+/// #2907 F-1 (a). Two executors disagree, so the quorum closes divergent with no canonical
+/// result. Replaying either result must not complete the task.
+#[tokio::test]
+async fn c0_divergent_quorum_then_replay_does_not_complete() {
+    let node = node();
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node
+        .submit(task(&identity(SUBMITTER_SEED), Some(two_executors())))
+        .await;
+    let from_a = signed(&a, hash, outcome(b"42"));
+    let from_b = signed(&b, hash, outcome(b"43"));
+    node.deliver(&from_a).await;
+    node.deliver(&from_b).await;
+    assert_eq!(
+        label(&node.status(hash).await),
+        "Pending",
+        "precondition: a divergent quorum completes nothing"
+    );
+    assert!(node.completions().is_empty(), "precondition");
+
+    for replay in [&from_a, &from_b] {
+        node.deliver(replay).await;
+        assert_eq!(
+            label(&node.status(hash).await),
+            "Pending",
+            "C0: a replay after divergence completed the task through the fallback"
+        );
+    }
+    assert!(
+        node.completions().is_empty(),
+        "C0: TaskCompleted after a divergent quorum: {:?}",
+        node.completions()
+    );
+}
+
+/// #2907 F-1 (a), federated delivery. Whatever the divergent submission itself emitted (that is
+/// T01's), a replay after the quorum closed must add no clearing and no completion.
+#[tokio::test]
+async fn c0_replay_after_divergence_adds_no_clearing() {
+    let node = node();
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node
+        .submit(task(&identity(SUBMITTER_SEED), Some(two_executors())))
+        .await;
+    let from_a = signed(&a, hash, outcome(b"42"));
+    let from_b = signed(&b, hash, outcome(b"43"));
+    node.deliver_federated(&from_a).await;
+    node.deliver_federated(&from_b).await;
+    let _ = node.status(hash).await; // barrier
+    let clearings_before = node.clearings().len();
+
+    node.deliver_federated(&from_a).await;
+    let status = node.status(hash).await;
+
+    assert_eq!(
+        label(&status),
+        "Pending",
+        "C0: a replayed federated result completed a divergent task"
+    );
+    assert_eq!(
+        node.clearings().len(),
+        clearings_before,
+        "C0: a replay after the quorum closed emitted a clearing"
+    );
+    assert!(node.completions().is_empty());
+}
+
+/// #2907 F-1 (d). After consensus, a replay from either executor changes neither the completed
+/// result nor the number of completions or clearings.
+#[tokio::test]
+async fn c0_replay_after_consensus_changes_nothing() {
+    let node = node();
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node
+        .submit(task(&identity(SUBMITTER_SEED), Some(two_executors())))
+        .await;
+    let from_a = signed(&a, hash, success());
+    let from_b = signed(&b, hash, success());
+    node.deliver_federated(&from_a).await;
+    node.deliver_federated(&from_b).await;
+    // The quorum's canonical member is the agreeing result with the smallest executor DID.
+    let canonical = if a.did < b.did { &from_a } else { &from_b };
+    let other = if a.did < b.did { &from_b } else { &from_a };
+    let accepted = node.status(hash).await;
+    assert_eq!(
+        accepted,
+        Some(TaskStatus::Completed {
+            result: Box::new(canonical.clone())
+        }),
+        "precondition: consensus completes the task from the canonical result"
+    );
+    let completions = node.completions();
+    let clearings = node.clearings().len();
+    assert_eq!(completions.len(), 1, "precondition: one completion");
+
+    // The non-canonical executor replays first, then the canonical one.
+    for replay in [other, canonical] {
+        node.deliver_federated(replay).await;
+        node.deliver(replay).await;
+    }
+
+    assert_eq!(
+        node.status(hash).await,
+        accepted,
+        "C0: a replay after consensus changed the completed result"
+    );
+    assert_eq!(
+        node.completions(),
+        completions,
+        "C0: a replay after consensus broadcast another TaskCompleted"
+    );
+    assert_eq!(
+        node.clearings().len(),
+        clearings,
+        "C0: a replay after consensus emitted another clearing"
+    );
+}
+
+/// Cancellation closes the quorum. Results that arrive after the submitter cancelled must not
+/// complete the task, even when they agree.
+#[tokio::test]
+async fn c0_cancelled_task_is_not_completed_by_later_agreeing_results() {
+    let node = node();
+    let submitter = identity(SUBMITTER_SEED);
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node.submit(task(&submitter, Some(two_executors()))).await;
+    node.handle
+        .cancel_task(&hash, &submitter.did, "changed my mind".into())
+        .await
+        .expect("cancel");
+    assert!(
+        label(&node.status(hash).await).starts_with("Cancelled"),
+        "precondition: the submitter cancelled the task"
+    );
+
+    node.deliver(&signed(&a, hash, success())).await;
+    node.deliver(&signed(&b, hash, success())).await;
+
+    let status = label(&node.status(hash).await);
+    assert!(
+        status.starts_with("Cancelled"),
+        "C0: agreeing results after cancellation completed the task: {status}"
+    );
+    assert!(
+        node.completions().is_empty(),
+        "C0: TaskCompleted after cancellation"
+    );
+}
+
+/// A fixed start time for clocked tests; the deadline is `START + COLLECTION_WINDOW_MS`.
+const START_MS: u64 = 1_800_000_000_000;
+const DEADLINE_MS: u64 = START_MS + COLLECTION_WINDOW_MS;
+
+/// #2907 F-1 (b). A result that arrives after the deadline but inside the clock-skew tolerance is
+/// counted, and closes the quorum as timed out. A later agreeing result must not complete the
+/// task through the fallback.
+#[tokio::test]
+async fn c0_timed_out_quorum_is_not_completed_by_a_late_result() {
+    let clock = Arc::new(AtomicU64::new(START_MS));
+    let node = clocked_node(Arc::clone(&clock));
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node
+        .submit(task(&identity(SUBMITTER_SEED), Some(two_executors())))
+        .await;
+
+    clock.store(DEADLINE_MS + CLOCK_SKEW_TOLERANCE_MS / 2, Ordering::SeqCst);
+    node.deliver(&signed(&a, hash, success())).await;
+    assert_eq!(label(&node.status(hash).await), "Pending", "precondition");
+
+    node.deliver(&signed(&b, hash, success())).await;
+    assert_eq!(
+        label(&node.status(hash).await),
+        "Pending",
+        "C0: a result after the quorum timed out completed the task"
+    );
+    assert!(
+        node.completions().is_empty(),
+        "C0: TaskCompleted after timeout"
+    );
+}
+
+/// #2907 F-1 (c). The expiry sweep retires a collecting quorum. A result that arrives afterwards
+/// must not complete the task. The sweep is invoked directly at a stepped clock: no waiting.
+#[tokio::test]
+async fn c0_expired_quorum_is_not_completed_by_a_late_result() {
+    let clock = Arc::new(AtomicU64::new(START_MS));
+    let node = clocked_node(Arc::clone(&clock));
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node
+        .submit(task(&identity(SUBMITTER_SEED), Some(two_executors())))
+        .await;
+    node.deliver(&signed(&a, hash, success())).await;
+    let _ = node.status(hash).await; // barrier: the actor has handled the result
+    assert_eq!(
+        node.quorum_status(&hash).unwrap(),
+        COLLECTING_ONE_OF_TWO,
+        "precondition"
+    );
+
+    clock.store(DEADLINE_MS + 1, Ordering::SeqCst);
+    assert_eq!(
+        node.quorum.cleanup_expired().unwrap(),
+        vec![hash],
+        "precondition: the sweep retires the quorum"
+    );
+
+    // Inside the skew tolerance, so only the sweep's retirement can refuse it.
+    node.deliver(&signed(&b, hash, success())).await;
+    assert_eq!(
+        label(&node.status(hash).await),
+        "Pending",
+        "C0: a result after the sweep expired the quorum completed the task"
+    );
+    assert!(
+        node.completions().is_empty(),
+        "C0: TaskCompleted after expiry"
+    );
+}
+
+/// #2907 F-3. A result after the collection window has closed is refused by the quorum
+/// ("Result collection window has closed"); that refusal must not fall through to the fallback.
+#[tokio::test]
+async fn c0_result_after_the_collection_window_does_not_complete() {
+    let clock = Arc::new(AtomicU64::new(START_MS));
+    let node = clocked_node(Arc::clone(&clock));
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node
+        .submit(task(&identity(SUBMITTER_SEED), Some(two_executors())))
+        .await;
+    node.deliver(&signed(&a, hash, success())).await;
+    let _ = node.status(hash).await; // barrier: the actor has handled the result
+    assert_eq!(
+        node.quorum_status(&hash).unwrap(),
+        COLLECTING_ONE_OF_TWO,
+        "precondition"
+    );
+
+    clock.store(DEADLINE_MS + CLOCK_SKEW_TOLERANCE_MS + 1, Ordering::SeqCst);
+    let late = signed(&b, hash, success());
+    let refusal = node.quorum.submit_result(late.clone());
+    assert!(
+        matches!(&refusal, Err(ComputeError::InvalidResult(_))),
+        "precondition: the quorum refuses a result after the window, got {refusal:?}"
+    );
+
+    node.deliver(&late).await;
+    assert_eq!(
+        label(&node.status(hash).await),
+        "Pending",
+        "C0: a result after the collection window completed the task"
+    );
+    assert!(
+        node.completions().is_empty(),
+        "C0: TaskCompleted after the window closed"
     );
 }

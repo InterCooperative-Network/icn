@@ -320,6 +320,11 @@ impl ResultAggregator {
     /// 3. No duplicate results from the same executor
     /// 4. Collection window has not expired
     pub fn add_result(&mut self, result: ComputeResult) -> Result<()> {
+        self.add_result_at(result, icn_time::current_timestamp_millis())
+    }
+
+    /// [`Self::add_result`] at an explicit time, in milliseconds since the Unix epoch.
+    pub fn add_result_at(&mut self, result: ComputeResult, now: u64) -> Result<()> {
         // Verify task hash matches
         if result.task_hash != self.task_hash {
             return Err(ComputeError::InvalidResult(format!(
@@ -337,8 +342,6 @@ impl ResultAggregator {
             ComputeError::InvalidResult(format!("Invalid executor DID '{executor}': {e}"))
         })?;
         result.verify_signature(&executor_did)?;
-
-        let now = icn_time::current_timestamp_millis();
 
         // Check if we already have a result from this executor
         if self.results.contains_key(&executor) {
@@ -364,12 +367,16 @@ impl ResultAggregator {
 
     /// Get current quorum status
     pub fn status(&self) -> QuorumStatus {
+        self.status_at(icn_time::current_timestamp_millis())
+    }
+
+    /// [`Self::status`] at an explicit time, in milliseconds since the Unix epoch.
+    pub fn status_at(&self, now: u64) -> QuorumStatus {
         let received = self.results.len();
         let required = self.verification.required_executors;
 
         // Still collecting
         if received < required {
-            let now = icn_time::current_timestamp_millis();
             if now > self.deadline {
                 return QuorumStatus::Timeout { received, required };
             }
@@ -472,21 +479,39 @@ impl ResultAggregator {
     }
 }
 
+/// The time source for collection windows: milliseconds since the Unix epoch.
+///
+/// Production uses `icn_time::current_timestamp_millis`. Tests inject a controlled clock so that
+/// timeout and expiry are deterministic.
+pub type QuorumClock = Arc<dyn Fn() -> u64 + Send + Sync>;
+
 /// Manager for coordinating result quorum across multiple tasks
 pub struct ResultQuorumManager {
     /// Active aggregators by task hash
     aggregators: Arc<RwLock<HashMap<TaskHash, ResultAggregator>>>,
     /// Verification configuration
     config: VerificationConfig,
+    /// Time source for collection windows
+    clock: QuorumClock,
 }
 
 impl ResultQuorumManager {
     /// Create a new result quorum manager
     pub fn new(config: VerificationConfig) -> Self {
+        Self::with_clock(config, Arc::new(icn_time::current_timestamp_millis))
+    }
+
+    /// Create a manager that reads time from `clock` instead of the system clock.
+    pub fn with_clock(config: VerificationConfig, clock: QuorumClock) -> Self {
         Self {
             aggregators: Arc::new(RwLock::new(HashMap::new())),
             config,
+            clock,
         }
+    }
+
+    fn now(&self) -> u64 {
+        (self.clock)()
     }
 
     /// Register a task for multi-executor verification
@@ -495,7 +520,7 @@ impl ResultQuorumManager {
     /// - Returns error if task is already registered
     /// - Returns error if MAX_CONCURRENT_VERIFICATIONS limit reached (DoS protection)
     pub fn register_task(&self, task_hash: TaskHash, verification: TaskVerification) -> Result<()> {
-        let now = icn_time::current_timestamp_millis();
+        let now = self.now();
 
         let aggregator = ResultAggregator::new(
             task_hash,
@@ -543,8 +568,9 @@ impl ResultQuorumManager {
             ))
         })?;
 
-        aggregator.add_result(result)?;
-        Ok(aggregator.status())
+        let now = self.now();
+        aggregator.add_result_at(result, now)?;
+        Ok(aggregator.status_at(now))
     }
 
     /// Get the status of a task's quorum
@@ -561,7 +587,7 @@ impl ResultQuorumManager {
             ))
         })?;
 
-        Ok(aggregator.status())
+        Ok(aggregator.status_at(self.now()))
     }
 
     /// Get the canonical result if consensus reached
@@ -614,7 +640,7 @@ impl ResultQuorumManager {
 
     /// Clean up timed-out aggregators
     pub fn cleanup_expired(&self) -> Result<Vec<TaskHash>> {
-        let now = icn_time::current_timestamp_millis();
+        let now = self.now();
 
         let mut aggregators = self
             .aggregators
