@@ -40,9 +40,25 @@ use super::ComputeActor;
 use crate::error::ComputeError;
 use crate::executor::Executor;
 use crate::policy::CharterPriority;
-use crate::result_quorum::{QuorumStatus, TaskVerification};
+use crate::result_quorum::{QuorumDecision, TaskVerification};
 use crate::task::{TaskManager, TaskStatus};
 use crate::types::{ComputeMessage, ComputeResult, ComputeTask, TaskHash, TaskPriority};
+
+/// What handling one task result did to its task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ResultAcceptance {
+    /// The quorum accepted a canonical result and the task was completed from it.
+    Accepted,
+    /// The quorum counted the result without accepting one: still collecting, or this result
+    /// closed it divergent or timed out.
+    Counted,
+    /// The task is registered for quorum verification and the result was refused: its quorum
+    /// had closed, or the aggregator rejected the result. Nothing changed.
+    Refused,
+    /// The task was never registered for quorum verification; the single-executor path handled
+    /// the result.
+    Unregistered,
+}
 use crate::{MIN_TRUST_EXECUTE, MIN_TRUST_SUBMIT};
 
 /// Release a commons credit reservation on non-success task termination.
@@ -107,6 +123,18 @@ impl ComputeActor {
 
     /// Handle task result with consensus checking
     pub(super) async fn on_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
+        self.accept_task_result(result).await.map(|_| ())
+    }
+
+    /// Handle a task result and report what it did to the task.
+    ///
+    /// A task registered for quorum verification completes only from the canonical result its
+    /// quorum accepts, exactly once. Only a task that was never registered (`TaskNotFound` from
+    /// the quorum) may complete through the single-executor path.
+    pub(super) async fn accept_task_result(
+        &self,
+        result: ComputeResult,
+    ) -> Result<ResultAcceptance, ComputeError> {
         let task_hash_str = hex::encode(result.task_hash);
 
         tracing::debug!(
@@ -175,107 +203,27 @@ impl ComputeActor {
         );
         icn_obs::metrics::compute::signatures_verified_inc();
 
-        // Check if this task is registered for multi-executor verification (Issue #511)
-        let quorum_result = self.quorum_manager.submit_result(result.clone());
-
-        // Handle quorum-based verification if task is registered
-        if let Ok(status) = quorum_result {
-            match status {
-                QuorumStatus::Collecting { received, required } => {
-                    tracing::debug!(
-                        task_hash = %task_hash_str,
-                        received = received,
-                        required = required,
-                        "Multi-executor task: collecting results"
-                    );
-                    return Ok(()); // Wait for more results
-                }
-                QuorumStatus::Consensus {
-                    result_hash,
-                    agreeing,
-                    total,
-                } => {
-                    tracing::info!(
-                        task_hash = %task_hash_str,
-                        agreeing = agreeing,
-                        total = total,
-                        result_hash = %hex::encode(result_hash),
-                        "Multi-executor task: consensus reached"
-                    );
-
-                    // Record quorum metrics
-                    icn_obs::metrics::compute::quorum_consensus_inc("multi_executor");
-
-                    // Get canonical result and proceed to completion
-                    if let Ok(Some(canonical)) =
-                        self.quorum_manager.get_canonical_result(&result.task_hash)
-                    {
-                        // Clean up quorum tracking
-                        let _ = self.quorum_manager.remove_task(&result.task_hash);
-                        return self.complete_task_result(canonical).await;
-                    }
-                }
-                QuorumStatus::Divergent {
-                    result_groups,
-                    total,
-                } => {
-                    tracing::warn!(
-                        task_hash = %task_hash_str,
-                        result_groups = result_groups,
-                        total = total,
-                        "Multi-executor task: results diverge, escalating to dispute"
-                    );
-
-                    // Record quorum metrics
-                    icn_obs::metrics::compute::quorum_divergent_inc(
-                        "multi_executor",
-                        result_groups,
-                    );
-
-                    // Get executor groups for dispute evidence
-                    if let Ok(groups) = self.quorum_manager.get_executor_groups(&result.task_hash) {
-                        // File disputes for divergent results
-                        self.handle_divergent_results(&result.task_hash, groups)
-                            .await;
-                    }
-
-                    // Accept majority result if available (before cleanup)
-                    let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
-
-                    // Clean up quorum tracking
-                    let _ = self.quorum_manager.remove_task(&result.task_hash);
-
-                    if let Ok(Some(canonical)) = canonical {
-                        return self.complete_task_result(canonical).await;
-                    }
-                    return Ok(()); // No canonical result
-                }
-                QuorumStatus::Timeout { received, required } => {
-                    tracing::warn!(
-                        task_hash = %task_hash_str,
-                        received = received,
-                        required = required,
-                        "Multi-executor task: collection timed out"
-                    );
-
-                    // Record quorum metrics
-                    icn_obs::metrics::compute::quorum_timeout_inc(
-                        "multi_executor",
-                        received,
-                        required,
-                    );
-
-                    // Proceed with available results if any (before cleanup)
-                    let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
-
-                    // Clean up quorum tracking
-                    let _ = self.quorum_manager.remove_task(&result.task_hash);
-
-                    if let Ok(Some(canonical)) = canonical {
-                        return self.complete_task_result(canonical).await;
-                    }
-                    return Ok(());
-                }
+        // Quorum verification (Issue #511). The decision, including the canonical result, comes
+        // from one locked step of the quorum manager, which also closes the quorum.
+        match self.quorum_manager.submit(result.clone()) {
+            Ok(decision) => {
+                return self
+                    .apply_quorum_decision(&result.task_hash, &task_hash_str, decision)
+                    .await
+            }
+            // Never registered: the single-executor path below applies.
+            Err(ComputeError::TaskNotFound(_)) => {}
+            // Registered, and this result is refused: the quorum has closed, or the aggregator
+            // rejected it (duplicate executor, collection window closed, bad signature). It
+            // must not fall through to the single-executor path.
+            Err(refusal) => {
+                tracing::debug!(
+                    task_hash = %task_hash_str,
+                    executor = %result.executor,
+                    error = %refusal,
+                    "Quorum refused result; not completing the task"
+                );
+                return Ok(ResultAcceptance::Refused);
             }
         }
 
@@ -458,7 +406,70 @@ impl ComputeActor {
             }
         }
 
-        Ok(())
+        Ok(ResultAcceptance::Unregistered)
+    }
+
+    /// Act on what the quorum decided for a counted result.
+    async fn apply_quorum_decision(
+        &self,
+        task_hash: &TaskHash,
+        task_hash_str: &str,
+        decision: QuorumDecision,
+    ) -> Result<ResultAcceptance, ComputeError> {
+        match decision {
+            QuorumDecision::Collecting { received, required } => {
+                tracing::debug!(
+                    task_hash = %task_hash_str,
+                    received = received,
+                    required = required,
+                    "Multi-executor task: collecting results"
+                );
+                Ok(ResultAcceptance::Counted)
+            }
+            QuorumDecision::Accepted {
+                canonical,
+                result_hash,
+                agreeing,
+                total,
+            } => {
+                tracing::info!(
+                    task_hash = %task_hash_str,
+                    agreeing = agreeing,
+                    total = total,
+                    result_hash = %hex::encode(result_hash),
+                    "Multi-executor task: consensus reached"
+                );
+                icn_obs::metrics::compute::quorum_consensus_inc("multi_executor");
+                self.complete_task_result(canonical).await?;
+                Ok(ResultAcceptance::Accepted)
+            }
+            QuorumDecision::Divergent {
+                result_groups,
+                total,
+                executor_groups,
+            } => {
+                tracing::warn!(
+                    task_hash = %task_hash_str,
+                    result_groups = result_groups,
+                    total = total,
+                    "Multi-executor task: results diverge, escalating to dispute"
+                );
+                icn_obs::metrics::compute::quorum_divergent_inc("multi_executor", result_groups);
+                self.handle_divergent_results(task_hash, executor_groups)
+                    .await;
+                Ok(ResultAcceptance::Counted)
+            }
+            QuorumDecision::TimedOut { received, required } => {
+                tracing::warn!(
+                    task_hash = %task_hash_str,
+                    received = received,
+                    required = required,
+                    "Multi-executor task: collection timed out"
+                );
+                icn_obs::metrics::compute::quorum_timeout_inc("multi_executor", received, required);
+                Ok(ResultAcceptance::Counted)
+            }
+        }
     }
 
     /// Complete a task with the given result (used by both quorum and legacy paths)
@@ -687,8 +698,14 @@ impl ComputeActor {
             timestamps.remove(&task_hash);
         }
 
-        // Clean up quorum tracking if task was registered
-        let _ = self.quorum_manager.remove_task(&task_hash);
+        // Close the quorum, if the task was registered, so later results are refused
+        if let Err(e) = self.quorum_manager.cancel_task(&task_hash) {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                error = %e,
+                "Failed to close the quorum of a cancelled task"
+            );
+        }
 
         tracing::info!(
             task_hash = %task_hash_str,
@@ -1707,6 +1724,16 @@ impl ComputeActor {
         let mut mgr = self.task_manager.lock().await;
         mgr.cancel(task_hash, requester, reason.clone())?;
         drop(mgr);
+
+        // Close the quorum, if the task was registered, so results that arrive after the
+        // cancellation are refused rather than completing the task.
+        if let Err(e) = self.quorum_manager.cancel_task(task_hash) {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                error = %e,
+                "Failed to close the quorum of a cancelled task"
+            );
+        }
 
         icn_obs::metrics::compute::tasks_cancelled_inc();
 

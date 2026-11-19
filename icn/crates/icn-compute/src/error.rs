@@ -64,6 +64,15 @@ pub enum ComputeError {
     #[error("invalid result: {0}")]
     InvalidResult(String),
 
+    /// The task is registered for quorum verification and its quorum has closed, so the result
+    /// is refused. Distinct from [`ComputeError::TaskNotFound`], which a quorum submission
+    /// returns only for a task that was never registered.
+    #[error("quorum closed for task {task}: {closure:?}")]
+    QuorumClosed {
+        task: String,
+        closure: crate::result_quorum::QuorumClosure,
+    },
+
     /// Dispute closed
     #[error("dispute closed")]
     DisputeClosed,

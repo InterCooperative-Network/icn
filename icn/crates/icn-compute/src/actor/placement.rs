@@ -1136,7 +1136,14 @@ impl ComputeActor {
         );
 
         // Process the result through normal channels
-        self.on_task_result(result.clone()).await?;
+        let acceptance = self.accept_task_result(result.clone()).await?;
+
+        // A result the quorum refused (its quorum had closed, or the aggregator rejected it)
+        // changed nothing, so it must not emit a clearing either. Whether a result that the
+        // quorum only counted may clear is T01's (EX-003), not decided here.
+        if acceptance == super::lifecycle::ResultAcceptance::Refused {
+            return Ok(());
+        }
 
         // Fire cross-entity clearing callback on successful federated completion.
         // Only fires when:

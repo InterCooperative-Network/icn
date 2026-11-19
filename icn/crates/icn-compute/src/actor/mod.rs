@@ -387,6 +387,13 @@ impl ComputeActor {
         self.quorum_manager = Arc::new(ResultQuorumManager::new(config));
     }
 
+    /// Replace the quorum manager, for example with one built by
+    /// [`ResultQuorumManager::with_clock`]. Call before [`Self::spawn`]: the expiry sweep holds the
+    /// manager it finds at spawn.
+    pub fn set_quorum_manager(&mut self, manager: Arc<ResultQuorumManager>) {
+        self.quorum_manager = manager;
+    }
+
     /// Get a reference to the quorum manager for result verification
     pub fn quorum_manager(&self) -> &Arc<ResultQuorumManager> {
         &self.quorum_manager
