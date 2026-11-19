@@ -470,6 +470,273 @@ impl Store for RendezvousStore {
     }
 }
 
+// ── position-lock witness (#2906 review FOLLOW_UP 1) ────────────────────────────────────────
+
+/// How long a contender that has read the durable position waits for the other contender to read
+/// or write it. With the manager's position lock in place the other cannot reach the record, so
+/// the hold expires and the run is serial. It is a bound, not a sleep: an implementation without
+/// the lock lets the other contender through at once.
+const POSITION_HOLD: Duration = Duration::from_secs(2);
+
+#[derive(Default)]
+struct PositionHoldState {
+    /// Contender has read or written the agreement's position record.
+    reached: [bool; 2],
+    held: [bool; 2],
+    overlapped: Option<bool>,
+}
+
+/// Holds a contender *after* its first read of the position record and *before* it can write it
+/// back, which is inside the read → modify → write that the position lock exists to protect.
+/// Unlike [`Rendezvous`], it ignores the transfer-row read that precedes the lock.
+#[derive(Default)]
+struct PositionHold {
+    state: Mutex<PositionHoldState>,
+    changed: Condvar,
+}
+
+impl PositionHold {
+    fn reached(&self, contender: usize) {
+        self.state.lock().unwrap().reached[contender] = true;
+        self.changed.notify_all();
+    }
+
+    fn after_position_read(&self, contender: usize) {
+        let other = 1 - contender;
+        let mut state = self.state.lock().unwrap();
+        state.reached[contender] = true;
+        self.changed.notify_all();
+        if std::mem::replace(&mut state.held[contender], true) {
+            return;
+        }
+        let deadline = Instant::now() + POSITION_HOLD;
+        while !state.reached[other] {
+            let now = Instant::now();
+            if now >= deadline {
+                state.overlapped.get_or_insert(false);
+                return;
+            }
+            state = self.changed.wait_timeout(state, deadline - now).unwrap().0;
+        }
+        state.overlapped.get_or_insert(true);
+    }
+
+    fn wait_until_reached(&self, contender: usize) {
+        let mut state = self.state.lock().unwrap();
+        while !state.reached[contender] {
+            state = self.changed.wait(state).unwrap();
+        }
+    }
+
+    fn overlapped(&self) -> Option<bool> {
+        self.state.lock().unwrap().overlapped
+    }
+}
+
+/// Delegates every operation to a real `SledStore`, running [`PositionHold`] around a contender's
+/// reads and writes of a position record.
+struct PositionHoldStore {
+    inner: Arc<SledStore>,
+    hold: Arc<PositionHold>,
+}
+
+impl PositionHoldStore {
+    fn contender_for(key: &[u8]) -> Option<usize> {
+        CONTENDER
+            .with(Cell::get)
+            .filter(|_| key.starts_with(POSITION_KEY_PREFIX))
+    }
+
+    fn wrote(&self, key: &[u8]) {
+        if let Some(contender) = Self::contender_for(key) {
+            self.hold.reached(contender);
+        }
+    }
+}
+
+impl Store for PositionHoldStore {
+    fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+        let value = self.inner.get(key)?;
+        if let Some(contender) = Self::contender_for(key) {
+            self.hold.after_position_read(contender);
+        }
+        Ok(value)
+    }
+    fn put(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+        self.inner.put(key, value)?;
+        self.wrote(key);
+        Ok(())
+    }
+    fn compare_and_put(
+        &self,
+        key: &[u8],
+        expected: Option<&[u8]>,
+        new: &[u8],
+    ) -> anyhow::Result<icn_store::CompareAndPut> {
+        let outcome = self.inner.compare_and_put(key, expected, new)?;
+        self.wrote(key);
+        Ok(outcome)
+    }
+    fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+        self.inner.delete(key)?;
+        self.wrote(key);
+        Ok(())
+    }
+    fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+        self.inner.delete_atomic(keys)?;
+        for key in keys {
+            self.wrote(key);
+        }
+        Ok(())
+    }
+    fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        self.inner.scan(prefix)
+    }
+    fn get_replica_metadata(&self, h: &ContentHash) -> anyhow::Result<Option<ReplicaMetadata>> {
+        self.inner.get_replica_metadata(h)
+    }
+    fn put_replica_metadata(&self, m: &ReplicaMetadata) -> anyhow::Result<()> {
+        self.inner.put_replica_metadata(m)
+    }
+    fn list_replica_hashes(&self) -> anyhow::Result<Vec<ContentHash>> {
+        self.inner.list_replica_hashes()
+    }
+}
+
+fn position_hold_manager(
+    node: &Node,
+) -> (
+    ClearingManager,
+    Arc<PositionHoldStore>,
+    Arc<SledStore>,
+    Arc<PositionHold>,
+) {
+    let sled = node.open_store();
+    let hold = Arc::new(PositionHold::default());
+    let store = Arc::new(PositionHoldStore {
+        inner: sled.clone(),
+        hold: hold.clone(),
+    });
+    let manager = ClearingManager::new(store.clone() as Arc<dyn Store>, OWN.to_string()).unwrap();
+    manager.create_agreement(agreement()).unwrap();
+    (manager, store, sled, hold)
+}
+
+fn stored_entry_statuses(store: &dyn Store, id: &str) -> Vec<TransferStatus> {
+    let mut key = POSITION_KEY_PREFIX.to_vec();
+    key.extend(AGREEMENT.as_bytes());
+    let bytes = store.get(&key).unwrap().expect("position is persisted");
+    serde_json::from_slice::<ClearingPosition>(&bytes)
+        .unwrap()
+        .pending_transfers
+        .iter()
+        .filter(|t| t.id == id)
+        .map(|t| t.status)
+        .collect()
+}
+
+/// Two *different* obligations (4 and 9) on one agreement, confirmed concurrently on one manager.
+/// Confirmation is a durable read → modify → write of the whole position record, so without the
+/// position lock the second writer replays a stale base and the first obligation is lost while
+/// both calls return `Ok`. A same-transfer race cannot show this: its two stale writes coincide.
+/// The assertions are economic only, so the bounded hold cannot turn a lost update into a pass.
+#[test]
+fn nb042_concurrent_confirmations_of_different_transfers_keep_both_obligations() {
+    let node = Node::new();
+    let (manager, store, sled, hold) = position_hold_manager(&node);
+    manager.propose_transfer(transfer("t-1", 4)).unwrap();
+    manager.propose_transfer(transfer("t-2", 9)).unwrap();
+
+    let results = std::thread::scope(|s| {
+        let handles: Vec<_> = [(0usize, "t-1"), (1usize, "t-2")]
+            .into_iter()
+            .map(|(contender, id)| {
+                let manager = &manager;
+                s.spawn(move || {
+                    CONTENDER.with(|cell| cell.set(Some(contender)));
+                    manager.confirm_transfer(id).map_err(|e| e.to_string())
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    eprintln!(
+        "position-lock witness (confirm ‖ confirm): overlapped={:?} results={results:?}",
+        hold.overlapped()
+    );
+
+    assert!(results.iter().all(Result::is_ok), "{results:?}");
+    assert_eq!(owed(&manager), 13, "live position lost an obligation");
+    assert_eq!(
+        stored_owed(sled.as_ref()),
+        13,
+        "durable position lost an obligation"
+    );
+    for id in ["t-1", "t-2"] {
+        assert_eq!(
+            stored_entry_statuses(sled.as_ref(), id),
+            vec![TransferStatus::Confirmed],
+            "{id} must be booked exactly once"
+        );
+    }
+
+    sled.flush().unwrap();
+    drop(manager);
+    drop(store);
+    assert_eq!(Arc::strong_count(&sled), 1, "fixture: leaked store handle");
+    drop(sled);
+    let (manager, _store) = node.manager();
+    assert_eq!(owed(&manager), 13, "and durably, after a restart");
+}
+
+/// Confirmation of t-2 races settlement of already-confirmed t-1 on one manager. Whatever order
+/// the lock imposes, what settlement reports discharged plus what is still owed must equal the two
+/// unique obligations, and settled t-1 must not be owed again. Without the lock the confirmation
+/// writes back the pre-settlement record and re-creates the discharged obligation.
+#[test]
+fn nb042_confirmation_racing_settlement_conserves_obligations() {
+    let node = Node::new();
+    let (manager, _store, sled, hold) = position_hold_manager(&node);
+    manager.propose_transfer(transfer("t-1", 4)).unwrap();
+    manager.confirm_transfer("t-1").unwrap();
+    manager.propose_transfer(transfer("t-2", 9)).unwrap();
+
+    let (confirmed, settled) = std::thread::scope(|s| {
+        let (manager, hold) = (&manager, &hold);
+        let confirm = s.spawn(move || {
+            CONTENDER.with(|cell| cell.set(Some(0)));
+            manager.confirm_transfer("t-2").map_err(|e| e.to_string())
+        });
+        let settle = s.spawn(move || {
+            hold.wait_until_reached(0);
+            CONTENDER.with(|cell| cell.set(Some(1)));
+            manager
+                .trigger_settlement(AGREEMENT)
+                .map_err(|e| e.to_string())
+        });
+        (confirm.join().unwrap(), settle.join().unwrap())
+    });
+    eprintln!(
+        "position-lock witness (confirm ‖ settle): overlapped={:?} confirm={confirmed:?}",
+        hold.overlapped()
+    );
+
+    assert!(confirmed.is_ok(), "{confirmed:?}");
+    let report = settled.unwrap();
+    assert_eq!(
+        report.coop_a_owed + stored_owed(sled.as_ref()),
+        13,
+        "settled + still owed must equal the two unique obligations"
+    );
+    assert!(
+        stored_entry_statuses(sled.as_ref(), "t-1").is_empty(),
+        "settled t-1 must not be tracked, and so owed, again"
+    );
+}
+
 // ── controls (must pass) ─────────────────────────────────────────────────────────────────────
 
 #[test]

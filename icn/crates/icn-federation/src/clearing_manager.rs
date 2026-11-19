@@ -307,9 +307,13 @@ impl ClearingManager {
     /// * [`FederationError::InvalidState`], with nothing written, when booking would contradict a
     ///   durable record: the transfer or its position entry is `Disputed`, or a `Pending` transfer
     ///   is not tracked by its agreement's position.
-    /// * Any other error is a failed read or write. Retrying is safe. If the position write failed,
-    ///   nothing was booked and the retry books it once. If only the later transfer-row write
-    ///   failed, the amount is already booked and the retry repairs the row without booking again.
+    /// * Any other error is a failed read or write. Retrying never books the amount twice. If the
+    ///   position write failed, nothing was booked and the retry books it once. If only the later
+    ///   transfer-row write failed, the amount is already booked; a retry before settlement repairs
+    ///   the row without booking again. Once settlement has discharged the entry, the retry is
+    ///   refused with [`FederationError::InvalidState`] and the row stays `Pending`: that durable
+    ///   state cannot be told apart from a proposal whose position write was lost, so refusing is
+    ///   the only safe answer. Economic state is still correct; only the derived row is stale.
     ///
     /// # Ownership
     ///
@@ -317,6 +321,14 @@ impl ClearingManager {
     /// managers over the same store: the other position writers in this type (proposal,
     /// settlement, netting) write the manager's cached position with a plain `put`, so one manager
     /// per clearing keyspace is assumed.
+    ///
+    /// **Precondition for production wiring.** This method has no production caller. Any caller
+    /// added later must reach it through the single long-lived manager that owns the clearing
+    /// keyspace (as the supervisor and gateway hold one), never through a manager built per
+    /// request. Two managers on one store each hold their own lock, so concurrent confirmations,
+    /// proposals or settlements on one agreement would replay stale position records and lose
+    /// obligations. Lifting this precondition needs its own acceptance contract, for example
+    /// compare-and-put on every position writer.
     pub fn confirm_transfer(&self, transfer_id: &str) -> Result<()> {
         let key = Self::transfer_key(transfer_id);
 
@@ -730,9 +742,11 @@ enum ConfirmDecision {
 /// Decide what confirming `transfer` may do, given its agreement's durable `position`.
 ///
 /// The position is the authority because its balances and its per-transfer statuses change in
-/// the same write. The transfer row is consulted only where the position has no entry for the
-/// transfer: settlement removes discharged entries, and the row is written `Confirmed` only after
-/// the position has booked it, so an untracked `Confirmed` row means booked and discharged.
+/// the same write. The transfer row can only make the answer more conservative: a `Disputed` row
+/// refuses and a `Settled` row reports already booked, whatever the position says. Otherwise the
+/// row matters only where the position has no entry for the transfer: settlement removes
+/// discharged entries, and the row is written `Confirmed` only after the position has booked it,
+/// so an untracked `Confirmed` row means booked and discharged.
 fn decide_confirmation(
     transfer: &CrossCoopTransfer,
     position: &ClearingPosition,
