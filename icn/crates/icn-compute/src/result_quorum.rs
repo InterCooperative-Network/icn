@@ -485,10 +485,157 @@ impl ResultAggregator {
 /// timeout and expiry are deterministic.
 pub type QuorumClock = Arc<dyn Fn() -> u64 + Send + Sync>;
 
+/// Why a registered task's quorum closed without accepting a result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuorumRejection {
+    /// The collected results did not agree.
+    Divergent,
+    /// A result arrived after the deadline, inside the skew tolerance, with too few results.
+    TimedOut,
+    /// The expiry sweep retired the collection after its deadline.
+    Expired,
+    /// The task was cancelled.
+    Cancelled,
+}
+
+/// How a registered task's quorum closed.
+///
+/// It outlives the task's aggregator, so that a later result is refused instead of being taken
+/// for one belonging to a task that never needed a quorum. It is deliberately small: the
+/// canonical result is handed to the caller once, in [`QuorumDecision::Accepted`], and the task's
+/// own record keeps it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QuorumClosure {
+    /// Consensus accepted the result with this output hash, from this executor.
+    Accepted {
+        /// Output hash of the agreeing group
+        result_hash: [u8; 32],
+        /// Executor of the canonical result
+        executor: String,
+    },
+    /// The quorum closed without accepting any result.
+    Rejected(QuorumRejection),
+}
+
+/// The authoritative quorum state of a task, whether or not an aggregator is still active.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QuorumRecord {
+    /// Never registered for quorum verification: the single-executor path applies.
+    NotRegistered,
+    /// Registered and still collecting results.
+    Collecting { received: usize, required: usize },
+    /// Registered, and its quorum has closed.
+    Closed(QuorumClosure),
+}
+
+/// What one counted submission decided.
+///
+/// It is produced under the manager's lock, in the same step that closes the quorum, so the
+/// canonical result cannot be lost to a concurrent expiry, cancellation or competing result
+/// between "consensus was reached" and "here is the result that was accepted".
+#[derive(Debug, Clone)]
+pub enum QuorumDecision {
+    /// The result was counted; more are needed.
+    Collecting { received: usize, required: usize },
+    /// Consensus: the quorum is closed and `canonical` is the accepted result.
+    Accepted {
+        canonical: ComputeResult,
+        result_hash: [u8; 32],
+        agreeing: usize,
+        total: usize,
+    },
+    /// The results diverged: the quorum is closed without acceptance.
+    Divergent {
+        result_groups: usize,
+        total: usize,
+        /// Executors grouped by output hash, for dispute evidence
+        executor_groups: HashMap<[u8; 32], Vec<String>>,
+    },
+    /// The deadline passed with too few results: the quorum is closed without acceptance.
+    TimedOut { received: usize, required: usize },
+}
+
+impl QuorumDecision {
+    /// The equivalent [`QuorumStatus`].
+    pub fn status(&self) -> QuorumStatus {
+        match self {
+            Self::Collecting { received, required } => QuorumStatus::Collecting {
+                received: *received,
+                required: *required,
+            },
+            Self::Accepted {
+                result_hash,
+                agreeing,
+                total,
+                ..
+            } => QuorumStatus::Consensus {
+                result_hash: *result_hash,
+                agreeing: *agreeing,
+                total: *total,
+            },
+            Self::Divergent {
+                result_groups,
+                total,
+                ..
+            } => QuorumStatus::Divergent {
+                result_groups: *result_groups,
+                total: *total,
+            },
+            Self::TimedOut { received, required } => QuorumStatus::Timeout {
+                received: *received,
+                required: *required,
+            },
+        }
+    }
+}
+
+/// Active collections and closed quorums, behind one lock so that closing is a single step.
+#[derive(Default)]
+struct QuorumBook {
+    /// Collections in progress. Bounded by [`MAX_CONCURRENT_VERIFICATIONS`].
+    active: HashMap<TaskHash, ResultAggregator>,
+    /// Closed quorums, kept until the task itself is retired ([`ResultQuorumManager::retire_task`]).
+    closed: HashMap<TaskHash, QuorumClosure>,
+}
+
+impl QuorumBook {
+    /// Drop the task's aggregator, with every collected result, and keep only its closure.
+    fn close(&mut self, task_hash: TaskHash, closure: QuorumClosure) {
+        self.active.remove(&task_hash);
+        self.closed.insert(task_hash, closure);
+    }
+}
+
 /// Manager for coordinating result quorum across multiple tasks
+///
+/// # Acceptance
+///
+/// A registered task's quorum is either collecting or closed. [`Self::submit`] closes it, in the
+/// same locked step that evaluates it, on consensus, divergence or timeout; [`Self::cancel_task`]
+/// and [`Self::cleanup_expired`] close it too. Once closed, every further result is refused with
+/// [`ComputeError::QuorumClosed`]. [`ComputeError::TaskNotFound`] from [`Self::submit`] means only
+/// that the task was never registered, which is the one case where the single-executor path may
+/// complete it.
+///
+/// # Retention
+///
+/// Active collections are bounded by [`MAX_CONCURRENT_VERIFICATIONS`]. When a quorum closes, its
+/// aggregator is dropped and replaced by a small [`QuorumClosure`] that does not count against
+/// that bound. A closure is kept until [`Self::retire_task`], which callers invoke only when the
+/// task itself leaves the task manager. There is no time-based expiry: dropping a closure while
+/// its task is still addressable would let a late result pass for one belonging to an
+/// unregistered task. Closures therefore live exactly as long as the task records they describe.
+/// (Today `TaskManager::cleanup` has no production caller, so both live for the process; a
+/// closure is an output hash and an executor DID, against a task record that holds its code and
+/// inputs.)
+///
+/// # Restart
+///
+/// All quorum state is in memory, as is the task manager. Nothing here survives a restart, and
+/// no restart guarantee is made.
 pub struct ResultQuorumManager {
-    /// Active aggregators by task hash
-    aggregators: Arc<RwLock<HashMap<TaskHash, ResultAggregator>>>,
+    /// Active collections and closed quorums
+    book: RwLock<QuorumBook>,
     /// Verification configuration
     config: VerificationConfig,
     /// Time source for collection windows
@@ -504,7 +651,7 @@ impl ResultQuorumManager {
     /// Create a manager that reads time from `clock` instead of the system clock.
     pub fn with_clock(config: VerificationConfig, clock: QuorumClock) -> Self {
         Self {
-            aggregators: Arc::new(RwLock::new(HashMap::new())),
+            book: RwLock::new(QuorumBook::default()),
             config,
             clock,
         }
@@ -514,9 +661,24 @@ impl ResultQuorumManager {
         (self.clock)()
     }
 
+    fn closed_error(task_hash: &TaskHash, closure: &QuorumClosure) -> ComputeError {
+        ComputeError::QuorumClosed {
+            task: hex::encode(task_hash),
+            closure: closure.clone(),
+        }
+    }
+
+    fn no_active_collection(task_hash: &TaskHash) -> ComputeError {
+        ComputeError::TaskNotFound(format!(
+            "No active quorum collection for task {}",
+            hex::encode(task_hash)
+        ))
+    }
+
     /// Register a task for multi-executor verification
     ///
     /// # Errors
+    /// - [`ComputeError::QuorumClosed`] if the task's quorum has already closed
     /// - Returns error if task is already registered
     /// - Returns error if MAX_CONCURRENT_VERIFICATIONS limit reached (DoS protection)
     pub fn register_task(&self, task_hash: TaskHash, verification: TaskVerification) -> Result<()> {
@@ -529,135 +691,233 @@ impl ResultQuorumManager {
             self.config.collection_window_ms,
         );
 
-        let mut aggregators = self
-            .aggregators
-            .write()
-            .map_err(|_| ComputeError::LockError)?;
+        let mut book = self.book.write().map_err(|_| ComputeError::LockError)?;
 
-        // DoS protection: limit concurrent verifications
-        if aggregators.len() >= MAX_CONCURRENT_VERIFICATIONS {
+        if let Some(closure) = book.closed.get(&task_hash) {
+            return Err(Self::closed_error(&task_hash, closure));
+        }
+
+        // DoS protection: limit concurrent verifications. Closed quorums do not count.
+        if book.active.len() >= MAX_CONCURRENT_VERIFICATIONS {
             return Err(ComputeError::InvalidResult(format!(
                 "Maximum concurrent verifications reached ({MAX_CONCURRENT_VERIFICATIONS}). Clean up expired tasks first."
             )));
         }
 
-        if aggregators.contains_key(&task_hash) {
+        if book.active.contains_key(&task_hash) {
             return Err(ComputeError::InvalidResult(format!(
                 "Task {} already registered for quorum verification",
                 hex::encode(task_hash)
             )));
         }
 
-        aggregators.insert(task_hash, aggregator);
+        book.active.insert(task_hash, aggregator);
         Ok(())
     }
 
-    /// Submit a result for quorum evaluation
-    pub fn submit_result(&self, result: ComputeResult) -> Result<QuorumStatus> {
+    /// Submit a result for quorum evaluation, closing the quorum when the result decides it.
+    ///
+    /// # Errors
+    /// - [`ComputeError::TaskNotFound`]: the task was never registered (or has been retired).
+    /// - [`ComputeError::QuorumClosed`]: the task's quorum has closed; the result is refused.
+    /// - [`ComputeError::InvalidResult`]: the aggregator refused the result (bad signature,
+    ///   wrong task, duplicate executor, collection window closed). Nothing changes.
+    pub fn submit(&self, result: ComputeResult) -> Result<QuorumDecision> {
         let task_hash = result.task_hash;
+        let now = self.now();
 
-        let mut aggregators = self
-            .aggregators
-            .write()
-            .map_err(|_| ComputeError::LockError)?;
+        let mut book = self.book.write().map_err(|_| ComputeError::LockError)?;
 
-        let aggregator = aggregators.get_mut(&task_hash).ok_or_else(|| {
+        if let Some(closure) = book.closed.get(&task_hash) {
+            return Err(Self::closed_error(&task_hash, closure));
+        }
+
+        let aggregator = book.active.get_mut(&task_hash).ok_or_else(|| {
             ComputeError::TaskNotFound(format!(
-                "No quorum aggregator for task {}",
+                "Task {} is not registered for quorum verification",
                 hex::encode(task_hash)
             ))
         })?;
 
-        let now = self.now();
         aggregator.add_result_at(result, now)?;
+
+        let (decision, closure) = match aggregator.status_at(now) {
+            QuorumStatus::Collecting { received, required } => {
+                return Ok(QuorumDecision::Collecting { received, required });
+            }
+            QuorumStatus::Consensus {
+                result_hash,
+                agreeing,
+                total,
+            } => {
+                let canonical = aggregator.canonical_result().cloned().ok_or_else(|| {
+                    ComputeError::Internal(
+                        "quorum reported consensus without a canonical result".into(),
+                    )
+                })?;
+                let closure = QuorumClosure::Accepted {
+                    result_hash,
+                    executor: canonical.executor.clone(),
+                };
+                (
+                    QuorumDecision::Accepted {
+                        canonical,
+                        result_hash,
+                        agreeing,
+                        total,
+                    },
+                    closure,
+                )
+            }
+            QuorumStatus::Divergent {
+                result_groups,
+                total,
+            } => (
+                QuorumDecision::Divergent {
+                    result_groups,
+                    total,
+                    executor_groups: aggregator.executor_groups(),
+                },
+                QuorumClosure::Rejected(QuorumRejection::Divergent),
+            ),
+            QuorumStatus::Timeout { received, required } => (
+                QuorumDecision::TimedOut { received, required },
+                QuorumClosure::Rejected(QuorumRejection::TimedOut),
+            ),
+        };
+
+        book.close(task_hash, closure);
+        Ok(decision)
+    }
+
+    /// [`Self::submit`], reporting only the status.
+    pub fn submit_result(&self, result: ComputeResult) -> Result<QuorumStatus> {
+        self.submit(result).map(|decision| decision.status())
+    }
+
+    /// The authoritative quorum state of a task.
+    pub fn record(&self, task_hash: &TaskHash) -> Result<QuorumRecord> {
+        let book = self.book.read().map_err(|_| ComputeError::LockError)?;
+
+        if let Some(closure) = book.closed.get(task_hash) {
+            return Ok(QuorumRecord::Closed(closure.clone()));
+        }
+        Ok(match book.active.get(task_hash) {
+            Some(aggregator) => QuorumRecord::Collecting {
+                received: aggregator.results.len(),
+                required: aggregator.verification.required_executors,
+            },
+            None => QuorumRecord::NotRegistered,
+        })
+    }
+
+    /// Get the status of a task's *active* collection.
+    ///
+    /// [`ComputeError::TaskNotFound`] here means only that no collection is active: the task may
+    /// never have been registered, or its quorum may have closed. Use [`Self::record`] to tell
+    /// those apart.
+    pub fn get_status(&self, task_hash: &TaskHash) -> Result<QuorumStatus> {
+        let now = self.now();
+        let book = self.book.read().map_err(|_| ComputeError::LockError)?;
+
+        let aggregator = book
+            .active
+            .get(task_hash)
+            .ok_or_else(|| Self::no_active_collection(task_hash))?;
+
         Ok(aggregator.status_at(now))
     }
 
-    /// Get the status of a task's quorum
-    pub fn get_status(&self, task_hash: &TaskHash) -> Result<QuorumStatus> {
-        let aggregators = self
-            .aggregators
-            .read()
-            .map_err(|_| ComputeError::LockError)?;
-
-        let aggregator = aggregators.get(task_hash).ok_or_else(|| {
-            ComputeError::TaskNotFound(format!(
-                "No quorum aggregator for task {}",
-                hex::encode(task_hash)
-            ))
-        })?;
-
-        Ok(aggregator.status_at(self.now()))
-    }
-
-    /// Get the canonical result if consensus reached
+    /// Get the canonical result of an *active* collection, if it has consensus.
+    ///
+    /// A closed quorum has no active collection. The accepted result is returned once, by
+    /// [`Self::submit`], in [`QuorumDecision::Accepted`].
     pub fn get_canonical_result(&self, task_hash: &TaskHash) -> Result<Option<ComputeResult>> {
-        let aggregators = self
-            .aggregators
-            .read()
-            .map_err(|_| ComputeError::LockError)?;
+        let book = self.book.read().map_err(|_| ComputeError::LockError)?;
 
-        let aggregator = aggregators.get(task_hash).ok_or_else(|| {
-            ComputeError::TaskNotFound(format!(
-                "No quorum aggregator for task {}",
-                hex::encode(task_hash)
-            ))
-        })?;
+        let aggregator = book
+            .active
+            .get(task_hash)
+            .ok_or_else(|| Self::no_active_collection(task_hash))?;
 
         Ok(aggregator.canonical_result().cloned())
     }
 
-    /// Get executor groupings for a task (useful for dispute evidence)
+    /// Get executor groupings of an *active* collection (useful for dispute evidence)
     pub fn get_executor_groups(
         &self,
         task_hash: &TaskHash,
     ) -> Result<HashMap<[u8; 32], Vec<String>>> {
-        let aggregators = self
-            .aggregators
-            .read()
-            .map_err(|_| ComputeError::LockError)?;
+        let book = self.book.read().map_err(|_| ComputeError::LockError)?;
 
-        let aggregator = aggregators.get(task_hash).ok_or_else(|| {
-            ComputeError::TaskNotFound(format!(
-                "No quorum aggregator for task {}",
-                hex::encode(task_hash)
-            ))
-        })?;
+        let aggregator = book
+            .active
+            .get(task_hash)
+            .ok_or_else(|| Self::no_active_collection(task_hash))?;
 
         Ok(aggregator.executor_groups())
     }
 
-    /// Remove a completed task's aggregator
-    pub fn remove_task(&self, task_hash: &TaskHash) -> Result<()> {
-        let mut aggregators = self
-            .aggregators
-            .write()
-            .map_err(|_| ComputeError::LockError)?;
+    /// Close a registered task's quorum because the task was cancelled.
+    ///
+    /// A quorum that has already closed keeps its closure, so an accepted result stays accepted.
+    /// A task that was never registered is unaffected.
+    pub fn cancel_task(&self, task_hash: &TaskHash) -> Result<()> {
+        let mut book = self.book.write().map_err(|_| ComputeError::LockError)?;
 
-        aggregators.remove(task_hash);
+        if book.active.contains_key(task_hash) {
+            book.close(
+                *task_hash,
+                QuorumClosure::Rejected(QuorumRejection::Cancelled),
+            );
+        }
         Ok(())
     }
 
-    /// Clean up timed-out aggregators
+    /// Forget everything about a task's quorum.
+    ///
+    /// Call this only when the task itself is retired from the task manager. Afterwards a result
+    /// for the task is indistinguishable from one for a task that was never registered.
+    pub fn retire_task(&self, task_hash: &TaskHash) -> Result<()> {
+        let mut book = self.book.write().map_err(|_| ComputeError::LockError)?;
+
+        book.active.remove(task_hash);
+        book.closed.remove(task_hash);
+        Ok(())
+    }
+
+    /// Close every collection whose deadline has passed, as [`QuorumRejection::Expired`].
+    ///
+    /// Returns the tasks closed by this call.
     pub fn cleanup_expired(&self) -> Result<Vec<TaskHash>> {
         let now = self.now();
 
-        let mut aggregators = self
-            .aggregators
-            .write()
-            .map_err(|_| ComputeError::LockError)?;
+        let mut book = self.book.write().map_err(|_| ComputeError::LockError)?;
 
-        let expired: Vec<TaskHash> = aggregators
+        let expired: Vec<TaskHash> = book
+            .active
             .iter()
             .filter(|(_, agg)| now > agg.deadline)
             .map(|(hash, _)| *hash)
             .collect();
 
         for hash in &expired {
-            aggregators.remove(hash);
+            book.close(*hash, QuorumClosure::Rejected(QuorumRejection::Expired));
         }
 
         Ok(expired)
+    }
+
+    /// Number of active collections (bounded by [`MAX_CONCURRENT_VERIFICATIONS`]).
+    pub fn active_count(&self) -> Result<usize> {
+        let book = self.book.read().map_err(|_| ComputeError::LockError)?;
+        Ok(book.active.len())
+    }
+
+    /// Number of closed quorums still retained.
+    pub fn closed_count(&self) -> Result<usize> {
+        let book = self.book.read().map_err(|_| ComputeError::LockError)?;
+        Ok(book.closed.len())
     }
 
     /// Get the verification config
@@ -1337,21 +1597,26 @@ mod tests {
             }
         ));
 
-        // Submit second result (same output)
+        // Submit second result (same output): consensus closes the quorum and hands over the
+        // canonical result in the same step.
         let result2 = exec2.signed_result(task_hash, b"output");
-        let status = manager.submit_result(result2).unwrap();
+        let decision = manager.submit(result2).unwrap();
         assert!(matches!(
-            status,
+            decision.status(),
             QuorumStatus::Consensus {
                 agreeing: 2,
                 total: 2,
                 ..
             }
         ));
-
-        // Get canonical result
-        let canonical = manager.get_canonical_result(&task_hash).unwrap();
-        assert!(canonical.is_some());
+        let QuorumDecision::Accepted { canonical, .. } = decision else {
+            panic!("consensus must carry the canonical result, got {decision:?}");
+        };
+        assert_eq!(canonical.task_hash, task_hash);
+        assert!(matches!(
+            manager.record(&task_hash).unwrap(),
+            QuorumRecord::Closed(QuorumClosure::Accepted { .. })
+        ));
     }
 
     #[test]
@@ -1395,5 +1660,206 @@ mod tests {
         // Find the majority group (should have 3 executors)
         let majority_count = groups.values().map(|v| v.len()).max().unwrap();
         assert_eq!(majority_count, 3);
+    }
+
+    // ── C0: closed quorums are authoritative (#2907 F-1) ───────────────────────────────────────
+
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    const T0: u64 = 1_800_000_000_000;
+    const WINDOW: u64 = 30_000;
+
+    fn clocked_manager() -> (ResultQuorumManager, Arc<AtomicU64>) {
+        let now = Arc::new(AtomicU64::new(T0));
+        let source = Arc::clone(&now);
+        let manager = ResultQuorumManager::with_clock(
+            VerificationConfig {
+                collection_window_ms: WINDOW,
+                ..VerificationConfig::default()
+            },
+            Arc::new(move || source.load(Ordering::SeqCst)),
+        );
+        (manager, now)
+    }
+
+    fn two_of_two() -> TaskVerification {
+        TaskVerification {
+            value: TaskValue::Medium,
+            required_executors: 2,
+            consensus_threshold: 0.67,
+            assigned_executors: vec![],
+        }
+    }
+
+    fn closure_of(manager: &ResultQuorumManager, hash: &TaskHash) -> QuorumClosure {
+        match manager.record(hash).unwrap() {
+            QuorumRecord::Closed(closure) => closure,
+            other => panic!("expected a closed quorum, got {other:?}"),
+        }
+    }
+
+    /// Every way a quorum closes, and that a closed quorum refuses every later result with the
+    /// typed `QuorumClosed` error, never `TaskNotFound`.
+    #[test]
+    fn closed_quorums_refuse_later_results_with_a_typed_error() {
+        let (manager, now) = clocked_manager();
+        let (a, b, c) = (
+            TestExecutor::new(),
+            TestExecutor::new(),
+            TestExecutor::new(),
+        );
+
+        let accepted = [1u8; 32];
+        let divergent = [2u8; 32];
+        let timed_out = [3u8; 32];
+        let expired = [4u8; 32];
+        let cancelled = [5u8; 32];
+        for hash in [accepted, divergent, timed_out, expired, cancelled] {
+            manager.register_task(hash, two_of_two()).unwrap();
+        }
+        assert_eq!(
+            manager.record(&[9u8; 32]).unwrap(),
+            QuorumRecord::NotRegistered
+        );
+        assert_eq!(
+            manager.record(&accepted).unwrap(),
+            QuorumRecord::Collecting {
+                received: 0,
+                required: 2
+            }
+        );
+
+        manager.submit(a.signed_result(accepted, b"x")).unwrap();
+        let decision = manager.submit(b.signed_result(accepted, b"x")).unwrap();
+        assert!(matches!(decision, QuorumDecision::Accepted { .. }));
+
+        manager.submit(a.signed_result(divergent, b"x")).unwrap();
+        let decision = manager.submit(b.signed_result(divergent, b"y")).unwrap();
+        assert!(matches!(decision, QuorumDecision::Divergent { .. }));
+
+        manager.cancel_task(&cancelled).unwrap();
+
+        // Past the deadline, inside the skew tolerance: one result times the collection out.
+        now.store(T0 + WINDOW + CLOCK_SKEW_TOLERANCE_MS / 2, Ordering::SeqCst);
+        let decision = manager.submit(a.signed_result(timed_out, b"x")).unwrap();
+        assert!(matches!(decision, QuorumDecision::TimedOut { .. }));
+        assert_eq!(manager.cleanup_expired().unwrap(), vec![expired]);
+
+        assert!(matches!(
+            closure_of(&manager, &accepted),
+            QuorumClosure::Accepted { .. }
+        ));
+        for (hash, rejection) in [
+            (divergent, QuorumRejection::Divergent),
+            (timed_out, QuorumRejection::TimedOut),
+            (expired, QuorumRejection::Expired),
+            (cancelled, QuorumRejection::Cancelled),
+        ] {
+            assert_eq!(
+                closure_of(&manager, &hash),
+                QuorumClosure::Rejected(rejection)
+            );
+        }
+
+        for hash in [accepted, divergent, timed_out, expired, cancelled] {
+            let late = manager.submit(c.signed_result(hash, b"x"));
+            assert!(
+                matches!(late, Err(ComputeError::QuorumClosed { .. })),
+                "a result after the quorum closed must be refused as QuorumClosed, got {late:?}"
+            );
+            assert!(matches!(
+                manager.register_task(hash, two_of_two()),
+                Err(ComputeError::QuorumClosed { .. })
+            ));
+        }
+        assert_eq!(manager.active_count().unwrap(), 0);
+        assert_eq!(manager.closed_count().unwrap(), 5);
+    }
+
+    /// A result the aggregator refuses changes nothing: the quorum keeps collecting.
+    #[test]
+    fn a_refused_result_leaves_the_quorum_collecting() {
+        let (manager, _now) = clocked_manager();
+        let a = TestExecutor::new();
+        let hash = [6u8; 32];
+        manager.register_task(hash, two_of_two()).unwrap();
+        let first = a.signed_result(hash, b"x");
+        manager.submit(first.clone()).unwrap();
+
+        assert!(matches!(
+            manager.submit(first),
+            Err(ComputeError::InvalidResult(_))
+        ));
+        assert_eq!(
+            manager.record(&hash).unwrap(),
+            QuorumRecord::Collecting {
+                received: 1,
+                required: 2
+            }
+        );
+    }
+
+    /// Cancellation and expiry cannot override an acceptance: a closed quorum keeps its closure.
+    #[test]
+    fn an_accepted_quorum_stays_accepted() {
+        let (manager, now) = clocked_manager();
+        let (a, b) = (TestExecutor::new(), TestExecutor::new());
+        let hash = [7u8; 32];
+        manager.register_task(hash, two_of_two()).unwrap();
+
+        // The second result lands after the deadline, inside the tolerance, and completes the
+        // quorum: consensus, even though the sweep would now consider the collection expired.
+        manager.submit(a.signed_result(hash, b"x")).unwrap();
+        now.store(T0 + WINDOW + 1, Ordering::SeqCst);
+        let decision = manager.submit(b.signed_result(hash, b"x")).unwrap();
+        assert!(matches!(decision, QuorumDecision::Accepted { .. }));
+
+        assert!(manager.cleanup_expired().unwrap().is_empty());
+        manager.cancel_task(&hash).unwrap();
+        assert!(matches!(
+            closure_of(&manager, &hash),
+            QuorumClosure::Accepted { .. }
+        ));
+    }
+
+    /// Closed quorums do not hold active verification capacity, and are released only by
+    /// retiring the task.
+    #[test]
+    fn closed_quorums_do_not_consume_active_capacity() {
+        let (manager, _now) = clocked_manager();
+        let hash = |i: usize| {
+            let mut h = [0u8; 32];
+            h[..8].copy_from_slice(&(i as u64).to_be_bytes());
+            h
+        };
+        for i in 0..MAX_CONCURRENT_VERIFICATIONS {
+            manager.register_task(hash(i), two_of_two()).unwrap();
+        }
+        assert!(manager
+            .register_task(hash(MAX_CONCURRENT_VERIFICATIONS), two_of_two())
+            .is_err());
+
+        for i in 0..MAX_CONCURRENT_VERIFICATIONS {
+            manager.cancel_task(&hash(i)).unwrap();
+        }
+        assert_eq!(manager.active_count().unwrap(), 0);
+        assert_eq!(
+            manager.closed_count().unwrap(),
+            MAX_CONCURRENT_VERIFICATIONS
+        );
+        manager
+            .register_task(hash(MAX_CONCURRENT_VERIFICATIONS), two_of_two())
+            .unwrap();
+
+        // Retiring a task is the only thing that forgets its closure.
+        manager.retire_task(&hash(0)).unwrap();
+        assert_eq!(
+            manager.record(&hash(0)).unwrap(),
+            QuorumRecord::NotRegistered
+        );
+        assert_eq!(
+            manager.closed_count().unwrap(),
+            MAX_CONCURRENT_VERIFICATIONS - 1
+        );
     }
 }

@@ -31,6 +31,12 @@
 //!   ```
 //!
 //!   A RED test that starts passing means the behaviour changed: re-classify it, do not delete it.
+//! * **Repaired contracts** were RED. They keep their name and invariant, run in normal CI, and
+//!   say in their doc comment what closed them. EX-018 was repaired by C0 (#2907 F-1): the quorum
+//!   manager keeps each registered task's closed quorum after its aggregator is retired, and only
+//!   a task that was never registered may take the single-executor path.
+//! * **C0 contracts** (end of file) extend EX-018 to every way a registered quorum closes:
+//!   divergence, consensus, cancellation, timeout, sweep expiry and the collection window.
 //!
 //! # Fixture
 //!
@@ -440,10 +446,12 @@ async fn control_clearing_callback_fires_for_an_unregistered_federated_task() {
     assert_eq!(clearings[0].amount, CLEARING_AMOUNT);
 }
 
-// ── RED contracts ────────────────────────────────────────────────────────────────────────────
+// ── repaired contracts ───────────────────────────────────────────────────────────────────────
 
+/// REPAIRED (was RED EX-018, observed `Completed(executor=<A>, fuel=5000)`). Closed by C0: a
+/// result the quorum refuses no longer falls through to the single-executor path; only a task
+/// that was never registered does.
 #[tokio::test]
-#[ignore = "RED EX-018: a repeated result from the one executor that has reported completes a registered two-executor task through the single-executor fallback (observed Completed, expected Pending while the quorum is Collecting 1/2); run with --ignored"]
 async fn ex018_refused_quorum_result_does_not_complete_a_registered_task() {
     let node = node();
     let a = identity(EXECUTOR_A_SEED);
@@ -490,6 +498,8 @@ async fn ex018_refused_quorum_result_does_not_complete_a_registered_task() {
         "EX-018: TaskCompleted was broadcast for a result the quorum did not accept"
     );
 }
+
+// ── RED contracts ────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
 #[ignore = "RED EX-003: the first successful federated result of a registered two-executor task fires a clearing notification while the quorum is still collecting (observed 1 notification for 500 credits, expected none); run with --ignored"]
