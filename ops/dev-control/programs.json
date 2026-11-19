@@ -1,0 +1,197 @@
+{
+  "schema": "icn-dev-control.programs.v1",
+  "canonical": false,
+  "description": "Curated, NON-AUTHORITATIVE navigation catalog for the ICN Development Control Center. It names the seven long-lived programs and the rules used to group live work under them. It holds no status: every PR, session, worktree and decision shown under a program is read live from its owner (git, GitHub, process table, tmux, icn-ops registry, host records). A program with no matched work is shown as 'no matched work observed', never as inactive. Goals and owners are shown only where a source is named here; otherwise they display as unassigned. Repositories not named here (for example private local stores) are classified by keyword over their store name, branch and task text.",
+  "classification_order": [
+    "by_repo",
+    "by_keyword",
+    "default_repo"
+  ],
+  "programs": [
+    {
+      "id": "icn-core",
+      "name": "ICN Core",
+      "summary": "The ICN substrate in the icn monorepo: daemon, kernel and protocol crates, identity, authority, governance, federation, compute and settlement.",
+      "default_for_repos": [
+        "icn"
+      ],
+      "keywords": [],
+      "handoff_keywords": [
+        "icn-core",
+        "federation",
+        "compute",
+        "ledger",
+        "authz",
+        "identity",
+        "governance",
+        "clearing"
+      ],
+      "tracking_issues": [
+        {
+          "repo": "icn",
+          "number": 2689,
+          "why": "organization-wide technical alpha program issue"
+        }
+      ],
+      "goals_source": "tracking issue (read live)",
+      "owner_source": null
+    },
+    {
+      "id": "nycn",
+      "name": "NYCN",
+      "summary": "First institution ecosystem package / reference federation (role per ops/state/ecosystem.json).",
+      "repos": [
+        "nycn"
+      ],
+      "keywords": [
+        "nycn",
+        "summit"
+      ],
+      "handoff_keywords": [
+        "nycn",
+        "summit"
+      ],
+      "tracking_issues": [],
+      "goals_source": null,
+      "owner_source": null
+    },
+    {
+      "id": "mutualware",
+      "name": "Mutualware",
+      "summary": "Cross-system Mutualware coordination: whole-system architecture, foundations and the engineering research notebook.",
+      "keywords": [
+        "mutualware"
+      ],
+      "handoff_keywords": [
+        "mutualware"
+      ],
+      "tracking_issues": [],
+      "goals_source": null,
+      "owner_source": null
+    },
+    {
+      "id": "public-website",
+      "name": "Public & Website",
+      "summary": "The public website, published claims, contributor onboarding and public-facing documentation.",
+      "keywords": [
+        "website",
+        "onboarding",
+        "contributor",
+        "claim-lint",
+        "status.toml",
+        "icn.zone",
+        "public",
+        "readiness claims"
+      ],
+      "handoff_keywords": [
+        "website",
+        "public",
+        "onboarding"
+      ],
+      "tracking_issues": [],
+      "goals_source": null,
+      "owner_source": null
+    },
+    {
+      "id": "community-learning",
+      "name": "Community & Learning",
+      "summary": "Role-based learning and onboarding, and the community onboarding bridge (roles per ops/state/ecosystem.json).",
+      "repos": [
+        "icn-learn",
+        "icn-community-bridge"
+      ],
+      "keywords": [
+        "learn",
+        "learning",
+        "community-bridge",
+        "education"
+      ],
+      "handoff_keywords": [
+        "learn",
+        "community"
+      ],
+      "tracking_issues": [],
+      "goals_source": null,
+      "owner_source": null
+    },
+    {
+      "id": "infra-integration",
+      "name": "Infrastructure & Integration",
+      "summary": "Org-level operating contracts and infrastructure repos, CI, dependency/security remediation, the ops MCP, agent tooling, and integration of other lanes onto main.",
+      "repos": [
+        "icn-infra",
+        "org-github"
+      ],
+      "keywords": [
+        "ci",
+        "deps",
+        "dependabot",
+        "rustsec",
+        "security audit",
+        "ops-mcp",
+        "mcp",
+        "agent",
+        "agents",
+        "workflow",
+        "integration",
+        "integrate",
+        "housekeeping",
+        "disk",
+        "build",
+        "publication policy",
+        "quinn",
+        "rustls",
+        "zstd",
+        "wasmtime",
+        "lru"
+      ],
+      "handoff_keywords": [
+        "infra",
+        "ci",
+        "quinn",
+        "rustls",
+        "zstd",
+        "wasmtime",
+        "disk",
+        "build",
+        "maintenance",
+        "integration",
+        "security"
+      ],
+      "tracking_issues": [],
+      "goals_source": null,
+      "owner_source": null
+    },
+    {
+      "id": "research",
+      "name": "Research Incubator",
+      "summary": "Experimental formats, v0 prototypes, design spikes and research notes that are not yet on a delivery path.",
+      "keywords": [
+        "experimental",
+        "v0",
+        "prototype",
+        "spike",
+        "research",
+        "notebook",
+        "design"
+      ],
+      "handoff_keywords": [
+        "research",
+        "notebook",
+        "design",
+        "architecture"
+      ],
+      "tracking_issues": [],
+      "goals_source": null,
+      "owner_source": null
+    }
+  ],
+  "keyword_priority": [
+    "mutualware",
+    "research",
+    "public-website",
+    "infra-integration",
+    "community-learning",
+    "nycn"
+  ]
+}

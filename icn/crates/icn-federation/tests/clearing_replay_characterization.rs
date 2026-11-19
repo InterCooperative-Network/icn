@@ -1,7 +1,7 @@
 //! Characterization of `ClearingManager` replay, persistence and partial-failure behaviour.
 //!
 //! Test-first evidence for research findings NB-042, NB-043, NB-045, NB-046 and NB-051 (the
-//! settlement-bookkeeping part). Nothing here changes production behaviour.
+//! settlement-bookkeeping part), and the regression tests for the parts since repaired.
 //!
 //! # How to read this file
 //!
@@ -16,6 +16,11 @@
 //!   ```
 //!
 //!   A RED test that starts passing means the behaviour changed: re-classify it, do not delete it.
+//! * **Repaired contracts** were RED contracts. They keep their name and invariant, run in normal
+//!   CI, and say in their doc comment what closed them. `ClearingManager::confirm_transfer` now
+//!   books a transfer with one write of its agreement's position record and decides under the
+//!   manager's lock from durable state; that repairs NB-042, the settled re-booking part of NB-051
+//!   and the confirmation half of NB-046.
 //!
 //! # Where each invariant comes from
 //!
@@ -34,15 +39,17 @@
 //!   commits. That is `icn-core` and needs a ledger stub.
 //! * NB-044 — the imbalance-limit admission rule. Whether the limit bounds pending exposure or
 //!   confirmed net is an owner decision; nothing here exercises `max_imbalance`.
-//! * Finality, dispute handling, netting, and any production fix.
+//! * Finality, dispute handling and netting.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::{Duration, Instant};
 
 use icn_federation::{
-    BilateralClearingAgreement, ClearingManager, CrossCoopTransfer, SettlementInterval,
-    TransferStatus,
+    BilateralClearingAgreement, ClearingManager, ClearingPosition, CrossCoopTransfer,
+    NettingResult, Obligation, SettlementInterval, TransferStatus,
 };
 use icn_identity::{Did, KeyPair};
 use icn_store::{ContentHash, ReplicaMetadata, SledStore, Store};
@@ -162,6 +169,19 @@ fn stored_transfer(store: &dyn Store, id: &str) -> Option<CrossCoopTransfer> {
         .map(|bytes| serde_json::from_slice(&bytes).unwrap())
 }
 
+/// What the agreement's persisted position says is owed, independent of the manager's caches.
+fn stored_owed(store: &dyn Store) -> i64 {
+    let mut key = POSITION_KEY_PREFIX.to_vec();
+    key.extend(AGREEMENT.as_bytes());
+    let bytes = store
+        .get(&key)
+        .unwrap()
+        .expect("the agreement's position is persisted");
+    serde_json::from_slice::<ClearingPosition>(&bytes)
+        .unwrap()
+        .coop_a_owes_b
+}
+
 // ── deterministic fault injection ────────────────────────────────────────────────────────────
 
 /// Delegates every operation to a real `SledStore`, except that it can be armed to fail the
@@ -253,6 +273,470 @@ fn reopen_clean(
     node.manager()
 }
 
+// ── forced stale read (#2904 F1) ─────────────────────────────────────────────────────────────
+
+/// How long a contender that has read a clearing record waits for the other contender to read
+/// one too, counted from when the other *started* its call, before concluding that the
+/// implementation serializes before its first read. A non-serializing implementation never waits
+/// this long: its second contender reaches the store without blocking.
+const SERIALIZATION_GRACE: Duration = Duration::from_secs(10);
+
+thread_local! {
+    /// Which contender (0 or 1) the current thread is. `None` on the test's own thread, whose
+    /// setup calls pass through the store untouched.
+    static CONTENDER: Cell<Option<usize>> = const { Cell::new(None) };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Op {
+    /// Logged *before* the read is performed.
+    Read,
+    /// Logged *after* the write has completed.
+    Write,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Logged {
+    contender: usize,
+    op: Op,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Interleaving {
+    /// Both contenders read a clearing record before either could write one.
+    Overlapped,
+    /// The second contender could not reach the store while the first was inside its call.
+    Serialized,
+}
+
+#[derive(Default)]
+struct RendezvousState {
+    started: [Option<Instant>; 2],
+    has_read: [bool; 2],
+    outcome: Option<Interleaving>,
+    log: Vec<Logged>,
+}
+
+#[derive(Default)]
+struct Rendezvous {
+    state: Mutex<RendezvousState>,
+    changed: Condvar,
+}
+
+impl Rendezvous {
+    fn start(&self, contender: usize) {
+        self.state.lock().unwrap().started[contender] = Some(Instant::now());
+        self.changed.notify_all();
+    }
+
+    fn log(&self, contender: usize, op: Op) {
+        self.state
+            .lock()
+            .unwrap()
+            .log
+            .push(Logged { contender, op });
+    }
+
+    /// Runs after `contender` has read a clearing record and before the value is returned to it.
+    /// On its first such read, hold it until the other contender has read too, so both act on
+    /// what they read before either can write; or until the other, having started, has been unable
+    /// to read for [`SERIALIZATION_GRACE`], which means the implementation serializes first.
+    fn after_read(&self, contender: usize) {
+        let other = 1 - contender;
+        let mut state = self.state.lock().unwrap();
+        if state.has_read[contender] {
+            return;
+        }
+        state.has_read[contender] = true;
+        self.changed.notify_all();
+        loop {
+            if state.outcome.is_some() {
+                return;
+            }
+            if state.has_read[other] {
+                state.outcome = Some(Interleaving::Overlapped);
+                self.changed.notify_all();
+                return;
+            }
+            state = match state.started[other] {
+                Some(started) if started.elapsed() >= SERIALIZATION_GRACE => {
+                    state.outcome = Some(Interleaving::Serialized);
+                    self.changed.notify_all();
+                    return;
+                }
+                Some(started) => {
+                    let remaining = SERIALIZATION_GRACE.saturating_sub(started.elapsed());
+                    self.changed.wait_timeout(state, remaining).unwrap().0
+                }
+                None => self.changed.wait(state).unwrap(),
+            };
+        }
+    }
+
+    fn outcome(&self) -> (Interleaving, Vec<Logged>) {
+        let state = self.state.lock().unwrap();
+        (
+            state
+                .outcome
+                .expect("both contenders read a clearing record"),
+            state.log.clone(),
+        )
+    }
+}
+
+fn is_clearing_record(key: &[u8]) -> bool {
+    key.starts_with(TRANSFER_KEY_PREFIX) || key.starts_with(POSITION_KEY_PREFIX)
+}
+
+/// Delegates every operation to a real `SledStore`. On a contender's thread it logs each read and
+/// write of a clearing record and runs the [`Rendezvous`] after each read.
+struct RendezvousStore {
+    inner: Arc<SledStore>,
+    rendezvous: Arc<Rendezvous>,
+}
+
+impl RendezvousStore {
+    fn contender_for(key: &[u8]) -> Option<usize> {
+        CONTENDER
+            .with(Cell::get)
+            .filter(|_| is_clearing_record(key))
+    }
+
+    fn wrote(&self, key: &[u8]) {
+        if let Some(contender) = Self::contender_for(key) {
+            self.rendezvous.log(contender, Op::Write);
+        }
+    }
+}
+
+impl Store for RendezvousStore {
+    fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+        let contender = Self::contender_for(key);
+        if let Some(contender) = contender {
+            self.rendezvous.log(contender, Op::Read);
+        }
+        let value = self.inner.get(key)?;
+        if let Some(contender) = contender {
+            self.rendezvous.after_read(contender);
+        }
+        Ok(value)
+    }
+    fn put(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+        self.inner.put(key, value)?;
+        self.wrote(key);
+        Ok(())
+    }
+    fn compare_and_put(
+        &self,
+        key: &[u8],
+        expected: Option<&[u8]>,
+        new: &[u8],
+    ) -> anyhow::Result<icn_store::CompareAndPut> {
+        let outcome = self.inner.compare_and_put(key, expected, new)?;
+        self.wrote(key);
+        Ok(outcome)
+    }
+    fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+        self.inner.delete(key)?;
+        self.wrote(key);
+        Ok(())
+    }
+    fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+        self.inner.delete_atomic(keys)?;
+        for key in keys {
+            self.wrote(key);
+        }
+        Ok(())
+    }
+    fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        let contender = Self::contender_for(prefix);
+        if let Some(contender) = contender {
+            self.rendezvous.log(contender, Op::Read);
+        }
+        let rows = self.inner.scan(prefix)?;
+        if let Some(contender) = contender {
+            self.rendezvous.after_read(contender);
+        }
+        Ok(rows)
+    }
+    fn get_replica_metadata(&self, h: &ContentHash) -> anyhow::Result<Option<ReplicaMetadata>> {
+        self.inner.get_replica_metadata(h)
+    }
+    fn put_replica_metadata(&self, m: &ReplicaMetadata) -> anyhow::Result<()> {
+        self.inner.put_replica_metadata(m)
+    }
+    fn list_replica_hashes(&self) -> anyhow::Result<Vec<ContentHash>> {
+        self.inner.list_replica_hashes()
+    }
+}
+
+// ── position-lock witness (#2906 review FOLLOW_UP 1) ────────────────────────────────────────
+
+/// How long a contender that has read the durable position waits for the other contender to read
+/// or write it. With the manager's position lock in place the other cannot reach the record, so
+/// the hold expires and the run is serial. It is a bound, not a sleep: an implementation without
+/// the lock lets the other contender through at once.
+const POSITION_HOLD: Duration = Duration::from_secs(2);
+
+#[derive(Default)]
+struct PositionHoldState {
+    /// Contender has read or written the agreement's position record.
+    reached: [bool; 2],
+    held: [bool; 2],
+    overlapped: Option<bool>,
+}
+
+/// Holds a contender *after* its first read of the position record and *before* it can write it
+/// back, which is inside the read → modify → write that the position lock exists to protect.
+/// Unlike [`Rendezvous`], it ignores the transfer-row read that precedes the lock.
+#[derive(Default)]
+struct PositionHold {
+    state: Mutex<PositionHoldState>,
+    changed: Condvar,
+}
+
+impl PositionHold {
+    fn reached(&self, contender: usize) {
+        self.state.lock().unwrap().reached[contender] = true;
+        self.changed.notify_all();
+    }
+
+    fn after_position_read(&self, contender: usize) {
+        let other = 1 - contender;
+        let mut state = self.state.lock().unwrap();
+        state.reached[contender] = true;
+        self.changed.notify_all();
+        if std::mem::replace(&mut state.held[contender], true) {
+            return;
+        }
+        let deadline = Instant::now() + POSITION_HOLD;
+        while !state.reached[other] {
+            let now = Instant::now();
+            if now >= deadline {
+                state.overlapped.get_or_insert(false);
+                return;
+            }
+            state = self.changed.wait_timeout(state, deadline - now).unwrap().0;
+        }
+        state.overlapped.get_or_insert(true);
+    }
+
+    fn wait_until_reached(&self, contender: usize) {
+        let mut state = self.state.lock().unwrap();
+        while !state.reached[contender] {
+            state = self.changed.wait(state).unwrap();
+        }
+    }
+
+    fn overlapped(&self) -> Option<bool> {
+        self.state.lock().unwrap().overlapped
+    }
+}
+
+/// Delegates every operation to a real `SledStore`, running [`PositionHold`] around a contender's
+/// reads and writes of a position record.
+struct PositionHoldStore {
+    inner: Arc<SledStore>,
+    hold: Arc<PositionHold>,
+}
+
+impl PositionHoldStore {
+    fn contender_for(key: &[u8]) -> Option<usize> {
+        CONTENDER
+            .with(Cell::get)
+            .filter(|_| key.starts_with(POSITION_KEY_PREFIX))
+    }
+
+    fn wrote(&self, key: &[u8]) {
+        if let Some(contender) = Self::contender_for(key) {
+            self.hold.reached(contender);
+        }
+    }
+}
+
+impl Store for PositionHoldStore {
+    fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+        let value = self.inner.get(key)?;
+        if let Some(contender) = Self::contender_for(key) {
+            self.hold.after_position_read(contender);
+        }
+        Ok(value)
+    }
+    fn put(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+        self.inner.put(key, value)?;
+        self.wrote(key);
+        Ok(())
+    }
+    fn compare_and_put(
+        &self,
+        key: &[u8],
+        expected: Option<&[u8]>,
+        new: &[u8],
+    ) -> anyhow::Result<icn_store::CompareAndPut> {
+        let outcome = self.inner.compare_and_put(key, expected, new)?;
+        self.wrote(key);
+        Ok(outcome)
+    }
+    fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+        self.inner.delete(key)?;
+        self.wrote(key);
+        Ok(())
+    }
+    fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+        self.inner.delete_atomic(keys)?;
+        for key in keys {
+            self.wrote(key);
+        }
+        Ok(())
+    }
+    fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        self.inner.scan(prefix)
+    }
+    fn get_replica_metadata(&self, h: &ContentHash) -> anyhow::Result<Option<ReplicaMetadata>> {
+        self.inner.get_replica_metadata(h)
+    }
+    fn put_replica_metadata(&self, m: &ReplicaMetadata) -> anyhow::Result<()> {
+        self.inner.put_replica_metadata(m)
+    }
+    fn list_replica_hashes(&self) -> anyhow::Result<Vec<ContentHash>> {
+        self.inner.list_replica_hashes()
+    }
+}
+
+fn position_hold_manager(
+    node: &Node,
+) -> (
+    ClearingManager,
+    Arc<PositionHoldStore>,
+    Arc<SledStore>,
+    Arc<PositionHold>,
+) {
+    let sled = node.open_store();
+    let hold = Arc::new(PositionHold::default());
+    let store = Arc::new(PositionHoldStore {
+        inner: sled.clone(),
+        hold: hold.clone(),
+    });
+    let manager = ClearingManager::new(store.clone() as Arc<dyn Store>, OWN.to_string()).unwrap();
+    manager.create_agreement(agreement()).unwrap();
+    (manager, store, sled, hold)
+}
+
+fn stored_entry_statuses(store: &dyn Store, id: &str) -> Vec<TransferStatus> {
+    let mut key = POSITION_KEY_PREFIX.to_vec();
+    key.extend(AGREEMENT.as_bytes());
+    let bytes = store.get(&key).unwrap().expect("position is persisted");
+    serde_json::from_slice::<ClearingPosition>(&bytes)
+        .unwrap()
+        .pending_transfers
+        .iter()
+        .filter(|t| t.id == id)
+        .map(|t| t.status)
+        .collect()
+}
+
+/// Two *different* obligations (4 and 9) on one agreement, confirmed concurrently on one manager.
+/// Confirmation is a durable read → modify → write of the whole position record, so without the
+/// position lock the second writer replays a stale base and the first obligation is lost while
+/// both calls return `Ok`. A same-transfer race cannot show this: its two stale writes coincide.
+/// The assertions are economic only, so the bounded hold cannot turn a lost update into a pass.
+#[test]
+fn nb042_concurrent_confirmations_of_different_transfers_keep_both_obligations() {
+    let node = Node::new();
+    let (manager, store, sled, hold) = position_hold_manager(&node);
+    manager.propose_transfer(transfer("t-1", 4)).unwrap();
+    manager.propose_transfer(transfer("t-2", 9)).unwrap();
+
+    let results = std::thread::scope(|s| {
+        let handles: Vec<_> = [(0usize, "t-1"), (1usize, "t-2")]
+            .into_iter()
+            .map(|(contender, id)| {
+                let manager = &manager;
+                s.spawn(move || {
+                    CONTENDER.with(|cell| cell.set(Some(contender)));
+                    manager.confirm_transfer(id).map_err(|e| e.to_string())
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    eprintln!(
+        "position-lock witness (confirm ‖ confirm): overlapped={:?} results={results:?}",
+        hold.overlapped()
+    );
+
+    assert!(results.iter().all(Result::is_ok), "{results:?}");
+    assert_eq!(owed(&manager), 13, "live position lost an obligation");
+    assert_eq!(
+        stored_owed(sled.as_ref()),
+        13,
+        "durable position lost an obligation"
+    );
+    for id in ["t-1", "t-2"] {
+        assert_eq!(
+            stored_entry_statuses(sled.as_ref(), id),
+            vec![TransferStatus::Confirmed],
+            "{id} must be booked exactly once"
+        );
+    }
+
+    sled.flush().unwrap();
+    drop(manager);
+    drop(store);
+    assert_eq!(Arc::strong_count(&sled), 1, "fixture: leaked store handle");
+    drop(sled);
+    let (manager, _store) = node.manager();
+    assert_eq!(owed(&manager), 13, "and durably, after a restart");
+}
+
+/// Confirmation of t-2 races settlement of already-confirmed t-1 on one manager. Whatever order
+/// the lock imposes, what settlement reports discharged plus what is still owed must equal the two
+/// unique obligations, and settled t-1 must not be owed again. Without the lock the confirmation
+/// writes back the pre-settlement record and re-creates the discharged obligation.
+#[test]
+fn nb042_confirmation_racing_settlement_conserves_obligations() {
+    let node = Node::new();
+    let (manager, _store, sled, hold) = position_hold_manager(&node);
+    manager.propose_transfer(transfer("t-1", 4)).unwrap();
+    manager.confirm_transfer("t-1").unwrap();
+    manager.propose_transfer(transfer("t-2", 9)).unwrap();
+
+    let (confirmed, settled) = std::thread::scope(|s| {
+        let (manager, hold) = (&manager, &hold);
+        let confirm = s.spawn(move || {
+            CONTENDER.with(|cell| cell.set(Some(0)));
+            manager.confirm_transfer("t-2").map_err(|e| e.to_string())
+        });
+        let settle = s.spawn(move || {
+            hold.wait_until_reached(0);
+            CONTENDER.with(|cell| cell.set(Some(1)));
+            manager
+                .trigger_settlement(AGREEMENT)
+                .map_err(|e| e.to_string())
+        });
+        (confirm.join().unwrap(), settle.join().unwrap())
+    });
+    eprintln!(
+        "position-lock witness (confirm ‖ settle): overlapped={:?} confirm={confirmed:?}",
+        hold.overlapped()
+    );
+
+    assert!(confirmed.is_ok(), "{confirmed:?}");
+    let report = settled.unwrap();
+    assert_eq!(
+        report.coop_a_owed + stored_owed(sled.as_ref()),
+        13,
+        "settled + still owed must equal the two unique obligations"
+    );
+    assert!(
+        stored_entry_statuses(sled.as_ref(), "t-1").is_empty(),
+        "settled t-1 must not be tracked, and so owed, again"
+    );
+}
+
 // ── controls (must pass) ─────────────────────────────────────────────────────────────────────
 
 #[test]
@@ -332,10 +816,10 @@ fn control_fault_injection_fails_exactly_the_armed_write() {
 
 // ── A. duplicate confirmation (NB-042) ───────────────────────────────────────────────────────
 
-/// Observed on `main`: 8. `confirm_transfer` calls `CrossCoopTransfer::confirm` unconditionally and
-/// then adds `dest_amount` to the position again.
+/// REPAIRED (was RED NB-042, observed 8: `confirm_transfer` set `Confirmed` unconditionally and
+/// added `dest_amount` again). It now books only if the agreement's durable position does not
+/// already record the transfer as booked, so the second call changes nothing.
 #[test]
-#[ignore = "RED NB-042: a repeated confirmation is booked again (observed 8, expected 4); run with --ignored"]
 fn nb042_repeated_confirmation_books_the_amount_once() {
     let node = Node::new();
     let (manager, _store) = node.manager();
@@ -351,36 +835,110 @@ fn nb042_repeated_confirmation_books_the_amount_once() {
     );
 }
 
-/// Two confirmations released together through a barrier. Deterministic: whatever the
-/// interleaving, both calls currently succeed and both add.
+/// REPAIRED (was RED NB-042, observed 8), and rewritten because the old version could not tell a
+/// real repair from a racy one (#2904 F1). It released both threads at a barrier *before*
+/// `confirm_transfer`, so a guard that checks the transfer row's status without serializing
+/// usually passed it, although both calls could still read `Pending` and both book.
+///
+/// This version forces the stale read. Each contender's first read of a clearing record goes
+/// through [`RendezvousStore`], which performs the read and then holds the contender until the
+/// other has read too. Both hold a `Pending` transfer row before either can write anything;
+/// whatever each does next, the amount must be booked once, live and after a restart.
+///
+/// An implementation may instead serialize *before* its first read. Then the overlap is
+/// impossible: the second contender is blocked while the first waits for it. The rendezvous does
+/// not hang or guess. Once the other contender has started its call and still has not read within
+/// [`SERIALIZATION_GRACE`], it records `Serialized` and releases the first, and the test checks
+/// from the log that the second's first read began after the first's last write completed. A
+/// non-serializing guard never blocks before its read, so it is forced into the overlap and
+/// caught; it could escape only if a runnable thread were not scheduled for the whole grace
+/// period. That would let this test pass an unsafe implementation; it can never fail a safe one.
 #[test]
-#[ignore = "RED NB-042: concurrent confirmations both book the amount (observed 8, expected 4); run with --ignored"]
 fn nb042_concurrent_confirmations_book_the_amount_once() {
     let node = Node::new();
-    let (manager, _store) = node.manager();
+    let sled = node.open_store();
+    let rendezvous = Arc::new(Rendezvous::default());
+    let store = Arc::new(RendezvousStore {
+        inner: sled.clone(),
+        rendezvous: rendezvous.clone(),
+    });
+    let manager = ClearingManager::new(store.clone() as Arc<dyn Store>, OWN.to_string()).unwrap();
     manager.create_agreement(agreement()).unwrap();
     manager.propose_transfer(transfer("t-1", AMOUNT)).unwrap();
 
-    let barrier = Barrier::new(2);
     std::thread::scope(|s| {
-        for _ in 0..2 {
-            s.spawn(|| {
-                barrier.wait();
+        for contender in 0..2 {
+            let (manager, rendezvous) = (&manager, &rendezvous);
+            s.spawn(move || {
+                CONTENDER.with(|cell| cell.set(Some(contender)));
+                rendezvous.start(contender);
                 let _ = manager.confirm_transfer("t-1");
             });
         }
     });
 
+    let (interleaving, log) = rendezvous.outcome();
+    eprintln!("nb042 concurrent witness: {interleaving:?}; log {log:?}");
+    match interleaving {
+        Interleaving::Overlapped => {
+            let first_write = log
+                .iter()
+                .position(|entry| entry.op == Op::Write)
+                .expect("one contender books the transfer");
+            let mut readers: Vec<usize> = log[..first_write]
+                .iter()
+                .filter(|entry| entry.op == Op::Read)
+                .map(|entry| entry.contender)
+                .collect();
+            readers.sort_unstable();
+            readers.dedup();
+            assert_eq!(
+                readers,
+                vec![0, 1],
+                "both contenders read before either wrote: {log:?}"
+            );
+        }
+        Interleaving::Serialized => {
+            let first = log[0].contender;
+            let second = 1 - first;
+            let last_write_of_first = log
+                .iter()
+                .rposition(|entry| entry.contender == first && entry.op == Op::Write);
+            let first_read_of_second = log
+                .iter()
+                .position(|entry| entry.contender == second && entry.op == Op::Read);
+            assert!(
+                matches!(
+                    (last_write_of_first, first_read_of_second),
+                    (Some(write), Some(read)) if read > write
+                ),
+                "a serializing implementation must finish one call before the other reads: {log:?}"
+            );
+        }
+    }
+
     assert_eq!(
         owed(&manager),
         AMOUNT,
-        "two concurrent confirmations of one transfer must owe {AMOUNT} once"
+        "two concurrent confirmations of one transfer must owe {AMOUNT} once ({interleaving:?})"
+    );
+
+    sled.flush().unwrap();
+    drop(manager);
+    drop(store);
+    assert_eq!(Arc::strong_count(&sled), 1, "fixture: leaked store handle");
+    drop(sled);
+    let (manager, store) = node.manager();
+    assert_eq!(owed(&manager), AMOUNT, "and durably, after a restart");
+    assert_eq!(
+        stored_transfer(store.as_ref(), "t-1").unwrap().status,
+        TransferStatus::Confirmed
     );
 }
 
-/// The replay arrives after a restart: the durable row already says `Confirmed`.
+/// REPAIRED (was RED NB-042, observed 8). The replay arrives after a restart: the durable row
+/// already says `Confirmed`, and the durable position already records the booking.
 #[test]
-#[ignore = "RED NB-042: a confirmation replayed after restart is booked again (observed 8, expected 4); run with --ignored"]
 fn nb042_confirmation_replayed_after_restart_books_the_amount_once() {
     let node = Node::new();
     let (manager, store) = node.manager();
@@ -397,6 +955,46 @@ fn nb042_confirmation_replayed_after_restart_books_the_amount_once() {
     let _ = manager.confirm_transfer("t-1");
 
     assert_eq!(owed(&manager), AMOUNT);
+}
+
+/// The booking is the position write; the transfer row is written after it. Fail the row write:
+/// the amount is booked, live and durably, while the row still says `Pending`. A retry must not
+/// book it again, and must repair the row. A guard that trusted the row's `Pending` would book it
+/// twice here; one that stopped at an error would leave the row stale.
+#[test]
+fn nb042_failed_row_write_after_booking_is_repaired_without_booking_again() {
+    let node = Node::new();
+    let (manager, faulty, sled) = faulty_manager(&node);
+    manager.propose_transfer(transfer("t-1", AMOUNT)).unwrap();
+
+    faulty.fail_next_put_under(TRANSFER_KEY_PREFIX);
+    assert!(
+        manager.confirm_transfer("t-1").is_err(),
+        "precondition: the injected failure is reported to the caller"
+    );
+    assert_eq!(faulty.failures(), 1);
+    assert_eq!(
+        stored_transfer(faulty.as_ref(), "t-1").unwrap().status,
+        TransferStatus::Pending,
+        "precondition: the row write is the one that failed"
+    );
+    assert_eq!(owed(&manager), AMOUNT, "the position write landed: booked");
+    assert_eq!(stored_owed(faulty.as_ref()), AMOUNT, "booked durably too");
+
+    let _ = manager.confirm_transfer("t-1");
+
+    assert_eq!(owed(&manager), AMOUNT, "a retry must not book it again");
+    assert_eq!(
+        stored_transfer(faulty.as_ref(), "t-1").unwrap().status,
+        TransferStatus::Confirmed,
+        "the retry repairs the row"
+    );
+    let (manager, store) = reopen_clean(&node, manager, faulty, sled);
+    assert_eq!(owed(&manager), AMOUNT);
+    assert_eq!(
+        stored_transfer(store.as_ref(), "t-1").unwrap().status,
+        TransferStatus::Confirmed
+    );
 }
 
 // ── B. duplicate proposal (NB-043) ───────────────────────────────────────────────────────────
@@ -512,10 +1110,13 @@ fn nb046_failed_position_write_during_proposal_leaves_consistent_state() {
     );
 }
 
-/// `confirm_transfer` writes the transfer row as `Confirmed`, then the position. Fail the position
-/// write. After reopen the row says `Confirmed` but the position owes nothing for it.
+/// REPAIRED (was RED NB-046, observed: row `Confirmed`, nothing owed). `confirm_transfer` used to
+/// write the row as `Confirmed` and then the position. It now books with one write of the
+/// position record and writes the row only after that. Fail the position write: nothing may be
+/// booked, durably or in the running manager. The live check is #2904 F2: an implementation that
+/// added to its cache before the failed write would pass a reopen-only check while the live
+/// manager reported the amount, and a retry would then book and persist it twice.
 #[test]
-#[ignore = "RED NB-046: a failed position write during confirmation leaves a confirmed transfer unbooked; run with --ignored"]
 fn nb046_failed_position_write_during_confirmation_leaves_consistent_state() {
     let node = Node::new();
     let (manager, faulty, sled) = faulty_manager(&node);
@@ -528,6 +1129,26 @@ fn nb046_failed_position_write_during_confirmation_leaves_consistent_state() {
     );
     assert_eq!(faulty.failures(), 1);
 
+    assert_eq!(
+        owed(&manager),
+        0,
+        "the running manager must not book a confirmation whose write failed"
+    );
+    assert_eq!(stored_owed(faulty.as_ref()), 0, "nor may the store");
+    assert_eq!(
+        stored_transfer(faulty.as_ref(), "t-1").unwrap().status,
+        TransferStatus::Pending,
+        "and the row is not marked confirmed"
+    );
+
+    // The fault is disarmed after one failure: a retry on the same manager books it once.
+    manager.confirm_transfer("t-1").unwrap();
+    assert_eq!(
+        owed(&manager),
+        AMOUNT,
+        "a retry after a failed confirmation books it exactly once"
+    );
+
     let (manager, store) = reopen_clean(&node, manager, faulty, sled);
     let durably_confirmed =
         stored_transfer(store.as_ref(), "t-1").unwrap().status == TransferStatus::Confirmed;
@@ -538,6 +1159,7 @@ fn nb046_failed_position_write_during_confirmation_leaves_consistent_state() {
         "a transfer that is durably Confirmed must be booked in the durable position, and one \
          that is not must not be (row Confirmed: {durably_confirmed})"
     );
+    assert!(durably_confirmed, "the retried confirmation is durable");
 }
 
 // ── E. settlement bookkeeping (NB-051, local part only) ──────────────────────────────────────
@@ -562,10 +1184,12 @@ fn nb051_settlement_records_settled_on_the_transfer_row() {
     );
 }
 
-/// Consequence of the above plus NB-042: a transfer already discharged by settlement can be
-/// confirmed again and re-enters the position.
+/// REPAIRED (was RED NB-051/NB-042, observed 4: a transfer already discharged by settlement could
+/// be confirmed again and re-entered the position). Settlement removes the position entry and the
+/// row still says `Confirmed`; `confirm_transfer` reads an untracked `Confirmed` transfer as
+/// booked and discharged, and books nothing. The row-status contract above stays RED: settlement
+/// still does not write `Settled` to the row.
 #[test]
-#[ignore = "RED NB-051/NB-042: a settled transfer can be confirmed again and re-booked (observed 4, expected 0); run with --ignored"]
 fn nb051_settled_transfer_is_not_booked_again() {
     let node = Node::new();
     let (manager, _store) = node.manager();
@@ -582,4 +1206,48 @@ fn nb051_settled_transfer_is_not_booked_again() {
         0,
         "an obligation already discharged by settlement must not be booked again"
     );
+}
+
+/// #2906 late finding (Codex review thread r4624665467). Netting that cancels an agreement's
+/// whole debt used to zero only the cached position and persist nothing for it, because only
+/// agreements still owing after netting were written. `confirm_transfer` decides from the
+/// durable record, so it read the stale pre-netting balance and booked the cancelled 4 again
+/// (observed 13, `main` 9). Netting now persists every position it changes, including those
+/// netted to zero.
+#[test]
+fn nb042_confirmation_after_full_netting_does_not_resurrect_the_cancelled_debt() {
+    let node = Node::new();
+    let (manager, store) = node.manager();
+    manager.create_agreement(agreement()).unwrap();
+    manager.propose_transfer(transfer("t-1", 4)).unwrap();
+    manager.confirm_transfer("t-1").unwrap();
+    manager.propose_transfer(transfer("t-2", 9)).unwrap();
+
+    let cancelled = Obligation {
+        from: OWN.to_string(),
+        to: PARTNER.to_string(),
+        amount: 4,
+        currency: CURRENCY.to_string(),
+    };
+    manager
+        .apply_multilateral_netting(&NettingResult {
+            original: vec![cancelled],
+            netted: vec![],
+            cycles_canceled: vec![],
+            amount_reduced: 4,
+        })
+        .unwrap();
+    assert_eq!(owed(&manager), 0, "netting cancelled the whole debt");
+    assert_eq!(
+        stored_owed(store.as_ref()),
+        0,
+        "a position netted to zero must be persisted as zero"
+    );
+
+    manager.confirm_transfer("t-2").unwrap();
+    assert_eq!(owed(&manager), 9, "only t-2 is owed after netting");
+    assert_eq!(stored_owed(store.as_ref()), 9);
+
+    let (manager, _store) = restart(&node, manager, store);
+    assert_eq!(owed(&manager), 9, "and durably, after a restart");
 }
