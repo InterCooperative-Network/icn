@@ -705,6 +705,97 @@ async fn c0_cancelled_task_is_not_completed_by_later_agreeing_results() {
     );
 }
 
+/// Cancellation delivered by gossip (`TaskCancelled`, handled by `on_task_cancelled`) closes the
+/// quorum exactly as the local cancel does. Agreeing results that arrive afterwards must not
+/// complete the task, broadcast `TaskCompleted`, or emit a clearing. Independent review of #2911
+/// (FOLLOW_UP 4, witness W5): before this contract, a gossip cancel that merely forgot the quorum
+/// (base semantics) passed the whole suite.
+#[tokio::test]
+async fn c0_gossip_cancelled_task_is_not_completed_by_later_agreeing_results() {
+    let node = node();
+    let submitter = identity(SUBMITTER_SEED);
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node.submit(task(&submitter, Some(two_executors()))).await;
+    node.handle
+        .handle_gossip(ComputeMessage::TaskCancelled {
+            task_hash: hash,
+            submitter: submitter.did.clone(),
+            reason: "cancelled elsewhere".into(),
+            cancelled_at: 2_000,
+        })
+        .await
+        .expect("gossip cancel");
+    assert!(
+        label(&node.status(hash).await).starts_with("Cancelled"),
+        "precondition: the gossiped cancellation was applied"
+    );
+
+    node.deliver_federated(&signed(&a, hash, success())).await;
+    node.deliver_federated(&signed(&b, hash, success())).await;
+
+    let status = label(&node.status(hash).await);
+    assert!(
+        status.starts_with("Cancelled"),
+        "C0: agreeing results after a gossiped cancellation completed the task: {status}"
+    );
+    assert!(
+        node.completions().is_empty(),
+        "C0: TaskCompleted after a gossiped cancellation: {:?}",
+        node.completions()
+    );
+    assert!(
+        node.clearings().is_empty(),
+        "C0: clearing emitted for a task cancelled by gossip: {} notification(s)",
+        node.clearings().len()
+    );
+}
+
+/// The federated result that closes a registered quorum with consensus still produces its
+/// authorized clearing notification. C0 must refuse only what arrives after the quorum closed,
+/// not the accepting result itself. Independent review of #2911 (FOLLOW_UP 4, witness W6):
+/// reporting `Accepted` as `Refused` previously passed the suite, because the replay contract only
+/// checks that the clearing count does not change.
+///
+/// The first, merely counted result also clears today. That is EX-003 (RED, owned by T01), so
+/// this contract counts only what the accepting result adds.
+#[tokio::test]
+async fn c0_accepting_federated_result_emits_its_clearing() {
+    let node = node();
+    let submitter = identity(SUBMITTER_SEED);
+    let (a, b) = (identity(EXECUTOR_A_SEED), identity(EXECUTOR_B_SEED));
+    let hash = node.submit(task(&submitter, Some(two_executors()))).await;
+
+    node.deliver_federated(&signed(&a, hash, success())).await;
+    let _ = node.status(hash).await; // barrier
+    let before_accept = node.clearings().len();
+
+    node.deliver_federated(&signed(&b, hash, success())).await;
+    assert!(
+        label(&node.status(hash).await).starts_with("Completed"),
+        "precondition: two agreeing executors reach consensus"
+    );
+    assert_eq!(node.completions().len(), 1, "precondition: one completion");
+
+    let clearings = node.clearings();
+    assert_eq!(
+        clearings.len(),
+        before_accept + 1,
+        "C0: the accepting federated result emitted {} clearing(s), expected exactly one",
+        clearings.len() - before_accept
+    );
+    let accepted = &clearings[before_accept];
+    assert_eq!(
+        (
+            accepted.from_entity_id.as_str(),
+            accepted.to_entity_id.as_str(),
+            accepted.amount,
+            accepted.currency.as_str(),
+        ),
+        (SUBMITTER_COOP, EXECUTOR_COOP, CLEARING_AMOUNT, "credits"),
+        "the accepting result's clearing names the wrong parties or amount"
+    );
+}
+
 /// A fixed start time for clocked tests; the deadline is `START + COLLECTION_WINDOW_MS`.
 const START_MS: u64 = 1_800_000_000_000;
 const DEADLINE_MS: u64 = START_MS + COLLECTION_WINDOW_MS;
