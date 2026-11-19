@@ -49,7 +49,7 @@ use std::time::{Duration, Instant};
 
 use icn_federation::{
     BilateralClearingAgreement, ClearingManager, ClearingPosition, CrossCoopTransfer,
-    SettlementInterval, TransferStatus,
+    NettingResult, Obligation, SettlementInterval, TransferStatus,
 };
 use icn_identity::{Did, KeyPair};
 use icn_store::{ContentHash, ReplicaMetadata, SledStore, Store};
@@ -1206,4 +1206,48 @@ fn nb051_settled_transfer_is_not_booked_again() {
         0,
         "an obligation already discharged by settlement must not be booked again"
     );
+}
+
+/// #2906 late finding (Codex review thread r4624665467). Netting that cancels an agreement's
+/// whole debt used to zero only the cached position and persist nothing for it, because only
+/// agreements still owing after netting were written. `confirm_transfer` decides from the
+/// durable record, so it read the stale pre-netting balance and booked the cancelled 4 again
+/// (observed 13, `main` 9). Netting now persists every position it changes, including those
+/// netted to zero.
+#[test]
+fn nb042_confirmation_after_full_netting_does_not_resurrect_the_cancelled_debt() {
+    let node = Node::new();
+    let (manager, store) = node.manager();
+    manager.create_agreement(agreement()).unwrap();
+    manager.propose_transfer(transfer("t-1", 4)).unwrap();
+    manager.confirm_transfer("t-1").unwrap();
+    manager.propose_transfer(transfer("t-2", 9)).unwrap();
+
+    let cancelled = Obligation {
+        from: OWN.to_string(),
+        to: PARTNER.to_string(),
+        amount: 4,
+        currency: CURRENCY.to_string(),
+    };
+    manager
+        .apply_multilateral_netting(&NettingResult {
+            original: vec![cancelled],
+            netted: vec![],
+            cycles_canceled: vec![],
+            amount_reduced: 4,
+        })
+        .unwrap();
+    assert_eq!(owed(&manager), 0, "netting cancelled the whole debt");
+    assert_eq!(
+        stored_owed(store.as_ref()),
+        0,
+        "a position netted to zero must be persisted as zero"
+    );
+
+    manager.confirm_transfer("t-2").unwrap();
+    assert_eq!(owed(&manager), 9, "only t-2 is owed after netting");
+    assert_eq!(stored_owed(store.as_ref()), 9);
+
+    let (manager, _store) = restart(&node, manager, store);
+    assert_eq!(owed(&manager), 9, "and durably, after a restart");
 }

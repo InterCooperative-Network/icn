@@ -9,7 +9,7 @@ use crate::error::{FederationError, Result};
 use crate::metrics;
 use crate::types::current_timestamp;
 use icn_store::Store;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use std::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -561,6 +561,11 @@ impl ClearingManager {
             poisoned.into_inner()
         });
 
+        // Every position this netting changes, persisted once below. A position netted to zero
+        // must be written too: `confirm_transfer` decides from the durable record, so a stale
+        // pre-netting balance left on disk would bring the cancelled debt back.
+        let mut affected: BTreeSet<String> = BTreeSet::new();
+
         // First, zero out all positions that were netted
         for obligation in &result.original {
             // Find the agreement between these parties
@@ -574,6 +579,7 @@ impl ClearingManager {
                         // Reset to zero - we'll rebuild from netted obligations
                         position.coop_a_owes_b = 0;
                         position.coop_b_owes_a = 0;
+                        affected.insert(agreement_id.clone());
                     }
                 }
             }
@@ -590,18 +596,22 @@ impl ClearingManager {
                 if forward_match {
                     if let Some(position) = positions.get_mut(agreement_id) {
                         position.coop_a_owes_b = obligation.amount;
-                        let pos_key = Self::position_key(agreement_id);
-                        let pos_value = serde_json::to_vec(position)?;
-                        self.store.put(&pos_key, &pos_value)?;
+                        affected.insert(agreement_id.clone());
                     }
                 } else if reverse_match {
                     if let Some(position) = positions.get_mut(agreement_id) {
                         position.coop_b_owes_a = obligation.amount;
-                        let pos_key = Self::position_key(agreement_id);
-                        let pos_value = serde_json::to_vec(position)?;
-                        self.store.put(&pos_key, &pos_value)?;
+                        affected.insert(agreement_id.clone());
                     }
                 }
+            }
+        }
+
+        for agreement_id in &affected {
+            if let Some(position) = positions.get(agreement_id) {
+                let pos_key = Self::position_key(agreement_id);
+                let pos_value = serde_json::to_vec(position)?;
+                self.store.put(&pos_key, &pos_value)?;
             }
         }
 
