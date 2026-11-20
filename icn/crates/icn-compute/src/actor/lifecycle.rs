@@ -1105,9 +1105,13 @@ impl ComputeActor {
             }
         }
 
-        // Record completion. If the task became terminal while it ran (cancelled, timed out, or
-        // completed from another executor's result), `complete` refuses with `TaskTerminal` and
-        // the `?` skips every effect below: no result broadcast, no event, no usage (EX-019).
+        // Record completion. Execution runs inline in the command loop, so no cancel or result
+        // command can interleave between the claim and here; only the timeout sweep, which runs
+        // beside the loop, can. If it failed the task meanwhile, `complete` refuses with
+        // `TaskTerminal` (EX-019) and the `?` skips every effect below: no result broadcast, no
+        // event, no usage, and no load or scope-queue release, because the sweep already
+        // released both for this claim. Moving execution off the command loop would break
+        // that argument: a refusal here would then have to release this node's own load.
         self.task_manager.lock().await.complete(result.clone())?;
 
         // Decrement our own executor load
