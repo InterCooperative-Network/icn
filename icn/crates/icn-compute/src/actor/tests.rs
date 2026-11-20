@@ -2258,3 +2258,273 @@ fn test_unique_largest_group_ignores_hashmap_order() {
         }
     }
 }
+
+/// EX-019: the legacy single-executor path reports a late result for a terminal task as
+/// `Refused` (not an `Err` the gossip handler only logs, and not `Unregistered`), so callers such
+/// as `on_federated_task_result` take their no-effect early return.
+#[tokio::test]
+async fn ex019_legacy_late_result_for_terminal_task_is_refused() {
+    use super::lifecycle::ResultAcceptance;
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let actor = ComputeActor::new("did:icn:node".into(), trust_cb);
+    let task = make_task("ex019-refused", "did:icn:alice");
+    let task_hash = actor.handle_submit(task.clone()).await.unwrap();
+
+    let signed_by = |seed: u8, fuel: u64| {
+        let key = ed25519_dalek::SigningKey::from_bytes(&[seed; 32]);
+        let mut result = ComputeResult {
+            task_hash,
+            task_id: task.id.clone(),
+            executor: icn_identity::Did::from_public_key(&key.verifying_key()).to_string(),
+            outcome: crate::types::ExecutionOutcome::Success(b"42".to_vec()),
+            fuel_used: fuel,
+            duration_ms: 10,
+            completed_at: 1000,
+            signature: vec![],
+        };
+        result.sign(&key);
+        result
+    };
+
+    let first = actor
+        .accept_task_result(signed_by(0x0A, 100))
+        .await
+        .unwrap();
+    assert_eq!(
+        first,
+        ResultAcceptance::Unregistered,
+        "the first result completes"
+    );
+
+    for late in [
+        signed_by(0x0A, 100),
+        signed_by(0x0B, 100),
+        signed_by(0x0A, 9_000),
+    ] {
+        let acceptance = actor.accept_task_result(late).await;
+        assert!(
+            matches!(acceptance, Ok(ResultAcceptance::Refused)),
+            "a late result for a completed task must be Refused; got {acceptance:?}"
+        );
+    }
+    let status = actor.task_manager.lock().await.status(&task_hash).cloned();
+    match status {
+        Some(TaskStatus::Completed { result }) => assert_eq!(result.fuel_used, 100),
+        other => panic!("expected the first completion to hold, got {other:?}"),
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// #2913 BLOCKER 1: claim accounting follows the authoritative claim transition.
+// ---------------------------------------------------------------------------------------------
+
+/// Own executor load, total scope-queue depth, and `task_scope_map` size.
+async fn claim_accounting(actor: &ComputeActor, executor: &str) -> (usize, usize, usize) {
+    let load = actor
+        .executor_registry
+        .lock()
+        .await
+        .get(executor)
+        .map(|i| i.tasks_executing)
+        .unwrap_or_else(|| panic!("{executor} is not registered"));
+    let depth: usize = actor.scope_queue_depths.lock().await.values().sum();
+    let mapped = actor.task_scope_map.lock().await.len();
+    (load, depth, mapped)
+}
+
+/// RW1 shape from the independent review: a node that executes legacy tasks, has its own
+/// executor registry entry, and receives every message it sends (its own `TaskSubmitted`,
+/// `TaskClaimed` and `TaskResult`) back in send order, as production gossip delivers them.
+///
+/// The loopback is pumped by hand rather than by a forwarder task: each message is dispatched
+/// through the same `handle_message` the command loop uses, in FIFO order, until the node goes
+/// quiet. No sleeps, and the pump is bounded.
+///
+/// Before the fix the self-echoed `TaskClaimed` arrived after inline completion, `claim` failed,
+/// and load / scope depth / `task_scope_map` were incremented anyway; EX-019's refusal of the
+/// echoed `TaskResult` removed the decrement that used to cancel it, so tasks 3..N were never
+/// claimed once own load reached `max_concurrent_tasks` (2).
+#[tokio::test]
+async fn blocker2913_self_delivering_node_keeps_executing_without_load_drift() {
+    use std::collections::VecDeque;
+    use std::sync::Mutex as StdMutex;
+
+    const TASKS: usize = 6; // > max_concurrent_tasks (2) by enough to expose a +1/task leak
+    const PUMP_BOUND: usize = 64;
+
+    let key = ed25519_dalek::SigningKey::from_bytes(&[0x11; 32]);
+    let own = icn_identity::Did::from_public_key(&key.verifying_key()).to_string();
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let mut actor = ComputeActor::new(own.clone(), trust_cb);
+    actor.set_signing_key(key.to_bytes().to_vec());
+    actor.set_max_concurrent_tasks(2);
+
+    let outbox: Arc<StdMutex<VecDeque<ComputeMessage>>> = Arc::default();
+    let sink = Arc::clone(&outbox);
+    actor.set_send_callback(Arc::new(move |m: ComputeMessage| {
+        sink.lock().expect("outbox").push_back(m);
+    }));
+    let completed: Arc<StdMutex<HashMap<String, usize>>> = Arc::default();
+    let seen = Arc::clone(&completed);
+    actor.set_event_callback(Arc::new(move |e: ComputeEvent| {
+        if let ComputeEvent::TaskCompleted { task_hash, .. } = e {
+            *seen.lock().expect("events").entry(task_hash).or_insert(0) += 1;
+        }
+    }));
+
+    // The own registry entry (in production: the node's own self-delivered capacity announce).
+    actor
+        .on_executor_announce(own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+    assert_eq!(claim_accounting(&actor, &own).await, (0, 0, 0));
+
+    for i in 0..TASKS {
+        let hash = actor
+            .handle_submit(make_task(&format!("rw1-{i}"), &own))
+            .await
+            .unwrap();
+
+        let mut claims_by_self = 0;
+        let mut delivered = 0;
+        loop {
+            let next = outbox.lock().expect("outbox").pop_front();
+            let Some(msg) = next else { break };
+            delivered += 1;
+            assert!(
+                delivered <= PUMP_BOUND,
+                "task {i}: loopback did not go quiet"
+            );
+            if matches!(&msg, ComputeMessage::TaskClaimed { task_hash, executor }
+                if *task_hash == hash && *executor == own)
+            {
+                claims_by_self += 1;
+            }
+            actor.handle_message(msg).await.unwrap();
+        }
+
+        let status = actor.task_manager.lock().await.status(&hash).cloned();
+        assert!(
+            matches!(status, Some(TaskStatus::Completed { .. })),
+            "task {i}: expected Completed, got {status:?} (own load leaked?)"
+        );
+        assert_eq!(
+            claims_by_self, 1,
+            "task {i}: executed by this node exactly once"
+        );
+        assert_eq!(
+            completed.lock().expect("events").get(&hex::encode(hash)),
+            Some(&1),
+            "task {i}: exactly one TaskCompleted"
+        );
+        assert_eq!(
+            claim_accounting(&actor, &own).await,
+            (0, 0, 0),
+            "task {i}: (own load, scope depth, task_scope_map) must return to zero"
+        );
+    }
+}
+
+/// Every refused claim class leaves executor load, scope depth and `task_scope_map` untouched;
+/// a successful claim still counts once.
+#[tokio::test]
+async fn blocker2913_refused_claims_have_no_accounting_effect() {
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let actor = ComputeActor::new("did:icn:node".into(), trust_cb);
+    let (first, second) = ("did:icn:exec-a", "did:icn:exec-b");
+    for did in [first, second] {
+        actor
+            .on_executor_announce(did.into(), vec![ExecutorCapability::Ccl])
+            .await
+            .unwrap();
+    }
+
+    // Unknown task.
+    actor
+        .on_task_claimed([0xEE; 32], first.into())
+        .await
+        .unwrap();
+    assert_eq!(
+        claim_accounting(&actor, first).await,
+        (0, 0, 0),
+        "unknown task"
+    );
+
+    // Successful new claim: counted once (positive control).
+    let open = actor
+        .handle_submit(make_task("claim-open", "did:icn:alice"))
+        .await
+        .unwrap();
+    actor.on_task_claimed(open, first.into()).await.unwrap();
+    assert_eq!(
+        claim_accounting(&actor, first).await,
+        (1, 1, 1),
+        "new claim"
+    );
+
+    // Duplicate claim of an already-claimed task, by the same and by another executor.
+    actor.on_task_claimed(open, first.into()).await.unwrap();
+    actor.on_task_claimed(open, second.into()).await.unwrap();
+    assert_eq!(
+        claim_accounting(&actor, first).await,
+        (1, 1, 1),
+        "duplicate (same)"
+    );
+    assert_eq!(
+        claim_accounting(&actor, second).await.0,
+        0,
+        "duplicate (other)"
+    );
+
+    // Terminal tasks: completed, failed, cancelled.
+    let mut terminal = Vec::new();
+    for state in ["completed", "failed", "cancelled"] {
+        let hash = actor
+            .handle_submit(make_task(&format!("claim-{state}"), "did:icn:alice"))
+            .await
+            .unwrap();
+        let mut mgr = actor.task_manager.lock().await;
+        match state {
+            "completed" => mgr
+                .complete(ComputeResult {
+                    task_hash: hash,
+                    task_id: format!("claim-{state}"),
+                    executor: first.into(),
+                    outcome: crate::types::ExecutionOutcome::Success(b"42".to_vec()),
+                    fuel_used: 1,
+                    duration_ms: 1,
+                    completed_at: 1000,
+                    signature: vec![],
+                })
+                .unwrap(),
+            "failed" => mgr.fail(&hash, "Deadline exceeded".into()).unwrap(),
+            _ => mgr.cancel(&hash, "did:icn:alice", "stop".into()).unwrap(),
+        }
+        drop(mgr);
+        terminal.push((state, hash));
+    }
+    for (state, hash) in terminal {
+        for did in [first, second] {
+            actor.on_task_claimed(hash, did.into()).await.unwrap();
+        }
+        assert_eq!(
+            claim_accounting(&actor, first).await,
+            (1, 1, 1),
+            "{state}: first executor"
+        );
+        assert_eq!(
+            claim_accounting(&actor, second).await.0,
+            0,
+            "{state}: second executor"
+        );
+        let status = actor.task_manager.lock().await.status(&hash).cloned();
+        assert!(
+            status
+                .as_ref()
+                .and_then(TaskStatus::terminal_state)
+                .is_some(),
+            "{state}: a refused claim must not reopen the task; got {status:?}"
+        );
+    }
+}
