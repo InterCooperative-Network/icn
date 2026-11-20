@@ -1112,6 +1112,11 @@ impl ComputeActor {
         // event, no usage, and no load or scope-queue release, because the sweep already
         // released both for this claim. Moving execution off the command loop would break
         // that argument: a refusal here would then have to release this node's own load.
+        #[cfg(test)]
+        if let Some((reached, proceed)) = &self.pre_complete_gate {
+            reached.notify_one();
+            proceed.notified().await;
+        }
         self.task_manager.lock().await.complete(result.clone())?;
 
         // Decrement our own executor load
