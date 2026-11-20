@@ -1291,11 +1291,31 @@ impl ComputeActor {
     ) -> Result<(), ComputeError> {
         // Single lock: look up submitter and claim atomically to avoid a
         // race where the task is removed between two separate locks.
+        //
+        // Load and scope-queue accounting below is the effect of a claim, so it runs only
+        // when `TaskManager::claim` actually moved the task Pending -> Claimed. A refused
+        // claim (unknown task, already claimed, or terminal) changes nothing. In particular
+        // a node receives its own `TaskClaimed` gossip after it has executed and completed
+        // the task inline; counting that echo leaked one unit of own load per task until
+        // `at_capacity()` refused all further work (#2913 BLOCKER 1).
         let submitter = {
             let mut mgr = self.task_manager.lock().await;
-            let submitter = mgr.get(&task_hash).map(|t| t.submitter.clone());
-            if submitter.is_some() {
-                let _ = mgr.claim(&task_hash, executor.clone());
+            let Some(submitter) = mgr.get(&task_hash).map(|t| t.submitter.clone()) else {
+                tracing::debug!(
+                    task_hash = %hex::encode(task_hash),
+                    executor = %executor,
+                    "Claim for an unknown task ignored; no accounting change"
+                );
+                return Ok(());
+            };
+            if let Err(refusal) = mgr.claim(&task_hash, executor.clone()) {
+                tracing::debug!(
+                    task_hash = %hex::encode(task_hash),
+                    executor = %executor,
+                    reason = %refusal,
+                    "Claim refused; no accounting change"
+                );
+                return Ok(());
             }
             submitter
         };
@@ -1308,20 +1328,18 @@ impl ComputeActor {
         drop(registry);
 
         // Epic 2 (#933): Track per-scope queue depth
-        if let Some(submitter) = submitter {
-            let scope = match &self.cell_service {
-                Some(cs) => cs.peer_scope(&submitter),
-                None => icn_kernel_api::ScopeLevel::Commons,
-            };
-            {
-                let mut depths = self.scope_queue_depths.lock().await;
-                *depths.entry(scope).or_insert(0) += 1;
-            }
-            {
-                let mut map = self.task_scope_map.lock().await;
-                map.insert(task_hash, scope);
-                icn_obs::metrics::compute::task_scope_map_size_set(map.len() as f64);
-            }
+        let scope = match &self.cell_service {
+            Some(cs) => cs.peer_scope(&submitter),
+            None => icn_kernel_api::ScopeLevel::Commons,
+        };
+        {
+            let mut depths = self.scope_queue_depths.lock().await;
+            *depths.entry(scope).or_insert(0) += 1;
+        }
+        {
+            let mut map = self.task_scope_map.lock().await;
+            map.insert(task_hash, scope);
+            icn_obs::metrics::compute::task_scope_map_size_set(map.len() as f64);
         }
 
         Ok(())

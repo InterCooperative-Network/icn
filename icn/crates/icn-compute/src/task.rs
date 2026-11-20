@@ -102,8 +102,13 @@ impl TaskManager {
         self.status.get(hash)
     }
 
-    /// Claim a task for execution
+    /// Claim a task for execution.
+    ///
+    /// Only a `Pending` task can be claimed. The refusals are typed so a caller can tell
+    /// them apart: `TaskNotFound` (unknown task), `TaskAlreadyClaimed` (duplicate claim),
+    /// `TaskTerminal` (completed, failed or cancelled). A refusal changes nothing.
     pub fn claim(&mut self, hash: &TaskHash, executor: String) -> Result<(), ComputeError> {
+        self.ensure_open(hash)?;
         let status = self
             .status
             .get(hash)
@@ -127,6 +132,7 @@ impl TaskManager {
             TaskStatus::Claimed { executor: e, .. } => {
                 Err(ComputeError::TaskAlreadyClaimed(e.clone()))
             }
+            // Unreachable after `ensure_open`; kept fail-closed rather than panicking.
             _ => Err(ComputeError::Internal("task not in pending state".into())),
         }
     }
@@ -631,6 +637,53 @@ mod tests {
             );
             assert_eq!(mgr.status(&hash).cloned(), before, "{name}: status changed");
         }
+    }
+
+    /// #2913 BLOCKER 1: a claim refusal is typed by cause and changes nothing, so the actor
+    /// can make claim accounting conditional on a real Pending -> Claimed transition.
+    #[test]
+    fn claim_refusals_are_typed_and_change_nothing() {
+        for (name, terminal) in TERMINAL {
+            let (mut mgr, hash) = manager_in(name);
+            let before = mgr.status(&hash).cloned();
+            let refused = mgr.claim(&hash, "did:icn:carol".into());
+            assert!(
+                matches!(
+                    &refused,
+                    Err(ComputeError::TaskTerminal { state, .. }) if *state == terminal
+                ),
+                "{name}: expected TaskTerminal({terminal:?}), got {refused:?}"
+            );
+            assert_eq!(mgr.status(&hash).cloned(), before, "{name}: status changed");
+        }
+
+        let (mut mgr, hash) = manager_in("claimed");
+        let before = mgr.status(&hash).cloned();
+        let refused = mgr.claim(&hash, "did:icn:carol".into());
+        assert!(
+            matches!(&refused, Err(ComputeError::TaskAlreadyClaimed(e)) if e == "did:icn:bob"),
+            "duplicate claim: got {refused:?}"
+        );
+        assert_eq!(
+            mgr.status(&hash).cloned(),
+            before,
+            "duplicate claim changed status"
+        );
+
+        let mut mgr = TaskManager::new(100);
+        assert!(matches!(
+            mgr.claim(&[7; 32], "did:icn:carol".into()),
+            Err(ComputeError::TaskNotFound(_))
+        ));
+        assert!(mgr.status(&[7; 32]).is_none());
+
+        let (mut mgr, hash) = manager_in("pending");
+        mgr.claim(&hash, "did:icn:carol".into())
+            .unwrap_or_else(|e| panic!("pending claim refused: {e}"));
+        assert!(matches!(
+            mgr.status(&hash),
+            Some(TaskStatus::Claimed { executor, .. }) if executor == "did:icn:carol"
+        ));
     }
 
     #[test]
