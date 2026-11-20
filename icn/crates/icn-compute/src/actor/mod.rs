@@ -117,6 +117,11 @@ pub struct ComputeActor {
     /// When set, all task submissions are validated against this policy:
     /// standing checks, credit ceiling enforcement, and charter priority ordering.
     commons_pool_policy: Option<crate::policy::CommonsPoolPolicy>,
+    /// Test-only scheduling seam: when set, local execution signals `.0` after executing a
+    /// claimed task and waits on `.1` before recording its completion, so a test can run the
+    /// timeout sweep in exactly that window. Compiled out of non-test builds.
+    #[cfg(test)]
+    pre_complete_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
     /// Callback for querying submitter ledger balances (E7 - #1134).
     /// Required for credit ceiling enforcement via `CommonsPoolPolicy::validate_submitter_credit`.
     balance_callback: Option<BalanceCallback>,
@@ -195,6 +200,8 @@ impl ComputeActor {
             commons_pool: Arc::new(RwLock::new(crate::commons_pool::CommonsPool::new())),
             stale_participant_max_age: None,
             commons_pool_policy: None,
+            #[cfg(test)]
+            pre_complete_gate: None,
             balance_callback: None,
             commons_required_credits_callback: None,
             commons_settlement_callback: None,

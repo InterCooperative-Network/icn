@@ -1109,10 +1109,24 @@ impl ComputeActor {
         // command can interleave between the claim and here; only the timeout sweep, which runs
         // beside the loop, can. If it failed the task meanwhile, `complete` refuses with
         // `TaskTerminal` (EX-019) and the `?` skips every effect below: no result broadcast, no
-        // event, no usage, and no load or scope-queue release, because the sweep already
-        // released both for this claim. Moving execution off the command loop would break
-        // that argument: a refusal here would then have to release this node's own load.
-        self.task_manager.lock().await.complete(result.clone())?;
+        // event, no recorded execution, no settlement, and no load or scope-queue release,
+        // because the sweep already released both for this claim. Moving execution off the
+        // command loop would break that argument: a refusal here would then have to release
+        // this node's own load.
+        //
+        // The one exception is the policy concurrency claim taken above for this claim. The
+        // sweep does not touch policy usage (it cannot tell a local claim from a remote or
+        // never-claimed task), so this refusal is its only release point: release it once here.
+        #[cfg(test)]
+        if let Some((reached, proceed)) = &self.pre_complete_gate {
+            reached.notify_one();
+            proceed.notified().await;
+        }
+        let completion = self.task_manager.lock().await.complete(result.clone());
+        if matches!(completion, Err(ComputeError::TaskTerminal { .. })) {
+            self.release_local_policy_claim(&claimed_task).await;
+        }
+        completion?;
 
         // Decrement our own executor load
         let mut registry = self.executor_registry.lock().await;
@@ -1343,6 +1357,32 @@ impl ComputeActor {
         }
 
         Ok(())
+    }
+
+    /// Release the policy concurrency claim `on_task_submitted` took for a local claim of
+    /// `task`, when that claim ends without a recorded completion. Mirrors the increment's
+    /// conditions (policy manager present, parseable submitter, `coop_id` or `"default"`), so it
+    /// decrements exactly the counter that was incremented, and only when it was.
+    async fn release_local_policy_claim(&self, task: &ComputeTask) {
+        let Some(ref policy_manager) = self.policy_manager else {
+            return;
+        };
+        let Ok(submitter_did) = icn_identity::Did::from_str(&task.submitter) else {
+            return;
+        };
+        let coop_id = task.coop_id.as_deref().unwrap_or("default");
+        if let Err(e) = policy_manager
+            .usage_tracker()
+            .task_completed(coop_id, &submitter_did)
+            .await
+        {
+            tracing::warn!(
+                task_id = %task.id,
+                submitter = %task.submitter,
+                error = %e,
+                "Failed to release policy concurrency claim"
+            );
+        }
     }
 
     /// Check for timed-out tasks and mark them as failed

@@ -2528,3 +2528,302 @@ async fn blocker2913_refused_claims_have_no_accounting_effect() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Policy concurrency accounting when the timeout sweep wins against local execution
+// (post-merge review of #2913, ledger #2915).
+//
+// A local claim increments the submitter's policy `concurrent_tasks`; only local completion
+// decremented it. When the timeout sweep fails the task while it is executing inline, EX-019
+// refuses the late `complete()`, so the decrement was skipped and the sweep releases load, scope
+// and reservations but not policy usage: one phantom concurrent task per such timeout.
+//
+// Scheduling is deterministic: `pre_complete_gate` stops local execution between `execute` and
+// `complete`, the sweep runs in that window, then execution resumes. No sleeps.
+// ---------------------------------------------------------------------------------------------
+
+const POLICY_COOP: &str = "policy-coop";
+
+struct PolicyNode {
+    actor: ComputeActor,
+    own: String,
+    submitter: icn_identity::Did,
+    outbox: Arc<std::sync::Mutex<Vec<ComputeMessage>>>,
+    completed_events: Arc<std::sync::Mutex<usize>>,
+}
+
+/// A node with a scheduling policy for `POLICY_COOP` whose default quota allows
+/// `max_concurrent` concurrent tasks per member, and its own executor registry entry.
+async fn policy_node(max_concurrent: u32) -> PolicyNode {
+    let key = ed25519_dalek::SigningKey::from_bytes(&[0x21; 32]);
+    let own = icn_identity::Did::from_public_key(&key.verifying_key()).to_string();
+    let submitter_key = ed25519_dalek::SigningKey::from_bytes(&[0x22; 32]);
+    let submitter = icn_identity::Did::from_public_key(&submitter_key.verifying_key());
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let mut actor = ComputeActor::new(own.clone(), trust_cb);
+    actor.set_signing_key(key.to_bytes().to_vec());
+
+    let pm = Arc::new(crate::policy::PolicyManager::new(Arc::new(
+        crate::policy::UsageTracker::new(),
+    )));
+    pm.set_policy(crate::policy::CoopSchedulingPolicy {
+        coop_id: POLICY_COOP.into(),
+        governance_domain: None,
+        rules: vec![],
+        member_quotas: HashMap::new(),
+        default_quota: crate::policy::MemberQuota {
+            cpu_hours_per_month: 100.0,
+            max_concurrent_tasks: max_concurrent,
+            max_priority: TaskPriority::Critical,
+            credits_per_month: None,
+        },
+        enforcement_mode: crate::policy::EnforcementMode::Strict,
+    })
+    .await;
+    actor.set_policy_manager(pm);
+
+    let outbox: Arc<std::sync::Mutex<Vec<ComputeMessage>>> = Arc::default();
+    let sink = Arc::clone(&outbox);
+    actor.set_send_callback(Arc::new(move |m: ComputeMessage| {
+        sink.lock().expect("outbox").push(m);
+    }));
+    let completed_events: Arc<std::sync::Mutex<usize>> = Arc::default();
+    let seen = Arc::clone(&completed_events);
+    actor.set_event_callback(Arc::new(move |e: ComputeEvent| {
+        if matches!(e, ComputeEvent::TaskCompleted { .. }) {
+            *seen.lock().expect("events") += 1;
+        }
+    }));
+
+    actor
+        .on_executor_announce(own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+
+    PolicyNode {
+        actor,
+        own,
+        submitter,
+        outbox,
+        completed_events,
+    }
+}
+
+fn policy_task(node: &PolicyNode, id: &str, deadline: Option<u64>) -> ComputeTask {
+    let mut task = make_task(id, &node.submitter.to_string());
+    task.coop_id = Some(POLICY_COOP.into());
+    task.deadline = deadline;
+    task
+}
+
+/// The submitter's policy `concurrent_tasks` on this node.
+async fn policy_concurrent(node: &PolicyNode) -> u32 {
+    node.actor
+        .policy_manager
+        .as_ref()
+        .expect("policy manager")
+        .usage_tracker()
+        .get_usage(&node.submitter, POLICY_COOP)
+        .await
+        .unwrap()
+        .concurrent_tasks
+}
+
+/// Execution and submission refuse a deadline already passed, so a task that must time out is
+/// given one `DEADLINE_MARGIN_MS` ahead and the sweep waits until it has passed (as L4b does).
+const DEADLINE_MARGIN_MS: u64 = 500;
+
+fn wall_ms() -> u64 {
+    icn_time::current_timestamp_millis()
+}
+
+async fn wait_past(deadline: u64) {
+    while wall_ms() <= deadline {
+        let remaining = deadline + 1 - wall_ms().min(deadline);
+        tokio::time::sleep(std::time::Duration::from_millis(remaining)).await;
+    }
+}
+
+async fn run_timeout_sweep(actor: &ComputeActor) {
+    ComputeActor::check_timeouts(
+        &actor.task_manager,
+        &actor.executor_registry,
+        &actor.send_callback,
+        &actor.scope_queue_depths,
+        &actor.task_scope_map,
+        &actor.pending_reservations,
+        &actor.commons_release_callback,
+    )
+    .await
+    .unwrap();
+}
+
+/// Results this node signed itself as executor (as opposed to the sweep's `system` result).
+fn own_results(node: &PolicyNode) -> usize {
+    node.outbox
+        .lock()
+        .expect("outbox")
+        .iter()
+        .filter(|m| matches!(m, ComputeMessage::TaskResult(r) if r.executor == node.own))
+        .count()
+}
+
+/// Deliver `task` for local execution and let the timeout sweep fail it after execution but
+/// before completion is recorded. Returns the execution's result and the submitter's policy
+/// `concurrent_tasks` observed inside the window (while the claim is live).
+async fn execute_with_sweep_winning(
+    node: &mut PolicyNode,
+    task: ComputeTask,
+) -> (Result<(), ComputeError>, u32) {
+    let deadline = task.deadline.expect("a task that times out has a deadline");
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let proceed = Arc::new(tokio::sync::Notify::new());
+    node.actor.pre_complete_gate = Some((Arc::clone(&reached), Arc::clone(&proceed)));
+    let node_ref = &*node;
+    // If execution ends without reaching the window it still releases the sweep side, so a
+    // broken seam fails the `during` assertion instead of hanging.
+    let execution = async {
+        let r = node_ref.actor.on_task_submitted(task).await;
+        reached.notify_one();
+        r
+    };
+    let outcome = tokio::join!(execution, async {
+        reached.notified().await;
+        let during = policy_concurrent(node_ref).await;
+        wait_past(deadline).await;
+        run_timeout_sweep(&node_ref.actor).await;
+        proceed.notify_one();
+        during
+    });
+    node.actor.pre_complete_gate = None;
+    outcome
+}
+
+/// RED regression: the sweep wins while the task executes; the late completion is refused
+/// (EX-019) and the policy concurrency claim must still be released, so later legitimate work
+/// is admitted.
+#[tokio::test]
+async fn timeout_winner_releases_local_policy_concurrency_claim() {
+    let mut node = policy_node(1).await;
+    let task = policy_task(&node, "tw-1", Some(wall_ms() + DEADLINE_MARGIN_MS));
+    let hash = task.hash();
+    assert_eq!(policy_concurrent(&node).await, 0);
+
+    let (exec, during) = execute_with_sweep_winning(&mut node, task).await;
+
+    assert_eq!(during, 1, "the local claim is counted once while executing");
+    assert!(
+        matches!(exec, Err(ComputeError::TaskTerminal { .. })),
+        "late completion must be refused, got {exec:?}"
+    );
+    let status = node.actor.task_manager.lock().await.status(&hash).cloned();
+    assert!(
+        matches!(status, Some(TaskStatus::Failed { .. })),
+        "the timeout's terminal decision stands, got {status:?}"
+    );
+    assert_eq!(*node.completed_events.lock().expect("events"), 0);
+    assert_eq!(
+        own_results(&node),
+        0,
+        "no result broadcast for a refused completion"
+    );
+    assert_eq!(claim_accounting(&node.actor, &node.own).await, (0, 0, 0));
+
+    // Later legitimate work is not blocked by a phantom active task (quota is 1).
+    let next = node
+        .actor
+        .handle_submit(policy_task(&node, "tw-next", None))
+        .await;
+    assert!(next.is_ok(), "later submission rejected: {next:?}");
+    assert_eq!(
+        policy_concurrent(&node).await,
+        0,
+        "the timed-out local claim leaked a policy concurrency slot"
+    );
+}
+
+/// Positive control: normal local completion releases the claim once and completes once.
+#[tokio::test]
+async fn normal_local_completion_releases_policy_concurrency_claim() {
+    let node = policy_node(1).await;
+    let task = policy_task(&node, "nc-1", None);
+    let hash = task.hash();
+
+    node.actor.on_task_submitted(task).await.unwrap();
+
+    let status = node.actor.task_manager.lock().await.status(&hash).cloned();
+    assert!(
+        matches!(status, Some(TaskStatus::Completed { .. })),
+        "{status:?}"
+    );
+    assert_eq!(*node.completed_events.lock().expect("events"), 1);
+    assert_eq!(own_results(&node), 1);
+    assert_eq!(policy_concurrent(&node).await, 0);
+    assert_eq!(claim_accounting(&node.actor, &node.own).await, (0, 0, 0));
+}
+
+/// No double decrement, and another live claim of the same submitter is untouched: with one
+/// other claim already counted, the timed-out task's release returns the counter to 1, and a
+/// repeated sweep plus a never-claimed Pending task timing out change nothing further.
+#[tokio::test]
+async fn timeout_release_is_exactly_once_and_spares_other_live_claims() {
+    let mut node = policy_node(3).await;
+    // Another live claim for the same submitter (e.g. a task executing elsewhere on this node's
+    // books): counted, and must survive everything below.
+    node.actor
+        .policy_manager
+        .as_ref()
+        .expect("policy manager")
+        .usage_tracker()
+        .task_claimed(POLICY_COOP, &node.submitter)
+        .await
+        .unwrap();
+    assert_eq!(policy_concurrent(&node).await, 1);
+
+    let task = policy_task(&node, "ex-1", Some(wall_ms() + DEADLINE_MARGIN_MS));
+    let (exec, during) = execute_with_sweep_winning(&mut node, task).await;
+    assert_eq!(during, 2);
+    assert!(
+        matches!(exec, Err(ComputeError::TaskTerminal { .. })),
+        "{exec:?}"
+    );
+    assert_eq!(
+        policy_concurrent(&node).await,
+        1,
+        "released exactly this claim"
+    );
+
+    // Repeated sweep: the task is already terminal; nothing is released again.
+    run_timeout_sweep(&node.actor).await;
+    assert_eq!(policy_concurrent(&node).await, 1);
+
+    // A Pending task that was never claimed locally times out: no policy release.
+    let pending_deadline = wall_ms() + DEADLINE_MARGIN_MS;
+    let pending = node
+        .actor
+        .handle_submit(policy_task(&node, "ex-pending", Some(pending_deadline)))
+        .await
+        .unwrap();
+    wait_past(pending_deadline).await;
+    run_timeout_sweep(&node.actor).await;
+    let status = node
+        .actor
+        .task_manager
+        .lock()
+        .await
+        .status(&pending)
+        .cloned();
+    assert!(
+        matches!(status, Some(TaskStatus::Failed { .. })),
+        "{status:?}"
+    );
+    assert_eq!(
+        policy_concurrent(&node).await,
+        1,
+        "an unclaimed timeout released usage"
+    );
+    assert_eq!(*node.completed_events.lock().expect("events"), 0);
+    assert_eq!(own_results(&node), 0);
+    assert_eq!(claim_accounting(&node.actor, &node.own).await, (0, 0, 0));
+}
