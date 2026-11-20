@@ -2258,3 +2258,59 @@ fn test_unique_largest_group_ignores_hashmap_order() {
         }
     }
 }
+
+/// EX-019: the legacy single-executor path reports a late result for a terminal task as
+/// `Refused` (not an `Err` the gossip handler only logs, and not `Unregistered`), so callers such
+/// as `on_federated_task_result` take their no-effect early return.
+#[tokio::test]
+async fn ex019_legacy_late_result_for_terminal_task_is_refused() {
+    use super::lifecycle::ResultAcceptance;
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let actor = ComputeActor::new("did:icn:node".into(), trust_cb);
+    let task = make_task("ex019-refused", "did:icn:alice");
+    let task_hash = actor.handle_submit(task.clone()).await.unwrap();
+
+    let signed_by = |seed: u8, fuel: u64| {
+        let key = ed25519_dalek::SigningKey::from_bytes(&[seed; 32]);
+        let mut result = ComputeResult {
+            task_hash,
+            task_id: task.id.clone(),
+            executor: icn_identity::Did::from_public_key(&key.verifying_key()).to_string(),
+            outcome: crate::types::ExecutionOutcome::Success(b"42".to_vec()),
+            fuel_used: fuel,
+            duration_ms: 10,
+            completed_at: 1000,
+            signature: vec![],
+        };
+        result.sign(&key);
+        result
+    };
+
+    let first = actor
+        .accept_task_result(signed_by(0x0A, 100))
+        .await
+        .unwrap();
+    assert_eq!(
+        first,
+        ResultAcceptance::Unregistered,
+        "the first result completes"
+    );
+
+    for late in [
+        signed_by(0x0A, 100),
+        signed_by(0x0B, 100),
+        signed_by(0x0A, 9_000),
+    ] {
+        let acceptance = actor.accept_task_result(late).await;
+        assert!(
+            matches!(acceptance, Ok(ResultAcceptance::Refused)),
+            "a late result for a completed task must be Refused; got {acceptance:?}"
+        );
+    }
+    let status = actor.task_manager.lock().await.status(&task_hash).cloned();
+    match status {
+        Some(TaskStatus::Completed { result }) => assert_eq!(result.fuel_used, 100),
+        other => panic!("expected the first completion to hold, got {other:?}"),
+    }
+}

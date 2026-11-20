@@ -52,11 +52,12 @@ pub(super) enum ResultAcceptance {
     /// The quorum counted the result without accepting one: still collecting, or this result
     /// closed it divergent or timed out.
     Counted,
-    /// The task is registered for quorum verification and the result was refused: its quorum
-    /// had closed, or the aggregator rejected the result. Nothing changed.
+    /// The result was refused and nothing changed: the task is registered for quorum
+    /// verification and its quorum had closed or the aggregator rejected the result, or the task
+    /// is already terminal (completed, failed or cancelled; EX-019).
     Refused,
     /// The task was never registered for quorum verification; the single-executor path handled
-    /// the result.
+    /// the result. For a task this node holds, that means the result completed it.
     Unregistered,
 }
 use crate::{MIN_TRUST_EXECUTE, MIN_TRUST_SUBMIT};
@@ -98,6 +99,21 @@ async fn consume_commons_reservation(
     task_id: &str,
 ) {
     pending_reservations.lock().await.remove(task_id);
+}
+
+/// Separate a terminal-state refusal from every other outcome of a status transition.
+///
+/// `Ok(Ok(()))`: the transition happened. `Ok(Err(state))`: the task was already terminal and
+/// nothing changed (EX-019), so the caller must skip the transition's effects. `Err`: any other
+/// error, propagated unchanged.
+fn refuse_if_terminal(
+    transition: Result<(), ComputeError>,
+) -> Result<Result<(), crate::task::TerminalState>, ComputeError> {
+    match transition {
+        Ok(()) => Ok(Ok(())),
+        Err(ComputeError::TaskTerminal { state, .. }) => Ok(Err(state)),
+        Err(other) => Err(other),
+    }
 }
 
 impl ComputeActor {
@@ -356,7 +372,18 @@ impl ComputeActor {
                 .get(&accepted_result.task_hash)
                 .map(|t| (t.id.clone(), t.scope, t.submitter.clone()));
             if task_reservation_info.is_some() {
-                mgr.complete(accepted_result)?;
+                // EX-019: a terminal task is final. A replayed, late or conflicting result is
+                // refused here, before any completion effect (load, event, settlement, clearing).
+                if let Err(refusal) = refuse_if_terminal(mgr.complete(accepted_result))? {
+                    drop(mgr);
+                    tracing::debug!(
+                        task_hash = %task_hash_str,
+                        executor = %executor_did,
+                        state = %refusal,
+                        "Result for a terminal task refused; nothing changed"
+                    );
+                    return Ok(ResultAcceptance::Refused);
+                }
             }
             drop(mgr);
 
@@ -440,8 +467,11 @@ impl ComputeActor {
                     "Multi-executor task: consensus reached"
                 );
                 icn_obs::metrics::compute::quorum_consensus_inc("multi_executor");
-                self.complete_task_result(canonical).await?;
-                Ok(ResultAcceptance::Accepted)
+                if self.complete_task_result(canonical).await? {
+                    Ok(ResultAcceptance::Accepted)
+                } else {
+                    Ok(ResultAcceptance::Refused)
+                }
             }
             QuorumDecision::Divergent {
                 result_groups,
@@ -472,8 +502,11 @@ impl ComputeActor {
         }
     }
 
-    /// Complete a task with the given result (used by both quorum and legacy paths)
-    async fn complete_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
+    /// Complete a task from a quorum's canonical result.
+    ///
+    /// Returns `false`, with no completion effect, when the task is already terminal (EX-019),
+    /// for example when it failed its deadline before the quorum accepted.
+    async fn complete_task_result(&self, result: ComputeResult) -> Result<bool, ComputeError> {
         let executor_did = result.executor.clone();
         let task_hash = result.task_hash;
         let outcome = result.outcome.clone();
@@ -485,7 +518,16 @@ impl ComputeActor {
             .get(&task_hash)
             .map(|t| (t.id.clone(), t.scope, t.submitter.clone()));
         if task_reservation_info.is_some() {
-            mgr.complete(result)?;
+            if let Err(refusal) = refuse_if_terminal(mgr.complete(result))? {
+                drop(mgr);
+                tracing::warn!(
+                    task_hash = %hex::encode(task_hash),
+                    executor = %executor_did,
+                    state = %refusal,
+                    "Quorum accepted a result for a terminal task; not completing it"
+                );
+                return Ok(false);
+            }
         }
         drop(mgr);
 
@@ -534,7 +576,7 @@ impl ComputeActor {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     /// Handle divergent results from multi-executor verification (Issue #511)
@@ -776,8 +818,22 @@ impl ComputeActor {
             }
         }
 
-        // Store task
-        let _hash = self.task_manager.lock().await.submit(task.clone())?;
+        // Store task. A task this node already holds keeps its stored state (EX-019): the
+        // submission is not re-applied, so it cannot reset a claimed or terminal task to
+        // Pending. Claiming below still runs, and it only picks Pending tasks, so a re-delivered
+        // submission of a still-pending task is executed exactly as before, and one of a
+        // completed, failed or cancelled task is never executed again.
+        match self.task_manager.lock().await.submit(task.clone()) {
+            Ok(_) => {}
+            Err(ComputeError::DuplicateTask { .. }) => {
+                tracing::debug!(
+                    task_id = %task.id,
+                    task_hash = %task_hash_str,
+                    "Submission of a task already held; keeping its stored state"
+                );
+            }
+            Err(e) => return Err(e),
+        }
 
         // Find highest-priority pending task we can execute
         let highest_priority_task = {
@@ -1049,7 +1105,9 @@ impl ComputeActor {
             }
         }
 
-        // Record completion
+        // Record completion. If the task became terminal while it ran (cancelled, timed out, or
+        // completed from another executor's result), `complete` refuses with `TaskTerminal` and
+        // the `?` skips every effect below: no result broadcast, no event, no usage (EX-019).
         self.task_manager.lock().await.complete(result.clone())?;
 
         // Decrement our own executor load
@@ -1307,8 +1365,20 @@ impl ComputeActor {
             // task_scope covers Pending tasks that were never claimed (no task_scope_map entry)
             let task_scope = mgr.get(&hash).map(|t| t.scope);
 
-            // Mark as failed
-            mgr.fail(&hash, "Deadline exceeded".to_string())?;
+            // Mark as failed. The sweep runs beside the command loop, so the task may have
+            // completed or been cancelled since `find_timed_out` released the lock. A terminal
+            // task is final (EX-019): skip it, with none of the timeout's effects below.
+            if let Err(state) =
+                refuse_if_terminal(mgr.fail(&hash, "Deadline exceeded".to_string()))?
+            {
+                drop(mgr);
+                tracing::debug!(
+                    task_hash = %task_hash_str,
+                    state = %state,
+                    "Task became terminal before the timeout sweep reached it; skipping"
+                );
+                continue;
+            }
             drop(mgr);
 
             icn_obs::metrics::compute::tasks_timeout_inc();
@@ -1432,6 +1502,81 @@ impl ComputeActor {
             });
         }
 
+        // Derive the task exactly as it will be stored, before any side effect (EX-019): the
+        // policy and charter adjustments below change the task, and so the hash it is held
+        // under. `check_submission` and the charter ordering only read state. A policy rejection
+        // is recorded here and returned at its original place, after the commons checks.
+
+        // Check policy compliance (Phase 16E)
+        let mut adjusted_task = task.clone();
+        let mut policy_rejection: Option<(String, String)> = None;
+        if let Some(ref policy_manager) = self.policy_manager {
+            // Parse submitter DID
+            let submitter_did = icn_identity::Did::from_str(&task.submitter)
+                .map_err(|e| ComputeError::InvalidInput(format!("Invalid submitter DID: {e}")))?;
+
+            // Extract coop_id from task (default to "default" if not specified)
+            let coop_id = task.coop_id.as_deref().unwrap_or("default");
+
+            // Check policy
+            match policy_manager
+                .check_submission(&task, &submitter_did, coop_id)
+                .await?
+            {
+                crate::policy::PolicyDecision::Reject { reason } => {
+                    policy_rejection = Some((coop_id.to_string(), reason));
+                }
+                crate::policy::PolicyDecision::Allow {
+                    adjusted_priority,
+                    placement_constraints,
+                } => {
+                    // Apply policy adjustments
+                    adjusted_task.priority = adjusted_priority;
+                    adjusted_task.placement_constraints = Some(placement_constraints.clone());
+                    tracing::debug!(
+                        task_id = %task.id,
+                        original_priority = ?task.priority,
+                        adjusted_priority = ?adjusted_priority,
+                        has_constraints = placement_constraints.required_region.is_some(),
+                        "Policy check passed with adjustments"
+                    );
+                }
+            }
+        }
+
+        // Apply charter-defined priority ordering (E7 - #1134).
+        // Charter priority may cap or reorder priorities relative to member standing.
+        // This runs after `CoopSchedulingPolicy` adjustments so both layers compose.
+        if let Some(ref policy) = self.commons_pool_policy {
+            let original = adjusted_task.priority;
+            adjusted_task.priority = apply_commons_charter_priority(policy, &adjusted_task, trust);
+            if adjusted_task.priority != original {
+                tracing::debug!(
+                    task_id = %task.id,
+                    original_priority = ?original,
+                    charter_priority = ?adjusted_task.priority,
+                    charter_policy = ?policy.priority,
+                    "Charter priority applied"
+                );
+            }
+        }
+
+        // A task already held, in any state, is refused before the commons checks and the
+        // credit reservation, so a duplicate submission has no effect at all (EX-019).
+        // `TaskManager::submit` refuses it again below; that is the authoritative check.
+        let stored_hash = adjusted_task.hash();
+        if self.task_manager.lock().await.get(&stored_hash).is_some() {
+            tracing::debug!(
+                task_id = %task.id,
+                task_hash = %hex::encode(stored_hash),
+                submitter = %task.submitter,
+                "Duplicate task submission refused"
+            );
+            return Err(ComputeError::DuplicateTask {
+                task: hex::encode(stored_hash),
+            });
+        }
+
         // Commons pool governance checks (E7 - #1134)
         // Standing and credit ceiling validation gate access to shared compute resources.
         if let Some(ref policy) = self.commons_pool_policy {
@@ -1542,64 +1687,15 @@ impl ComputeActor {
             }
         }
 
-        // Check policy compliance (Phase 16E)
-        let mut adjusted_task = task.clone();
-        if let Some(ref policy_manager) = self.policy_manager {
-            // Parse submitter DID
-            let submitter_did = icn_identity::Did::from_str(&task.submitter)
-                .map_err(|e| ComputeError::InvalidInput(format!("Invalid submitter DID: {e}")))?;
-
-            // Extract coop_id from task (default to "default" if not specified)
-            let coop_id = task.coop_id.as_deref().unwrap_or("default");
-
-            // Check policy
-            match policy_manager
-                .check_submission(&task, &submitter_did, coop_id)
-                .await?
-            {
-                crate::policy::PolicyDecision::Reject { reason } => {
-                    tracing::warn!(
-                        task_id = %task.id,
-                        submitter = %task.submitter,
-                        coop_id = %coop_id,
-                        reason = %reason,
-                        "Task rejected by policy"
-                    );
-                    return Err(ComputeError::PolicyViolation(reason));
-                }
-                crate::policy::PolicyDecision::Allow {
-                    adjusted_priority,
-                    placement_constraints,
-                } => {
-                    // Apply policy adjustments
-                    adjusted_task.priority = adjusted_priority;
-                    adjusted_task.placement_constraints = Some(placement_constraints.clone());
-                    tracing::debug!(
-                        task_id = %task.id,
-                        original_priority = ?task.priority,
-                        adjusted_priority = ?adjusted_priority,
-                        has_constraints = placement_constraints.required_region.is_some(),
-                        "Policy check passed with adjustments"
-                    );
-                }
-            }
-        }
-
-        // Apply charter-defined priority ordering (E7 - #1134).
-        // Charter priority may cap or reorder priorities relative to member standing.
-        // This runs after `CoopSchedulingPolicy` adjustments so both layers compose.
-        if let Some(ref policy) = self.commons_pool_policy {
-            let original = adjusted_task.priority;
-            adjusted_task.priority = apply_commons_charter_priority(policy, &adjusted_task, trust);
-            if adjusted_task.priority != original {
-                tracing::debug!(
-                    task_id = %task.id,
-                    original_priority = ?original,
-                    charter_priority = ?adjusted_task.priority,
-                    charter_policy = ?policy.priority,
-                    "Charter priority applied"
-                );
-            }
+        if let Some((coop_id, reason)) = policy_rejection {
+            tracing::warn!(
+                task_id = %task.id,
+                submitter = %task.submitter,
+                coop_id = %coop_id,
+                reason = %reason,
+                "Task rejected by policy"
+            );
+            return Err(ComputeError::PolicyViolation(reason));
         }
 
         // Add to local task manager (use adjusted task)

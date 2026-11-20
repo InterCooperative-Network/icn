@@ -99,7 +99,7 @@ pub use scheduler::{
     PlacementOffer, PlacementPolicy, PlacementRequest, ResourceChangeType, ResourceProfile,
     ResourceRefreshConfig, ScopeContext,
 };
-pub use task::{TaskManager, TaskStatus};
+pub use task::{TaskManager, TaskStatus, TerminalState};
 pub use types::{
     ComputeMessage, ComputeResult, ComputeTask, ContentHash, DeterminismClass, ExecutionOutcome,
     ExecutorCapability, FuelLimit, PrivacyClass, TaskCode, TaskHash, TaskId, TaskPriority,
