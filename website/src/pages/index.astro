@@ -40,6 +40,7 @@ import MaturityBadge from '../components/MaturityBadge.astro';
 import EvidenceBadge from '../components/EvidenceBadge.astro';
 import Icon from '../components/Icon.astro';
 import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectState';
+import { WALKTHROUGH_STEPS } from '../data/walkthrough';
 
 // The homepage states the shape of the maturity picture, never a per-subsystem
 // claim — those belong on /whats-real-now, where each one carries its evidence
@@ -109,8 +110,13 @@ const PARTICIPATION = [
         </p>
 
         <div class="hero-actions">
+          <!-- "See ICN work" implied a system in live operation. The
+               destination is explicitly labelled "illustrative direction" —
+               fixture data, no live institution. A concrete noun the reader
+               already owns ("one decision") is both more accurate and a
+               better first word than the project's name. -->
           <a href="/see-it-work" class="btn btn-primary">
-            See ICN work
+            Follow one decision
             <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
           </a>
           <a href="/what-is-icn" class="btn btn-secondary">Start reading</a>
@@ -276,13 +282,14 @@ const PARTICIPATION = [
           </a>
         </div>
 
+        <!-- Rendered from data/walkthrough.ts, not retyped. The previous hand-
+             copied list had already drifted from the source it mirrors (step 06
+             differed in its apostrophe), which is how a copy announces that it
+             will eventually differ in substance too. -->
         <ol class="see-preview" aria-label="The six steps of the walkthrough">
-          <li><span class="see-preview-n">01</span> Someone is recognized by their cooperative</li>
-          <li><span class="see-preview-n">02</span> Something comes up that needs a decision</li>
-          <li><span class="see-preview-n">03</span> The rules say who may decide it, and why</li>
-          <li><span class="see-preview-n">04</span> Before anything happens, you can see what would happen</li>
-          <li><span class="see-preview-n">05</span> What happened leaves a record that can be checked</li>
-          <li><span class="see-preview-n">06</span> The record joins the institution's memory</li>
+          {WALKTHROUGH_STEPS.map((step) => (
+            <li><span class="see-preview-n">{step.n}</span> {step.title}</li>
+          ))}
         </ol>
       </div>
     </div>
