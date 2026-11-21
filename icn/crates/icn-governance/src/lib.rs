@@ -61,6 +61,7 @@ pub mod profile;
 pub mod proof;
 #[allow(missing_docs)]
 pub mod proposal;
+pub mod proposal_commitment;
 #[allow(missing_docs)]
 pub mod protocol;
 #[allow(missing_docs)]
