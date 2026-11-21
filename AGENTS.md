@@ -152,15 +152,46 @@ They should not duplicate identity models, current architecture state, live issu
 
 `CLAUDE.md`, `docs/ai/CODEX_WORKFLOW.md`, `.claude/**`, and similar provider surfaces adapt this contract to a tool. They do not override it.
 
-## 9. Completion report
+## 9. Completion: publish, then report
+
+### 9.1 Verified work is published by default
+
+Completed, verified, publication-safe work must not stay stranded in a local worktree. Within an authorized development task, the default completion path is:
+
+> implement → verify → review → commit → publication-safety check → push → confirm remote → open/update PR → record durable state
+
+Ordinary scoped commits and non-force pushes of a feature branch to its approved remote are part of that authorized task; they do not need a separate permission request each time. At each bounded, verified milestone:
+
+1. Confirm the repository, worktree, and branch are the intended ones, and that the worktree is yours (§2).
+2. Inspect the full staged and unstaged diff, and the commits about to be published.
+3. Run the verification the changed paths require (§5). Rust changes go through the `push` skill's scoped gates.
+4. Stage named paths (never `git add .` in a tree that holds unrelated changes) and commit with a descriptive, scoped message.
+5. Review the diff **and the exact commits being published**, including the one just created, for secrets, credentials, private or real-person data, restricted operational detail, and unintended files. That includes commit author and committer metadata: a machine-local Git identity can carry a personal address that a public remote would publish. Run this review after committing, so it covers the metadata the push will carry; if it finds a problem, fix the commit locally before anything is pushed.
+6. Confirm the remote is approved for this content, considering repository visibility and §6/§8 private-source boundaries.
+7. Push the feature branch with an ordinary, non-force push.
+8. Verify that the remote branch exists and points at the commit you intended (`git ls-remote`), not merely that the push exited 0.
+9. Open or update the pull request. A verified intermediate milestone may be a draft PR. An intentionally failing test contract may be published only as a clearly labelled draft and must never be described as passing.
+10. Promote what must survive to its durable owner (§6), and state what remains local and why.
+
+Publish the specific validated commits, not whatever happens to be local. Do not push every local branch, and do not push a long-lived historical branch merely because some of its commits are useful: establish its ancestry, what already reached the default branch, its existing PRs, and the privacy of its whole history first. A missing remote branch name is not proof that its commits are unpublished, and a clean worktree is not proof that work is preserved remotely.
+
+### 9.2 What the default does not authorize
+
+The default covers feature-branch publication only. It never authorizes force-push or remote history rewriting, deleting remote branches, merging, pushing to a protected branch, changing branch protection or repository visibility, releases, deployments, host/service/infrastructure changes, migrations or live-data mutation, bypassing CI or review, publishing secrets or private records, institutional decisions or governance activation, or recording human approval that did not happen. A stronger restriction from a domain owner, scoped instruction, or repository policy still wins.
+
+When publication is unsafe, unauthorized, or blocked, keep the work local through the approved mechanism and report the specific blocker. Do not publish it partially to make the report look complete.
+
+### 9.3 Completion report
 
 Before claiming completion, state:
 
 - the final base/head or relevant live state;
+- for each published branch: repository, worktree, branch, local head, remote head, whether they match, and the PR with its draft/review status;
 - what changed and what deliberately did not;
-- the evidence run or inspected;
+- the evidence run or inspected, including the publication-safety review;
+- what remains local-only, and why;
 - any unresolved assumptions or external failures;
 - whether the work is implementation, test/library-only, integration, migration, deployment, or documentation-only;
 - the exact next blocker if the task did not reach its acceptance condition.
 
-Do not turn "implemented" into "integrated," "deployed," "production-ready," or "adopted" without evidence for those separate claims.
+Do not turn "implemented" into "integrated," "deployed," "production-ready," or "adopted" without evidence for those separate claims. Pushed is not integrated, merged is not deployed, and deployed is not adopted.
