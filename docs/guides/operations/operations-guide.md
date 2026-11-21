@@ -166,7 +166,7 @@ git log --oneline HEAD..origin/main
 Use gateway health (`http://localhost:8080/v1/health`) and metrics (`http://localhost:9100/metrics`) for real-time visibility into:
 
 **Status Banner:**
-- **Healthy** (green): All systems operational
+- **Healthy** (green): all monitored components reporting healthy
 - **Degraded** (yellow): Non-critical issues detected (e.g., 100+ quarantine entries)
 - **Unhealthy** (red): Critical issues (e.g., 1000+ quarantine entries)
 

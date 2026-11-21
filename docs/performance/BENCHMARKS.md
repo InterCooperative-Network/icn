@@ -330,7 +330,8 @@ cargo bench --workspace
 3. Efficient P2P communication
 4. Linear scalability with predictable behavior
 
-**No Performance Blockers**: Ready for production deployment.
+**No Performance Blockers**: the benchmarks above surfaced no performance blocker.
+Performance is one gate among several, so this is not a readiness judgement.
 
 ---
 
