@@ -39,11 +39,34 @@ pub(crate) fn get_entry(ledger: &Ledger, hash: &ContentHash) -> Result<Option<Jo
 
     match value {
         Some(bytes) => {
-            let entry: JournalEntry = serde_json::from_slice(&bytes)?;
+            let mut entry: JournalEntry = serde_json::from_slice(&bytes)?;
+            // The id is `#[serde(skip)]`; the key we just read IS the identity.
+            entry.id = Some(hash.clone());
             Ok(Some(entry))
         }
         None => Ok(None),
     }
+}
+
+/// Parse the identity out of a journal storage key (`ledger:journal:<64 hex>`).
+///
+/// The key is the only persisted carrier of a journal entry's identity. The id
+/// is taken verbatim from it, never recomputed from the entry's contents, and
+/// a key that is not exactly the prefix plus 64 hex digits is an error rather
+/// than an entry without an identity.
+pub(crate) fn journal_id_from_key(key: &[u8]) -> Result<ContentHash> {
+    let rest = key
+        .strip_prefix(JOURNAL_PREFIX.as_bytes())
+        .ok_or_else(|| anyhow::anyhow!("journal key lacks the {JOURNAL_PREFIX:?} prefix"))?;
+    let raw =
+        hex::decode(rest).map_err(|e| anyhow::anyhow!("malformed journal key (not hex): {e}"))?;
+    let arr = <[u8; 32]>::try_from(raw.as_slice()).map_err(|_| {
+        anyhow::anyhow!(
+            "malformed journal key: expected 32 bytes, got {}",
+            raw.len()
+        )
+    })?;
+    Ok(ContentHash::from_bytes(arr))
 }
 
 /// Get all journal entries
@@ -52,8 +75,10 @@ pub(crate) fn get_all_entries(ledger: &Ledger) -> Result<Vec<JournalEntry>> {
     let pairs = ledger.store.scan(prefix)?;
 
     let mut entries = Vec::new();
-    for (_key, value) in pairs {
-        let entry: JournalEntry = serde_json::from_slice(&value)?;
+    for (key, value) in pairs {
+        let id = journal_id_from_key(&key)?;
+        let mut entry: JournalEntry = serde_json::from_slice(&value)?;
+        entry.id = Some(id);
         entries.push(entry);
     }
 
