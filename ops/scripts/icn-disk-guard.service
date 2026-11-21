@@ -1,0 +1,48 @@
+[Unit]
+Description=ICN dev VM disk guard — bound Cargo build-artifact growth across agent worktrees
+Documentation=file:///home/ubuntu/icn-dev/scripts/icn-disk-guard
+# Needs the network only for `gh` PR-state lookups. If it is unavailable the guard degrades
+# safely: unknown PR state classifies STALE-UNKNOWN and nothing is reclaimed.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Installed system-wide rather than as a user unit, deliberately. A user timer only runs
+# while a login session exists (Linger=no on this host), so it would silently stop after a
+# reboot with nobody logged in. Enabling lingering was the alternative, but that would also
+# start dotfiles-sync.service — a `git pull` — unattended at boot, which is a behavioural
+# change well outside this guard's remit. Running one system unit as the dev user gives
+# boot-persistent housekeeping with the smallest blast radius.
+User=ubuntu
+Group=ubuntu
+Environment=HOME=/home/ubuntu
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/home/ubuntu/bin
+WorkingDirectory=/home/ubuntu
+
+# --auto runs both policy layers: routine housekeeping regardless of filesystem state, and
+# the more eager pressure layer above FS_WARN_PCT. It performs no git mutation, no branch
+# deletion, no worktree removal, no docker prune, no package removal and no source deletion.
+# The only filesystem write it can make is `rm -rf` on a directory named `target/` carrying a
+# Cargo CACHEDIR.TAG, in a worktree positively classified MERGED-INACTIVE.
+ExecStart=/home/ubuntu/icn-dev/scripts/icn-disk-guard --auto --quiet
+
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=30min
+
+# 1 = WARNING, 2 = CRITICAL. Both are real signals the script logs and prints; failing the
+# unit on them would only make `systemctl status` permanently red without adding information.
+SuccessExitStatus=0 1 2
+
+# The guard needs to read /proc for liveness and write only under the ICN tree.
+ProtectSystem=strict
+ReadWritePaths=/home/ubuntu/icn-dev
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
