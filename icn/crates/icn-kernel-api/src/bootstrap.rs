@@ -96,7 +96,8 @@ struct CachedDecision {
 /// TTL-based cache for policy decisions.
 ///
 /// Uses PolicyRequestCore as the cache key for fast lookups.
-/// Context metadata is not cached - only consulted on cache miss.
+/// Context-sensitive requests bypass this core-only cache entirely. They must not
+/// reuse decisions made for a different resource, namespace, capability or metadata.
 pub struct DecisionCache {
     entries: RwLock<HashMap<PolicyRequestCore, CachedDecision>>,
     max_entries: usize,
@@ -290,9 +291,20 @@ impl OracleRegistry {
         let phase = self.phase();
         let domain = &request.core.domain;
 
-        // Check cache first (fast path)
-        if let Some(cached) = self.cache.get(&request.core) {
-            return cached;
+        // PolicyRequestCore omits PolicyContext. Reusing its cached result for a
+        // different topic, charter, resource or presented capability could reuse
+        // an authorization decision with different inputs. Until a complete,
+        // version-aware context key is defined, evaluate contextual requests
+        // fresh; keep the existing fast path for genuinely context-free requests.
+        let cacheable = request.context.resource.is_none()
+            && request.context.namespace.is_none()
+            && request.context.metadata.is_empty()
+            && request.context.capability.is_none();
+
+        if cacheable {
+            if let Some(cached) = self.cache.get(&request.core) {
+                return cached;
+            }
         }
 
         // Cache miss - get oracle for domain
@@ -308,7 +320,7 @@ impl OracleRegistry {
                     }
                 };
                 // Cache the deny decision to avoid repeated lookups
-                if matches!(phase, BootstrapPhase::Running) {
+                if cacheable && matches!(phase, BootstrapPhase::Running) {
                     self.cache.insert(
                         request.core.clone(),
                         decision.clone(),
@@ -319,13 +331,14 @@ impl OracleRegistry {
             }
         };
 
-        // Evaluate request
+        // Evaluate request against its complete context.
         let decision = oracle.evaluate(request);
-        let ttl = oracle.cache_ttl();
 
-        // Cache the decision
-        self.cache
-            .insert(request.core.clone(), decision.clone(), ttl);
+        // Only context-free requests can safely share this core-only key.
+        if cacheable {
+            self.cache
+                .insert(request.core.clone(), decision.clone(), oracle.cache_ttl());
+        }
 
         decision
     }
@@ -681,7 +694,110 @@ impl CapabilityRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authz::{ActionKind, DenyAllOracle, PolicyRequest};
+    use crate::authz::{ActionKind, DenyAllOracle, PolicyContext, PolicyRequest};
+
+    /// A cached allow for a low-threshold topic or one with no context must
+    /// never authorize another resource requiring a higher threshold.
+    #[test]
+    fn test_oracle_registry_context_isolation_for_thresholds_and_resources() {
+        struct ContextAwareOracle;
+
+        impl PolicyOracle for ContextAwareOracle {
+            fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+                if request.context.resource.as_deref() == Some("private")
+                    || request.context.namespace.as_deref() == Some("hidden")
+                    || request.context.capability.is_some()
+                {
+                    return PolicyDecision::deny("protected context");
+                }
+
+                let required = request
+                    .context
+                    .metadata
+                    .get("min_trust_threshold")
+                    .and_then(|value| value.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+
+                if required > 0.5 {
+                    PolicyDecision::deny("trust threshold not met")
+                } else {
+                    PolicyDecision::allow()
+                }
+            }
+
+            fn domain(&self) -> Domain {
+                Domain::trust()
+            }
+
+            fn cache_ttl(&self) -> Duration {
+                Duration::from_secs(300)
+            }
+        }
+
+        let registry = OracleRegistry::new();
+        registry.register(Domain::trust(), Arc::new(ContextAwareOracle));
+        registry.set_phase(BootstrapPhase::Running);
+
+        let actor = "did:icn:policy-context-test".to_string();
+        let bare = PolicyRequest::new(actor.clone(), ActionKind::Subscribe, Domain::trust());
+        assert!(registry.evaluate(&bare).is_allowed());
+        assert_eq!(registry.cache_stats().entries, 1);
+
+        let make = |resource: &str, threshold: &str| {
+            PolicyRequest::with_context(
+                PolicyRequestCore::new(actor.clone(), ActionKind::Subscribe, Domain::trust()),
+                PolicyContext::new()
+                    .with_resource(resource)
+                    .with_metadata("min_trust_threshold", threshold),
+            )
+        };
+
+        // Both sides of the allow/deny boundary are re-evaluated even after
+        // the context-free allow has been cached.
+        assert!(!registry.evaluate(&make("public", "0.8")).is_allowed());
+        assert!(registry.evaluate(&make("public", "0.2")).is_allowed());
+        assert!(!registry.evaluate(&make("private", "0.2")).is_allowed());
+        assert!(!registry.evaluate(&make("public", "0.8")).is_allowed());
+
+        // Isolate the other fields, too: a test carrying both resource and
+        // metadata would not detect a future regression that checks only one.
+        let core = PolicyRequestCore::new(actor.clone(), ActionKind::Subscribe, Domain::trust());
+        let resource_only = PolicyRequest::with_context(
+            core.clone(),
+            PolicyContext::new().with_resource("private"),
+        );
+        let namespace_only = PolicyRequest::with_context(
+            core.clone(),
+            PolicyContext::new().with_namespace("hidden"),
+        );
+        let metadata_only = PolicyRequest::with_context(
+            core.clone(),
+            PolicyContext::new().with_metadata("min_trust_threshold", "0.9"),
+        );
+        let capability = crate::authz::Capability {
+            id: "presented-cap".into(),
+            resource: "resource".into(),
+            action: "subscribe".into(),
+            constraints: crate::authz::Constraints::default(),
+            holder: None,
+            issuer: "did:icn:test-issuer".into(),
+            expiration: u64::MAX,
+            signature: vec![],
+        };
+        let capability_only =
+            PolicyRequest::with_context(core, PolicyContext::new().with_capability(capability));
+        for contextual_request in [
+            resource_only,
+            namespace_only,
+            metadata_only,
+            capability_only,
+        ] {
+            assert!(!registry.evaluate(&contextual_request).is_allowed());
+        }
+
+        // The only cache entry is the original context-free allowance.
+        assert_eq!(registry.cache_stats().entries, 1);
+    }
 
     #[test]
     fn test_bootstrap_phase() {
