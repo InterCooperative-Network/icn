@@ -36,12 +36,14 @@
 
 import Layout from '../layouts/Layout.astro';
 import MaturityGrid from '../components/MaturityGrid.astro';
+import MaturityBadge from '../components/MaturityBadge.astro';
 import MaturityCard from '../components/MaturityCard.astro';
 import SubsystemTable from '../components/SubsystemTable.astro';
 import EvidenceBadge from '../components/EvidenceBadge.astro';
 import ReadingLadder from '../components/ReadingLadder.astro';
-import { PROJECT_STATE as projectState, evidenceClassesInUse } from '../lib/projectState';
+import { PROJECT_STATE as projectState, evidenceClassesInUse, subsystemsInBand } from '../lib/projectState';
 import buildLog from '../data/build-log.generated.json';
+import { describeFreshness } from '../lib/freshness';
 
 /**
  * Editorial review date for the prose on this page. This is NOT the data
@@ -52,9 +54,34 @@ const PROSE_REVIEWED = '2026-08-17';
 
 const subsystems = projectState.subsystems;
 
+// How many selected changes show before the rest fold into a native <details>
+// (all of them are in the HTML either way).
+const LOG_VISIBLE = 5;
+
+// Relates the two date signals (verification vs. the selected change log).
+// The build date is the only clock; the log is a bounded selection, so
+// nothing below derives a total from it. See src/lib/freshness.ts.
+const freshness = describeFreshness({
+  verified: { oldest: projectState.oldestVerified, newest: projectState.newestVerified },
+  proseReviewed: PROSE_REVIEWED,
+  entries: buildLog.entries,
+  builtOn: new Date().toISOString().slice(0, 10),
+});
+
 // The legend lists only the evidence classes that actually appear below —
 // a legend explaining classes the reader will never encounter is noise.
 const evidenceLegend = evidenceClassesInUse();
+
+// The short version: every subsystem grouped by its band, strongest first, each
+// with its evidence label in text. Derived from the same projection as the
+// table below, so the two cannot disagree. Adapted from the #2791 'short
+// version'; the question captions it used ("what is moving fastest" and so on)
+// are dropped because they were comparative claims the data does not make. The
+// band definitions live in 'How to read the labels' and are not retyped here.
+const GLANCE_BANDS = ['strong', 'advancing', 'maturing', 'behind', 'notyet'] as const;
+const glance = GLANCE_BANDS
+  .map((band) => ({ band, members: subsystemsInBand(band) }))
+  .filter((g) => g.members.length > 0);
 ---
 
 <Layout
@@ -98,10 +125,133 @@ const evidenceLegend = evidenceClassesInUse();
     </div>
   </section>
 
+  <!-- ═══ SHORT VERSION ═════════════════════════════════════════════════════ -->
+  <section class="section wrn-short" aria-labelledby="short-version">
+    <div class="container">
+      <div class="wrn-short-inner">
+        <nav class="wrn-jump" aria-label="On this page">
+          <ul>
+            <li><a href="#short-version">Short version</a></li>
+            <li><a href="#wrn-fresh-h">Checked and changed</a></li>
+            <li><a href="#subsystems">Subsystems</a></li>
+            <li><a href="#not-in-table">Not in the table</a></li>
+            <li><a href="#recent-changes">Recent changes</a></li>
+          </ul>
+        </nav>
+
+        <h2 id="short-version">The short version</h2>
+        <p class="sublede">
+          Each subsystem ICN tracks, grouped by how far along it is, with the
+          kind of evidence behind it in words. Each name links to its row, with
+          its recorded gaps.
+        </p>
+
+        <ul class="wrn-glance">
+          {glance.map((g) => (
+            <li class="wrn-glance-row">
+              <MaturityBadge band={g.band} />
+              <ul class="wrn-glance-names">
+                {g.members.map((s) => (
+                  <li>
+                    <a href={`#sub-${s.id}`}>{s.name}</a>
+                    <span class="wrn-glance-ev">{s.evidence.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+
+        <p class="wrn-short-note">
+          None of these is deployed. ICN has no production deployment claim and
+          no live federation, and a well-built subsystem may only ever have been
+          exercised against prepared data. Planned work is not listed here
+          because it is not a row in the record. Evidence labels are explained
+          under <a href="#how-to-read">how to read the labels</a>, and the dates
+          are explained next.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ VERIFIED / CHANGED / REASSESS ═════════════════════════════════════ -->
+  <section class="section section-alt wrn-fresh" aria-labelledby="wrn-fresh-h">
+    <div class="container">
+      <div class="wrn-fresh-inner">
+        <h2 id="wrn-fresh-h">Checked, changed, and not yet re-checked</h2>
+        <p class="sublede">
+          Code keeps landing. The assessments in the table move only when
+          someone re-reads a subsystem against its source. These are different
+          events, and this page keeps them apart.
+        </p>
+
+        <dl class="wrn-fresh-list">
+          <div class="wrn-fresh-row">
+            <dt>Last checked</dt>
+            <dd>
+              <strong>
+                Subsystem evidence, <time datetime={freshness.verifiedNewest}>{freshness.verifiedNewest}</time>.
+              </strong>
+              {freshness.verificationUniform
+                ? ' Every row carries this date.'
+                : ` Rows range from ${freshness.verifiedOldest} to ${freshness.verifiedNewest}.`}
+              The written framing was re-read on
+              <time datetime={freshness.proseReviewed}>{freshness.proseReviewed}</time>.
+              This page was built on
+              <time datetime={freshness.builtOn}>{freshness.builtOn}</time>;
+              nothing here refreshes after that.
+            </dd>
+          </div>
+          <div class="wrn-fresh-row">
+            <dt>Changed since</dt>
+            <dd>
+              <strong>Some changes landed after that check.</strong>
+              <a href="#recent-changes">The list below</a> shows a selection of them{freshness.selectedAfterVerification.length > 0
+                ? `, touching: ${freshness.areasTouched.join(', ')}`
+                : ''}.
+              It is a selection, not a complete list, and it has no total:
+              reviewed, merged changes of certain kinds, from the latest
+              {buildLog.scanned} commits, capped at a fixed number.
+            </dd>
+          </div>
+          <div class="wrn-fresh-row">
+            <dt>Not yet re-checked</dt>
+            <dd>
+              <strong>Every maturity assessment.</strong>
+              Re-checking means re-reading each subsystem's source, tests, and
+              recorded gaps. That is maintainer-owned work not done since the
+              date above, so the table is the standing assessment, not a verdict
+              on today's code.
+            </dd>
+          </div>
+          <div class="wrn-fresh-row">
+            <dt>Operating today</dt>
+            <dd>
+              <strong>Nothing, as far as this page can say.</strong>
+              ICN has no production deployment claim and no live federation.
+              Tests and fixtures show code behaving as designed against prepared
+              data, not that an institution has run it. None of the dates above
+              is a readiness date.
+            </dd>
+          </div>
+        </dl>
+
+        <div class="callout callout-note">
+          <span class="callout-label">Why a merged change is not a readiness change</span>
+          <p>
+            A change can add a capability, fix a defect, record a decision, or
+            only tidy tooling. Read a recent change as "something moved here",
+            never as "this is now ready".
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ THE TWO AXES ══════════════════════════════════════════════════════ -->
   <section class="section section-alt">
     <div class="container">
-      <h2>How to read this page</h2>
+      <h2 id="how-to-read">How to read the labels</h2>
       <p class="sublede">
         Every claim carries two labels, because "how far along is it" and "how
         do we know" are different questions. Collapsing them is how a merged
@@ -111,6 +261,8 @@ const evidenceLegend = evidenceClassesInUse();
       <div class="wrn-axes">
         <div class="wrn-axis">
           <h3>Maturity — how far along it is</h3>
+          <details class="wrn-band-details">
+            <summary>What each maturity band means</summary>
           <MaturityGrid>
             <MaturityCard band="strong">
               <p>Implemented, integrated, and load-bearing. Capabilities we are prepared to stand behind in public.</p>
@@ -125,6 +277,7 @@ const evidenceLegend = evidenceClassesInUse();
               <p>Scaffolding exists; the capability does not. We would rather say that than imply a schedule.</p>
             </MaturityCard>
           </MaturityGrid>
+          </details>
         </div>
 
         <div class="wrn-axis">
@@ -158,7 +311,7 @@ const evidenceLegend = evidenceClassesInUse();
   <!-- ═══ THE GENERATED TABLE ═══════════════════════════════════════════════ -->
   <section class="section">
     <div class="container">
-      <h2>Subsystems</h2>
+      <h2 id="subsystems">Subsystems</h2>
       <p class="sublede">
         Generated from the repository's own state file. The gap column is the
         project's own record of what is missing — it is published rather than
@@ -182,7 +335,7 @@ const evidenceLegend = evidenceClassesInUse();
   <section class="section band-feature">
     <div class="container">
       <div class="container-reading wrn-prose">
-        <h2>What the table does not say</h2>
+        <h2 id="not-in-table">What the table does not say</h2>
 
         <h3>The bounded thing that actually runs</h3>
         <p>
@@ -245,7 +398,7 @@ const evidenceLegend = evidenceClassesInUse();
   <!-- ═══ BUILD LOG ═════════════════════════════════════════════════════════ -->
   <section class="section">
     <div class="container">
-      <h2>Recent state changes</h2>
+      <h2 id="recent-changes">Recent state changes</h2>
       <p class="sublede">
         Meaningful changes that landed and were reviewed — not a commit feed.
         An entry here means something changed and someone reviewed it. It does
@@ -254,10 +407,15 @@ const evidenceLegend = evidenceClassesInUse();
       </p>
 
       <ol class="wrn-log">
-        {buildLog.entries.map((entry) => (
+        {buildLog.entries.slice(0, LOG_VISIBLE).map((entry) => (
           <li class="wrn-log-item">
             <time datetime={entry.date} class="wrn-log-date">{entry.date}</time>
-            <span class="wrn-log-class">{entry.class.label}</span>
+            <span class="wrn-log-meta">
+              <span class="wrn-log-class">{entry.class.label}</span>
+              {entry.date > freshness.verifiedNewest && (
+                <span class="wrn-log-after">After the {freshness.verifiedNewest} subsystem check</span>
+              )}
+            </span>
             <span class="wrn-log-body">
               <span class="wrn-log-desc">{entry.description}</span>
               <a class="wrn-log-link" href={entry.prUrl} target="_blank" rel="noopener">
@@ -267,9 +425,36 @@ const evidenceLegend = evidenceClassesInUse();
           </li>
         ))}
       </ol>
+      {buildLog.entries.length > LOG_VISIBLE && (
+        <details class="wrn-log-more">
+          <summary>
+            Earlier selected changes ({buildLog.entries.length - LOG_VISIBLE})
+          </summary>
+          <ol class="wrn-log">
+            {buildLog.entries.slice(LOG_VISIBLE).map((entry) => (
+              <li class="wrn-log-item">
+            <time datetime={entry.date} class="wrn-log-date">{entry.date}</time>
+            <span class="wrn-log-meta">
+              <span class="wrn-log-class">{entry.class.label}</span>
+              {entry.date > freshness.verifiedNewest && (
+                <span class="wrn-log-after">After the {freshness.verifiedNewest} subsystem check</span>
+              )}
+            </span>
+            <span class="wrn-log-body">
+              <span class="wrn-log-desc">{entry.description}</span>
+              <a class="wrn-log-link" href={entry.prUrl} target="_blank" rel="noopener">
+                #{entry.pr} ↗
+              </a>
+            </span>
+          </li>
+            ))}
+          </ol>
+        </details>
+      )}
 
       <p class="figure-note">
-        Newest entry {buildLog.newestEntryDate}. Selected from the last
+        Newest entry {buildLog.newestEntryDate}. This is a selection, not every
+        change and not a count of changes. It is drawn from the last
         {buildLog.scanned} commits: only reviewed, merged changes whose type
         corresponds to a change in what the project does — new behaviour,
         corrections, hardening, recorded decisions, and re-verifications of this
@@ -315,6 +500,149 @@ const evidenceLegend = evidenceClassesInUse();
 </Layout>
 
 <style>
+  /* In-page links (the jump list, the short version) target these headings.
+     Without an offset they land under the fixed 64px header. */
+  h2[id] {
+    scroll-margin-top: calc(64px + var(--space-md));
+  }
+
+  .wrn-short-inner {
+    max-width: var(--measure-wide);
+  }
+
+  .wrn-jump ul {
+    list-style: none;
+    margin: 0 0 var(--space-xl);
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-md);
+  }
+
+  .wrn-jump a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--target-min, 44px);
+    font-size: var(--text-sm);
+  }
+
+  .wrn-glance {
+    list-style: none;
+    margin: var(--space-lg) 0;
+    padding: 0;
+  }
+
+  .wrn-glance-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .wrn-glance-row:first-child {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .wrn-glance-names {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .wrn-glance-names a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--target-min, 44px);
+    margin-right: var(--space-sm);
+  }
+
+  .wrn-glance-ev {
+    white-space: nowrap;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .wrn-short-note {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+  }
+
+  .wrn-log-more summary {
+    cursor: pointer;
+    min-height: var(--target-min, 44px);
+    display: inline-flex;
+    align-items: center;
+    color: var(--accent-teal);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .wrn-band-details summary {
+    cursor: pointer;
+    min-height: var(--target-min, 44px);
+    display: inline-flex;
+    align-items: center;
+    color: var(--accent-teal);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    margin-bottom: var(--space-sm);
+  }
+
+  .wrn-fresh-inner {
+    max-width: var(--measure-wide);
+  }
+
+  .wrn-fresh-inner h2 {
+    margin-bottom: var(--space-md);
+  }
+
+  .wrn-fresh time {
+    white-space: nowrap;
+  }
+
+  .wrn-fresh-list {
+    margin: var(--space-xl) 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-lg);
+  }
+
+  .wrn-fresh-row {
+    display: grid;
+    gap: var(--space-xs);
+    padding-left: var(--space-md);
+    border-left: 3px solid var(--border-teal);
+  }
+
+  .wrn-fresh-row dt {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .wrn-fresh-row dd {
+    margin: 0;
+    line-height: 1.65;
+  }
+
+  .wrn-log-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .wrn-log-after {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
   .wrn-hero {
     padding-top: calc(64px + var(--space-3xl));
   }

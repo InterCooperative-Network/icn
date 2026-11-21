@@ -59,7 +59,7 @@ const { subsystems, showGaps = true } = Astro.props;
     </thead>
     <tbody>
       {subsystems.map((s) => (
-        <tr>
+        <tr id={`sub-${s.id}`}>
           <th scope="row" class="subsystem-name">
             <span class="subsystem-name-label">{s.name}</span>
             {s.crates.length > 0 && (
@@ -84,9 +84,14 @@ const { subsystems, showGaps = true } = Astro.props;
               {s.gaps.length === 0 ? (
                 <span class="subsystem-nogaps">None recorded</span>
               ) : (
-                <ul class="subsystem-gaps">
-                  {s.gaps.map((gap) => <li>{gap}</li>)}
-                </ul>
+                <details class="subsystem-gap-details">
+                  <summary>
+                    {s.gaps.length} recorded {s.gaps.length === 1 ? "gap" : "gaps"}
+                  </summary>
+                  <ul class="subsystem-gaps">
+                    {s.gaps.map((gap) => <li>{gap}</li>)}
+                  </ul>
+                </details>
               )}
             </td>
           )}
@@ -96,7 +101,43 @@ const { subsystems, showGaps = true } = Astro.props;
   </table>
 </div>
 
+<script>
+  // Progressive enhancement only. Each gap list is a native <details>, so every
+  // gap is in the HTML and reachable with one activation with no script at all
+  // (the phone default, where the lists made the page very long). With script,
+  // wide viewports open them so the table reads as a table, and printing opens
+  // them so a printed copy is not missing the gaps.
+  const details = document.querySelectorAll<HTMLDetailsElement>(".subsystem-gap-details");
+  const wide = window.matchMedia("(min-width: 900px)");
+  const setOpen = (open: boolean) => details.forEach((d) => (d.open = open));
+  if (details.length > 0) {
+    if (wide.matches) setOpen(true);
+    window.addEventListener("beforeprint", () => setOpen(true));
+  }
+</script>
+
 <style>
+  .subsystem-gap-details summary {
+    cursor: pointer;
+    min-height: var(--target-min, 44px);
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--text-sm);
+    color: var(--accent-teal);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .subsystem-gap-details[open] > summary {
+    margin-bottom: var(--space-xs);
+  }
+
+  /* The anchor target is the row, not its name cell: without this a jump from
+     the short version lands the row under the fixed 64px header. */
+  .subsystem-table tr[id] {
+    scroll-margin-top: calc(64px + var(--space-md));
+  }
+
   .subsystem-scroll {
     margin: var(--space-xl) 0;
   }
@@ -194,12 +235,33 @@ const { subsystems, showGaps = true } = Astro.props;
       width: auto;
     }
 
+    /* A row is a compact wrapped card: the name on its own line, then
+       maturity, evidence and date side by side where they fit, then the gaps.
+       Stacking all of them one per line was most of the page's phone height. */
     .subsystem-table tr {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 0 var(--space-md);
       border: 1px solid var(--border-default);
       border-radius: var(--radius-lg);
       background: var(--bg-card);
-      padding: var(--space-lg);
+      padding: var(--space-md) var(--space-lg);
       margin-bottom: var(--space-md);
+    }
+
+    .subsystem-table tr > th {
+      flex: 1 1 100%;
+    }
+
+    .subsystem-table tr > td:last-child {
+      flex: 1 1 9rem;
+    }
+
+    /* The summary ("3 recorded gaps") already names the cell, so the generated
+       label above it would only repeat it. */
+    .subsystem-table td[data-label="Recorded gaps"]::before {
+      display: none;
     }
 
     .subsystem-table th,
