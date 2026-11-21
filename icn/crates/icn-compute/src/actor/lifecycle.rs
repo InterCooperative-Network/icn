@@ -835,14 +835,42 @@ impl ComputeActor {
             Err(e) => return Err(e),
         }
 
-        // Find highest-priority pending task we can execute
+        // Find the highest-priority pending task we can execute and are eligible for. The
+        // candidate is not necessarily the task just received, so placement constraints are
+        // checked here, on every candidate (#2918), with the rule placement negotiation uses.
+        // An excluded task stays Pending and untouched, available to eligible executors.
         let highest_priority_task = {
             let mgr = self.task_manager.lock().await;
             let pending = mgr.pending_by_priority();
             let executor = self.executor.read().await;
+            let own_capabilities = executor.capabilities();
             pending
                 .into_iter()
-                .find(|(_, t)| executor.can_execute(t))
+                .find(|(h, t)| {
+                    if !executor.can_execute(t) {
+                        return false;
+                    }
+                    let Some(constraints) = t.placement_constraints.as_ref() else {
+                        return true;
+                    };
+                    match super::placement::placement_exclusion(
+                        constraints,
+                        &self.own_did,
+                        self.own_region.as_deref(),
+                        &own_capabilities,
+                    ) {
+                        None => true,
+                        Some(exclusion) => {
+                            tracing::debug!(
+                                task_id = %t.id,
+                                task_hash = %hex::encode(h),
+                                exclusion = ?exclusion,
+                                "Skipping task: placement constraints exclude this executor"
+                            );
+                            false
+                        }
+                    }
+                })
                 .map(|(h, _)| h)
         };
 

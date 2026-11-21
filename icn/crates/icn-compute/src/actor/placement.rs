@@ -11,6 +11,82 @@ use crate::types::{ComputeMessage, ExecutorCapability, TaskHash};
 use crate::MIN_TRUST_EXECUTE;
 use std::collections::HashMap;
 
+/// Which placement constraint excludes an executor from a task.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum PlacementExclusion {
+    /// The task requires a region and the executor is in another one.
+    WrongRegion { required: String, own: String },
+    /// The task requires a region and the executor has none configured (fails closed).
+    NoRegionConfigured { required: String },
+    /// A non-empty allow-list does not name the executor.
+    NotAllowListed,
+    /// The forbid-list names the executor.
+    Forbidden,
+    /// The executor lacks a required capability.
+    MissingCapability(String),
+}
+
+impl PlacementExclusion {
+    /// The `placement_constraints_enforced` metric label, where one is counted.
+    fn metric_label(&self) -> Option<&'static str> {
+        match self {
+            Self::WrongRegion { .. } | Self::NoRegionConfigured { .. } => None,
+            Self::NotAllowListed => Some("whitelist"),
+            Self::Forbidden => Some("blacklist"),
+            Self::MissingCapability(_) => Some("capability"),
+        }
+    }
+}
+
+/// The one placement-eligibility rule, shared by placement negotiation and legacy claiming
+/// (#2918): the first of `constraints` that excludes executor `own_did`, in `own_region`, with
+/// `own_capabilities`, or `None` when the executor is eligible.
+///
+/// Checked in order: required region (no configured region fails closed), allow-list,
+/// forbid-list, required capabilities (`"Ccl"`, `"Wasm"`, or a custom capability's name).
+pub(super) fn placement_exclusion(
+    constraints: &crate::policy::PlacementConstraints,
+    own_did: &str,
+    own_region: Option<&str>,
+    own_capabilities: &[ExecutorCapability],
+) -> Option<PlacementExclusion> {
+    if let Some(required) = &constraints.required_region {
+        match own_region {
+            Some(own) if own == required => {}
+            Some(own) => {
+                return Some(PlacementExclusion::WrongRegion {
+                    required: required.clone(),
+                    own: own.to_string(),
+                })
+            }
+            None => {
+                return Some(PlacementExclusion::NoRegionConfigured {
+                    required: required.clone(),
+                })
+            }
+        }
+    }
+    if !constraints.allowed_executors.is_empty()
+        && !constraints.allowed_executors.iter().any(|d| d == own_did)
+    {
+        return Some(PlacementExclusion::NotAllowListed);
+    }
+    if constraints.forbidden_executors.iter().any(|d| d == own_did) {
+        return Some(PlacementExclusion::Forbidden);
+    }
+    constraints
+        .required_capabilities
+        .iter()
+        .find(|required| {
+            !own_capabilities.iter().any(|cap| match cap {
+                ExecutorCapability::Ccl => *required == "Ccl",
+                ExecutorCapability::Wasm => *required == "Wasm",
+                ExecutorCapability::Custom(name) => name == *required,
+            })
+        })
+        .map(|missing| PlacementExclusion::MissingCapability(missing.clone()))
+}
+
 impl ComputeActor {
     /// Handle executor announcement
     pub(super) async fn on_executor_announce(
@@ -189,83 +265,34 @@ impl ComputeActor {
             // mgr lock is dropped here
         };
 
-        // Check placement constraints (no longer holding task_manager lock)
+        // Check placement constraints (no longer holding task_manager lock), with the same
+        // rule legacy claiming applies (#2918). Capabilities are the ones this node advertises
+        // in the registry; its entry exists, since an unregistered node returned above and
+        // entries are never removed.
         if let Some(ref constraints) = placement_constraints {
-            // Check required region
-            if let Some(ref required_region) = constraints.required_region {
-                if let Some(ref own_region) = self.own_region {
-                    if own_region != required_region {
-                        tracing::debug!(
-                            task_hash = %task_hash_str,
-                            required_region = %required_region,
-                            own_region = %own_region,
-                            "Task requires different region, skipping claim"
-                        );
-                        return Ok(());
-                    }
-                } else {
-                    // No region configured, cannot claim region-specific tasks
-                    tracing::debug!(
-                        task_hash = %task_hash_str,
-                        required_region = %required_region,
-                        "Task requires region but node has no region configured, skipping claim"
-                    );
-                    return Ok(());
-                }
-            }
-
-            // Check executor whitelist
-            if !constraints.allowed_executors.is_empty()
-                && !constraints.allowed_executors.contains(&self.own_did)
-            {
+            let own_capabilities = self
+                .executor_registry
+                .lock()
+                .await
+                .get(&self.own_did)
+                .map(|info| info.capabilities.clone())
+                .unwrap_or_default();
+            if let Some(exclusion) = placement_exclusion(
+                constraints,
+                &self.own_did,
+                self.own_region.as_deref(),
+                &own_capabilities,
+            ) {
                 tracing::info!(
                     task_hash = %task_hash_str,
                     executor = %self.own_did,
-                    "Executor not in whitelist, skipping placement"
+                    exclusion = ?exclusion,
+                    "Placement constraints exclude this executor, skipping placement"
                 );
-                icn_obs::metrics::compute::placement_constraints_enforced_inc("whitelist");
-                return Ok(());
-            }
-
-            // Check executor blacklist
-            if constraints.forbidden_executors.contains(&self.own_did) {
-                tracing::info!(
-                    task_hash = %task_hash_str,
-                    executor = %self.own_did,
-                    "Executor in blacklist, skipping placement"
-                );
-                icn_obs::metrics::compute::placement_constraints_enforced_inc("blacklist");
-                return Ok(());
-            }
-
-            // Check required capabilities
-            if !constraints.required_capabilities.is_empty() {
-                // Get our capabilities from registry (safe - not holding task_manager)
-                let registry = self.executor_registry.lock().await;
-                if let Some(info) = registry.get(&self.own_did) {
-                    let our_caps = &info.capabilities;
-                    for required in &constraints.required_capabilities {
-                        // Convert string to capability and check
-                        let has_cap = our_caps.iter().any(|cap| match cap {
-                            crate::types::ExecutorCapability::Ccl => required == "Ccl",
-                            crate::types::ExecutorCapability::Wasm => required == "Wasm",
-                            crate::types::ExecutorCapability::Custom(name) => name == required,
-                        });
-                        if !has_cap {
-                            tracing::info!(
-                                task_hash = %task_hash_str,
-                                executor = %self.own_did,
-                                missing_capability = %required,
-                                "Missing required capability, skipping placement"
-                            );
-                            icn_obs::metrics::compute::placement_constraints_enforced_inc(
-                                "capability",
-                            );
-                            return Ok(());
-                        }
-                    }
+                if let Some(label) = exclusion.metric_label() {
+                    icn_obs::metrics::compute::placement_constraints_enforced_inc(label);
                 }
-                // registry lock dropped here
+                return Ok(());
             }
         }
 
