@@ -1,140 +1,69 @@
-# Gate 1: Becoming a Reader
+# Phase 1 checkpoint: reading and contributing
 
-> **Status**: Entry gate to **Reader** tier  
-> **Required**: Complete Layers 01-03  
-> **Time estimate**: 1-2 weeks (Foundations track) or 2-3 days (Accelerated track)
+> **Optional learning exercise.** This checkpoint helps you practice the skills in Phase 1. It is **not** a gate for making contributions, opening PRs, reviewing ideas, or joining project discussions. No mentor approval or badge is required.
 
-## What You've Learned
+If your goal is to help right away, use [Getting Started](../../../GETTING_STARTED.md) instead.
 
-In Phase 1, you built **foundational fluency**:
-- Environment: Build, test, lint without friction
-- Rust: Ownership/borrowing as system invariants, not abstract rules
-- Visibility: Errors, tracing, metrics as first-class concerns
+## What this checkpoint is for
 
-You can now **read ICN code**, trace flows, and explain behavior.
+After [Environment](01-environment.md), [Rust Through ICN's Lens](02-rust-through-icn.md), and [Errors and Tracing](03-errors-and-tracing.md), try to show that you can:
 
-## Requirements
+- Find the part of the repository that owns a behavior.
+- Run one relevant command and interpret its result.
+- Explain one design or runtime boundary without confusing an intended invariant with what current code actually enforces.
+- Share an observation or bounded change clearly enough for another contributor to use.
 
-Complete **all four** artifacts below. Each produces a concrete deliverable.
+The exercises below are optional. Choose the ones that help you learn.
 
-### Artifact 1: System Map Diagram
+## Exercise A: map a behavior
 
-**What**: Draw the ICN architecture showing kernel/app/domain crate boundaries.
+Pick one behavior you care about: identity creation, gateway authorization, governance proposals, gossip, or an actual test.
 
-**Requirements**:
-- Three distinct regions: Kernel, Apps, Domain
-- Label at least 5 crates in each region (15 total)
-- Show dependency flow: Apps import both Kernel and Domain, Kernel never imports Domain
-- Hand-drawn sketch (photo) or digital diagram (Figma, Excalidraw, etc.)
+1. Locate its entry point in the current checkout.
+2. Trace two or three relevant functions or modules.
+3. Sketch the relationships and name each source path.
+4. Note which facts you verified in code and which remain design intentions or questions.
 
-**Example structure**:
-```
-┌─────────────────────────────────────┐
-│         KERNEL (generic)            │
-│  icn-core, icn-net, icn-gossip,    │
-│  icn-store, icn-obs, icn-kernel-api │
-└─────────────────────────────────────┘
-         ↑           ↑           ↑
-         │           │           │
-┌────────┴───────────┴───────────┴────┐
-│            APPS (oracles)            │
-│  apps/trust, apps/ledger,            │
-│  apps/governance                     │
-└──────────────────────────────────────┘
-         ↓           ↓           ↓
-┌────────┴───────────┴───────────┴────┐
-│      DOMAIN (data structures)        │
-│  icn-trust, icn-ledger,              │
-│  icn-governance, icn-ccl             │
-└──────────────────────────────────────┘
-```
+**Useful artifact:** a short diagram or paragraph with source links. Don't force every crate into a simplistic kernel/app/domain chart; consult the current ownership map and applicable architectural rules.
 
-**Verification**: Can you explain why `icn-core` cannot import `icn-ledger`?
+## Exercise B: run a focused test
 
----
+From a clean checkout, follow the [technical quickstart](../../../GETTING_STARTED.md#3-technical-path-get-a-development-environment-working).
 
-### Artifact 2: Tooling Fluency
+1. Record the checkout revision and toolchain pin.
+2. Run one scoped test (such as the quickstart's `icn-kernel-api` library test).
+3. Write down what the result establishes and what it does **not** establish.
+4. If it fails, preserve enough information to reproduce the failure.
 
-**What**: Prove you can navigate the build/test cycle without friction.
+**Useful artifact:** the command and outcome, or a clear issue/Discussion describing an unexpected result. You do not have to make an entire workspace green to finish this exercise.
 
-**Tasks**:
-1. Clone the ICN repo (if not already done)
-2. Run `cd icn && cargo build` — must succeed
-3. Run `cargo test --workspace --lib` — must complete (some tests may fail, that's OK)
-4. Introduce a deliberate compiler error (e.g., remove a semicolon)
-5. Run `cargo build`, read the error, fix it
-6. Screenshot or copy/paste the error + your fix
+## Exercise C: explain one error or safety rule
 
-**Verification**: You understand compiler errors and can resolve them systematically.
+Find a `Result` or explicit error in a crate you are reading. Explain:
 
----
+- What input or state triggers the error?
+- Who receives it, and what happens next?
+- What would go wrong if the error were silently ignored?
 
-### Artifact 3: Error/Tracing Proof
+If you want coding practice, reproduce a safe, local error in an isolated lab rather than deliberately breaking the main repository. Do not weaken production validation for an exercise.
 
-**What**: Demonstrate understanding of ICN's error handling and observability.
+**Useful artifact:** a short explanation with file and test references.
 
-**Tasks**:
-1. Locate `icn/crates/icn-core/src/error.rs` and explain the thiserror pattern used
-2. Explain the difference between `#[error("...")]` and `#[error(transparent)]`
-3. Add a new tracing span to your lab-02 workspace code
-4. Run the code, capture the tracing output, highlight the span you added
+## Exercise D: make a small real contribution
 
-**Verification**: You can instrument code for visibility.
+Choose one:
 
----
+- Correct an onboarding step that you actually verified was wrong.
+- Improve documentation that overstates what a subsystem currently does.
+- Add a focused regression test for a reproduced defect.
+- Record a useful cooperative or UX scenario in a Discussion, with clear actors and expected behavior.
 
-### Artifact 4: Tiny PR
+**Useful artifact:** a focused PR, a reproducible issue, or a specific Discussion. A PR is not mandatory for this learning checkpoint, and no arbitrary line-count limit defines a good contribution.
 
-**What**: Make a small, meaningful contribution to ICN.
+For code and documentation changes, read [CONTRIBUTING.md](../../../../CONTRIBUTING.md) and [AGENTS.md](../../../../AGENTS.md), work on a branch, and run the checks relevant to your change. Keep established security and architectural invariants intact.
 
-**Options** (choose one):
-- Fix a typo in documentation
-- Add a tracing span to improve observability
-- Improve a test description or add a missing test case
-- Add a code comment explaining a non-obvious invariant
+## Reflect and continue
 
-**Requirements**:
-- PR must follow commit format: `type(scope): description` (see `CONTRIBUTING.md`)
-- PR description explains **why** the change improves the codebase
-- Code must pass `cargo fmt` and `cargo clippy`
+Can you explain what you tried, what you learned, what evidence supports it, and what you would do next? That's a useful checkpoint.
 
-**Note**: This is a *tiny* PR — 1-10 lines changed. The goal is to practice the contribution workflow, not to ship a feature.
-
-**Verification**: You can navigate the GitHub PR workflow and pass CI checks.
-
----
-
-## After Passing
-
-**Congratulations!** You are now a **Reader**.
-
-You can:
-- ✅ Run tests and trace execution flows
-- ✅ Read Rust code and identify invariants
-- ✅ Explain error handling patterns
-- ✅ File well-structured bug reports with repro steps
-- ✅ Navigate the contribution workflow
-
-**Next step**: Proceed to **Phase 2: Architecture** to become a **Fixer**.
-
----
-
-## Submission
-
-Submit your four artifacts to your mentor or in the #onboarding channel:
-1. System map diagram (image)
-2. Compiler error trace + fix (screenshot or code block)
-3. Tracing span proof (code + output)
-4. Link to merged or open PR
-
-Once reviewed and approved, you'll receive the **Reader** badge and can continue to Phase 2.
-
----
-
-## Need Help?
-
-- **Stuck on builds?** → `reference/module-00-setup.md` has troubleshooting steps
-- **Rust confusion?** → `reference/module-01-rust-fundamentals.md` has deep dives
-- **Tracing unclear?** → `reference/module-12-observability.md` has examples
-
-Don't hesitate to ask questions in #onboarding or open a discussion thread!
+You can continue to [Phase 2](../phase-2-architecture/05-the-meaning-firewall.md), choose a [hands-on lab](../../labs/), or work on another [first contribution](../../../GETTING_STARTED.md#1-pick-a-first-contribution). There is no required sequence for contributing to ICN.
