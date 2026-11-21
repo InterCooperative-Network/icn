@@ -337,8 +337,12 @@ impl ComputeActor {
 
     /// Set the node's region identifier
     ///
-    /// Used for region-based task placement constraints.
+    /// Used for region-based task placement constraints, matched by exact string equality.
     /// Region identifiers should follow a consistent naming scheme (e.g., "us-west", "eu-central").
+    ///
+    /// In the daemon this is set from the operator's `compute.region` before spawn (#2920). It is
+    /// the operator's assertion about this node, not authenticated geography: enforcement is
+    /// cooperative, and with no region set a region-constrained task is refused (fail closed).
     pub fn set_region(&mut self, region: String) {
         self.own_region = Some(region);
     }
