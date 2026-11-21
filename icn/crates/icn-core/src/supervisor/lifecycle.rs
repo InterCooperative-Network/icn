@@ -1122,7 +1122,7 @@ async fn spawn_actors_with_identity(
             identity_bundle: identity_bundle.clone(),
             store_path: config.store_path(),
             contract_registry: Some(contract_registry_handle.clone()),
-            policy_config: config.compute.policy.clone(),
+            compute_config: config.compute.clone(),
             federation_clearing_handle: federation_clearing_handle_for_compute,
             balance_callback: compute_balance_callback,
             payment_callback: compute_payment_callback,

@@ -517,6 +517,12 @@ impl Config {
         if self.compute.max_concurrent_tasks == 0 {
             errors.push("compute.max_concurrent_tasks cannot be 0".to_string());
         }
+        // An invalid region is fatal: it is never coerced to "no region" (#2920).
+        if let Some(region) = &self.compute.region {
+            if let Err(e) = validate_compute_region(region) {
+                errors.push(e);
+            }
+        }
 
         // Identity backend validation
         match self.identity.validate() {
@@ -1171,6 +1177,156 @@ min_replica_trust = -0.5
         assert!(result.is_err());
         let errors = result.unwrap_err();
         assert!(errors.iter().any(|e| e.contains("consensus_threshold")));
+    }
+
+    // #2920: operator-configured compute region.
+
+    /// A daemon config file: the required sections followed by `extra`.
+    fn issue2920_daemon_toml(extra: &str) -> Config {
+        let toml_str = format!(
+            r#"
+data_dir = "/tmp/icn"
+
+[network]
+mdns_enabled = false
+listen_addr = "127.0.0.1:7777"
+rpc_port = 5601
+bootstrap_peers = []
+
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = "info"
+
+{extra}"#
+        );
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    #[test]
+    fn issue2920_compute_region_parses_from_daemon_toml() {
+        let config = issue2920_daemon_toml("[compute]\nregion = \"eu-central\"\n");
+        assert_eq!(config.compute.region.as_deref(), Some("eu-central"));
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn issue2920_compute_region_absent_is_none() {
+        let config = issue2920_daemon_toml("[compute]\nmax_concurrent_tasks = 4\n");
+        assert_eq!(config.compute.region, None);
+        let config = issue2920_daemon_toml("");
+        assert_eq!(config.compute.region, None);
+        assert_eq!(Config::default().compute.region, None);
+        assert!(Config::default().validate().is_ok());
+    }
+
+    #[test]
+    fn issue2920_topology_region_never_supplies_compute_region() {
+        let config = issue2920_daemon_toml(
+            r#"
+[topology]
+region = "eu-central"
+cluster_id = "fra-1"
+role = "edge"
+
+[topology.neighbor_limits]
+max_local_cluster = 10
+max_regional = 10
+max_backbone = 5
+max_trusted = 20
+
+[topology.fanout]
+local_cluster = 8
+regional = 6
+global = 4
+"#,
+        );
+        assert_eq!(config.topology.region, "eu-central");
+        assert_eq!(config.compute.region, None);
+        // The topology default ("default") is not a compute region either.
+        assert_eq!(Config::default().compute.region, None);
+    }
+
+    #[test]
+    fn issue2920_compute_region_survives_toml_round_trip() {
+        let mut config = Config::default();
+        config.compute.region = Some("eu-central".into());
+        let back: Config = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
+        assert_eq!(back.compute.region.as_deref(), Some("eu-central"));
+
+        let back: Config = toml::from_str(&toml::to_string(&Config::default()).unwrap()).unwrap();
+        assert_eq!(back.compute.region, None);
+    }
+
+    fn compute_region_errors(region: &str) -> Vec<String> {
+        let mut config = Config::default();
+        config.compute.region = Some(region.to_string());
+        match config.validate() {
+            Ok(_) => Vec::new(),
+            Err(errors) => errors
+                .into_iter()
+                .filter(|e| e.contains("compute.region"))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn issue2920_compute_region_accepts_the_documented_grammar() {
+        let max = format!("a{}z", "0".repeat(COMPUTE_REGION_MAX_LEN - 2));
+        assert_eq!(max.len(), COMPUTE_REGION_MAX_LEN);
+        for ok in [
+            "eu-central",
+            "us-west-2",
+            "a",
+            "7",
+            "EU-Central",
+            "ca.qc_montreal-1",
+            max.as_str(),
+        ] {
+            assert!(
+                compute_region_errors(ok).is_empty(),
+                "{ok:?} must be accepted, got {:?}",
+                compute_region_errors(ok)
+            );
+        }
+    }
+
+    #[test]
+    fn issue2920_compute_region_rejects_invalid_values() {
+        let overlong = "a".repeat(COMPUTE_REGION_MAX_LEN + 1);
+        for bad in [
+            "",
+            " ",
+            " eu-central",
+            "eu-central ",
+            "\teu-central",
+            "eu-central\n",
+            "eu central",
+            "eu/central",
+            "eu:central",
+            "eu-centrál",
+            "-eu-central",
+            "eu-central-",
+            ".eu",
+            "eu_",
+            overlong.as_str(),
+        ] {
+            assert_eq!(
+                compute_region_errors(bad).len(),
+                1,
+                "{bad:?} must be rejected with one compute.region error"
+            );
+        }
+    }
+
+    #[test]
+    fn issue2920_invalid_compute_region_from_toml_is_a_validation_error() {
+        let config = issue2920_daemon_toml("[compute]\nregion = \" eu-central\"\n");
+        // Parsed verbatim, never trimmed or coerced to None ...
+        assert_eq!(config.compute.region.as_deref(), Some(" eu-central"));
+        // ... and refused by validation, which is fatal at daemon startup.
+        let errors = config.validate().unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("compute.region")));
     }
 
     #[test]
