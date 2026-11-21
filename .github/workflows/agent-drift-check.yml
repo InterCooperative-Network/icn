@@ -66,7 +66,7 @@ jobs:
     # section 11 needs a locale whose [0-9] collates as digits, absent on the ubuntu-26 image.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Select Node explicitly: the runner default moved to Node 24 on ubuntu-26,
       # whose headers require C++20 while better-sqlite3 9.x builds as C++17, so
