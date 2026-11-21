@@ -7,7 +7,8 @@ use tokio::sync::RwLock;
 
 use icn_identity::Did;
 use icn_ledger::{
-    entry::JournalEntryBuilder, CurrencyPair, FxConversionDetails, Ledger, SharedEventEmitter,
+    entry::JournalEntryBuilder, CurrencyPair, FxConversionDetails, Ledger, LedgerError,
+    OperationId, SharedEventEmitter,
 };
 use icn_obs::metrics::gateway as metrics;
 use icn_store::{SledStore, Store};
@@ -17,6 +18,26 @@ use crate::models::{CrossTransferQuote, CrossTransferResponse};
 use crate::coop::CoopId;
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
+
+/// What [`LedgerManager::create_settlement_for_operation`] did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperationSettlement {
+    /// Hex id of the journal entry that carries the operation.
+    pub entry_id: String,
+    /// True when the operation was already journaled: nothing was appended, no budget was
+    /// consumed and no event was broadcast by this call.
+    pub replayed: bool,
+}
+
+/// Keep the ledger's operation conflict visible as a conflict instead of a generic failure.
+fn operation_error(err: anyhow::Error) -> GatewayError {
+    match err.downcast_ref::<LedgerError>() {
+        Some(conflict @ LedgerError::OperationConflict { .. }) => {
+            GatewayError::Conflict(conflict.to_string())
+        }
+        _ => GatewayError::SubstrateError(err),
+    }
+}
 
 /// Ledger manager that maintains separate ledgers per cooperative
 pub struct LedgerManager {
@@ -182,6 +203,113 @@ impl LedgerManager {
 
         let hash_str = hash.to_hex();
 
+        self.after_settlement_appended(coop_id, from, to, amount, currency, &hash_str);
+
+        Ok(hash_str)
+    }
+
+    /// Create a settlement for a named operation, at most once.
+    ///
+    /// Same entry shape and authorization recording as [`create_settlement`](Self::create_settlement),
+    /// plus an [`OperationId`] the caller derived from a durable source of its own (an escrow
+    /// id, a schedule cycle, a client idempotency key). The id is what distinguishes a retry
+    /// from a new settlement:
+    ///
+    /// - a new operation is budget-checked, appended, recorded and broadcast exactly as
+    ///   `create_settlement` does, and `replayed` is `false`;
+    /// - a repeat of an operation that is already journaled appends nothing, is not
+    ///   budget-checked again, records no spending and broadcasts nothing; the id of the entry
+    ///   appended the first time is returned with `replayed: true`;
+    /// - the same id with a different payer, payee, amount or unit is refused with
+    ///   [`GatewayError::Conflict`].
+    ///
+    /// This holds across a restart of the gateway. No HTTP route or system path calls this yet;
+    /// `create_settlement` is unchanged for every existing caller.
+    ///
+    /// # Limit
+    ///
+    /// The budget store is a separate record. If the first attempt journaled the entry and then
+    /// failed to record the spending, a replay does not record it either. That gap exists on
+    /// `create_settlement` today (the error is logged and ignored) and is not widened here.
+    pub async fn create_settlement_for_operation(
+        &self,
+        coop_id: &CoopId,
+        from: &Did,
+        to: &Did,
+        amount: i64,
+        currency: String,
+        auth_proof: Option<String>,
+        operation: OperationId,
+    ) -> Result<OperationSettlement> {
+        let ledger_arc = self.get_ledger(coop_id).await?;
+
+        let proof = auth_proof.unwrap_or_else(|| "system-executed".to_string());
+        let entry = JournalEntryBuilder::new(from.clone())
+            .debit(from.clone(), currency.clone(), amount)
+            .credit(to.clone(), currency.clone(), amount)
+            .operation(operation)
+            .with_direct_member_provenance(from.clone(), proof)
+            .build()
+            .map_err(GatewayError::SubstrateError)?;
+
+        // One write guard covers the lookup, the budget gate and the append, so two callers of
+        // one operation cannot both find it absent.
+        let mut ledger = ledger_arc.write().await;
+
+        // Answer a retry from the journal before any gate: an operation that was applied must
+        // not start failing because the budget it consumed is now exhausted.
+        if let Some(existing) = ledger.operation_entry(&entry).map_err(operation_error)? {
+            return Ok(OperationSettlement {
+                entry_id: existing.to_hex(),
+                replayed: true,
+            });
+        }
+
+        // Enforce budget limits if store is available (new operations only).
+        if let Some(store) = &self.budget_store {
+            let from_account = from.to_string();
+            if !store
+                .check_spending(&from_account, amount)
+                .map_err(|e| GatewayError::InternalError(format!("Budget check failed: {e}")))?
+            {
+                return Err(GatewayError::BudgetExceeded(format!(
+                    "Budget exceeded for account {from_account}"
+                )));
+            }
+        }
+
+        let outcome = ledger
+            .append_operation(entry)
+            .await
+            .map_err(operation_error)?;
+        let entry_id = outcome.entry_id().to_hex();
+
+        // Unreachable while the guard is held, but a replay must never repeat side effects.
+        if outcome.is_replay() {
+            return Ok(OperationSettlement {
+                entry_id,
+                replayed: true,
+            });
+        }
+
+        self.after_settlement_appended(coop_id, from, to, amount, currency, &entry_id);
+
+        Ok(OperationSettlement {
+            entry_id,
+            replayed: false,
+        })
+    }
+
+    /// Record the spending and announce a settlement whose entry was just appended.
+    fn after_settlement_appended(
+        &self,
+        coop_id: &CoopId,
+        from: &Did,
+        to: &Did,
+        amount: i64,
+        currency: String,
+        hash_str: &str,
+    ) {
         // Record spending in budget store
         if let Some(store) = &self.budget_store {
             let from_account = from.to_string();
@@ -196,7 +324,7 @@ impl LedgerManager {
         if let Some(broadcaster) = &self.event_broadcaster {
             let event = GatewayEvent::SettlementCreated {
                 coop_id: coop_id.clone(),
-                hash: hash_str.clone(),
+                hash: hash_str.to_string(),
                 from: from.to_string(),
                 to: to.to_string(),
                 amount,
@@ -208,8 +336,6 @@ impl LedgerManager {
                 broadcaster.broadcast(&coop_id, event).await;
             });
         }
-
-        Ok(hash_str)
     }
 
     /// Get position for an account

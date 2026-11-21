@@ -139,6 +139,16 @@ impl JournalEntryBuilder {
         self
     }
 
+    /// Name the economic operation this entry carries.
+    ///
+    /// Stores the id in the `nonce` field, exactly as [`nonce`](Self::nonce) would, so the entry
+    /// id it produces is the one `nonce(operation.to_bytes())` produces. The id only protects
+    /// against a repeated append when the entry is appended through
+    /// [`Ledger::append_operation`](crate::Ledger::append_operation).
+    pub fn operation(self, operation: crate::operation::OperationId) -> Self {
+        self.nonce(operation.to_bytes())
+    }
+
     /// Set governance decision provenance.
     ///
     /// Use when this entry was authorized by a governance proposal/vote.
