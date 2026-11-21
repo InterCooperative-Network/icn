@@ -2827,3 +2827,276 @@ async fn timeout_release_is_exactly_once_and_spares_other_live_claims() {
     assert_eq!(own_results(&node), 0);
     assert_eq!(claim_accounting(&node.actor, &node.own).await, (0, 0, 0));
 }
+
+// ---------------------------------------------------------------------------------------------
+// #2914: one task identity on the legacy path.
+//
+// With a `PolicyManager` wired (the daemon always wires one) `handle_submit` stores the
+// policy-adjusted task: `placement_constraints` becomes `Some(..)` even when the coop has no
+// policy, and the commons charter may cap the priority. `ComputeTask::hash()` covers the whole
+// encoding, so the stored task and the task gossiped in `TaskSubmitted` must be the same task,
+// or the submitter and every executor hold the task under different hashes.
+//
+// Nodes are wired as the daemon wires them (policy manager + commons charter, own DID = signing
+// key) and receive every message in send order, their own included, through a hand-pumped
+// FIFO loopback as in the RW1 test above. No sleeps; the pump is bounded.
+// ---------------------------------------------------------------------------------------------
+
+const IDENTITY_COOP: &str = "identity-coop";
+const IDENTITY_REGION: &str = "eu-central";
+const IDENTITY_PUMP_BOUND: usize = 64;
+
+struct IdentityNode {
+    actor: ComputeActor,
+    own: String,
+    outbox: Arc<std::sync::Mutex<std::collections::VecDeque<ComputeMessage>>>,
+    completed: Arc<std::sync::Mutex<HashMap<String, usize>>>,
+}
+
+/// A node wired like the daemon: a `PolicyManager` (with a data-sovereignty rule for
+/// `IDENTITY_COOP`, so the placement adjustment is visible) and the default commons charter
+/// (`UbsFirst`, which caps a `High` task at `Normal`).
+async fn identity_node(seed: u8, max_concurrent: usize) -> IdentityNode {
+    let key = ed25519_dalek::SigningKey::from_bytes(&[seed; 32]);
+    let own = icn_identity::Did::from_public_key(&key.verifying_key()).to_string();
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let mut actor = ComputeActor::new(own.clone(), trust_cb);
+    actor.set_signing_key(key.to_bytes().to_vec());
+    actor.set_max_concurrent_tasks(max_concurrent);
+
+    let pm = Arc::new(crate::policy::PolicyManager::new(Arc::new(
+        crate::policy::UsageTracker::new(),
+    )));
+    pm.set_policy(crate::policy::CoopSchedulingPolicy {
+        coop_id: IDENTITY_COOP.into(),
+        governance_domain: None,
+        rules: vec![crate::policy::SchedulingRule::DataSovereignty {
+            region: IDENTITY_REGION.into(),
+            tags: vec![],
+        }],
+        member_quotas: HashMap::new(),
+        default_quota: crate::policy::MemberQuota {
+            cpu_hours_per_month: 100.0,
+            max_concurrent_tasks: 10,
+            max_priority: TaskPriority::Critical,
+            credits_per_month: None,
+        },
+        enforcement_mode: crate::policy::EnforcementMode::Strict,
+    })
+    .await;
+    actor.set_policy_manager(pm);
+    actor.set_commons_pool_policy(CommonsPoolPolicy::default());
+
+    let outbox: Arc<std::sync::Mutex<std::collections::VecDeque<ComputeMessage>>> = Arc::default();
+    let sink = Arc::clone(&outbox);
+    actor.set_send_callback(Arc::new(move |m: ComputeMessage| {
+        sink.lock().expect("outbox").push_back(m);
+    }));
+    let completed: Arc<std::sync::Mutex<HashMap<String, usize>>> = Arc::default();
+    let seen = Arc::clone(&completed);
+    actor.set_event_callback(Arc::new(move |e: ComputeEvent| {
+        if let ComputeEvent::TaskCompleted { task_hash, .. } = e {
+            *seen.lock().expect("events").entry(task_hash).or_insert(0) += 1;
+        }
+    }));
+
+    actor
+        .on_executor_announce(own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+
+    IdentityNode {
+        actor,
+        own,
+        outbox,
+        completed,
+    }
+}
+
+/// A `High`-priority legacy task (no resource profile) for `IDENTITY_COOP`. Both adjustments
+/// apply to it: the policy adds placement constraints and the charter caps it at `Normal`.
+fn identity_task(id: &str) -> ComputeTask {
+    let submitter = ed25519_dalek::SigningKey::from_bytes(&[0x3F; 32]);
+    let submitter = icn_identity::Did::from_public_key(&submitter.verifying_key()).to_string();
+    let mut task = make_task(id, &submitter);
+    task.coop_id = Some(IDENTITY_COOP.into());
+    task.priority = TaskPriority::High;
+    task
+}
+
+/// What the pump observed: every `TaskSubmitted` payload, every `(task_hash, executor)` claim,
+/// and every error a delivery returned.
+#[derive(Default)]
+struct PumpLog {
+    submitted: Vec<ComputeTask>,
+    claims: Vec<(TaskHash, String)>,
+    errors: Vec<String>,
+}
+
+/// Deliver every queued message, FIFO across `nodes`, to every node (the sender included), until
+/// all outboxes are empty. Gossip reaches every subscriber, the sender among them.
+async fn pump(nodes: &[&IdentityNode]) -> PumpLog {
+    let mut log = PumpLog::default();
+    let mut delivered = 0;
+    loop {
+        let next = nodes
+            .iter()
+            .find_map(|n| n.outbox.lock().expect("outbox").pop_front());
+        let Some(msg) = next else { break };
+        delivered += 1;
+        assert!(
+            delivered <= IDENTITY_PUMP_BOUND,
+            "loopback did not go quiet"
+        );
+        match &msg {
+            ComputeMessage::TaskSubmitted(t) => log.submitted.push((**t).clone()),
+            ComputeMessage::TaskClaimed {
+                task_hash,
+                executor,
+            } => log.claims.push((*task_hash, executor.clone())),
+            _ => {}
+        }
+        for node in nodes {
+            if let Err(e) = node.actor.handle_message(msg.clone()).await {
+                log.errors.push(format!("{}: {e}", node.own));
+            }
+        }
+    }
+    log
+}
+
+/// RW3 shape: one self-delivering node submits and executes. The gossiped task is the stored
+/// task, the self-delivered copy is recognised as the task already held, and the task executes
+/// and completes exactly once under the one hash `submit` returned.
+#[tokio::test]
+async fn issue2914_self_delivered_submission_is_the_stored_task() {
+    let node = identity_node(0x31, 2).await;
+    let task = identity_task("identity-self");
+    let raw_hash = task.hash();
+
+    let hash = node.actor.handle_submit(task).await.unwrap();
+    assert_ne!(
+        hash, raw_hash,
+        "fixture: the policy and charter adjustments must change the task's identity"
+    );
+
+    let log = pump(&[&node]).await;
+    assert!(log.errors.is_empty(), "deliveries failed: {:?}", log.errors);
+
+    // 1. What was gossiped is exactly what is stored, adjustments included.
+    assert_eq!(log.submitted.len(), 1, "one submission broadcast");
+    let broadcast = &log.submitted[0];
+    assert_eq!(
+        hex::encode(broadcast.hash()),
+        hex::encode(hash),
+        "the gossiped task must hash to the stored identity"
+    );
+    // `hash()` is blake3 over the complete canonical encoding: equal hashes = the same task.
+    let stored = node
+        .actor
+        .task_manager
+        .lock()
+        .await
+        .get(&hash)
+        .map(|t| t.hash());
+    assert_eq!(
+        stored,
+        Some(broadcast.hash()),
+        "the gossiped task is the stored task"
+    );
+    // 7. The adjustments survive into what executors receive.
+    assert_eq!(
+        broadcast
+            .placement_constraints
+            .as_ref()
+            .and_then(|c| c.required_region.as_deref()),
+        Some(IDENTITY_REGION),
+        "policy placement constraints are part of the gossiped task"
+    );
+    assert_eq!(
+        broadcast.priority,
+        TaskPriority::Normal,
+        "the commons charter priority cap is part of the gossiped task"
+    );
+
+    // 2/3. Self-delivery created no second task: there is no copy under any other hash.
+    let mgr = node.actor.task_manager.lock().await;
+    assert!(mgr.get(&raw_hash).is_none(), "no copy under the raw hash");
+    // 4. Nothing is left orphaned in Pending.
+    assert_eq!(mgr.pending_count(), 0, "no orphaned Pending task");
+    let status = mgr.status(&hash).cloned();
+    drop(mgr);
+    assert!(
+        matches!(&status, Some(TaskStatus::Completed { result }) if result.executor == node.own),
+        "the stored task completed on this node, got {status:?}"
+    );
+
+    // 5. Executed at most once, and only under the stored identity.
+    assert_eq!(
+        log.claims,
+        vec![(hash, node.own.clone())],
+        "exactly one claim, of the stored task"
+    );
+    let completed = node.completed.lock().expect("events").clone();
+    assert_eq!(
+        completed,
+        HashMap::from([(hex::encode(hash), 1)]),
+        "exactly one TaskCompleted, for the stored task"
+    );
+}
+
+/// The submitter cannot execute (at capacity), so another node executes the gossiped task. The
+/// submitter must recognise that executor's claim and result: they name the hash it stored.
+#[tokio::test]
+async fn issue2914_submitter_recognises_remote_executor_result() {
+    let submitter = identity_node(0x32, 0).await; // at capacity: never executes
+    let executor = identity_node(0x33, 2).await;
+    // Each node's own capacity announcement, as gossip delivers it to the other.
+    submitter
+        .actor
+        .on_executor_announce(executor.own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+    executor
+        .actor
+        .on_executor_announce(submitter.own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+
+    let task = identity_task("identity-remote");
+    let raw_hash = task.hash();
+    let hash = submitter.actor.handle_submit(task).await.unwrap();
+    assert_ne!(hash, raw_hash, "fixture: adjustments must change identity");
+
+    let log = pump(&[&submitter, &executor]).await;
+    assert!(log.errors.is_empty(), "deliveries failed: {:?}", log.errors);
+
+    // 5. Executed once, by the executor, under the submitter's identity.
+    assert_eq!(
+        log.claims,
+        vec![(hash, executor.own.clone())],
+        "exactly one claim, by the executor, of the stored task"
+    );
+
+    for (name, node) in [("submitter", &submitter), ("executor", &executor)] {
+        let mgr = node.actor.task_manager.lock().await;
+        assert!(
+            mgr.get(&raw_hash).is_none(),
+            "{name}: no copy under the raw hash"
+        );
+        assert_eq!(mgr.pending_count(), 0, "{name}: no orphaned Pending task");
+        let status = mgr.status(&hash).cloned();
+        drop(mgr);
+        // 6. The submitter holds the executor's result under the hash it returned.
+        assert!(
+            matches!(&status, Some(TaskStatus::Completed { result })
+                if result.executor == executor.own && result.task_hash == hash),
+            "{name}: the stored task completed with the executor's result, got {status:?}"
+        );
+    }
+    assert_eq!(
+        submitter.completed.lock().expect("events").clone(),
+        HashMap::from([(hex::encode(hash), 1)]),
+        "submitter: exactly one TaskCompleted, for the stored task"
+    );
+}

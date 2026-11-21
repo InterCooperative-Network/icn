@@ -1846,7 +1846,11 @@ impl ComputeActor {
                     "Using legacy claiming (no resource profile)"
                 );
 
-                cb(ComputeMessage::TaskSubmitted(Box::new(task)));
+                // Gossip the task exactly as stored (#2914): the policy and charter adjustments
+                // are part of its canonical encoding, so `adjusted_task.hash()` is `hash`. The raw
+                // `task` would be held by every receiver, this node's own self-delivery included,
+                // under a different hash.
+                cb(ComputeMessage::TaskSubmitted(Box::new(adjusted_task)));
             }
         }
 
