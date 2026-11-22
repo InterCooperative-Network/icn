@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::proof::{GovernanceProofV2, ProofOutcome};
+use crate::{MembershipAction, ProposalPayload};
 
 /// Schema identifier of version 1 of the bundle. A bundle naming any other schema is refused.
 pub const GOVERNANCE_PROOF_BUNDLE_SCHEMA_V1: &str = "urn:icn:contract:governance-proof-bundle:v1";
@@ -105,6 +106,21 @@ pub enum BundleVerifyError {
     /// The pinned signer's attestation signature does not verify under the pinned key.
     #[error("authenticity: the pinned signer's attestation signature is invalid")]
     InvalidSignature,
+    /// A payload binding is present but does not belong to this decision: a different decision
+    /// hash, a non-accepted outcome, or a signer other than the pinned one.
+    #[error("decision: payload binding does not belong to this decision ({0})")]
+    PayloadBindingMismatch(String),
+    /// The payload binding's signature does not verify under the pinned key (e.g. the payload
+    /// text was changed after signing).
+    #[error("authenticity: payload binding signature is invalid")]
+    PayloadBindingInvalidSignature,
+    /// A subject was expected, but the proof binds no payload (a non-accepted outcome, or a proof
+    /// written before bindings existed): it cannot say what was decided.
+    #[error("subject: proof binds no payload, so it cannot show what was decided")]
+    PayloadUnbound,
+    /// The bound payload is not the expected membership change.
+    #[error("subject: bound payload is {found}, expected {expected}")]
+    SubjectMismatch { expected: String, found: String },
 }
 
 impl BundleVerifyError {
@@ -123,6 +139,10 @@ impl BundleVerifyError {
             Self::UntrustedSigner { .. } => "untrusted_signer",
             Self::AttestationDecisionMismatch => "attestation_decision_mismatch",
             Self::InvalidSignature => "invalid_signature",
+            Self::PayloadBindingMismatch(_) => "payload_binding_mismatch",
+            Self::PayloadBindingInvalidSignature => "payload_binding_invalid_signature",
+            Self::PayloadUnbound => "payload_unbound",
+            Self::SubjectMismatch { .. } => "subject_mismatch",
         }
     }
 }
@@ -143,7 +163,26 @@ pub struct VerifiedGovernanceProof {
     pub proof_sha256: String,
     /// The bounded meaning of a pass.
     pub claim: &'static str,
+    /// The decided payload, when the pinned node bound it to this decision (accepted outcomes
+    /// from binding-aware producers). Parsed from the exact signed text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<serde_json::Value>,
+    /// Lowercase hex blake3 of the exact signed payload text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_hash: Option<String>,
+    /// Unix seconds at which the pinned node closed the decision and bound the payload.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bound_at: Option<u64>,
+    /// What the payload binding adds to `claim`, when present.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_claim: Option<&'static str>,
 }
+
+/// What a verified payload binding adds.
+pub const VERIFIED_PAYLOAD_CLAIM: &str = "the same pinned node states that this exact payload is \
+     what the decision in domain_id accepted; it does not show the change is still current (a \
+     later removal is a separate decision, and no expiry exists), who may decide is the domain's \
+     membership rule, and no institutional key signs it";
 
 /// The bounded meaning of a successful verification.
 pub const VERIFIED_CLAIM: &str = "the pinned node identity attested this governance decision hash \
@@ -276,6 +315,51 @@ pub fn verify_bundle(
         return Err(BundleVerifyError::InvalidSignature);
     }
 
+    // 5. The payload binding. Only a binding by the pinned key is this verifier's evidence; one
+    //    by any other key is ignored (the proof is unbound here), never trusted and never fatal.
+    //    A pinned binding must belong to this decision and verify, or the bundle is refused.
+    //    Absence is not a failure here; `expect_membership` makes it one.
+    let pinned_binding = proof.payload_binding.as_ref().filter(|binding| {
+        Did::from_str(&binding.signer_did)
+            .and_then(|did| did.to_verifying_key())
+            .map(|key| key.to_bytes() == pinned_bytes)
+            .unwrap_or(false)
+    });
+    let (payload, payload_hash, bound_at, payload_claim) = match pinned_binding {
+        None => (None, None, None, None),
+        Some(binding) => {
+            if binding.decision_hash != proof.receipt.decision_hash {
+                return Err(BundleVerifyError::PayloadBindingMismatch(
+                    "different decision_hash".into(),
+                ));
+            }
+            if proof.receipt.outcome != ProofOutcome::Accepted {
+                return Err(BundleVerifyError::PayloadBindingMismatch(
+                    "binding on a decision that was not accepted".into(),
+                ));
+            }
+            if !binding.verify(&pinned_key) {
+                return Err(BundleVerifyError::PayloadBindingInvalidSignature);
+            }
+            // Strict typed parse of the exact signed text: the derived deserializer refuses
+            // duplicate fields, so no lenient reader can find a different member in it. A payload
+            // this build cannot parse (e.g. a newer variant) leaves the proof unbound for this
+            // verifier rather than failing a plain verify; `expect_membership` then refuses it.
+            match serde_json::from_str::<ProposalPayload>(&binding.payload_json) {
+                Err(_) => (None, None, None, None),
+                Ok(parsed) => match serde_json::to_value(&parsed) {
+                    Err(_) => (None, None, None, None),
+                    Ok(value) => (
+                        Some(value),
+                        Some(hex::encode(binding.payload_hash())),
+                        Some(binding.decided_at),
+                        Some(VERIFIED_PAYLOAD_CLAIM),
+                    ),
+                },
+            }
+        }
+    };
+
     Ok(VerifiedGovernanceProof {
         schema: GOVERNANCE_PROOF_BUNDLE_SCHEMA_V1,
         proposal_id: proof.receipt.proposal_id.clone(),
@@ -286,5 +370,59 @@ pub fn verify_bundle(
         attested_at: attestation.timestamp,
         proof_sha256: bundle.proof_sha256,
         claim: VERIFIED_CLAIM,
+        payload,
+        payload_hash,
+        bound_at,
+        payload_claim,
     })
+}
+
+/// Require that a verified proof binds exactly this membership change.
+///
+/// `member` is compared by key equality, so any spelling of the expected DID matches; an
+/// unusable expected DID is reported as a mismatch, never a pass.
+pub fn expect_membership(
+    verified: &VerifiedGovernanceProof,
+    action: MembershipAction,
+    member: &str,
+    domain: Option<&str>,
+) -> Result<(), BundleVerifyError> {
+    let expected = format!("membership {action:?} {member}");
+    // The membership payload names no domain; the domain is committed by the decision hash.
+    // Without pinning it, an admission into any domain the node votes in would pass.
+    if let Some(domain) = domain {
+        if verified.domain_id != domain {
+            return Err(BundleVerifyError::SubjectMismatch {
+                expected: format!("{expected} in domain {domain}"),
+                found: format!("a decision in domain {}", verified.domain_id),
+            });
+        }
+    }
+    let payload = verified
+        .payload
+        .as_ref()
+        .ok_or(BundleVerifyError::PayloadUnbound)?;
+    let parsed: ProposalPayload = serde_json::from_value(payload.clone())
+        .map_err(|e| BundleVerifyError::ProofMalformed(format!("bound payload: {e}")))?;
+    let ProposalPayload::Membership {
+        action: found_action,
+        member: found_member,
+    } = parsed
+    else {
+        return Err(BundleVerifyError::SubjectMismatch {
+            expected,
+            found: "a non-membership payload".into(),
+        });
+    };
+    let expected_did = Did::from_str(member).map_err(|_| BundleVerifyError::SubjectMismatch {
+        expected: expected.clone(),
+        found: "(expected member is not a usable DID)".into(),
+    })?;
+    if found_action != action || found_member != expected_did {
+        return Err(BundleVerifyError::SubjectMismatch {
+            expected,
+            found: format!("membership {found_action:?} {found_member}"),
+        });
+    }
+    Ok(())
 }

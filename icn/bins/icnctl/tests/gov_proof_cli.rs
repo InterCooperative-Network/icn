@@ -15,14 +15,64 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::Arc;
 
+use sha2::Digest;
+
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_governance::{
-    GovernanceDomainId, GovernanceOps, GovernanceParams, MembershipConfig, ProposalId,
-    ProposalPayload, ProposalScope, StaticMembershipResolver, VoteChoice,
+    GovernanceDomainId, GovernanceOps, GovernanceParams, MembershipAction, MembershipConfig,
+    ProposalId, ProposalPayload, ProposalScope, StaticMembershipResolver, VoteChoice,
 };
 use icn_governance_actor::{actor::GovernanceActor, manager::GovernanceManager};
 use icn_identity::{Did, IdentityBundle};
 use icn_store::{SledStore, Store};
+
+/// Receipt backend for the actor's execution-closure gate (Invariant 7): membership proposals
+/// are execution-required, so the actor refuses to close them without one, exactly as the
+/// daemon wires one in. Nothing here is under test — the proof store is real sled.
+struct NullReceiptBackend;
+
+impl icn_governance_actor::receipt_backend::GovernanceReceiptBackend for NullReceiptBackend {
+    fn put_governance(&self, _: &icn_governance::GovernanceDecisionReceipt) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_governance_by_proposal(
+        &self,
+        _: &str,
+    ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn put_allocation(
+        &self,
+        _: &icn_kernel_api::AllocationReceipt,
+    ) -> Result<icn_kernel_api::Hash, String> {
+        Ok([0u8; 32])
+    }
+    fn get_governance_by_decision(
+        &self,
+        _: &icn_kernel_api::Hash,
+    ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn list_allocations_by_decision(
+        &self,
+        _: &icn_kernel_api::Hash,
+    ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+        Ok(vec![])
+    }
+    fn put_institutional_effect(
+        &self,
+        _: &icn_governance_actor::institutional_effect::InstitutionalEffectRecord,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+    fn list_institutional_effects_by_proposal(
+        &self,
+        _: &str,
+    ) -> Result<Vec<icn_governance_actor::institutional_effect::InstitutionalEffectRecord>, String>
+    {
+        Ok(vec![])
+    }
+}
 
 fn icnctl_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_icnctl"))
@@ -40,6 +90,10 @@ fn icnctl(data_dir: &Path, args: &[&str]) -> Output {
 /// Verify with no usable data directory, the RPC endpoint on a closed port and proxies pointing
 /// nowhere — so a pass cannot have come from a store, a daemon or the network.
 fn verify_offline(bundle: &Path, signer: &str) -> Output {
+    verify_offline_with(bundle, signer, &[])
+}
+
+fn verify_offline_with(bundle: &Path, signer: &str, extra: &[&str]) -> Output {
     Command::new(icnctl_bin())
         .args(["--data-dir", "/nonexistent/icn-offline-verify"])
         .args(["--endpoint", "127.0.0.1:9"])
@@ -49,6 +103,7 @@ fn verify_offline(bundle: &Path, signer: &str) -> Output {
         .args(["gov", "proof", "verify", "--bundle"])
         .arg(bundle)
         .args(["--expect-signer", signer])
+        .args(extra)
         .output()
         .unwrap()
 }
@@ -66,11 +121,20 @@ fn text(out: &Output) -> String {
 /// The producer gets its own runtime, shut down after the close, so the actor task and every
 /// store handle it held are gone before the binary runs — as when the daemon has exited.
 fn real_decision(data_dir: &Path) -> (ProposalId, Did) {
+    real_decision_with(
+        data_dir,
+        ProposalPayload::Text {
+            body: "We adopt this fictional statement.".to_string(),
+        },
+    )
+}
+
+fn real_decision_with(data_dir: &Path, payload: ProposalPayload) -> (ProposalId, Did) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
-    let out = runtime.block_on(produce(data_dir));
+    let out = runtime.block_on(produce(data_dir, payload));
     runtime.shutdown_timeout(std::time::Duration::from_secs(5));
     let store_path = data_dir.join("store").join("governance");
     for _ in 0..50 {
@@ -82,7 +146,7 @@ fn real_decision(data_dir: &Path) -> (ProposalId, Did) {
     out
 }
 
-async fn produce(data_dir: &Path) -> (ProposalId, Did) {
+async fn produce(data_dir: &Path, payload: ProposalPayload) -> (ProposalId, Did) {
     let bundle = IdentityBundle::generate().unwrap();
     let did = bundle.did().clone();
     let signing_key = Arc::new(ed25519_dalek::SigningKey::from_bytes(
@@ -107,6 +171,9 @@ async fn produce(data_dir: &Path) -> (ProposalId, Did) {
         )
         .await
         .unwrap();
+        handle
+            .install_receipt_store(Arc::new(NullReceiptBackend))
+            .await;
         let manager = GovernanceManager::with_handle(
             Arc::new(handle.clone()) as Arc<dyn GovernanceOps + Send + Sync>
         );
@@ -128,9 +195,7 @@ async fn produce(data_dir: &Path) -> (ProposalId, Did) {
                 did.clone(),
                 "Adopt a fictional statement".to_string(),
                 "A declarative text proposal.".to_string(),
-                ProposalPayload::Text {
-                    body: "We adopt this fictional statement.".to_string(),
-                },
+                payload,
                 ProposalScope::Local,
             )
             .await
@@ -238,8 +303,14 @@ fn export_then_verify_offline_with_exit_codes() {
 /// so tests of the export command itself — its lock, store read and file write — need a
 /// directory the gate clears. The proof bytes are still the production ones, copied verbatim.
 fn proof_only_data_dir() -> (tempfile::TempDir, ProposalId, Did) {
+    proof_only_data_dir_with(ProposalPayload::Text {
+        body: "We adopt this fictional statement.".to_string(),
+    })
+}
+
+fn proof_only_data_dir_with(payload: ProposalPayload) -> (tempfile::TempDir, ProposalId, Did) {
     let src = tempfile::tempdir().unwrap();
-    let (id, did) = real_decision(src.path());
+    let (id, did) = real_decision_with(src.path(), payload);
     let key = icn_governance::proof_bundle::stored_proof_key(&id.0);
     let bytes = {
         let store = SledStore::open(src.path().join("store").join("governance")).unwrap();
@@ -427,4 +498,124 @@ fn verify_exit_codes_offline() {
         Some(7)
     );
     assert_eq!(verify_offline(&path, did.as_str()).status.code(), Some(0));
+}
+
+/// Gate 3: the admission a peer verifies offline names the admitted member.
+#[test]
+fn verify_expect_member_exit_codes() {
+    let b = IdentityBundle::generate().unwrap().did().clone();
+    let (dir, id, a) = proof_only_data_dir_with(ProposalPayload::Membership {
+        action: MembershipAction::Add,
+        member: b.clone(),
+    });
+    let out = dir.path().join("admission.json");
+    let exp = icnctl(
+        dir.path(),
+        &[
+            "gov",
+            "proof",
+            "export",
+            "--proposal-id",
+            &id.0,
+            "--out",
+            out.to_str().unwrap(),
+        ],
+    );
+    assert!(exp.status.success(), "export: {}", text(&exp));
+    let v = |member: &str, action: &str, bundle: &Path| {
+        verify_offline_with(
+            bundle,
+            a.as_str(),
+            &["--expect-member", member, "--expect-action", action],
+        )
+        .status
+        .code()
+    };
+    assert_eq!(v(b.as_str(), "add", &out), Some(0), "B was admitted");
+    let dom = |domain: &str| {
+        verify_offline_with(
+            &out,
+            a.as_str(),
+            &["--expect-member", b.as_str(), "--expect-domain", domain],
+        )
+        .status
+        .code()
+    };
+    assert_eq!(
+        dom("cli-offline-proof"),
+        Some(0),
+        "decided by the expected body"
+    );
+    assert_eq!(dom("sandbox"), Some(9), "not by another domain");
+    let stranger = IdentityBundle::generate().unwrap().did().to_string();
+    assert_eq!(v(&stranger, "add", &out), Some(9), "a stranger was not");
+    assert_eq!(v(b.as_str(), "remove", &out), Some(9), "B was not removed");
+
+    // A swapped member with the checksum fixed: the binding signature refuses it.
+    let mut bundle: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
+    let mut proof: serde_json::Value =
+        serde_json::from_slice(&hex::decode(bundle["proof_bytes_hex"].as_str().unwrap()).unwrap())
+            .unwrap();
+    let pj = proof["payload_binding"]["payload_json"]
+        .as_str()
+        .unwrap()
+        .replace(b.as_str(), &stranger);
+    proof["payload_binding"]["payload_json"] = serde_json::Value::String(pj);
+    let raw = serde_json::to_vec(&proof).unwrap();
+    bundle["proof_sha256"] = serde_json::Value::String(hex::encode(sha2::Sha256::digest(&raw)));
+    bundle["proof_bytes_hex"] = serde_json::Value::String(hex::encode(&raw));
+    let forged = dir.path().join("forged.json");
+    std::fs::write(&forged, serde_json::to_vec(&bundle).unwrap()).unwrap();
+    assert_eq!(
+        v(&stranger, "add", &forged),
+        Some(4),
+        "forged subject is refused"
+    );
+
+    // The same admission with its binding stripped: a decision, but no member can be read.
+    let mut stripped =
+        serde_json::from_slice::<serde_json::Value>(&std::fs::read(&out).unwrap()).unwrap();
+    let mut sp: serde_json::Value = serde_json::from_slice(
+        &hex::decode(stripped["proof_bytes_hex"].as_str().unwrap()).unwrap(),
+    )
+    .unwrap();
+    sp.as_object_mut().unwrap().remove("payload_binding");
+    let raw = serde_json::to_vec(&sp).unwrap();
+    stripped["proof_sha256"] = serde_json::Value::String(hex::encode(sha2::Sha256::digest(&raw)));
+    stripped["proof_bytes_hex"] = serde_json::Value::String(hex::encode(&raw));
+    let unbound = dir.path().join("unbound.json");
+    std::fs::write(&unbound, serde_json::to_vec(&stripped).unwrap()).unwrap();
+    assert_eq!(
+        verify_offline(&unbound, a.as_str()).status.code(),
+        Some(0),
+        "still a decision"
+    );
+    assert_eq!(
+        v(b.as_str(), "add", &unbound),
+        Some(8),
+        "but it binds no member"
+    );
+
+    // A text decision binds a payload, but not a membership change.
+    let (tdir, tid, ta) = proof_only_data_dir();
+    let tout = tdir.path().join("text.json");
+    assert!(icnctl(
+        tdir.path(),
+        &[
+            "gov",
+            "proof",
+            "export",
+            "--proposal-id",
+            &tid.0,
+            "--out",
+            tout.to_str().unwrap()
+        ],
+    )
+    .status
+    .success());
+    let code = verify_offline_with(&tout, ta.as_str(), &["--expect-member", b.as_str()])
+        .status
+        .code();
+    assert_eq!(code, Some(9), "a text decision is not an admission");
 }
