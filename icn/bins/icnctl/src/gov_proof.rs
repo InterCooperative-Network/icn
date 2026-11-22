@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use icn_governance::proof_bundle::{
-    export_bundle, stored_proof_key, verify_bundle, BundleVerifyError,
+    expect_membership, export_bundle, stored_proof_key, verify_bundle, BundleVerifyError,
 };
+use icn_governance::MembershipAction;
 use sha2::{Digest, Sha256};
 
 #[derive(Subcommand, Debug)]
@@ -33,7 +34,10 @@ pub(crate) enum ProofCommands {
     ///
     /// Exit codes: 0 verified; 2 integrity; 3 decision inconsistent; 4 signature invalid or
     /// absent; 5 signer not the pinned one; 6 malformed or unsupported bundle; 7 unusable
-    /// pinned signer; 1 could not read the bundle.
+    /// pinned signer; 8 a member was expected but the proof binds no payload the pinned signer
+    /// signed; 9 the bound payload is not the expected membership change (or domain); 1 could
+    /// not read the bundle. "Verified" means the pinned node states its domain accepted this
+    /// change; it does not show the change is still current or institutionally authorized.
     Verify {
         /// Bundle file to verify
         #[arg(long)]
@@ -41,6 +45,16 @@ pub(crate) enum ProofCommands {
         /// DID of the node expected to have attested the decision (obtained out of band)
         #[arg(long)]
         expect_signer: String,
+        /// Also require that the decision bound this membership change for this DID
+        /// (compared by key, so any spelling of the DID matches)
+        #[arg(long)]
+        expect_member: Option<String>,
+        /// The expected membership action, with --expect-member
+        #[arg(long, value_parser = ["add", "remove"], default_value = "add", requires = "expect_member")]
+        expect_action: String,
+        /// The governance domain (accepting body) that must have decided it, with --expect-member
+        #[arg(long, requires = "expect_member")]
+        expect_domain: Option<String>,
     },
 }
 
@@ -58,6 +72,10 @@ pub(crate) fn exit_code(err: &BundleVerifyError) -> i32 {
         | BundleVerifyError::ProofEncoding
         | BundleVerifyError::ProofMalformed(_) => 6,
         BundleVerifyError::InvalidPinnedSigner(_) => 7,
+        BundleVerifyError::PayloadBindingMismatch(_) => 3,
+        BundleVerifyError::PayloadBindingInvalidSignature => 4,
+        BundleVerifyError::PayloadUnbound => 8,
+        BundleVerifyError::SubjectMismatch { .. } => 9,
     }
 }
 
@@ -67,10 +85,26 @@ pub(crate) fn run(cmd: ProofCommands, data_dir: &Path) -> Result<()> {
         ProofCommands::Verify {
             bundle,
             expect_signer,
+            expect_member,
+            expect_action,
+            expect_domain,
         } => {
             let bytes = std::fs::read(&bundle)
                 .with_context(|| format!("reading bundle {}", bundle.display()))?;
-            match verify_bundle(&bytes, &expect_signer) {
+            let action = if expect_action == "remove" {
+                MembershipAction::Remove
+            } else {
+                MembershipAction::Add
+            };
+            let result =
+                verify_bundle(&bytes, &expect_signer).and_then(|verified| match &expect_member {
+                    Some(member) => {
+                        expect_membership(&verified, action, member, expect_domain.as_deref())
+                            .map(|()| verified)
+                    }
+                    None => Ok(verified),
+                });
+            match result {
                 Ok(verified) => {
                     let mut out = serde_json::to_value(&verified)?;
                     out["verified"] = serde_json::Value::Bool(true);

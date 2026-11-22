@@ -1091,6 +1091,97 @@ impl GovernanceDecisionAttestation {
     }
 }
 
+/// A node's signed statement that an **accepted** decision carried exactly this payload.
+///
+/// The decision hash commits to the proposal id, domain, outcome, tally and votes, but not to
+/// the payload, so on its own a proof cannot say *what* was decided (for a membership decision:
+/// which DID was admitted or removed). This binding closes that gap for one signer: it signs
+/// `DOMAIN_TAG ‖ decision_hash ‖ blake3(payload_json) ‖ u64le(decided_at) ‖ u64le(len did) ‖ did`.
+///
+/// `payload_json` is carried as the exact text that was hashed, so a verifier never depends on
+/// re-serializing the payload the same way the producer did.
+///
+/// What it is not: institutional authority. It is the attesting node's statement about a
+/// decision its governance domain reached; who may decide is the domain's membership rule.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GovernancePayloadBinding {
+    /// Decision this payload belongs to; must equal the receipt's `decision_hash`.
+    pub decision_hash: Hash,
+    /// The accepted proposal's payload, exactly as hashed and signed.
+    pub payload_json: String,
+    /// Unix seconds at which the decision was closed and bound.
+    pub decided_at: u64,
+    /// DID of the signing node.
+    pub signer_did: String,
+    /// Ed25519 signature over the canonical binding payload.
+    pub signature: SignatureBytes,
+}
+
+impl GovernancePayloadBinding {
+    /// Domain separation tag for payload-binding signatures.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:payload_binding:v1";
+
+    /// blake3 of the exact `payload_json` bytes.
+    pub fn payload_hash(&self) -> Hash {
+        *blake3::hash(self.payload_json.as_bytes()).as_bytes()
+    }
+
+    fn message(
+        decision_hash: &Hash,
+        payload_hash: &Hash,
+        decided_at: u64,
+        signer_did: &str,
+    ) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(Self::DOMAIN_TAG);
+        bytes.extend_from_slice(decision_hash);
+        bytes.extend_from_slice(payload_hash);
+        bytes.extend_from_slice(&decided_at.to_le_bytes());
+        bytes.extend_from_slice(&(signer_did.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(signer_did.as_bytes());
+        bytes
+    }
+
+    /// Bind `payload_json` to `decision_hash` under `signing_key`.
+    pub fn sign(
+        decision_hash: Hash,
+        payload_json: String,
+        decided_at: u64,
+        signer_did: String,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Self {
+        use ed25519_dalek::Signer;
+        let payload_hash = *blake3::hash(payload_json.as_bytes()).as_bytes();
+        let message = Self::message(&decision_hash, &payload_hash, decided_at, &signer_did);
+        let signature = signing_key.sign(&message).to_bytes().to_vec();
+        Self {
+            decision_hash,
+            payload_json,
+            decided_at,
+            signer_did,
+            signature,
+        }
+    }
+
+    /// Verify the signature against `verifying_key`, recomputing the payload hash.
+    pub fn verify(&self, verifying_key: &ed25519_dalek::VerifyingKey) -> bool {
+        use ed25519_dalek::Verifier;
+        if self.signature.len() != 64 {
+            return false;
+        }
+        let mut sig_bytes = [0u8; 64];
+        sig_bytes.copy_from_slice(&self.signature);
+        let sig = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+        let message = Self::message(
+            &self.decision_hash,
+            &self.payload_hash(),
+            self.decided_at,
+            &self.signer_did,
+        );
+        verifying_key.verify(&message, &sig).is_ok()
+    }
+}
+
 /// Governance proof bundle (canonical receipt + one or more node attestations).
 ///
 /// Equality semantics are intentionally anchored to `receipt.decision_hash` only.
@@ -1098,6 +1189,11 @@ impl GovernanceDecisionAttestation {
 pub struct GovernanceProofV2 {
     pub receipt: GovernanceDecisionReceipt,
     pub attestations: Vec<GovernanceDecisionAttestation>,
+    /// Optional signed binding of an accepted decision to its payload. Absent on proofs
+    /// written before it existed and on non-accepted outcomes; omitted from the serialized
+    /// form when absent, so those proofs keep their exact bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload_binding: Option<GovernancePayloadBinding>,
 }
 
 impl PartialEq for GovernanceProofV2 {
@@ -1116,7 +1212,14 @@ impl GovernanceProofV2 {
         Self {
             receipt,
             attestations,
+            payload_binding: None,
         }
+    }
+
+    /// Attach a payload binding.
+    pub fn with_payload_binding(mut self, binding: GovernancePayloadBinding) -> Self {
+        self.payload_binding = Some(binding);
+        self
     }
 
     /// Convert from legacy proof shape.
@@ -1127,6 +1230,7 @@ impl GovernanceProofV2 {
         Self {
             receipt: GovernanceDecisionReceipt::from_legacy(proof),
             attestations: Vec::new(),
+            payload_binding: None,
         }
     }
 

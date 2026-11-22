@@ -2666,7 +2666,22 @@ impl GovernanceActor {
                         now,
                         signing_key,
                     );
-                    let proof = icn_governance::GovernanceProofV2::new(receipt, vec![attestation]);
+                    let mut proof =
+                        icn_governance::GovernanceProofV2::new(receipt, vec![attestation]);
+                    // An accepted decision also binds its exact payload, so a peer holding only
+                    // the proof can verify *what* was decided (e.g. which member was admitted).
+                    // Rejected / no-quorum outcomes decided nothing to bind.
+                    if proof_outcome == ProofOutcome::Accepted {
+                        let payload_json = serde_json::to_string(&proposal.payload)?;
+                        let binding = icn_governance::GovernancePayloadBinding::sign(
+                            proof.receipt.decision_hash,
+                            payload_json,
+                            now,
+                            self.did.to_string(),
+                            signing_key,
+                        );
+                        proof = proof.with_payload_binding(binding);
+                    }
 
                     let serialized = serde_json::to_vec(&proof)?;
 

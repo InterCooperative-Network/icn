@@ -450,6 +450,7 @@ const REGISTRY: &[Domain] = &[
     d(b"icn:gov:meeting_attendance:v2", Blake3, Raw, Production, &["icn/crates/icn-governance/src/proof.rs"]),
     d(b"icn:gov:mutation_applied:v1", Blake3, Raw, Production, &["icn/crates/icn-governance/src/proof.rs"]),
     d(b"icn:gov:mutation_plan_recorded:v1", Blake3, Raw, Production, &["icn/crates/icn-governance/src/proof.rs"]),
+    d(b"icn:gov:payload_binding:v1", SignatureMessage, Raw, Production, &["icn/crates/icn-governance/src/proof.rs"]),
     d(b"icn:gov:process_gate_result:v1", Blake3, Raw, Production, &["icn/crates/icn-governance/src/proof.rs"]),
     d(b"icn:gov:process_session_opened:v1", Blake3, Raw, Production, &["icn/crates/icn-governance/src/proof.rs"]),
     d(b"icn:gov:recognition-basis:bootstrap-rehearsal:v1", Blake3, Raw, Production, &["icn/crates/icn-governance/src/subject_recognition.rs", "icn/crates/icn-governance/tests/reference/subject_recognition_reference.py"]),

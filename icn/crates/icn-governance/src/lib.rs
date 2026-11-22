@@ -153,12 +153,12 @@ pub use proof::{
     EvidencePacketMadeAvailableReceipt, EvidencePacketProducedReceipt,
     EvidencePacketReceiptSetError, EvidencePacketSourceRef, GovernanceDecisionAttestation,
     GovernanceDecisionReceipt, GovernanceDecisionReceiptV2, GovernanceDecisionReceiptV2Error,
-    GovernanceDecisionReceiptV3, GovernanceDecisionReceiptV3Error, GovernanceProof,
-    GovernanceProofV2, MandateGrantRef, MandateGrantRefError, MandateGrantRefTarget,
-    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MeetingAttendanceReceiptV2Error,
-    MeetingAttendanceTransition, MutationAppliedReceipt, MutationPlanRecordedReceipt,
-    NoMandateReason, ProcessGateKind, ProcessGateResult, ProcessGateResultReceipt,
-    ProcessSessionOpenedReceipt, ProofOutcome, ReceiptMandateAttestation,
+    GovernanceDecisionReceiptV3, GovernanceDecisionReceiptV3Error, GovernancePayloadBinding,
+    GovernanceProof, GovernanceProofV2, MandateGrantRef, MandateGrantRefError,
+    MandateGrantRefTarget, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2,
+    MeetingAttendanceReceiptV2Error, MeetingAttendanceTransition, MutationAppliedReceipt,
+    MutationPlanRecordedReceipt, NoMandateReason, ProcessGateKind, ProcessGateResult,
+    ProcessGateResultReceipt, ProcessSessionOpenedReceipt, ProofOutcome, ReceiptMandateAttestation,
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
