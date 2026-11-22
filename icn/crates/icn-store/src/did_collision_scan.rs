@@ -1080,18 +1080,21 @@ pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
             gate: "#2627 registry: governance replication-sequence disposition (owner decision)",
             inventory_rows: &[24],
             posture: DeferredCollisionPosture::ReportOnly,
-            posture_rationale: "GovernanceSequenceCounter reads one watermark per raw key, \
-                                lazily on first use of that exact (author, domain) pair, and \
-                                writes only that key back; nothing scans the keyspace or merges \
-                                rows, so alias rows survive intact for the owner to disposition. \
-                                The author is the node's own Did rendered by as_str(). An alias \
-                                spelling would resume from its own watermark rather than its \
-                                twin's, lowering seq for that principal; seq is a same-key \
-                                comparator and never an acceptance gate (§10 of \
-                                authenticated-governance-replication), so that is ordering \
-                                weakness, not loss. A covered descriptor (MaxMonotonic, as for \
-                                outgoing_seq) would need an untagged length-prefixed principal \
-                                region the registry does not have yet.",
+            posture_rationale: "Startup only — this is not a statement that alias handling is \
+                                safe. GovernanceSequenceCounter reads one watermark per raw key, \
+                                lazily, and writes back only that key; nothing scans or merges \
+                                the keyspace, so no row is collapsed or orphaned at startup. \
+                                The value is a high-water mark: an alias or re-spelled author \
+                                resumes from its own (possibly zero) watermark and REISSUES \
+                                sequence numbers already signed for that principal, so any \
+                                migration must merge MaxMonotonic and must never take a lower \
+                                survivor. Collision reporting is incomplete here: the scan runs \
+                                as WholeKey and carries the u32 length field into the shape, so \
+                                aliases of different length are not grouped. Covering this \
+                                keyspace needs an untagged length-framed PrincipalRegion. Today \
+                                no receiver reads seq (op_id hashes the signed body), so the \
+                                reissue is latent; it bites when same-key conflict resolution \
+                                lands.",
         },
     ]
 }
@@ -2501,6 +2504,40 @@ mod tests {
         // And it is not counted as scanned by any registered keyspace.
         let scanned: usize = a.report.keyspaces.iter().map(|k| k.rows_scanned).sum();
         assert_eq!(scanned, 1, "only the registered row was scanned");
+    }
+
+    /// Characterization, not endorsement: the deferral scans this keyspace as `WholeKey`, so the
+    /// u32 length field in front of the author is carried into the canonical shape verbatim.
+    /// Two spellings of one author with different lengths therefore land in different shapes
+    /// and are NOT grouped as a collision. A covered disposition needs a length-framed region.
+    #[test]
+    fn governance_replication_sequence_aliases_of_different_length_are_not_grouped_yet() {
+        let (b58, b16) = two_spellings(0x25);
+        assert_ne!(
+            b58.len(),
+            b16.len(),
+            "precondition: the spellings differ in length"
+        );
+        let row = |author: &str| {
+            let mut key = b"gov:repl:seq:v1:".to_vec();
+            key.extend_from_slice(&(author.len() as u32).to_be_bytes());
+            key.extend_from_slice(author.as_bytes());
+            key.extend_from_slice(&4u32.to_be_bytes());
+            key.extend_from_slice(b"coop");
+            key
+        };
+        let (s1, s2) = (40u64.to_be_bytes(), 3u64.to_be_bytes());
+        let store = store_with_raw(&[(row(&b58), &s1), (row(&b16), &s2)]);
+        let reports = scan_deferred(&store, &n2a_deferred_namespaces()).unwrap();
+        let r = reports
+            .iter()
+            .find(|r| r.name == "governance/replication_sequence")
+            .unwrap();
+        assert_eq!(r.report.rows_with_readable_did, 2, "both rows are read");
+        assert!(
+            r.report.collision_groups.is_empty(),
+            "if this fails the scan now groups length-varying aliases: update the rationale"
+        );
     }
 
     /// A node that has closed one proposal holds a replication-sequence row naming its own DID.
