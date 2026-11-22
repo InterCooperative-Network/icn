@@ -51,6 +51,32 @@ impl BootstrapConfig {
     }
 }
 
+/// The bootstrap entries that name a DID, as `(expected DID, address)`.
+///
+/// These are the peers the bootstrap health task keeps connected. Address-only entries are
+/// left out on purpose: they name nobody, so a reconnection could not be checked against an
+/// expectation, and the placeholder `dial_addr` derives for them must not be mistaken for one
+/// (#2533). An unparseable entry is skipped here; `dial_bootstrap_peers` already reports it.
+///
+/// `own_did` is excluded: a bootstrap list shared across a cluster names every node, and a node
+/// cannot dial itself (#2506), so keeping its own entry would only fail on every check.
+pub async fn known_did_bootstrap_peers(
+    config: &BootstrapConfig,
+    own_did: &Did,
+) -> Vec<(Did, SocketAddr)> {
+    let mut peers = Vec::new();
+    for peer_url in &config.bootstrap_peers {
+        if let Ok(super::bridge::BootstrapPeer::KnownDid { did, addr }) =
+            super::bridge::parse_bootstrap_peer(peer_url).await
+        {
+            if &did != own_did {
+                peers.push((did, addr));
+            }
+        }
+    }
+    peers
+}
+
 /// Dial bootstrap peers.
 ///
 /// Returns the **addresses** transport was established to, not peer identities. Neither

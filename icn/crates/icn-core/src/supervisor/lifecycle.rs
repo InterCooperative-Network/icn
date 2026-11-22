@@ -768,6 +768,20 @@ async fn spawn_actors_with_identity(
     )
     .await;
 
+    // Keep DID-named bootstrap peers connected. The startup dial above is one attempt; without
+    // this task a connection that later timed out was never re-established, so two nodes that
+    // lost their link stayed apart until one of them restarted. Each check is bounded by the
+    // task's reconnect timeout, and the task exits on shutdown.
+    let health_peers =
+        super::init_bootstrap::known_did_bootstrap_peers(&bootstrap_config, &did).await;
+    background_tasks.spawn(super::background_tasks::run_bootstrap_health_task(
+        super::background_tasks::BootstrapHealthConfig::default(),
+        health_peers,
+        network_handle.clone(),
+        None,
+        shutdown_tx.subscribe(),
+    ));
+
     // Create event bus for inter-actor communication
     let event_bus = Arc::new(crate::events::EventBus::new());
     info!("Event bus created");
