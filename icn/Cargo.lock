@@ -4025,6 +4025,7 @@ dependencies = [
  "icn-entity",
  "icn-federation",
  "icn-gateway",
+ "icn-gossip",
  "icn-governance",
  "icn-governance-actor",
  "icn-identity",
