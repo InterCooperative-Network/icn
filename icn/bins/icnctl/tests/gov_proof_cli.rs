@@ -573,6 +573,30 @@ fn verify_expect_member_exit_codes() {
         "forged subject is refused"
     );
 
+    // The same admission with its binding stripped: a decision, but no member can be read.
+    let mut stripped =
+        serde_json::from_slice::<serde_json::Value>(&std::fs::read(&out).unwrap()).unwrap();
+    let mut sp: serde_json::Value = serde_json::from_slice(
+        &hex::decode(stripped["proof_bytes_hex"].as_str().unwrap()).unwrap(),
+    )
+    .unwrap();
+    sp.as_object_mut().unwrap().remove("payload_binding");
+    let raw = serde_json::to_vec(&sp).unwrap();
+    stripped["proof_sha256"] = serde_json::Value::String(hex::encode(sha2::Sha256::digest(&raw)));
+    stripped["proof_bytes_hex"] = serde_json::Value::String(hex::encode(&raw));
+    let unbound = dir.path().join("unbound.json");
+    std::fs::write(&unbound, serde_json::to_vec(&stripped).unwrap()).unwrap();
+    assert_eq!(
+        verify_offline(&unbound, a.as_str()).status.code(),
+        Some(0),
+        "still a decision"
+    );
+    assert_eq!(
+        v(b.as_str(), "add", &unbound),
+        Some(8),
+        "but it binds no member"
+    );
+
     // A text decision binds a payload, but not a membership change.
     let (tdir, tid, ta) = proof_only_data_dir();
     let tout = tdir.path().join("text.json");

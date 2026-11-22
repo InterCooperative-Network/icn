@@ -315,9 +315,17 @@ pub fn verify_bundle(
         return Err(BundleVerifyError::InvalidSignature);
     }
 
-    // 5. The payload binding, when present, must belong to this decision and verify under the
-    //    same pinned key. Its absence is not a failure here; `expect_membership` makes it one.
-    let (payload, payload_hash, bound_at, payload_claim) = match &proof.payload_binding {
+    // 5. The payload binding. Only a binding by the pinned key is this verifier's evidence; one
+    //    by any other key is ignored (the proof is unbound here), never trusted and never fatal.
+    //    A pinned binding must belong to this decision and verify, or the bundle is refused.
+    //    Absence is not a failure here; `expect_membership` makes it one.
+    let pinned_binding = proof.payload_binding.as_ref().filter(|binding| {
+        Did::from_str(&binding.signer_did)
+            .and_then(|did| did.to_verifying_key())
+            .map(|key| key.to_bytes() == pinned_bytes)
+            .unwrap_or(false)
+    });
+    let (payload, payload_hash, bound_at, payload_claim) = match pinned_binding {
         None => (None, None, None, None),
         Some(binding) => {
             if binding.decision_hash != proof.receipt.decision_hash {
@@ -330,34 +338,24 @@ pub fn verify_bundle(
                     "binding on a decision that was not accepted".into(),
                 ));
             }
-            let signer_is_pinned = Did::from_str(&binding.signer_did)
-                .and_then(|did| did.to_verifying_key())
-                .map(|key| key.to_bytes() == pinned_bytes)
-                .unwrap_or(false);
-            if !signer_is_pinned {
-                // A binding by another node says nothing the pinned signer stands behind. The
-                // proof stays verifiable as a decision; it is simply unbound for this verifier,
-                // so `expect_membership` refuses it (payload_unbound) rather than trusting it.
-                (None, None, None, None)
-            } else {
-                if !binding.verify(&pinned_key) {
-                    return Err(BundleVerifyError::PayloadBindingInvalidSignature);
-                }
-                // Typed parse of the exact signed text first: the derived deserializer refuses
-                // duplicate fields, so no other parser can read a different member from it.
-                serde_json::from_str::<ProposalPayload>(&binding.payload_json).map_err(|e| {
-                    BundleVerifyError::ProofMalformed(format!("bound payload: {e}"))
-                })?;
-                let value: serde_json::Value = serde_json::from_str(&binding.payload_json)
-                    .map_err(|e| {
-                        BundleVerifyError::ProofMalformed(format!("bound payload: {e}"))
-                    })?;
-                (
-                    Some(value),
-                    Some(hex::encode(binding.payload_hash())),
-                    Some(binding.decided_at),
-                    Some(VERIFIED_PAYLOAD_CLAIM),
-                )
+            if !binding.verify(&pinned_key) {
+                return Err(BundleVerifyError::PayloadBindingInvalidSignature);
+            }
+            // Strict typed parse of the exact signed text: the derived deserializer refuses
+            // duplicate fields, so no lenient reader can find a different member in it. A payload
+            // this build cannot parse (e.g. a newer variant) leaves the proof unbound for this
+            // verifier rather than failing a plain verify; `expect_membership` then refuses it.
+            match serde_json::from_str::<ProposalPayload>(&binding.payload_json) {
+                Err(_) => (None, None, None, None),
+                Ok(parsed) => match serde_json::to_value(&parsed) {
+                    Err(_) => (None, None, None, None),
+                    Ok(value) => (
+                        Some(value),
+                        Some(hex::encode(binding.payload_hash())),
+                        Some(binding.decided_at),
+                        Some(VERIFIED_PAYLOAD_CLAIM),
+                    ),
+                },
             }
         }
     };

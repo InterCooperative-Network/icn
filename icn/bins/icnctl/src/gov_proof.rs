@@ -36,8 +36,9 @@ pub(crate) enum ProofCommands {
     /// absent; 5 signer not the pinned one; 6 malformed or unsupported bundle; 7 unusable
     /// pinned signer; 8 a member was expected but the proof binds no payload the pinned signer
     /// signed; 9 the bound payload is not the expected membership change (or domain); 1 could
-    /// not read the bundle. "Verified" means the pinned node states its domain accepted this
-    /// change; it does not show the change is still current or institutionally authorized.
+    /// not read the bundle. With --expect-member, success means the pinned node states that its
+    /// domain accepted this change; it does not show the change is still current or
+    /// institutionally authorized.
     Verify {
         /// Bundle file to verify
         #[arg(long)]
@@ -52,7 +53,8 @@ pub(crate) enum ProofCommands {
         /// The expected membership action, with --expect-member
         #[arg(long, value_parser = ["add", "remove"], default_value = "add", requires = "expect_member")]
         expect_action: String,
-        /// The governance domain (accepting body) that must have decided it, with --expect-member
+        /// The domain ID the pinned node recorded for the decision, with --expect-member (a label
+        /// chosen on that node, not an authenticated institution; omit it and any domain passes)
         #[arg(long, requires = "expect_member")]
         expect_domain: Option<String>,
     },

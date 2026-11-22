@@ -405,7 +405,8 @@ fn a_genuinely_signed_binding_from_another_decision_is_refused() {
 }
 
 /// Signed payload text with a duplicate `member` key: a lenient parser keeps the last one, a
-/// strict one refuses. The verifier must refuse, so no reader can find a different member.
+/// strict one refuses. The verifier must never read a member out of it: the proof is left
+/// unbound, so no membership can be attributed to it.
 #[test]
 fn a_bound_payload_with_duplicate_keys_is_refused() {
     let b = subject();
@@ -425,10 +426,17 @@ fn a_bound_payload_with_duplicate_keys_is_refused() {
             &d.node_key,
         ));
     });
-    assert!(matches!(
-        verify_bundle(&forged, &d.node_did).unwrap_err(),
-        BundleVerifyError::ProofMalformed(_)
-    ));
+    let verified = verify_bundle(&forged, &d.node_did).expect("the decision itself verifies");
+    assert!(
+        verified.payload.is_none(),
+        "no member is read from ambiguous text"
+    );
+    for who in [&b, &mallory] {
+        assert_eq!(
+            expect_membership(&verified, MembershipAction::Add, who.as_str(), None),
+            Err(BundleVerifyError::PayloadUnbound)
+        );
+    }
 }
 
 #[test]
@@ -471,18 +479,20 @@ fn a_non_membership_decision_is_not_an_admission() {
     ));
 }
 
+/// The pinned node itself signs a binding for a decision that was rejected: refused, because a
+/// rejection decided nothing to bind.
 #[test]
 fn a_binding_on_a_rejected_decision_is_refused() {
     let b = subject();
-    let accepted = close(VoteChoice::For, membership(MembershipAction::Add, &b));
     let rejected = close(VoteChoice::Against, membership(MembershipAction::Add, &b));
-    // Graft an accepted decision's binding onto a rejection, pointing it at the rejection's
-    // decision hash: the outcome check refuses it before any signature is consulted.
-    let binding: GovernanceProofV2 = serde_json::from_slice(&accepted.stored()).unwrap();
     let forged = with_proof(&rejected.export(), |p| {
-        let mut moved = binding.payload_binding.clone().unwrap();
-        moved.decision_hash = p.receipt.decision_hash;
-        p.payload_binding = Some(moved);
+        p.payload_binding = Some(GovernancePayloadBinding::sign(
+            p.receipt.decision_hash,
+            serde_json::to_string(&membership(MembershipAction::Add, &b)).unwrap(),
+            1,
+            rejected.node_did.clone(),
+            &rejected.node_key,
+        ));
     });
     assert!(matches!(
         verify_bundle(&forged, &rejected.node_did).unwrap_err(),
