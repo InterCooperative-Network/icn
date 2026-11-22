@@ -1118,8 +1118,53 @@ impl NetworkActor {
     /// If oracle is provided, enables policy-based rate limiting.
     /// If topology_config is provided, enables topology-aware neighbor management.
     /// If personhood_store is provided, enables Sybil resistance via per-person rate limiting.
+    ///
+    /// Starts mDNS discovery; [`Self::spawn_with_mdns`] lets the caller decide.
     #[allow(clippy::too_many_arguments)]
     pub async fn spawn(
+        identity_bundle: IdentityBundle,
+        listen_addr: SocketAddr,
+        shutdown_tx: tokio::sync::broadcast::Sender<()>,
+        incoming_handler: Option<IncomingMessageHandler>,
+        oracle: Option<Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
+        fallback_config: Option<RateLimitConfig>,
+        topology_config: Option<TopologyConfig>,
+        stun_servers: Option<Vec<SocketAddr>>,
+        turn_config: Option<crate::TurnConfig>,
+        misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
+        store: Option<Arc<dyn Store>>,
+        personhood_store: Option<Arc<dyn PersonhoodStoreTrait>>,
+        anchor_rate_config: Option<AnchorRateLimitConfig>,
+        advertised_addr: Option<SocketAddr>,
+    ) -> Result<NetworkHandle> {
+        Self::spawn_with_mdns(
+            identity_bundle,
+            listen_addr,
+            shutdown_tx,
+            incoming_handler,
+            oracle,
+            fallback_config,
+            topology_config,
+            stun_servers,
+            turn_config,
+            misbehavior_detector,
+            store,
+            personhood_store,
+            anchor_rate_config,
+            advertised_addr,
+            true,
+        )
+        .await
+    }
+
+    /// [`Self::spawn`], with mDNS discovery on or off.
+    ///
+    /// Off means discovery is never started: this node neither registers an mDNS service —
+    /// which would multicast its DID and listen address on every interface — nor browses for
+    /// other nodes' advertisements. It is the operator's `network.mdns_enabled`, which until
+    /// this existed was read by nothing.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn spawn_with_mdns(
         identity_bundle: IdentityBundle,
         listen_addr: SocketAddr,
         shutdown_tx: tokio::sync::broadcast::Sender<()>,
@@ -1138,6 +1183,7 @@ impl NetworkActor {
         // Required in K8s/Docker where the QUIC endpoint binds to `0.0.0.0` but must
         // advertise the pod/container IP so other nodes can dial back.
         advertised_addr: Option<SocketAddr>,
+        mdns_enabled: bool,
     ) -> Result<NetworkHandle> {
         let did = identity_bundle.did().clone();
 
@@ -1145,7 +1191,9 @@ impl NetworkActor {
 
         // Start discovery (best-effort in constrained environments)
         let mut discovery = Discovery::new();
-        if let Err(e) = discovery.start(did.clone(), listen_addr).await {
+        if !mdns_enabled {
+            info!("mDNS discovery disabled by configuration; not advertising or browsing");
+        } else if let Err(e) = discovery.start(did.clone(), listen_addr).await {
             warn!(
                 error = %e,
                 "Discovery startup failed; continuing without mDNS peer discovery"

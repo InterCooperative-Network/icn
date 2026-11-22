@@ -1395,7 +1395,7 @@ async fn spawn_network_actor(
         network_store_path.display()
     );
 
-    let network_handle = icn_net::NetworkActor::spawn(
+    let network_handle = icn_net::NetworkActor::spawn_with_mdns(
         identity_bundle.clone(),
         listen_addr,
         shutdown_tx.clone(),
@@ -1410,6 +1410,7 @@ async fn spawn_network_actor(
         None, // Personhood store for Sybil resistance
         None, // Anchor rate limit config
         advertised_addr,
+        config.network.mdns_enabled,
     )
     .await?;
 
