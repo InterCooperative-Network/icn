@@ -1,10 +1,11 @@
-//! The N2-A startup gate after a real governance close.
+//! The N2-A startup gate after real governance activity.
 //!
-//! Closing a proposal on a node with a signing key emits a signed replication envelope, which
-//! durably writes a `gov:repl:seq:v1:` row naming the node's own DID. Before that keyspace was
-//! registered, the gate saw the row as uncovered and refused the data directory: the daemon that
-//! had just closed a proposal could not start again. This drives the production close path and
-//! then runs the gate over the daemon's real layout.
+//! Signed governance emission (proposal create and vote cast; a close names no acting principal
+//! and goes out unsigned) durably writes a `gov:repl:seq:v1:` watermark row naming the author's
+//! DID. Before that keyspace was registered, the gate saw the row as uncovered and refused the
+//! data directory: a node that had signed one proposal or vote could not start again. This drives
+//! the production path to a closed decision, proves the row exists, then runs the real gate over
+//! the daemon's layout.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::sync::Arc;
@@ -131,6 +132,24 @@ async fn produce(choice: VoteChoice) -> ClosedDecision {
 fn the_startup_gate_is_clear_after_a_real_close() {
     let decision = close_a_real_decision(VoteChoice::For);
     let data_dir = decision.store_path.parent().unwrap().parent().unwrap();
+
+    // Precondition: signed emission actually wrote a watermark row. Without one the gate would
+    // pass trivially (e.g. if emission fell back to unsigned) and this test would prove nothing.
+    let rows = {
+        let mut store = None;
+        for _ in 0..50 {
+            match SledStore::open(&decision.store_path) {
+                Ok(s) => {
+                    store = Some(s);
+                    break;
+                }
+                Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+            }
+        }
+        let store = store.expect("store reopens with the producer stopped");
+        icn_store::Store::scan_count(&store, b"gov:repl:seq:v1:").expect("scan")
+    };
+    assert!(rows >= 1, "precondition: a gov:repl:seq:v1 row was written");
 
     // sled releases its lock from a background thread; the gate opens the store itself.
     let mut verdict = None;

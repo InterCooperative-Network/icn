@@ -1080,21 +1080,23 @@ pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
             gate: "#2627 registry: governance replication-sequence disposition (owner decision)",
             inventory_rows: &[24],
             posture: DeferredCollisionPosture::ReportOnly,
-            posture_rationale: "Startup only — this is not a statement that alias handling is \
-                                safe. GovernanceSequenceCounter reads one watermark per raw key, \
-                                lazily, and writes back only that key; nothing scans or merges \
-                                the keyspace, so no row is collapsed or orphaned at startup. \
-                                The value is a high-water mark: an alias or re-spelled author \
-                                resumes from its own (possibly zero) watermark and REISSUES \
-                                sequence numbers already signed for that principal, so any \
-                                migration must merge MaxMonotonic and must never take a lower \
-                                survivor. Collision reporting is incomplete here: the scan runs \
-                                as WholeKey and carries the u32 length field into the shape, so \
-                                aliases of different length are not grouped. Covering this \
-                                keyspace needs an untagged length-framed PrincipalRegion. Today \
-                                no receiver reads seq (op_id hashes the signed body), so the \
-                                reissue is latent; it bites when same-key conflict resolution \
-                                lands.",
+            posture_rationale: "Startup only — not a statement that alias handling is safe, \
+                                and a deviation from ReportOnly's contract the owner must accept: \
+                                the counter refuses nothing at the point of use. At startup \
+                                nothing scans or merges the keyspace (one watermark per raw key, \
+                                read lazily, only that key written back), so no row is collapsed \
+                                or orphaned. The value is a high-water mark keyed by the signed \
+                                author's spelling, and Did equality is already key equality, so \
+                                an alias-spelled principal gets its own watermark and REISSUES \
+                                sequence numbers already signed for that principal — reachable \
+                                in-process today, not only at migration. The consequence is \
+                                latent while no receiver reads seq (op_id hashes the signed \
+                                body). The fix belongs in the counter (key on identifier bytes); \
+                                any migration must merge MaxMonotonic. Reporting is incomplete: \
+                                scanned as WholeKey, the u32 author length lands in the shape so \
+                                aliases of different length are not grouped, and a domain id \
+                                that spells did:icn: adds a false principal or an unreadable \
+                                row.",
         },
     ]
 }
