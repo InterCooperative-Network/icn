@@ -1070,6 +1070,29 @@ pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
                                 writes the survivor back and orphans the losers. No domain rule \
                                 authorizes that merge (#2676).",
         },
+        DeferredNamespace {
+            name: "governance/replication_sequence",
+            // `gov:repl:seq:v1:` ‖ u32_be len ‖ author spelling ‖ u32_be len ‖ domain id
+            // (apps/governance/src/replication_sequence.rs `sequence_key`). Written on the
+            // first signed governance emission of every (author, domain) pair, so a node that
+            // has closed one proposal holds at least one row.
+            prefix: b"gov:repl:seq:v1:",
+            gate: "#2627 registry: governance replication-sequence disposition (owner decision)",
+            inventory_rows: &[24],
+            posture: DeferredCollisionPosture::ReportOnly,
+            posture_rationale: "GovernanceSequenceCounter reads one watermark per raw key, \
+                                lazily on first use of that exact (author, domain) pair, and \
+                                writes only that key back; nothing scans the keyspace or merges \
+                                rows, so alias rows survive intact for the owner to disposition. \
+                                The author is the node's own Did rendered by as_str(). An alias \
+                                spelling would resume from its own watermark rather than its \
+                                twin's, lowering seq for that principal; seq is a same-key \
+                                comparator and never an acceptance gate (§10 of \
+                                authenticated-governance-replication), so that is ordering \
+                                weakness, not loss. A covered descriptor (MaxMonotonic, as for \
+                                outgoing_seq) would need an untagged length-prefixed principal \
+                                region the registry does not have yet.",
+        },
     ]
 }
 
@@ -2480,6 +2503,44 @@ mod tests {
         assert_eq!(scanned, 1, "only the registered row was scanned");
     }
 
+    /// A node that has closed one proposal holds a replication-sequence row naming its own DID.
+    /// That row is deferred, not uncovered, and does not block the startup gate.
+    #[test]
+    fn governance_replication_sequence_row_is_deferred_and_does_not_block() {
+        let (one, _) = two_spellings(0x24);
+        let mut key = b"gov:repl:seq:v1:".to_vec();
+        key.extend_from_slice(&(one.len() as u32).to_be_bytes());
+        key.extend_from_slice(one.as_bytes());
+        let domain = b"coop-board";
+        key.extend_from_slice(&(domain.len() as u32).to_be_bytes());
+        key.extend_from_slice(domain);
+        let seq = 11u64.to_be_bytes();
+        let store = store_with_raw(&[(key, &seq)]);
+
+        let deferrals = n2a_deferred_namespaces();
+        let a = audit(&store, &[], &deferrals);
+        assert_eq!(a.deferred_did_rows(), 1, "the author row is deferred");
+        assert_eq!(a.uncovered_did_rows(), 0, "and not uncovered");
+        assert!(
+            a.is_clear(),
+            "a node that closed a proposal must still start"
+        );
+        let d = deferrals
+            .iter()
+            .find(|d| d.name == "governance/replication_sequence")
+            .expect("registered");
+        assert_eq!(d.posture, DeferredCollisionPosture::ReportOnly);
+        let reports = scan_deferred(&store, &deferrals).unwrap();
+        let r = reports
+            .iter()
+            .find(|r| r.name == "governance/replication_sequence")
+            .unwrap();
+        assert_eq!(
+            r.report.rows_with_readable_did, 1,
+            "the author row is read, not skipped"
+        );
+        assert!(!r.blocks());
+    }
     #[test]
     fn every_principal_row_lands_in_exactly_one_of_three_states() {
         // covered | deferred | uncovered — and nothing may fall through.
