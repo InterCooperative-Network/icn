@@ -49,6 +49,7 @@ Useful maps include:
 - [`source-tree-map.md`](reference/project-index/source-tree-map.md) — source-tree navigation;
 - [`rust-workspace-map.md`](reference/project-index/rust-workspace-map.md) — Rust workspace navigation;
 - [`runtime-surface-map.md`](reference/project-index/runtime-surface-map.md) — runtime-surface inventory/orientation;
+- [`membership-authority-flow-map.md`](reference/project-index/membership-authority-flow-map.md) — membership stores, authorization decision points and gaps;
 - [`show-readiness-map.md`](reference/project-index/show-readiness-map.md) — public-claim guardrails;
 - generated records under `docs/reference/project-index/generated/` — mechanical snapshots/projections.
 
