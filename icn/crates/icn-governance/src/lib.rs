@@ -51,6 +51,7 @@ pub mod effect_manifest;
 pub mod error;
 pub mod gate;
 pub mod handle;
+pub mod institutional_admission;
 pub mod institutional_domain;
 #[allow(missing_docs)]
 pub mod invariant_gate;
