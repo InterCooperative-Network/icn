@@ -619,3 +619,123 @@ fn verify_expect_member_exit_codes() {
         .code();
     assert_eq!(code, Some(9), "a text decision is not an admission");
 }
+
+/// `--at` evaluates standing at a time the verifier supplies; before the decision it is refused.
+#[test]
+fn verify_standing_at_exit_codes() {
+    let b = IdentityBundle::generate().unwrap().did().clone();
+    let (dir, id, a) = proof_only_data_dir_with(ProposalPayload::Membership {
+        action: MembershipAction::Add,
+        member: b.clone(),
+    });
+    let out = dir.path().join("admission.json");
+    assert!(icnctl(
+        dir.path(),
+        &[
+            "gov",
+            "proof",
+            "export",
+            "--proposal-id",
+            &id.0,
+            "--out",
+            out.to_str().unwrap()
+        ],
+    )
+    .status
+    .success());
+    let base = verify_offline_with(
+        &out,
+        a.as_str(),
+        &[
+            "--expect-member",
+            b.as_str(),
+            "--expect-domain",
+            "cli-offline-proof",
+        ],
+    );
+    let v: serde_json::Value = serde_json::from_slice(&base.stdout).unwrap();
+    let decided = v["bound_at"].as_u64().expect("bound_at");
+    let at = |t: u64| {
+        let t = t.to_string();
+        verify_offline_with(
+            &out,
+            a.as_str(),
+            &[
+                "--expect-member",
+                b.as_str(),
+                "--expect-domain",
+                "cli-offline-proof",
+                "--at",
+                &t,
+            ],
+        )
+    };
+    assert_eq!(at(decided - 1).status.code(), Some(10), "not yet in effect");
+    let ok = at(decided);
+    assert_eq!(ok.status.code(), Some(0), "{}", text(&ok));
+    let s: serde_json::Value = serde_json::from_slice(&ok.stdout).unwrap();
+    assert_eq!(s["standing"]["status"], "admitted_no_revocation_observed");
+    // --at without the domain is refused by the CLI before any evaluation.
+    let t = decided.to_string();
+    let no_domain = verify_offline_with(
+        &out,
+        a.as_str(),
+        &["--expect-member", b.as_str(), "--at", &t],
+    );
+    assert_eq!(no_domain.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&no_domain.stderr).contains("--expect-domain"),
+        "refused by clap for the missing flag, not by verification: {}",
+        text(&no_domain)
+    );
+
+    // Revocation evidence fails closed and names its source.
+    let rev = |file: &Path| {
+        verify_offline_with(
+            &out,
+            a.as_str(),
+            &[
+                "--expect-member",
+                b.as_str(),
+                "--expect-domain",
+                "cli-offline-proof",
+                "--at",
+                &t,
+                "--revocation",
+                file.to_str().unwrap(),
+            ],
+        )
+    };
+    let malformed = dir.path().join("malformed.json");
+    std::fs::write(&malformed, b"{not json").unwrap();
+    let m = rev(&malformed);
+    assert_eq!(m.status.code(), Some(6), "{}", text(&m));
+    assert!(
+        text(&m).contains("revocation[0]"),
+        "names the failing bundle: {}",
+        text(&m)
+    );
+    let mut tampered: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
+    let mut raw = hex::decode(tampered["proof_bytes_hex"].as_str().unwrap()).unwrap();
+    let i = raw.len() / 3;
+    raw[i] ^= 1;
+    tampered["proof_bytes_hex"] = serde_json::Value::String(hex::encode(&raw));
+    let tampered_path = dir.path().join("tampered-rev.json");
+    std::fs::write(&tampered_path, serde_json::to_vec(&tampered).unwrap()).unwrap();
+    assert_eq!(
+        rev(&tampered_path).status.code(),
+        Some(2),
+        "tampered revocation"
+    );
+    assert_eq!(
+        rev(&out).status.code(),
+        Some(9),
+        "an admission is not a removal"
+    );
+    assert_eq!(
+        rev(&dir.path().join("does-not-exist.json")).status.code(),
+        Some(1),
+        "unreadable revocation"
+    );
+}

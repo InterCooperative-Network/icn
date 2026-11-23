@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use icn_governance::proof_bundle::{
-    expect_membership, export_bundle, stored_proof_key, verify_bundle, BundleVerifyError,
+    evaluate_standing_at, expect_membership, export_bundle, stored_proof_key, verify_bundle,
+    BundleVerifyError,
 };
 use icn_governance::MembershipAction;
 use sha2::{Digest, Sha256};
@@ -32,11 +33,14 @@ pub(crate) enum ProofCommands {
     },
     /// Verify a bundle offline against a signer you pin.
     ///
-    /// Exit codes: 0 verified; 2 integrity; 3 decision inconsistent; 4 signature invalid or
-    /// absent; 5 signer not the pinned one; 6 malformed or unsupported bundle; 7 unusable
-    /// pinned signer; 8 a member was expected but the proof binds no payload the pinned signer
-    /// signed; 9 the bound payload is not the expected membership change (or domain); 1 could
-    /// not read the bundle. With --expect-member, success means the pinned node states that its
+    /// Exit codes: 0 verified; 2 integrity (also clap's usage-error code); 3 decision
+    /// inconsistent, or an admission and removal with the same decision time; 4 signature invalid
+    /// or absent; 5 signer not the pinned one; 6 malformed or unsupported bundle; 7 unusable
+    /// pinned signer; 8 a member was expected but a proof binds no payload the pinned signer
+    /// signed; 9 a bound payload is not the expected membership change or domain (admission or
+    /// removal); 10 with --at, the admission was not yet decided at that time; 11 with --at, a
+    /// supplied removal revoked it by then; 1 could not read a bundle. Decisions are ordered by
+    /// the pinned node's own decision clock. The JSON `source` names the failing bundle. With --expect-member, success means the pinned node states that its
     /// domain accepted this change; it does not show the change is still current or
     /// institutionally authorized.
     Verify {
@@ -57,6 +61,15 @@ pub(crate) enum ProofCommands {
         /// chosen on that node, not an authenticated institution; omit it and any domain passes)
         #[arg(long, requires = "expect_member")]
         expect_domain: Option<String>,
+        /// Evaluate the member's standing at this unix time (seconds), supplied by you — never
+        /// taken from the bundle. Requires --expect-member and --expect-domain. Reports at best
+        /// "admitted, no revocation observed"; never current membership.
+        #[arg(long, requires_all = ["expect_member", "expect_domain"])]
+        at: Option<u64>,
+        /// A removal decision bundle to consider as revocation evidence (repeatable). Each is
+        /// verified under the same pinned signer; a bundle that fails is an error, not skipped.
+        #[arg(long, requires = "at")]
+        revocation: Vec<PathBuf>,
     },
 }
 
@@ -78,6 +91,9 @@ pub(crate) fn exit_code(err: &BundleVerifyError) -> i32 {
         BundleVerifyError::PayloadBindingInvalidSignature => 4,
         BundleVerifyError::PayloadUnbound => 8,
         BundleVerifyError::SubjectMismatch { .. } => 9,
+        BundleVerifyError::NotYetEffective { .. } => 10,
+        BundleVerifyError::RevokedByEvidence { .. } => 11,
+        BundleVerifyError::AmbiguousOrder { .. } => 3,
     }
 }
 
@@ -90,6 +106,8 @@ pub(crate) fn run(cmd: ProofCommands, data_dir: &Path) -> Result<()> {
             expect_member,
             expect_action,
             expect_domain,
+            at,
+            revocation,
         } => {
             let bytes = std::fs::read(&bundle)
                 .with_context(|| format!("reading bundle {}", bundle.display()))?;
@@ -106,10 +124,48 @@ pub(crate) fn run(cmd: ProofCommands, data_dir: &Path) -> Result<()> {
                     }
                     None => Ok(verified),
                 });
+            // Which bundle an error came from: the admission, or the i-th --revocation.
+            let mut source = bundle.display().to_string();
+            let mut removals = Vec::new();
+            for (i, path) in revocation.iter().enumerate() {
+                let bytes = std::fs::read(path)
+                    .with_context(|| format!("reading revocation bundle {}", path.display()))?;
+                removals.push((
+                    format!("revocation[{i}] {}", path.display()),
+                    verify_bundle(&bytes, &expect_signer),
+                ));
+            }
+            let result = result.and_then(|verified| match at {
+                None => Ok((verified, None)),
+                Some(at) => {
+                    let mut verified_removals = Vec::new();
+                    for (label, removal) in removals {
+                        match removal {
+                            Ok(r) => verified_removals.push(r),
+                            Err(e) => {
+                                source = label;
+                                return Err(e);
+                            }
+                        }
+                    }
+                    let removals = verified_removals;
+                    let standing = evaluate_standing_at(
+                        &verified,
+                        &removals,
+                        expect_member.as_deref().unwrap_or_default(),
+                        expect_domain.as_deref().unwrap_or_default(),
+                        at,
+                    )?;
+                    Ok((verified, Some(standing)))
+                }
+            });
             match result {
-                Ok(verified) => {
+                Ok((verified, standing)) => {
                     let mut out = serde_json::to_value(&verified)?;
                     out["verified"] = serde_json::Value::Bool(true);
+                    if let Some(standing) = standing {
+                        out["standing"] = serde_json::to_value(&standing)?;
+                    }
                     println!("{}", serde_json::to_string_pretty(&out)?);
                     Ok(())
                 }
@@ -118,6 +174,7 @@ pub(crate) fn run(cmd: ProofCommands, data_dir: &Path) -> Result<()> {
                         "verified": false,
                         "code": e.code(),
                         "reason": e.to_string(),
+                        "source": source,
                     });
                     println!("{}", serde_json::to_string_pretty(&out)?);
                     std::process::exit(exit_code(&e));

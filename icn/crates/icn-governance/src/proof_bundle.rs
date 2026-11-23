@@ -121,6 +121,15 @@ pub enum BundleVerifyError {
     /// The bound payload is not the expected membership change.
     #[error("subject: bound payload is {found}, expected {expected}")]
     SubjectMismatch { expected: String, found: String },
+    /// At the evaluation time the admission had not yet been decided.
+    #[error("standing: at {at} the admission (decided at {admitted_at}) was not yet in effect")]
+    NotYetEffective { at: u64, admitted_at: u64 },
+    /// Supplied, verified removal evidence revokes the admission at or before the evaluation time.
+    #[error("standing: at {at} the admission was revoked by a removal decided at {removed_at}")]
+    RevokedByEvidence { at: u64, removed_at: u64 },
+    /// An admission and a removal carry the same decision time, so their order is unknown.
+    #[error("standing: admission and removal share decision time {at}; their order is unknown")]
+    AmbiguousOrder { at: u64 },
 }
 
 impl BundleVerifyError {
@@ -143,6 +152,9 @@ impl BundleVerifyError {
             Self::PayloadBindingInvalidSignature => "payload_binding_invalid_signature",
             Self::PayloadUnbound => "payload_unbound",
             Self::SubjectMismatch { .. } => "subject_mismatch",
+            Self::NotYetEffective { .. } => "not_yet_effective",
+            Self::RevokedByEvidence { .. } => "revoked_by_evidence",
+            Self::AmbiguousOrder { .. } => "ambiguous_order",
         }
     }
 }
@@ -425,4 +437,88 @@ pub fn expect_membership(
         });
     }
     Ok(())
+}
+
+/// What a set of verified decisions shows about one member's standing at one evaluation time.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct StandingAt {
+    /// The evaluation time, as supplied by the verifier (unix seconds). Never the producer's.
+    pub at: u64,
+    pub member: String,
+    pub domain_id: String,
+    /// When the admitting decision was closed and bound by the pinned node.
+    pub admitted_at: u64,
+    /// Always `admitted_no_revocation_observed`: the only affirmative result this can give.
+    pub status: &'static str,
+    /// How many verified removal decisions were supplied and considered.
+    pub revocations_considered: usize,
+    pub claim: &'static str,
+}
+
+/// The bounded meaning of an affirmative standing result.
+pub const STANDING_CLAIM: &str = "the pinned node states that, at the supplied evaluation time, \
+     its domain had admitted this member and none of the removal decisions supplied had revoked \
+     it; decisions are ordered by the pinned node's own decision clock; removals not supplied \
+     cannot be observed, so this is not proof of current membership; no membership term exists \
+     to expire it; and it is not institutional authorization";
+
+/// Evaluate a member's standing at `at`, from an admission and any removal decisions the verifier
+/// holds — all already verified under the same pinned signer.
+///
+/// This is a relying-party evaluation at a verifier-chosen position, not an ingress gate: it
+/// orders decisions by the decision times the pinned node signed, and it can only refuse on
+/// evidence it is given. Rules:
+/// - the admission must bind `membership Add <member>` in `domain`; each removal must bind
+///   `membership Remove <member>` in `domain`, attested by the same signer — anything else is a
+///   caller error, never silently ignored;
+/// - `at` before the admission's decision time → `NotYetEffective`;
+/// - a removal decided after the admission and at or before `at` → `RevokedByEvidence`
+///   (a removal decided before the admission predates it and does not revoke it);
+/// - a removal with the admission's exact decision time → `AmbiguousOrder` (fail closed).
+///
+/// Ordering trusts the pinned node's decision clock (`bound_at`, unix seconds). A clock that
+/// stepped backwards between an admission and a removal would make the removal look like it
+/// predates the admission; whether to refuse such evidence is an open owner decision.
+pub fn evaluate_standing_at(
+    admission: &VerifiedGovernanceProof,
+    removals: &[VerifiedGovernanceProof],
+    member: &str,
+    domain: &str,
+    at: u64,
+) -> Result<StandingAt, BundleVerifyError> {
+    expect_membership(admission, MembershipAction::Add, member, Some(domain))?;
+    let admitted_at = admission
+        .bound_at
+        .ok_or(BundleVerifyError::PayloadUnbound)?;
+    let mut revoked_at: Option<u64> = None;
+    for removal in removals {
+        if removal.attested_by != admission.attested_by {
+            return Err(BundleVerifyError::UntrustedSigner {
+                pinned: admission.attested_by.clone(),
+            });
+        }
+        expect_membership(removal, MembershipAction::Remove, member, Some(domain))?;
+        let removed_at = removal.bound_at.ok_or(BundleVerifyError::PayloadUnbound)?;
+        if removed_at == admitted_at {
+            return Err(BundleVerifyError::AmbiguousOrder { at: removed_at });
+        }
+        if removed_at > admitted_at && removed_at <= at {
+            revoked_at = Some(revoked_at.map_or(removed_at, |r| r.min(removed_at)));
+        }
+    }
+    if at < admitted_at {
+        return Err(BundleVerifyError::NotYetEffective { at, admitted_at });
+    }
+    if let Some(removed_at) = revoked_at {
+        return Err(BundleVerifyError::RevokedByEvidence { at, removed_at });
+    }
+    Ok(StandingAt {
+        at,
+        member: member.to_string(),
+        domain_id: domain.to_string(),
+        admitted_at,
+        status: "admitted_no_revocation_observed",
+        revocations_considered: removals.len(),
+        claim: STANDING_CLAIM,
+    })
 }
