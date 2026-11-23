@@ -228,14 +228,27 @@ impl Node {
 
     /// Establish a `StaticList` domain containing this node, plus an open proposal.
     async fn seed_static_domain(&self, domain: &str, scope: ProposalScope) -> ProposalId {
+        self.seed_static_domain_with(domain, scope, Vec::new())
+            .await
+    }
+
+    /// As [`Self::seed_static_domain`], with further members listed beside this node.
+    async fn seed_static_domain_with(
+        &self,
+        domain: &str,
+        scope: ProposalScope,
+        others: Vec<icn_identity::Did>,
+    ) -> ProposalId {
         let domain_id = GovernanceDomainId(domain.to_string());
+        let mut members = vec![self.did.clone()];
+        members.extend(others);
         self.ops
             .create_domain(
                 domain_id.clone(),
                 format!("Domain {domain}"),
                 "cooperative_default".to_string(),
                 GovernanceParams::new(50, 50, 3600),
-                MembershipConfig::static_list(vec![self.did.clone()]),
+                MembershipConfig::static_list(members),
             )
             .await
             .expect("create_domain");
@@ -608,11 +621,12 @@ async fn a_node_without_a_signing_key_emits_the_legacy_payload() {
 #[tokio::test(flavor = "current_thread")]
 async fn a_vote_cast_for_another_member_is_never_signed() {
     let node = Node::spawn(true).await;
-    let proposal_id = node
-        .seed_static_domain("relay-domain", ProposalScope::Local)
-        .await;
-
+    // Bob must actually be a member: the actor refuses votes from non-members, and this test
+    // is about relaying a *member's* vote, not about a stranger's.
     let bob = IdentityBundle::generate().unwrap().did().clone();
+    let proposal_id = node
+        .seed_static_domain_with("relay-domain", ProposalScope::Local, vec![bob.clone()])
+        .await;
 
     node.ops
         .cast_vote(proposal_id.clone(), bob.clone(), VoteChoice::For, None)

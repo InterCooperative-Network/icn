@@ -1948,6 +1948,16 @@ impl GovernanceActor {
             } => {
                 info!("Creating proposal: {} (scope: {:?})", title, scope);
 
+                // A proposal belongs to a governance domain this node holds; refuse one for a
+                // domain that does not exist here before anything is persisted or broadcast
+                // (parity with `GovernanceManager::create_proposal`).
+                if self.load_domain(&domain_id)?.is_none() {
+                    anyhow::bail!(
+                        "Domain '{}' not found. Cannot create a proposal in it.",
+                        domain_id.0
+                    );
+                }
+
                 let mut proposal = Proposal::new(
                     domain_id,
                     self.did.clone(),
@@ -2188,6 +2198,43 @@ impl GovernanceActor {
                     &proposal_id,
                     icn_governance::LegacyRailOp::VoteCast,
                 )?;
+
+                // A vote needs an existing proposal that is open for voting (`Open` only; not
+                // Draft or Deliberation), in a domain this node holds, from one of that domain's
+                // voters. These are the rules `GovernanceManager::cast_vote` states, but in
+                // production the manager forwards here, so on this path they are new: the
+                // unfiltered close tally counts every stored row, so a row must not exist unless
+                // it may count. StaticList membership is the listed voters (by key, so any
+                // spelling); TrustThreshold keeps its existing meaning and is not checked here —
+                // a known gap, since such a close also counts every stored row. Checked after the
+                // firewall above and before any vote row exists.
+                let proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+                if !proposal.state.is_open() {
+                    anyhow::bail!(
+                        "Cannot vote on proposal '{}': not open for voting (current state: {:?})",
+                        proposal_id.0,
+                        proposal.state
+                    );
+                }
+                let domain = self.load_domain(&proposal.domain_id)?.ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Domain '{}' not found. Cannot verify voter membership.",
+                        proposal.domain_id.0
+                    )
+                })?;
+                let is_member = match &domain.config.membership.source {
+                    MembershipSource::StaticList(members) => members.contains(&voter),
+                    MembershipSource::TrustThreshold(_) => true,
+                };
+                if !is_member {
+                    anyhow::bail!(
+                        "Voter {} is not a member of domain {}",
+                        voter,
+                        proposal.domain_id.0
+                    );
+                }
 
                 // One stored row per cryptographic principal (#2641). This path
                 // has no duplicate-vote guard, so a voter re-spelling their DID
