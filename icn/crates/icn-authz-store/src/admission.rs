@@ -148,6 +148,9 @@ pub trait CustodianAdmissionVerifierV0: Send + Sync {
     fn policy(&self) -> AdmissionPolicyRefV0;
 
     /// Verify untrusted evidence for `target` at `now` without consuming anything.
+    ///
+    /// On the custodian path ([`crate::LocalResourceReservations::reserve_admitted`]) `now` is
+    /// always the installed [`CustodianClockV0`]'s reading, never a caller value.
     fn preflight(
         &self,
         evidence: &CheckpointedEvidenceV0,
@@ -157,17 +160,52 @@ pub trait CustodianAdmissionVerifierV0: Send + Sync {
     ) -> Result<VerifiedAdmissionV0, AdmissionRefusalV0>;
 }
 
-/// Error installing a verifier.
+/// The custodian's source of time for custodian-policy admission (Part 8 F1, experimental).
+///
+/// # Unit
+///
+/// [`Self::now`] returns **unix seconds**: whole seconds since 1970-01-01T00:00:00Z, ignoring leap
+/// seconds. That is the unit in which an authorization's `not_after` is compared on this path, so
+/// evidence must state `not_after` in unix seconds to be judged correctly here.
+///
+/// # What this does and does not guarantee
+///
+/// Installing a clock moves the *choice* of admission time from the caller of
+/// [`crate::LocalResourceReservations::reserve_admitted`] to the custodian: a caller can no longer
+/// name the time at which its own evidence is judged. It does **not** make the time correct. The
+/// unit specifies an interface, not integrity: a wrong, skewed, rolled-back or attacker-controlled
+/// host clock gives wrong admission decisions, and nothing here detects that. Nor is the reading
+/// monotonic: successive calls may go backwards, and the store keeps no high-water mark across
+/// calls or restarts. Trustworthy time (a monotonic floor, trusted time sources) is out of scope.
+///
+/// Implementations must be cheap, must not panic, and must not consult caller-controlled input.
+///
+/// # Failing closed
+///
+/// The reading cannot report an error. A clock that cannot determine the time (for example a host
+/// clock that reads before the epoch) **must return `u64::MAX`**, which refuses every admission,
+/// and **never `0` or any other default**: `0` precedes every `not_after` and so admits every
+/// authorization that would be unexpired at the epoch, which fails open. In particular, do not
+/// implement this as `duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or_default()`.
+pub trait CustodianClockV0: Send + Sync {
+    /// The current time in unix seconds, or `u64::MAX` if it cannot be determined.
+    fn now(&self) -> u64;
+}
+
+/// Error installing a verifier or the clock.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum AdmissionRegistryError {
     #[error("a verifier for this admission policy and version is already installed")]
     Duplicate,
+    #[error("a custodian clock is already installed")]
+    DuplicateClock,
 }
 
-/// The custodian's verifiers, keyed by exact policy and version.
+/// The custodian's verifiers, keyed by exact policy and version, and its admission clock.
 #[derive(Default, Clone)]
 pub struct AdmissionRegistryV0 {
     verifiers: BTreeMap<AdmissionPolicyRefV0, Arc<dyn CustodianAdmissionVerifierV0>>,
+    clock: Option<Arc<dyn CustodianClockV0>>,
 }
 
 impl AdmissionRegistryV0 {
@@ -189,11 +227,29 @@ impl AdmissionRegistryV0 {
         Ok(())
     }
 
+    /// Install the custodian clock that custodian-policy admission reads its time from. A second
+    /// clock is refused rather than silently replacing the first. Without one, every
+    /// [`crate::LocalResourceReservations::reserve_admitted`] call fails closed.
+    pub fn install_clock(
+        &mut self,
+        clock: Arc<dyn CustodianClockV0>,
+    ) -> Result<(), AdmissionRegistryError> {
+        if self.clock.is_some() {
+            return Err(AdmissionRegistryError::DuplicateClock);
+        }
+        self.clock = Some(clock);
+        Ok(())
+    }
+
     pub(crate) fn get(
         &self,
         policy: &AdmissionPolicyRefV0,
     ) -> Option<&Arc<dyn CustodianAdmissionVerifierV0>> {
         self.verifiers.get(policy)
+    }
+
+    pub(crate) fn clock(&self) -> Option<&Arc<dyn CustodianClockV0>> {
+        self.clock.as_ref()
     }
 }
 
@@ -201,6 +257,7 @@ impl std::fmt::Debug for AdmissionRegistryV0 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AdmissionRegistryV0")
             .field("policies", &self.verifiers.keys().collect::<Vec<_>>())
+            .field("clock_installed", &self.clock.is_some())
             .finish()
     }
 }

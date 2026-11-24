@@ -503,9 +503,14 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
         }
     }
 
-    /// Install the custodian's admission verifiers. Takes the store by value: code that only
-    /// holds `&LocalResourceReservations` (every reservation caller) cannot add or swap one.
-    /// Without a verifier for a pool's declared policy, that pool refuses every reservation.
+    /// Install the custodian's admission verifiers and clock
+    /// ([`AdmissionRegistryV0::install_clock`]). Takes the store by value: code that only holds
+    /// `&LocalResourceReservations` (every reservation caller) cannot add or swap either.
+    /// Without a verifier for a pool's declared policy, that pool refuses every reservation;
+    /// without a clock, [`Self::reserve_admitted`] refuses every reservation.
+    ///
+    /// Call this once, with the complete registry: a second call replaces the whole registry,
+    /// verifiers and clock alike, rather than merging into or refusing over the first.
     pub fn with_admission(mut self, registry: AdmissionRegistryV0) -> Self {
         self.admission = registry;
         self
@@ -645,6 +650,9 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
     /// Valid only for pools whose authoritative requirement is `CallerResolved` (every V0 pool,
     /// and V1 pools that declare it explicitly). A pool that declares a custodian admission
     /// policy refuses this call inside the commit transaction, whatever the caller supplies.
+    ///
+    /// `now` is the caller's clock (the V0 contract, unchanged): on this path the caller already
+    /// chooses its own trust inputs, so the custodian clock does not apply.
     pub fn reserve_checkpointed(
         &self,
         evidence: &CheckpointedEvidenceV0,
@@ -660,13 +668,91 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
 
     /// Custodian-policy admission. The pool's stored requirement selects the verifier; the
     /// caller supplies only untrusted evidence and an opaque supplement for that verifier.
+    ///
+    /// **The caller supplies no time.** The admission time is read once from the custodian's
+    /// installed [`crate::CustodianClockV0`] (unix seconds), and that one reading is used for the
+    /// verifier preflight, the store's own expiry re-check and the record's `reserved_at`. Without
+    /// an installed clock this refuses with [`ReservationError::AdmissionUnavailable`] before
+    /// reading the pool, calling a verifier or opening a transaction, so nothing is consumed.
+    ///
+    /// The single reading is taken before verification, which may be slow (log replay). An
+    /// authorization that expires while it is being verified is therefore still judged, and its
+    /// `reserved_at` stamped, at the earlier reading. That is the accepted trade-off for one
+    /// consistent time per call.
+    ///
+    /// The clock's guarantees are the clock's (see [`crate::CustodianClockV0`]): this removes the
+    /// caller's control of admission time, not the host's.
+    ///
+    /// A caller holding `&LocalResourceReservations` reserves with evidence, a supplement and a
+    /// request only (this compiles):
+    ///
+    /// ```
+    /// use std::any::Any;
+    /// use icn_authz::effect_v0::CheckpointedEvidenceV0;
+    /// use icn_authz_store::{LocalResourceReservations, ReservationRequestV0};
+    /// fn reserve(
+    ///     store: &LocalResourceReservations,
+    ///     evidence: &CheckpointedEvidenceV0,
+    ///     supplement: &dyn Any,
+    ///     request: &ReservationRequestV0,
+    /// ) {
+    ///     let _ = store.reserve_admitted(evidence, supplement, request);
+    /// }
+    /// ```
+    ///
+    /// It cannot pass a time (this does not compile):
+    ///
+    /// ```compile_fail
+    /// use std::any::Any;
+    /// use icn_authz::effect_v0::CheckpointedEvidenceV0;
+    /// use icn_authz_store::{LocalResourceReservations, ReservationRequestV0};
+    /// fn reserve(
+    ///     store: &LocalResourceReservations,
+    ///     evidence: &CheckpointedEvidenceV0,
+    ///     supplement: &dyn Any,
+    ///     request: &ReservationRequestV0,
+    /// ) {
+    ///     let _ = store.reserve_admitted(evidence, supplement, 1_000, request);
+    /// }
+    /// ```
+    ///
+    /// and cannot install or replace the clock, which only the by-value owner can do (the owner
+    /// compiles):
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use icn_authz_store::{AdmissionRegistryV0, CustodianClockV0, LocalResourceReservations};
+    /// fn build(store: LocalResourceReservations, clock: Arc<dyn CustodianClockV0>) {
+    ///     let mut registry = AdmissionRegistryV0::new();
+    ///     registry.install_clock(clock).unwrap();
+    ///     let _custodian = store.with_admission(registry);
+    /// }
+    /// ```
+    ///
+    /// while a borrower does not:
+    ///
+    /// ```compile_fail
+    /// use std::sync::Arc;
+    /// use icn_authz_store::{AdmissionRegistryV0, CustodianClockV0, LocalResourceReservations};
+    /// fn build(store: &LocalResourceReservations, clock: Arc<dyn CustodianClockV0>) {
+    ///     let mut registry = AdmissionRegistryV0::new();
+    ///     registry.install_clock(clock).unwrap();
+    ///     let _custodian = store.with_admission(registry);
+    /// }
+    /// ```
     pub fn reserve_admitted(
         &self,
         evidence: &CheckpointedEvidenceV0,
         supplement: &dyn Any,
-        now: u64,
         request: &ReservationRequestV0,
     ) -> Result<ReservationRecordV0, ReservationError> {
+        let now = self
+            .admission
+            .clock()
+            .ok_or_else(|| {
+                ReservationError::AdmissionUnavailable("no custodian clock is installed".into())
+            })?
+            .now();
         request.validate()?;
         let record = self
             .inspect_pool_record(request.context, request.pool_id)?
@@ -1781,5 +1867,168 @@ mod tests {
             registry.install(std::sync::Arc::new(NeverCalled(ADMISSION))),
             Err(crate::AdmissionRegistryError::Duplicate)
         );
+    }
+
+    // ---- Part 8 F1: custodian clock --------------------------------------------------------
+
+    /// A fixed clock that also counts how often it is read.
+    struct FixedClock {
+        at: u64,
+        reads: std::sync::atomic::AtomicUsize,
+    }
+
+    impl FixedClock {
+        fn at(at: u64) -> std::sync::Arc<Self> {
+            std::sync::Arc::new(Self {
+                at,
+                reads: std::sync::atomic::AtomicUsize::new(0),
+            })
+        }
+        fn reads(&self) -> usize {
+            self.reads.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    impl crate::CustodianClockV0 for FixedClock {
+        fn now(&self) -> u64 {
+            self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.at
+        }
+    }
+
+    /// Records the `now` it was handed, then refuses (so nothing is ever committed).
+    struct RecordingVerifier {
+        policy: AdmissionPolicyRefV0,
+        seen: std::sync::Mutex<Vec<u64>>,
+    }
+
+    impl crate::CustodianAdmissionVerifierV0 for RecordingVerifier {
+        fn policy(&self) -> AdmissionPolicyRefV0 {
+            self.policy
+        }
+        fn preflight(
+            &self,
+            _: &CheckpointedEvidenceV0,
+            _: &dyn Any,
+            _: [u8; 32],
+            now: u64,
+        ) -> Result<crate::VerifiedAdmissionV0, crate::AdmissionRefusalV0> {
+            self.seen.lock().unwrap().push(now);
+            Err(crate::AdmissionRefusalV0("recording only".into()))
+        }
+    }
+
+    /// Structurally valid evidence whose authorization claims `not_after`. The verifiers here
+    /// never verify it; it only has to be a value a caller could pass.
+    fn evidence(not_after: u64) -> CheckpointedEvidenceV0 {
+        let key = SigningKey::from_bytes(&[0x87; 32]);
+        let writer = PrincipalKey::try_from_verifying_key(key.verifying_key()).unwrap();
+        let effect = request().effect(TARGET).unwrap();
+        let body = CheckpointedAuthorizationV0 {
+            context: CTX,
+            checkpoint: LogCheckpointV0 {
+                seq: 1,
+                head: [0x88; 32],
+            },
+            subject_matter: effect.commitment(CTX, OP),
+            rule_hash: [0x89; 32],
+            verdict: Verdict::Pass,
+            inputs: Vec::new(),
+            effect,
+            operation_id: OP,
+            not_after,
+        };
+        CheckpointedEvidenceV0 {
+            inception: icn_authz::effect_v0::ContextInceptionV0::new(vec![writer], 1, [0x8A; 32])
+                .unwrap(),
+            log: Vec::new(),
+            authorization: Signed::sign(body, &key),
+            vote_bundles: Vec::new(),
+        }
+    }
+
+    fn policy_store(
+        dir: &tempfile::TempDir,
+        verifier: std::sync::Arc<dyn crate::CustodianAdmissionVerifierV0>,
+        clock: Option<std::sync::Arc<dyn crate::CustodianClockV0>>,
+    ) -> LocalResourceReservations {
+        let mut registry = AdmissionRegistryV0::new();
+        registry.install(verifier).unwrap();
+        if let Some(clock) = clock {
+            registry.install_clock(clock).unwrap();
+        }
+        let store = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_admission(registry);
+        store
+            .initialize_pool_v1(pool_v1(requires(AdmissionGradeV0::Rehearsal)))
+            .unwrap();
+        store
+    }
+
+    fn untouched(store: &LocalResourceReservations) {
+        assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
+        assert!(store.inspect_reservation(CTX, OP).unwrap().is_none());
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(pool_v1(requires(
+                AdmissionGradeV0::Rehearsal
+            ))))
+        );
+    }
+
+    #[test]
+    fn without_a_clock_reserve_admitted_fails_closed_before_any_verifier_or_write() {
+        let dir = tempfile::tempdir().unwrap();
+        // NeverCalled panics if consulted: the refusal must come before the verifier.
+        let store = policy_store(&dir, std::sync::Arc::new(NeverCalled(ADMISSION)), None);
+        for not_after in [0, 1_000, u64::MAX] {
+            assert!(matches!(
+                store.reserve_admitted(&evidence(not_after), &(), &request()),
+                Err(ReservationError::AdmissionUnavailable(_))
+            ));
+        }
+        untouched(&store);
+        // A generic (caller-resolved) V1 pool is refused the same way: no clock, no admitted path.
+        let dir = tempfile::tempdir().unwrap();
+        let generic = v1_store(&dir, AdmissionRequirementV1::CallerResolved);
+        assert!(matches!(
+            generic.reserve_admitted(&evidence(1_000), &(), &request()),
+            Err(ReservationError::AdmissionUnavailable(_))
+        ));
+    }
+
+    #[test]
+    fn the_verifier_is_handed_exactly_the_custodian_clock_whatever_the_caller_supplies() {
+        for at in [0u64, 1_000, 1_700_000_000, u64::MAX] {
+            let dir = tempfile::tempdir().unwrap();
+            let verifier = std::sync::Arc::new(RecordingVerifier {
+                policy: ADMISSION,
+                seen: std::sync::Mutex::new(Vec::new()),
+            });
+            let clock = FixedClock::at(at);
+            let store = policy_store(&dir, verifier.clone(), Some(clock.clone()));
+            // Every caller-controlled input varies; none of them moves the admission time.
+            for (not_after, supplement) in [(0u64, 1u64), (at, at), (u64::MAX, 0)] {
+                assert!(matches!(
+                    store.reserve_admitted(&evidence(not_after), &supplement, &request()),
+                    Err(ReservationError::AdmissionRefused(_))
+                ));
+            }
+            assert_eq!(*verifier.seen.lock().unwrap(), vec![at, at, at]);
+            assert_eq!(clock.reads(), 3, "exactly one clock reading per call");
+            untouched(&store);
+        }
+    }
+
+    #[test]
+    fn registry_refuses_a_second_clock() {
+        let mut registry = AdmissionRegistryV0::new();
+        registry.install_clock(FixedClock::at(1)).unwrap();
+        assert_eq!(
+            registry.install_clock(FixedClock::at(2)),
+            Err(crate::AdmissionRegistryError::DuplicateClock)
+        );
+        assert!(format!("{registry:?}").contains("clock_installed: true"));
     }
 }

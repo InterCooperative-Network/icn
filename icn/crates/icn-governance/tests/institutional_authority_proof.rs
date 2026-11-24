@@ -43,9 +43,9 @@ use icn_authz::effect_v0::{
 };
 use icn_authz_store::{
     AdmissionGradeV0, AdmissionPolicyRefV0, AdmissionRegistryV0, AdmissionRequirementV1,
-    DurabilityBarrier, LocalReservationPolicyV0, LocalResourceReservations, ReservationError,
-    ReservationReconciliation, ReservationRequestV0, ResourcePoolRecord, ResourcePoolV0,
-    ResourcePoolV1,
+    CustodianClockV0, DurabilityBarrier, LocalReservationPolicyV0, LocalResourceReservations,
+    ReservationError, ReservationReconciliation, ReservationRequestV0, ResourcePoolRecord,
+    ResourcePoolV0, ResourcePoolV1,
 };
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::domain::GovernanceDomainId;
@@ -1083,7 +1083,25 @@ fn untouched(target: &LocalResourceReservations, inst: &Institution, op: [u8; 32
 // Mandatory admission at the target (experimental V1 pool + custodian-installed verifier)
 // ---------------------------------------------------------------------------------------------
 
+/// The custodian's admission clock in these tests: a fixed reading in unix seconds (Part 8 F1).
+struct FixedClock(u64);
+
+impl CustodianClockV0 for FixedClock {
+    fn now(&self) -> u64 {
+        self.0
+    }
+}
+
+fn clock_at(now: u64) -> std::sync::Arc<dyn CustodianClockV0> {
+    std::sync::Arc::new(FixedClock(now))
+}
+
 fn registry_for(anchors: &[&InstitutionalTrustAnchorV0]) -> AdmissionRegistryV0 {
+    registry_at(anchors, Some(NOW))
+}
+
+/// The custodian's verifiers for `anchors`, with its clock fixed at `now` (or no clock).
+fn registry_at(anchors: &[&InstitutionalTrustAnchorV0], now: Option<u64>) -> AdmissionRegistryV0 {
     let mut registry = AdmissionRegistryV0::new();
     for anchor in anchors {
         registry
@@ -1091,6 +1109,9 @@ fn registry_for(anchors: &[&InstitutionalTrustAnchorV0]) -> AdmissionRegistryV0 
                 (*anchor).clone(),
             )))
             .unwrap();
+    }
+    if let Some(now) = now {
+        registry.install_clock(clock_at(now)).unwrap();
     }
     registry
 }
@@ -1133,7 +1154,7 @@ fn reserve_admitted(
     let supplement = InstitutionalSupplementV0 {
         recognitions: evidence.recognitions.clone(),
     };
-    target.reserve_admitted(&evidence.authorization, &supplement, NOW, request)
+    target.reserve_admitted(&evidence.authorization, &supplement, request)
 }
 
 fn valid_admission(inst: &Institution) -> (InstitutionalEvidenceV0, ReservationRequestV0) {
@@ -1827,12 +1848,7 @@ fn missing_or_unknown_admission_policy_fails_closed() {
     // A supplement of the wrong type is refused by the verifier, not ignored.
     let (_dir3, target) = policy_target(&inst, &trust, AdmissionGradeV0::Rehearsal);
     assert!(matches!(
-        target.reserve_admitted(
-            &evidence.authorization,
-            &evidence.recognitions,
-            NOW,
-            &request
-        ),
+        target.reserve_admitted(&evidence.authorization, &evidence.recognitions, &request),
         Err(ReservationError::AdmissionRefused(_))
     ));
     untouched(&target, &inst, OP);
@@ -1943,6 +1959,7 @@ fn store_refuses_a_preflight_for_another_target_even_from_its_own_verifier() {
             now: None,
         }))
         .unwrap();
+    registry.install_clock(clock_at(NOW)).unwrap();
     let dir = tempfile::tempdir().unwrap();
     let store = LocalResourceReservations::open(dir.path(), elsewhere)
         .unwrap()
@@ -1960,7 +1977,7 @@ fn store_refuses_a_preflight_for_another_target_even_from_its_own_verifier() {
 }
 
 /// An expired authorization cannot commit even when the installed verifier wrongly evaluates it at
-/// an earlier time: the store checks expiry against its own `now`.
+/// an earlier time: the store checks expiry against the custodian clock's reading itself.
 #[test]
 fn store_refuses_an_expired_authorization_even_from_its_own_verifier() {
     let inst = Institution::new(DOMAIN);
@@ -1976,6 +1993,8 @@ fn store_refuses_an_expired_authorization_even_from_its_own_verifier() {
             now: Some(NOW),
         }))
         .unwrap();
+    // The custodian clock reads one second past expiry; the faulty verifier ignores it.
+    registry.install_clock(clock_at(not_after + 1)).unwrap();
     let dir = tempfile::tempdir().unwrap();
     let store = LocalResourceReservations::open(dir.path(), inst.custodian)
         .unwrap()
@@ -1992,12 +2011,7 @@ fn store_refuses_an_expired_authorization_even_from_its_own_verifier() {
     let supplement = InstitutionalSupplementV0 {
         recognitions: evidence.recognitions.clone(),
     };
-    let result = store.reserve_admitted(
-        &evidence.authorization,
-        &supplement,
-        not_after + 1,
-        &request,
-    );
+    let result = store.reserve_admitted(&evidence.authorization, &supplement, &request);
     assert!(
         matches!(result, Err(ReservationError::InvalidInput(_))),
         "{result:?}"
@@ -2121,4 +2135,234 @@ fn rehearsal_recognition_never_satisfies_a_production_pool() {
         "{result:?}"
     );
     untouched(&target, &inst, OP);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Part 8 F1: custodian-controlled admission time (unix seconds, from the installed clock)
+// ---------------------------------------------------------------------------------------------
+
+/// A custodian store over `dir`, its clock fixed at `now` (or none). Initializes the policy pool
+/// only when `init` is set, so the same directory can be reopened as after a restart.
+fn custodian_store(
+    dir: &std::path::Path,
+    inst: &Institution,
+    anchor: &InstitutionalTrustAnchorV0,
+    now: Option<u64>,
+    init: bool,
+) -> LocalResourceReservations {
+    let store = LocalResourceReservations::open(dir, inst.custodian)
+        .unwrap()
+        .with_admission(registry_at(&[anchor], now));
+    if init {
+        store
+            .initialize_pool_v1(institutional_pool(
+                inst,
+                anchor,
+                AdmissionGradeV0::Rehearsal,
+            ))
+            .unwrap();
+    }
+    store
+}
+
+/// The expiry boundary is judged at the custodian clock: from the earliest time through
+/// `not_after` inclusive it admits, and `reserved_at` is exactly the clock's reading; one second
+/// past `not_after` it refuses and consumes nothing.
+#[test]
+fn custodian_clock_decides_the_expiry_boundary_and_stamps_reserved_at() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    assert_eq!(
+        evidence.authorization.authorization.body.not_after,
+        NOT_AFTER
+    );
+
+    for at in [0, NOW, NOT_AFTER - 1, NOT_AFTER] {
+        let dir = tempfile::tempdir().unwrap();
+        let store = custodian_store(dir.path(), &inst, &trust, Some(at), true);
+        let record = reserve_admitted(&store, &evidence, &request)
+            .unwrap_or_else(|e| panic!("clock {at}: {e:?}"));
+        assert_eq!(record.reserved_at, at, "reserved_at is the clock's reading");
+        assert_eq!(
+            store.inspect_reservation(inst.ctx, OP).unwrap(),
+            Some(record)
+        );
+    }
+
+    for at in [NOT_AFTER + 1, NOT_AFTER + 86_400, u64::MAX] {
+        let dir = tempfile::tempdir().unwrap();
+        let store = custodian_store(dir.path(), &inst, &trust, Some(at), true);
+        let result = reserve_admitted(&store, &evidence, &request);
+        assert!(
+            matches!(result, Err(ReservationError::AdmissionRefused(_))),
+            "clock {at}: {result:?}"
+        );
+        untouched(&store, &inst, OP);
+    }
+}
+
+/// With no clock installed the custodian path refuses valid evidence as unavailable and consumes
+/// nothing, so the same evidence still admits once a clock is installed.
+#[test]
+fn no_custodian_clock_refuses_valid_evidence_without_consuming_it() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    let dir = tempfile::tempdir().unwrap();
+
+    let unclocked = custodian_store(dir.path(), &inst, &trust, None, true);
+    let result = reserve_admitted(&unclocked, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionUnavailable(_))),
+        "{result:?}"
+    );
+    untouched(&unclocked, &inst, OP);
+    drop(unclocked);
+
+    let clocked = custodian_store(dir.path(), &inst, &trust, Some(NOW), false);
+    assert_eq!(
+        reserve_admitted(&clocked, &evidence, &request)
+            .unwrap()
+            .reserved_at,
+        NOW
+    );
+}
+
+/// Admission time is not persisted and survives no restart as a decision: each reopened store
+/// judges by its own installed clock. An expired-clock refusal stays a refusal after restart,
+/// a clockless restart refuses, and a correct clock then admits exactly once.
+#[test]
+fn restart_keeps_custodian_clock_refusals_and_records() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    let dir = tempfile::tempdir().unwrap();
+
+    let expired = custodian_store(dir.path(), &inst, &trust, Some(NOT_AFTER + 1), true);
+    assert!(matches!(
+        reserve_admitted(&expired, &evidence, &request),
+        Err(ReservationError::AdmissionRefused(_))
+    ));
+    drop(expired);
+
+    let reopened = custodian_store(dir.path(), &inst, &trust, Some(NOT_AFTER + 1), false);
+    assert!(matches!(
+        reserve_admitted(&reopened, &evidence, &request),
+        Err(ReservationError::AdmissionRefused(_))
+    ));
+    untouched(&reopened, &inst, OP);
+    drop(reopened);
+
+    let clockless = custodian_store(dir.path(), &inst, &trust, None, false);
+    assert!(matches!(
+        reserve_admitted(&clockless, &evidence, &request),
+        Err(ReservationError::AdmissionUnavailable(_))
+    ));
+    untouched(&clockless, &inst, OP);
+    drop(clockless);
+
+    let valid = custodian_store(dir.path(), &inst, &trust, Some(NOW), false);
+    let record = reserve_admitted(&valid, &evidence, &request).unwrap();
+    assert_eq!(record.reserved_at, NOW);
+    drop(valid);
+
+    // After a restart the committed record is unchanged and the operation is not admitted again,
+    // whatever the new clock reads.
+    for at in [NOW, NOT_AFTER + 1] {
+        let after = custodian_store(dir.path(), &inst, &trust, Some(at), false);
+        let replay = reserve_admitted(&after, &evidence, &request);
+        if at <= NOT_AFTER {
+            // In range: the verifier admits, and the store refuses the already-consumed operation.
+            assert!(
+                matches!(replay, Err(ReservationError::Authorization(_))),
+                "{replay:?}"
+            );
+        } else {
+            // Past expiry: the verifier refuses before the store is consulted.
+            assert!(
+                matches!(replay, Err(ReservationError::AdmissionRefused(_))),
+                "{replay:?}"
+            );
+        }
+        assert_eq!(
+            after.inspect_reservation(inst.ctx, OP).unwrap(),
+            Some(record.clone())
+        );
+        assert_eq!(available(&after, inst.ctx), 10 - 4);
+    }
+}
+
+/// Nothing the caller controls on the custodian path (evidence, supplement, request) moves the
+/// admission time: with the clock past expiry every combination is refused, and with the clock
+/// in range the same valid inputs admit.
+#[test]
+fn caller_inputs_cannot_move_the_custodian_admission_time() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    let supplement = InstitutionalSupplementV0 {
+        recognitions: evidence.recognitions.clone(),
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let expired = custodian_store(dir.path(), &inst, &trust, Some(NOT_AFTER + 1), true);
+    let supplements: [&dyn std::any::Any; 4] = [&supplement, &NOW, &(NOW, NOT_AFTER), &()];
+    for s in supplements {
+        let result = expired.reserve_admitted(&evidence.authorization, s, &request);
+        assert!(
+            matches!(result, Err(ReservationError::AdmissionRefused(_))),
+            "{result:?}"
+        );
+    }
+    untouched(&expired, &inst, OP);
+    drop(expired);
+
+    let in_range = custodian_store(dir.path(), &inst, &trust, Some(NOW), false);
+    assert!(in_range
+        .reserve_admitted(&evidence.authorization, &supplement, &request)
+        .is_ok());
+}
+
+/// A clock that advances one second on every read, starting at `start`, and counts its reads.
+struct SteppingClock {
+    start: u64,
+    reads: std::sync::atomic::AtomicU64,
+}
+
+impl CustodianClockV0 for SteppingClock {
+    fn now(&self) -> u64 {
+        self.start + self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// One reading per call, on the success path too: with a clock that reads `NOT_AFTER` first and
+/// `NOT_AFTER + 1` on any later read, the reservation admits, `reserved_at` is the first reading,
+/// and the clock was read exactly once. A second reading for the verifier, the store's expiry
+/// re-check or `reserved_at` would see an expired or different time.
+#[test]
+fn one_custodian_clock_reading_serves_verifier_expiry_check_and_reserved_at() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    let clock = std::sync::Arc::new(SteppingClock {
+        start: NOT_AFTER,
+        reads: std::sync::atomic::AtomicU64::new(0),
+    });
+    let mut registry = registry_at(&[&trust], None);
+    registry.install_clock(clock.clone()).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let store = LocalResourceReservations::open(dir.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry);
+    store
+        .initialize_pool_v1(institutional_pool(
+            &inst,
+            &trust,
+            AdmissionGradeV0::Rehearsal,
+        ))
+        .unwrap();
+
+    let record = reserve_admitted(&store, &evidence, &request).unwrap();
+    assert_eq!(record.reserved_at, NOT_AFTER);
+    assert_eq!(clock.reads.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
