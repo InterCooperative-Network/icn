@@ -1,0 +1,111 @@
+name: Doctests
+
+# Workspace-wide doctests (`cargo test --doc`). The Test job in ci.yml runs only `--lib` and
+# `--test '*'`, so documentation examples, including `compile_fail` API boundaries, never ran in CI.
+#
+# NOT a required check: branch protection is unchanged, and this workflow adds no trigger to any other
+# workflow. It runs untrusted pull-request code with a read-only token and no secrets
+# (`pull_request`, never `pull_request_target`).
+
+on:
+  pull_request:
+    paths:
+      - "icn/**"
+      - ".github/workflows/doctests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "icn/**"
+      - ".github/workflows/doctests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doctests-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Doctests need no debug info; dropping it keeps the workspace build within runner disk.
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  doctests:
+    name: Workspace doctests
+    timeout-minutes: 120
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      # Record exactly which Rust sources are under test. On a pull request the checkout is the
+      # merge commit; when its icn/ tree equals the base parent's, the run is an exact baseline of
+      # that base commit's Rust code.
+      - name: Record tested sources
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          head=$(git rev-parse HEAD)
+          {
+            echo "### Sources under test"
+            echo "- event: \`${EVENT_NAME}\`, checkout: \`${head}\`"
+            if git rev-parse -q --verify HEAD^2 >/dev/null; then
+              base=$(git rev-parse HEAD^1)
+              if [ "$(git rev-parse HEAD:icn)" = "$(git rev-parse HEAD^1:icn)" ]; then
+                echo "- \`icn/\` is byte-identical to base parent \`${base}\`: this run is an exact baseline of that commit's Rust code."
+              else
+                echo "- \`icn/\` differs from base parent \`${base}\`: this run tests the pull request's Rust changes."
+              fi
+            else
+              echo "- not a merge checkout: \`icn/\` is exactly \`${head}\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+        with:
+          verbose: 'true'
+          aggressive: 'true'
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v1-rust-doctests"
+
+      - name: Run workspace doctests
+        shell: bash
+        working-directory: ./icn
+        run: |
+          set -o pipefail
+          cargo test --workspace --doc --locked --no-fail-fast 2>&1 | tee "$RUNNER_TEMP/doctests.log"
+
+      - name: Summarize doctest results
+        if: always()
+        shell: bash
+        run: |
+          log="$RUNNER_TEMP/doctests.log"
+          [ -f "$log" ] || { echo "No doctest log (the run did not start)." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          {
+            echo "### Doctest results"
+            grep -E '^test result:' "$log" | awk '{p+=$4; f+=$6; i+=$8} END {printf "- %d result lines: %d passed, %d failed, %d ignored\n", NR, p, f, i}'
+            echo "- Doc-test targets: $(grep -c '^   Doc-tests ' "$log")"
+            if grep -qE '^test .* FAILED$' "$log"; then
+              echo "#### Failing doctests"
+              grep -E '^test .* FAILED$' "$log" | sed 's/^/- /'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          df -h / >> "$GITHUB_STEP_SUMMARY"
