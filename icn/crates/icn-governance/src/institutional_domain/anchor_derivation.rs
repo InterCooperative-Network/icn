@@ -8,11 +8,13 @@
 //!   its own configuration. Nothing checks that assertion. It is unchanged by this module, keeps
 //!   its V0 meaning, and is never converted into a [`BindingDerivedAnchorV1`].
 //! - [`BindingDerivedAnchorV1`] is minted **only** by [`BindingDerivedAnchorV1::from_binding`],
-//!   which re-verifies the stored binding against the context's own founding evidence. Its field
-//!   is private and there is no other constructor, no `From` conversion and no `Default`, so a
-//!   configured anchor cannot be presented as a derived one.
+//!   which checks that a binding, a V1 inception and a founder-signed genesis are **mutually
+//!   consistent**. Its fields are private and there is no other constructor, no `From`
+//!   conversion and no `Default`, so a configured anchor cannot be presented as a derived one.
 //!
-//! A consumer that requires record-derived provenance takes `&BindingDerivedAnchorV1`, and passes
+//! The derived type is **binding-consistent, not provenance-verified** (see "Founder identity is
+//! self-certified" below). Until the bundle verifier (P6) exists, nothing may treat a
+//! `&BindingDerivedAnchorV1` as stronger institutional authority than a configured anchor. Pass
 //! [`BindingDerivedAnchorV1::anchor`] to the existing admission machinery
 //! ([`crate::institutional_admission`]), which is unchanged.
 //!
@@ -39,6 +41,14 @@
 //!
 //! # What it does NOT establish (read before citing)
 //!
+//! - **Founder identity is self-certified.** The founder set is whatever the inception says.
+//!   Anyone can generate keys, found a context whose inception commits to
+//!   `served_domain_commitment(D)`, sign its genesis, and build a matching binding (the binding
+//!   constructor is public, and a raw-store holder can store one). `from_binding` **accepts** such
+//!   a fully self-consistent rogue triple; this is pinned by the LIMIT test
+//!   `limit_a_fully_rogue_consistent_triple_is_accepted`. What it refuses is *inconsistency*:
+//!   a binding, inception and genesis that do not all name the same `D`, `C` and genesis. The
+//!   trust root is therefore still whoever chooses the evidence, as for a configured anchor.
 //! - **The binding's basis.** Neither a `PredecessorCutover` nor a `DeclaredGenesis` basis is
 //!   verified here: the predecessor's consent, the seal and the declaration decision are the
 //!   bundle verifier's job (P6). A derived anchor shows that the stored record, the inception and
@@ -109,9 +119,10 @@ pub enum AnchorDerivationError {
     Anchor(TrustAnchorError),
 }
 
-/// An institutional trust anchor whose domain→context binding was re-verified against the
-/// context's inception and founder-signed genesis. See the module docs for exactly what that
-/// does and does not establish.
+/// An institutional trust anchor whose domain→context binding is consistent with the context's
+/// V1 inception and founder-signed genesis. **Not provenance-verified**: founder identity is
+/// self-certified (see the module docs), so this is no stronger than a configured anchor until
+/// P6 verifies the binding's basis.
 ///
 /// The only constructor is [`Self::from_binding`]. A dependent crate can neither build one by
 /// struct literal nor convert a configured anchor into one:
@@ -151,8 +162,8 @@ impl BindingDerivedAnchorV1 {
     /// `genesis`, with the relying party's own frontier, rules and recognition requirement.
     ///
     /// `binding` normally comes from the app layer's typed store read; it is treated as an
-    /// untrusted record and re-verified. `inception` and `genesis` are founding evidence; they
-    /// are verified, not trusted.
+    /// untrusted record and checked for consistency. `inception` and `genesis` are checked against
+    /// it and against each other; the founders themselves are not authenticated (module docs).
     pub fn from_binding(
         binding: &InstitutionalAuthorityBindingV1,
         inception: &ContextInception,

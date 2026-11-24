@@ -963,15 +963,23 @@ fn missing_or_invalid_founder_evidence_is_refused() {
     let outsider =
         SignedLogEntryV0::genesis(body.clone(), &[&inst.founders[0], &key(0x99)]).unwrap();
     let unsigned = SignedLogEntryV0::genesis(body.clone(), &[]).unwrap();
-    for genesis in [&below, &outsider, &unsigned] {
+    for genesis in [&below, &unsigned] {
         assert!(
             matches!(
                 derive_with(&b, &v1(&inst), genesis, 2, None),
-                Err(AnchorDerivationError::InvalidGenesis(_))
+                Err(AnchorDerivationError::InvalidGenesis(
+                    LogRefusal::FounderQuorumNotMet { .. }
+                ))
             ),
             "founder evidence below quorum must be refused"
         );
     }
+    assert_eq!(
+        derive_with(&b, &v1(&inst), &outsider, 2, None),
+        Err(AnchorDerivationError::InvalidGenesis(
+            LogRefusal::NotAFounder
+        ))
+    );
 
     let foreign = Institution::new(FOREIGN_DOMAIN);
     assert!(matches!(
@@ -1152,5 +1160,56 @@ fn corrupted_binding_bytes_never_derive_an_anchor() {
     assert!(
         decoded_but_refused > 0,
         "the property must not pass vacuously"
+    );
+}
+
+/// LIMIT (security review F1, pinned so nobody reads more into the type than it gives): founder
+/// identity is self-certified. An attacker who mints keys, founds a context committing to DOMAIN,
+/// signs its genesis and builds a matching binding gets a derived anchor. Consistency is checked;
+/// provenance is not (that is P6). The rogue anchor is for a DIFFERENT context than the honest
+/// one, so it never admits the honest institution's evidence, and vice versa.
+#[test]
+fn limit_a_fully_rogue_consistent_triple_is_accepted() {
+    let honest = Institution::new(DOMAIN);
+    let rogue_founders = [key(0xE1), key(0xE2), key(0xE3)];
+    let rogue_inception = ContextInceptionV1::new(
+        rogue_founders.iter().map(pk).collect(),
+        2,
+        [0x1b; 32],
+        served_domain_commitment(&dom(DOMAIN)).unwrap(),
+    )
+    .unwrap();
+    let ctx = rogue_inception.context_ref();
+    let body = LogEntryV0 {
+        context: ctx,
+        seq: 1,
+        prev: ctx.0,
+        transition: TransitionV0::Genesis {
+            writer: pk(&key(0xE9)),
+            transition_rule: strict().rule_hash(),
+            effect_rule: strict().rule_hash(),
+            standing: vec![],
+        },
+    };
+    let genesis =
+        SignedLogEntryV0::genesis(body, &[&rogue_founders[0], &rogue_founders[1]]).unwrap();
+    let forged =
+        InstitutionalAuthorityBindingV1::new(dom(DOMAIN), ctx, genesis.body.head(), basis())
+            .unwrap();
+    let rogue = derive_with(
+        &forged,
+        &ContextInception::V1(rogue_inception),
+        &genesis,
+        2,
+        None,
+    )
+    .expect("LIMIT: a self-consistent rogue triple is accepted; provenance is P6's job");
+    assert_eq!(rogue.domain(), &dom(DOMAIN));
+    assert_ne!(rogue.context(), honest.ctx);
+    // The rogue anchor does not admit the honest institution's evidence.
+    let (evidence, _) = valid_admission(&honest);
+    assert_eq!(
+        verify_institutional_authorization(rogue.anchor(), &evidence),
+        Err(InstitutionalRefusal::UntrustedContext)
     );
 }

@@ -17,7 +17,10 @@
 //!   [`StoredAnchorError::Derivation`].
 //!
 //! The stored record alone never yields an anchor: the inception and the founder-signed genesis
-//! are always re-verified against it.
+//! are always checked against it. That is a **consistency** check, not provenance: founder
+//! identity is self-certified, so a raw-store holder who also supplies a matching self-founded
+//! inception and genesis gets an anchor (see `anchor_derivation`'s module docs and the pinned
+//! LIMIT test). Legitimacy needs the bundle verifier (P6).
 
 use std::fmt;
 

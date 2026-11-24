@@ -57,7 +57,11 @@ struct Founded {
 }
 
 fn found(domain: &str) -> Founded {
-    let founders = [key(0xF1), key(0xF2), key(0xF3)];
+    found_by(domain, [0xF1, 0xF2, 0xF3])
+}
+
+fn found_by(domain: &str, seeds: [u8; 3]) -> Founded {
+    let founders = seeds.map(key);
     let v1 = ContextInceptionV1::new(
         founders.iter().map(pk).collect(),
         2,
@@ -210,4 +214,17 @@ fn an_unbindable_domain_id_is_refused() {
             AuthorityBindingError::InvalidDomain(_)
         ))
     ));
+}
+
+/// LIMIT (security review F1): a raw-store holder who ALSO supplies a matching self-founded
+/// inception and genesis gets an anchor for D. The store read is a consistency check, not
+/// provenance; legitimacy needs P6.
+#[test]
+fn limit_a_raw_store_holder_with_matching_rogue_evidence_gets_an_anchor() {
+    let (raw, typed) = fixture();
+    let rogue = found_by(D, [0xE1, 0xE2, 0xE3]);
+    raw_put(&raw, D, &binding_for(D, &rogue).encode());
+    let derived = derive_anchor_from_store(&typed, &GovernanceDomainId::new(D), input(&rogue))
+        .expect("LIMIT: consistency, not provenance");
+    assert_ne!(derived.context(), found(D).ctx);
 }
