@@ -97,12 +97,16 @@ jobs:
         if: always()
         shell: bash
         run: |
-          log="$RUNNER_TEMP/doctests.log"
-          [ -f "$log" ] || { echo "No doctest log (the run did not start)." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          raw="$RUNNER_TEMP/doctests.log"
+          [ -f "$raw" ] || { echo "No doctest log (the run did not start)." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          # CARGO_TERM_COLOR=always wraps cargo's status words in ANSI codes; strip them before counting.
+          log="$RUNNER_TEMP/doctests.plain.log"
+          sed 's/\x1b\[[0-9;]*m//g' "$raw" > "$log"
           {
             echo "### Doctest results"
-            grep -E '^test result:' "$log" | awk '{p+=$4; f+=$6; i+=$8} END {printf "- %d result lines: %d passed, %d failed, %d ignored\n", NR, p, f, i}'
-            echo "- Doc-test targets: $(grep -c '^   Doc-tests ' "$log")"
+            grep -E '^test result: (ok|FAILED)\. [0-9]+ passed' "$log" | sed -E 's/^test result: //' \
+              | awk '{p+=$2; f+=$4; i+=$6; x+=$10} END {printf "- %d result lines: %d passed, %d failed, %d ignored, %d filtered out\n", NR, p, f, i, x}'
+            echo "- Doc-test targets: $(grep -cE '^ *Doc-tests [A-Za-z0-9_]+' "$log")"
             if grep -qE '^test .* FAILED$' "$log"; then
               echo "#### Failing doctests"
               grep -E '^test .* FAILED$' "$log" | sed 's/^/- /'
