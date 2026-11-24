@@ -58,8 +58,8 @@ pub use admission::{
 };
 pub use reservation::{
     pool_key, reservation_key, DurabilityBarrier, LocalReservationPolicyV0,
-    LocalResourceReservations, ReservationError, ReservationReconciliation, ReservationRecordV0,
-    ReservationRequestV0, ResourcePoolRecord, ResourcePoolV0, ResourcePoolV1,
+    LocalResourceReservations, PoolAdminV0, ReservationError, ReservationReconciliation,
+    ReservationRecordV0, ReservationRequestV0, ResourcePoolRecord, ResourcePoolV0, ResourcePoolV1,
     SledDurabilityBarrier, POOL_KEY_PREFIX, RESERVATION_ACTION, RESERVATION_KEY_PREFIX,
 };
 
