@@ -182,14 +182,20 @@ pub trait CustodianAdmissionVerifierV0: Send + Sync {
 ///
 /// # Failing closed
 ///
-/// The reading cannot report an error. A clock that cannot determine the time (for example a host
-/// clock that reads before the epoch) **must return `u64::MAX`**, which refuses every admission,
-/// and **never `0` or any other default**: `0` precedes every `not_after` and so admits every
-/// authorization that would be unexpired at the epoch, which fails open. In particular, do not
-/// implement this as `duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or_default()`.
+/// A clock that cannot determine the time (for example a host clock that reads before the epoch)
+/// returns **`None`**. [`crate::LocalResourceReservations::reserve_admitted`] then refuses with
+/// [`crate::ReservationError::AdmissionUnavailable`] before reading the pool, calling a verifier
+/// or opening a transaction, so nothing is consumed, whatever the evidence's `not_after`.
+///
+/// `None` is the only failure signal. Every `Some(t)` is judged as a real time `t`: `Some(0)` is
+/// the epoch (it admits any authorization not yet expired then), and `Some(u64::MAX)` is the far
+/// future (it refuses every authorization except one whose `not_after` is itself `u64::MAX`). So
+/// never map a failure to a substitute reading, such as `unwrap_or_default()` (`Some(0)`, which
+/// fails open). The direct host form is already correct:
+/// `SystemTime::now().duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs())`.
 pub trait CustodianClockV0: Send + Sync {
-    /// The current time in unix seconds, or `u64::MAX` if it cannot be determined.
-    fn now(&self) -> u64;
+    /// The current time in unix seconds, or `None` if it cannot be determined.
+    fn now(&self) -> Option<u64>;
 }
 
 /// Error installing a verifier or the clock.

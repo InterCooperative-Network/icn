@@ -1087,8 +1087,8 @@ fn untouched(target: &LocalResourceReservations, inst: &Institution, op: [u8; 32
 struct FixedClock(u64);
 
 impl CustodianClockV0 for FixedClock {
-    fn now(&self) -> u64 {
-        self.0
+    fn now(&self) -> Option<u64> {
+        Some(self.0)
     }
 }
 
@@ -2330,8 +2330,8 @@ struct SteppingClock {
 }
 
 impl CustodianClockV0 for SteppingClock {
-    fn now(&self) -> u64 {
-        self.start + self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    fn now(&self) -> Option<u64> {
+        Some(self.start + self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
     }
 }
 
@@ -2365,4 +2365,105 @@ fn one_custodian_clock_reading_serves_verifier_expiry_check_and_reserved_at() {
     let record = reserve_admitted(&store, &evidence, &request).unwrap();
     assert_eq!(record.reserved_at, NOT_AFTER);
     assert_eq!(clock.reads.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+/// A clock that cannot determine the time (`None`), counting its reads.
+#[derive(Default)]
+struct UnavailableClock {
+    reads: std::sync::atomic::AtomicU64,
+}
+
+impl CustodianClockV0 for UnavailableClock {
+    fn now(&self) -> Option<u64> {
+        self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        None
+    }
+}
+
+/// The valid admission, its authorization re-signed by the writer with `not_after` replaced. The
+/// votes bind the effect commitment, not `not_after`, so the evidence stays otherwise valid.
+fn valid_admission_until(
+    inst: &Institution,
+    not_after: u64,
+) -> (InstitutionalEvidenceV0, ReservationRequestV0) {
+    let (mut evidence, request) = valid_admission(inst);
+    let mut body = evidence.authorization.authorization.body.clone();
+    body.not_after = not_after;
+    evidence.authorization.authorization = sign_checkpointed_authorization(body, &inst.writer);
+    (evidence, request)
+}
+
+/// A clock that cannot read the time refuses as unavailable, for ordinary evidence and for
+/// evidence that never expires (`not_after = u64::MAX`, which the old `u64::MAX` failure sentinel
+/// admitted), reads once per call, and consumes nothing: no record, consumed entry or capacity,
+/// so the same evidence still admits once the store is reopened with a real reading.
+#[test]
+fn unavailable_custodian_time_refuses_any_expiry_without_consuming() {
+    let inst = Institution::new(DOMAIN);
+    let trust = inst.trust(2, None);
+    for not_after in [NOT_AFTER, u64::MAX] {
+        let (evidence, request) = valid_admission_until(&inst, not_after);
+        assert_eq!(
+            evidence.authorization.authorization.body.not_after,
+            not_after
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let clock = std::sync::Arc::new(UnavailableClock::default());
+        let mut registry = registry_at(&[&trust], None);
+        registry.install_clock(clock.clone()).unwrap();
+        let store = LocalResourceReservations::open(dir.path(), inst.custodian)
+            .unwrap()
+            .with_admission(registry);
+        store
+            .initialize_pool_v1(institutional_pool(
+                &inst,
+                &trust,
+                AdmissionGradeV0::Rehearsal,
+            ))
+            .unwrap();
+
+        for call in 1..=2 {
+            let result = reserve_admitted(&store, &evidence, &request);
+            assert!(
+                matches!(result, Err(ReservationError::AdmissionUnavailable(_))),
+                "not_after {not_after}: {result:?}"
+            );
+            assert_eq!(
+                clock.reads.load(std::sync::atomic::Ordering::SeqCst),
+                call,
+                "exactly one clock reading per call"
+            );
+            untouched(&store, &inst, OP);
+        }
+        drop(store);
+
+        let clocked = custodian_store(dir.path(), &inst, &trust, Some(NOW), false);
+        assert_eq!(
+            reserve_admitted(&clocked, &evidence, &request)
+                .unwrap()
+                .reserved_at,
+            NOW
+        );
+    }
+}
+
+/// Evidence that never expires (`not_after = u64::MAX`) admits at every real reading, `0` and
+/// `u64::MAX` included, and `reserved_at` is that reading. Every `Some` is a time, never a
+/// failure signal.
+#[test]
+fn a_real_reading_admits_never_expiring_evidence_and_stamps_that_reading() {
+    let inst = Institution::new(DOMAIN);
+    let trust = inst.trust(2, None);
+    let (evidence, request) = valid_admission_until(&inst, u64::MAX);
+    for at in [0, NOW, NOT_AFTER + 1, u64::MAX - 1, u64::MAX] {
+        let dir = tempfile::tempdir().unwrap();
+        let store = custodian_store(dir.path(), &inst, &trust, Some(at), true);
+        let record = reserve_admitted(&store, &evidence, &request)
+            .unwrap_or_else(|e| panic!("clock {at}: {e:?}"));
+        assert_eq!(record.reserved_at, at, "reserved_at is the clock's reading");
+        assert_eq!(
+            store.inspect_reservation(inst.ctx, OP).unwrap(),
+            Some(record)
+        );
+    }
 }

@@ -672,8 +672,9 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
     /// **The caller supplies no time.** The admission time is read once from the custodian's
     /// installed [`crate::CustodianClockV0`] (unix seconds), and that one reading is used for the
     /// verifier preflight, the store's own expiry re-check and the record's `reserved_at`. Without
-    /// an installed clock this refuses with [`ReservationError::AdmissionUnavailable`] before
-    /// reading the pool, calling a verifier or opening a transaction, so nothing is consumed.
+    /// an installed clock, or when the clock reports that it cannot determine the time (`None`),
+    /// this refuses with [`ReservationError::AdmissionUnavailable`] before reading the pool,
+    /// calling a verifier or opening a transaction, so nothing is consumed.
     ///
     /// The single reading is taken before verification, which may be slow (log replay). An
     /// authorization that expires while it is being verified is therefore still judged, and its
@@ -746,13 +747,19 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
         supplement: &dyn Any,
         request: &ReservationRequestV0,
     ) -> Result<ReservationRecordV0, ReservationError> {
+        // The single reading of admission time for this call (Part 8 F1).
         let now = self
             .admission
             .clock()
             .ok_or_else(|| {
                 ReservationError::AdmissionUnavailable("no custodian clock is installed".into())
             })?
-            .now();
+            .now()
+            .ok_or_else(|| {
+                ReservationError::AdmissionUnavailable(
+                    "the custodian clock cannot determine the time".into(),
+                )
+            })?;
         request.validate()?;
         let record = self
             .inspect_pool_record(request.context, request.pool_id)?
@@ -1871,14 +1878,20 @@ mod tests {
 
     // ---- Part 8 F1: custodian clock --------------------------------------------------------
 
-    /// A fixed clock that also counts how often it is read.
+    /// A fixed clock (a reading, or unavailable time) that also counts how often it is read.
     struct FixedClock {
-        at: u64,
+        at: Option<u64>,
         reads: std::sync::atomic::AtomicUsize,
     }
 
     impl FixedClock {
         fn at(at: u64) -> std::sync::Arc<Self> {
+            Self::reading(Some(at))
+        }
+        fn unavailable() -> std::sync::Arc<Self> {
+            Self::reading(None)
+        }
+        fn reading(at: Option<u64>) -> std::sync::Arc<Self> {
             std::sync::Arc::new(Self {
                 at,
                 reads: std::sync::atomic::AtomicUsize::new(0),
@@ -1890,7 +1903,7 @@ mod tests {
     }
 
     impl crate::CustodianClockV0 for FixedClock {
-        fn now(&self) -> u64 {
+        fn now(&self) -> Option<u64> {
             self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             self.at
         }
@@ -1996,6 +2009,58 @@ mod tests {
             generic.reserve_admitted(&evidence(1_000), &(), &request()),
             Err(ReservationError::AdmissionUnavailable(_))
         ));
+    }
+
+    #[test]
+    fn an_unavailable_clock_fails_closed_before_any_verifier_or_write_whatever_not_after() {
+        let dir = tempfile::tempdir().unwrap();
+        let clock = FixedClock::unavailable();
+        // NeverCalled panics if consulted: the refusal must come before the verifier. Including
+        // `not_after = u64::MAX`, which no substitute reading (`0` or `u64::MAX`) would refuse.
+        let store = policy_store(
+            &dir,
+            std::sync::Arc::new(NeverCalled(ADMISSION)),
+            Some(clock.clone()),
+        );
+        for not_after in [0, 1_000, u64::MAX] {
+            assert!(matches!(
+                store.reserve_admitted(&evidence(not_after), &(), &request()),
+                Err(ReservationError::AdmissionUnavailable(_))
+            ));
+        }
+        assert_eq!(clock.reads(), 3, "exactly one clock reading per call");
+        untouched(&store);
+    }
+
+    #[test]
+    fn zero_is_a_reading_and_unavailable_time_is_not() {
+        // `Some(0)` is the epoch: it reaches the verifier as time 0.
+        let dir = tempfile::tempdir().unwrap();
+        let verifier = std::sync::Arc::new(RecordingVerifier {
+            policy: ADMISSION,
+            seen: std::sync::Mutex::new(Vec::new()),
+        });
+        let store = policy_store(&dir, verifier.clone(), Some(FixedClock::at(0)));
+        assert!(matches!(
+            store.reserve_admitted(&evidence(1_000), &(), &request()),
+            Err(ReservationError::AdmissionRefused(_))
+        ));
+        assert_eq!(*verifier.seen.lock().unwrap(), vec![0]);
+        untouched(&store);
+
+        // `None` never reaches it: unavailable, not "time 0".
+        let dir = tempfile::tempdir().unwrap();
+        let verifier = std::sync::Arc::new(RecordingVerifier {
+            policy: ADMISSION,
+            seen: std::sync::Mutex::new(Vec::new()),
+        });
+        let store = policy_store(&dir, verifier.clone(), Some(FixedClock::unavailable()));
+        assert!(matches!(
+            store.reserve_admitted(&evidence(1_000), &(), &request()),
+            Err(ReservationError::AdmissionUnavailable(_))
+        ));
+        assert!(verifier.seen.lock().unwrap().is_empty());
+        untouched(&store);
     }
 
     #[test]
