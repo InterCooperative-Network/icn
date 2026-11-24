@@ -37,6 +37,7 @@ pub mod grant_minting;
 pub mod handlers;
 pub mod http;
 pub mod init;
+pub mod institutional_authority_store;
 pub mod institutional_effect;
 pub mod manager;
 pub mod mandate_gate;
