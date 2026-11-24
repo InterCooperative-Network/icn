@@ -305,6 +305,12 @@ const NOT_REGISTERED: &[(&str, &str, &str)] = &[
          domain (ContextRef), and nothing signs it",
     ),
     (
+        "icn.authz.v1.inception",
+        "icn/crates/icn-authz/src/effect_v0/statements.rs",
+        "never leads a preimage: the V1 inception is hashed only after the `icn.authz.v0.context` \
+         domain (ContextRef), and nothing signs it (same as `icn.authz.v0.inception`)",
+    ),
+    (
         "icn.authz.v0.evidence",
         "icn/crates/icn-authz/src/effect_v0/statements.rs",
         "transport container only: evidence bytes are decoded, never hashed or signed; each \
@@ -453,6 +459,7 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.gen.subject-context", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.gen.subject-context-ref", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.governance.institutional-admission-policy.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/institutional_admission.rs"]),
+    d(b"icn.governance.served-domain.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/domain.rs"]),
     d(b"icn.governance.threshold-rule.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/authz_threshold.rs"]),
     d(b"icn.n1.authority-receipt.decisions.v1\0", Sha256, Raw, Production, &["icn/crates/icn-core/src/authority_registry.rs"]),
     // `segment_id` hashes the segment; nothing signs it (ADR-0089 §3).

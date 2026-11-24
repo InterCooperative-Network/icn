@@ -365,7 +365,7 @@ impl Institution {
             not_after: NOT_AFTER,
         };
         CheckpointedEvidenceV0 {
-            inception: self.inception.clone(),
+            inception: self.inception.clone().into(),
             log: log.to_vec(),
             authorization: sign_checkpointed_authorization(body, &self.writer),
             vote_bundles,
@@ -557,7 +557,7 @@ fn independent_verify(
         .map_err(|_| IndependentRefusal::Decode("vote bundle"))?;
     let evidence = InstitutionalEvidenceV0 {
         authorization: CheckpointedEvidenceV0 {
-            inception,
+            inception: inception.into(),
             log,
             authorization,
             vote_bundles,
