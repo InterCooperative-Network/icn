@@ -21,6 +21,36 @@ pub enum TaskStatus {
     Cancelled { cancelled_at: u64, reason: String },
 }
 
+/// The final states of a task. Once a task reaches one, its status never changes again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerminalState {
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+impl std::fmt::Display for TerminalState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            TerminalState::Completed => "completed",
+            TerminalState::Failed => "failed",
+            TerminalState::Cancelled => "cancelled",
+        })
+    }
+}
+
+impl TaskStatus {
+    /// The terminal state this status is in, or `None` while the task is still open.
+    pub fn terminal_state(&self) -> Option<TerminalState> {
+        match self {
+            TaskStatus::Pending | TaskStatus::Claimed { .. } => None,
+            TaskStatus::Completed { .. } => Some(TerminalState::Completed),
+            TaskStatus::Failed { .. } => Some(TerminalState::Failed),
+            TaskStatus::Cancelled { .. } => Some(TerminalState::Cancelled),
+        }
+    }
+}
+
 /// Manages task lifecycle
 pub struct TaskManager {
     /// Tasks by hash
@@ -41,13 +71,22 @@ impl TaskManager {
         }
     }
 
-    /// Submit a new task
+    /// Submit a new task.
+    ///
+    /// A hash this manager already holds, in any state, is refused with
+    /// [`ComputeError::DuplicateTask`] and nothing changes: a resubmission can neither reset a
+    /// claimed task nor reopen a terminal one (EX-019).
     pub fn submit(&mut self, task: ComputeTask) -> Result<TaskHash, ComputeError> {
+        let hash = task.hash();
+        if self.tasks.contains_key(&hash) {
+            return Err(ComputeError::DuplicateTask {
+                task: hex::encode(hash),
+            });
+        }
         if self.pending_count() >= self.max_pending {
             return Err(ComputeError::Internal("too many pending tasks".into()));
         }
 
-        let hash = task.hash();
         self.tasks.insert(hash, task);
         self.status.insert(hash, TaskStatus::Pending);
         Ok(hash)
@@ -63,8 +102,13 @@ impl TaskManager {
         self.status.get(hash)
     }
 
-    /// Claim a task for execution
+    /// Claim a task for execution.
+    ///
+    /// Only a `Pending` task can be claimed. The refusals are typed so a caller can tell
+    /// them apart: `TaskNotFound` (unknown task), `TaskAlreadyClaimed` (duplicate claim),
+    /// `TaskTerminal` (completed, failed or cancelled). A refusal changes nothing.
     pub fn claim(&mut self, hash: &TaskHash, executor: String) -> Result<(), ComputeError> {
+        self.ensure_open(hash)?;
         let status = self
             .status
             .get(hash)
@@ -88,16 +132,33 @@ impl TaskManager {
             TaskStatus::Claimed { executor: e, .. } => {
                 Err(ComputeError::TaskAlreadyClaimed(e.clone()))
             }
+            // Unreachable after `ensure_open`; kept fail-closed rather than panicking.
             _ => Err(ComputeError::Internal("task not in pending state".into())),
         }
     }
 
-    /// Record task completion
+    /// Refuse a transition out of a terminal state with [`ComputeError::TaskTerminal`].
+    fn ensure_open(&self, hash: &TaskHash) -> Result<(), ComputeError> {
+        match self.status.get(hash).and_then(TaskStatus::terminal_state) {
+            Some(state) => Err(ComputeError::TaskTerminal {
+                task: hex::encode(hash),
+                state,
+            }),
+            None => Ok(()),
+        }
+    }
+
+    /// Record task completion.
+    ///
+    /// Only an open (pending or claimed) task completes. A completed, failed or cancelled task
+    /// is final: the result is refused with [`ComputeError::TaskTerminal`] and the stored status,
+    /// including an accepted result, is unchanged (EX-019).
     pub fn complete(&mut self, result: ComputeResult) -> Result<(), ComputeError> {
         let hash = result.task_hash;
         if !self.tasks.contains_key(&hash) {
             return Err(ComputeError::TaskNotFound(hex::encode(hash)));
         }
+        self.ensure_open(&hash)?;
         self.status.insert(
             hash,
             TaskStatus::Completed {
@@ -107,11 +168,15 @@ impl TaskManager {
         Ok(())
     }
 
-    /// Mark task as failed
+    /// Mark task as failed.
+    ///
+    /// Like [`TaskManager::complete`], refuses a terminal task with
+    /// [`ComputeError::TaskTerminal`] and changes nothing (EX-019).
     pub fn fail(&mut self, hash: &TaskHash, reason: String) -> Result<(), ComputeError> {
         if !self.tasks.contains_key(hash) {
             return Err(ComputeError::TaskNotFound(hex::encode(hash)));
         }
+        self.ensure_open(hash)?;
         self.status.insert(*hash, TaskStatus::Failed { reason });
         Ok(())
     }
@@ -455,6 +520,231 @@ mod tests {
 
         let result = mgr.cancel(&fake_hash, "did:icn:alice", "No such task".into());
         assert!(matches!(result, Err(ComputeError::TaskNotFound(_))));
+    }
+
+    // ── EX-019: terminal states are final, a duplicate submission changes nothing ──────────
+
+    fn result_by(
+        hash: TaskHash,
+        executor: &str,
+        outcome: ExecutionOutcome,
+        fuel: u64,
+    ) -> ComputeResult {
+        ComputeResult {
+            task_hash: hash,
+            task_id: "task-1".into(),
+            executor: executor.into(),
+            outcome,
+            fuel_used: fuel,
+            duration_ms: 50,
+            completed_at: 2000,
+            signature: vec![],
+        }
+    }
+
+    /// One manager per state: Pending, Claimed, and each terminal state reached through the
+    /// manager's own transitions.
+    fn manager_in(state: &str) -> (TaskManager, TaskHash) {
+        let mut mgr = TaskManager::new(100);
+        let hash = mgr.submit(make_task("task-1")).unwrap();
+        match state {
+            "pending" => {}
+            "claimed" => mgr.claim(&hash, "did:icn:bob".into()).unwrap(),
+            "completed" => mgr
+                .complete(result_by(
+                    hash,
+                    "did:icn:bob",
+                    ExecutionOutcome::Success(vec![42]),
+                    100,
+                ))
+                .unwrap(),
+            "failed" => mgr.fail(&hash, "Deadline exceeded".into()).unwrap(),
+            "cancelled" => mgr.cancel(&hash, "did:icn:alice", "stop".into()).unwrap(),
+            other => panic!("unknown fixture state {other}"),
+        }
+        (mgr, hash)
+    }
+
+    const TERMINAL: [(&str, TerminalState); 3] = [
+        ("completed", TerminalState::Completed),
+        ("failed", TerminalState::Failed),
+        ("cancelled", TerminalState::Cancelled),
+    ];
+
+    #[test]
+    fn complete_refuses_every_terminal_state_and_changes_nothing() {
+        for (name, terminal) in TERMINAL {
+            // An identical replay, another executor, another outcome, another fuel figure.
+            let late = [
+                result_by(
+                    [0; 32],
+                    "did:icn:bob",
+                    ExecutionOutcome::Success(vec![42]),
+                    100,
+                ),
+                result_by(
+                    [0; 32],
+                    "did:icn:mallory",
+                    ExecutionOutcome::Success(vec![42]),
+                    100,
+                ),
+                result_by(
+                    [0; 32],
+                    "did:icn:bob",
+                    ExecutionOutcome::Failed("late".into()),
+                    100,
+                ),
+                result_by(
+                    [0; 32],
+                    "did:icn:bob",
+                    ExecutionOutcome::Success(vec![42]),
+                    90_000,
+                ),
+            ];
+            for mut result in late {
+                let (mut mgr, hash) = manager_in(name);
+                result.task_hash = hash;
+                let before = mgr.status(&hash).cloned();
+
+                let refused = mgr.complete(result);
+
+                assert!(
+                    matches!(
+                        &refused,
+                        Err(ComputeError::TaskTerminal { state, .. }) if *state == terminal
+                    ),
+                    "{name}: expected TaskTerminal({terminal:?}), got {refused:?}"
+                );
+                assert_eq!(mgr.status(&hash).cloned(), before, "{name}: status changed");
+            }
+        }
+    }
+
+    #[test]
+    fn fail_refuses_every_terminal_state_and_changes_nothing() {
+        for (name, terminal) in TERMINAL {
+            let (mut mgr, hash) = manager_in(name);
+            let before = mgr.status(&hash).cloned();
+
+            let refused = mgr.fail(&hash, "Deadline exceeded".into());
+
+            assert!(
+                matches!(
+                    &refused,
+                    Err(ComputeError::TaskTerminal { state, .. }) if *state == terminal
+                ),
+                "{name}: expected TaskTerminal({terminal:?}), got {refused:?}"
+            );
+            assert_eq!(mgr.status(&hash).cloned(), before, "{name}: status changed");
+        }
+    }
+
+    /// #2913 BLOCKER 1: a claim refusal is typed by cause and changes nothing, so the actor
+    /// can make claim accounting conditional on a real Pending -> Claimed transition.
+    #[test]
+    fn claim_refusals_are_typed_and_change_nothing() {
+        for (name, terminal) in TERMINAL {
+            let (mut mgr, hash) = manager_in(name);
+            let before = mgr.status(&hash).cloned();
+            let refused = mgr.claim(&hash, "did:icn:carol".into());
+            assert!(
+                matches!(
+                    &refused,
+                    Err(ComputeError::TaskTerminal { state, .. }) if *state == terminal
+                ),
+                "{name}: expected TaskTerminal({terminal:?}), got {refused:?}"
+            );
+            assert_eq!(mgr.status(&hash).cloned(), before, "{name}: status changed");
+        }
+
+        let (mut mgr, hash) = manager_in("claimed");
+        let before = mgr.status(&hash).cloned();
+        let refused = mgr.claim(&hash, "did:icn:carol".into());
+        assert!(
+            matches!(&refused, Err(ComputeError::TaskAlreadyClaimed(e)) if e == "did:icn:bob"),
+            "duplicate claim: got {refused:?}"
+        );
+        assert_eq!(
+            mgr.status(&hash).cloned(),
+            before,
+            "duplicate claim changed status"
+        );
+
+        let mut mgr = TaskManager::new(100);
+        assert!(matches!(
+            mgr.claim(&[7; 32], "did:icn:carol".into()),
+            Err(ComputeError::TaskNotFound(_))
+        ));
+        assert!(mgr.status(&[7; 32]).is_none());
+
+        let (mut mgr, hash) = manager_in("pending");
+        mgr.claim(&hash, "did:icn:carol".into())
+            .unwrap_or_else(|e| panic!("pending claim refused: {e}"));
+        assert!(matches!(
+            mgr.status(&hash),
+            Some(TaskStatus::Claimed { executor, .. }) if executor == "did:icn:carol"
+        ));
+    }
+
+    #[test]
+    fn complete_and_fail_still_close_an_open_task() {
+        for open in ["pending", "claimed"] {
+            let (mut mgr, hash) = manager_in(open);
+            mgr.complete(result_by(
+                hash,
+                "did:icn:bob",
+                ExecutionOutcome::Success(vec![42]),
+                100,
+            ))
+            .unwrap_or_else(|e| panic!("{open}: complete refused: {e}"));
+            assert!(matches!(
+                mgr.status(&hash),
+                Some(TaskStatus::Completed { .. })
+            ));
+
+            let (mut mgr, hash) = manager_in(open);
+            mgr.fail(&hash, "Deadline exceeded".into())
+                .unwrap_or_else(|e| panic!("{open}: fail refused: {e}"));
+            assert!(matches!(mgr.status(&hash), Some(TaskStatus::Failed { .. })));
+        }
+    }
+
+    #[test]
+    fn submit_refuses_a_held_hash_in_every_state_and_changes_nothing() {
+        for state in ["pending", "claimed", "completed", "failed", "cancelled"] {
+            let (mut mgr, hash) = manager_in(state);
+            let before = mgr.status(&hash).cloned();
+            let pending_before = mgr.pending_count();
+
+            let refused = mgr.submit(make_task("task-1"));
+
+            assert!(
+                matches!(&refused, Err(ComputeError::DuplicateTask { .. })),
+                "{state}: expected DuplicateTask, got {refused:?}"
+            );
+            assert_eq!(
+                mgr.status(&hash).cloned(),
+                before,
+                "{state}: status changed"
+            );
+            assert_eq!(
+                mgr.pending_count(),
+                pending_before,
+                "{state}: pending count changed"
+            );
+        }
+    }
+
+    #[test]
+    fn duplicate_submission_is_refused_before_the_pending_limit() {
+        // A full queue must not mask the duplicate refusal with "too many pending tasks".
+        let mut mgr = TaskManager::new(1);
+        let hash = mgr.submit(make_task("task-1")).unwrap();
+        let refused = mgr.submit(make_task("task-1"));
+        assert!(
+            matches!(&refused, Err(ComputeError::DuplicateTask { task }) if *task == hex::encode(hash)),
+            "got {refused:?}"
+        );
     }
 
     #[test]
