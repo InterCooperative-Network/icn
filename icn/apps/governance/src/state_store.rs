@@ -196,7 +196,7 @@ pub trait GovernanceStateStore: Send + Sync {
 
 // ---- Key helpers ----
 
-fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
+pub(crate) fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
     format!("gov:domain:{}", id.0).into_bytes()
 }
 
