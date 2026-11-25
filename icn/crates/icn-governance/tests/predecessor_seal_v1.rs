@@ -13,7 +13,7 @@ use icn_governance::predecessor_seal::{
     DrainStatus, PredecessorLifecycle, SealRefusal, TransitionOutcome, MAX_FINAL_SET,
     MAX_PROPOSAL_ID_LEN, PREDECESSOR_FINAL_SET_DOMAIN,
 };
-use icn_governance::proposal::{ExecutionClosureClass, ProposalState};
+use icn_governance::proposal::{ProposalPayload, ProposalState};
 use icn_governance::ProposalOutcome;
 use icn_identity::authority_log::SubjectId;
 
@@ -460,11 +460,15 @@ fn final_set_is_bound_to_domain_attempt_cutover_and_exact_set() {
 #[test]
 fn classification_uses_the_real_proposal_states() {
     use DrainStatus::*;
-    let req = ExecutionClosureClass::ExecutionRequired;
-    let decl = ExecutionClosureClass::Declarative;
+    // ExecutionRequired (every payload but Text) and Declarative (Text), per the real payload.
+    let req = ProposalPayload::VetoProposal {
+        target_proposal_id: "t".into(),
+        reason: "r".into(),
+    };
+    let decl = ProposalPayload::Text { body: "b".into() };
     let t = 1_000;
     assert_eq!(
-        classify(&ProposalState::Draft, req, false, true),
+        classify(&ProposalState::Draft, &req, false, true),
         InactiveDraft
     );
     for active in [
@@ -477,25 +481,25 @@ fn classification_uses_the_real_proposal_states() {
             closes_at: t,
         },
     ] {
-        assert_eq!(classify(&active, decl, true, false), Active);
+        assert_eq!(classify(&active, &decl, true, false), Active);
     }
     let accepted = ProposalState::Accepted { closed_at: t };
-    assert_eq!(classify(&accepted, decl, false, false), Terminal);
-    assert_eq!(classify(&accepted, req, true, false), Terminal);
+    assert_eq!(classify(&accepted, &decl, false, false), Terminal);
+    assert_eq!(classify(&accepted, &req, true, false), Terminal);
     assert_eq!(
-        classify(&accepted, req, false, false),
+        classify(&accepted, &req, false, false),
         TerminalEffectsPending
     );
     assert_eq!(
-        classify(&accepted, req, false, true),
+        classify(&accepted, &req, false, true),
         TerminalEffectsPending
     );
     assert_eq!(
-        classify(&accepted, req, true, true),
+        classify(&accepted, &req, true, true),
         TerminalChangesCutoverBasis
     );
     assert_eq!(
-        classify(&accepted, decl, true, true),
+        classify(&accepted, &decl, true, true),
         TerminalChangesCutoverBasis
     );
     let forced = |outcome| ProposalState::ForceClosed {
@@ -504,11 +508,11 @@ fn classification_uses_the_real_proposal_states() {
         reason: "r".into(),
     };
     assert_eq!(
-        classify(&forced(ProposalOutcome::Accepted), req, false, false),
+        classify(&forced(ProposalOutcome::Accepted), &req, false, false),
         TerminalEffectsPending
     );
     assert_eq!(
-        classify(&forced(ProposalOutcome::Rejected), req, false, true),
+        classify(&forced(ProposalOutcome::Rejected), &req, false, true),
         Terminal
     );
     for closed in [
@@ -521,7 +525,7 @@ fn classification_uses_the_real_proposal_states() {
         },
     ] {
         // Not accepted: no effect to close and no basis change, whatever the caller says.
-        assert_eq!(classify(&closed, req, false, true), Terminal);
+        assert_eq!(classify(&closed, &req, false, true), Terminal);
     }
 }
 
@@ -603,4 +607,75 @@ fn a_final_set_from_another_domain_or_attempt_does_not_seal_this_one() {
     assert_ne!(f_other_attempt, f_this);
     let produced = evaluate_drain(&l(), &state, &[("a", DrainStatus::Terminal)]).unwrap();
     assert_eq!(produced, seal(2, &c, f_this));
+}
+
+#[test]
+fn drain_evidence_order_is_checked_over_every_entry_including_drafts() {
+    use DrainStatus::*;
+    let c = commitment("successor.coop.example", 0xB1);
+    let state = pending(1, &c);
+    // The terminal ids alone would be ascending; the full evidence is not.
+    for bad in [
+        vec![("b", Terminal), ("a", InactiveDraft)],
+        vec![("a", Terminal), ("a", InactiveDraft)],
+    ] {
+        assert!(matches!(
+            evaluate_drain(&l(), &state, &bad),
+            Err(SealRefusal::FinalSet(_))
+        ));
+    }
+}
+
+#[test]
+fn abort_replay_edges_and_sealed_foreign_state() {
+    let c = commitment("successor.coop.example", 0xB1);
+    let other = commitment("successor.coop.example", 0xB9);
+    assert_eq!(
+        refused(&legacy(0, None), &abort(0, &c)),
+        SealRefusal::StaleAttempt {
+            attempt: 0,
+            latest: 0
+        }
+    );
+    assert_eq!(
+        refused(&legacy(2, Some(k(&c))), &abort(2, &other)),
+        SealRefusal::StaleAttempt {
+            attempt: 2,
+            latest: 2
+        }
+    );
+    let foreign = CutoverCommitmentV1::new(
+        GovernanceDomainId("another.coop.example".into()),
+        GovernanceDomainId("successor.coop.example".into()),
+        c.context,
+        c.genesis_head,
+        c.roster_commitment,
+        c.recognition_map_commitment,
+    )
+    .unwrap();
+    let sealed_foreign = PredecessorLifecycle::Sealed {
+        attempt: 1,
+        commitment: foreign,
+        final_set: [0xF0; 32],
+    };
+    assert_eq!(
+        refused(&sealed_foreign, &abort(1, &c)),
+        SealRefusal::ForeignPredecessor
+    );
+}
+
+/// Pins the documented trust gap: the pure validator records whatever F a hand-built Seal
+/// carries. Only `evaluate_drain` computes F; P5b must recompute it under its fence.
+#[test]
+fn a_hand_built_seal_records_its_f_unchecked() {
+    let c = commitment("successor.coop.example", 0xB1);
+    let arbitrary = [0u8; 32];
+    assert_eq!(
+        next(&pending(1, &c), &seal(1, &c, arbitrary)),
+        PredecessorLifecycle::Sealed {
+            attempt: 1,
+            commitment: c.clone(),
+            final_set: arbitrary
+        }
+    );
 }

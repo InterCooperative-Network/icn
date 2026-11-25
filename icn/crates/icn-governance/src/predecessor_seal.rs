@@ -27,7 +27,7 @@ use sha2::{Digest, Sha256};
 
 use crate::cutover::{CutoverCommitmentV1, CutoverError};
 use crate::domain::GovernanceDomainId;
-use crate::proposal::{ExecutionClosureClass, ProposalState};
+use crate::proposal::{ExecutionClosureClass, ProposalPayload, ProposalState};
 use crate::ProposalOutcome;
 
 /// Domain tag of the final-set commitment `F`.
@@ -183,6 +183,10 @@ pub enum SealRefusal {
 }
 
 /// Validate `transition` against the stored `state` of predecessor `domain`.
+///
+/// A `Seal` carries a caller-supplied `final_set`, which this function records but cannot
+/// recompute (it has no proposal set). Use [`evaluate_drain`] to produce a `Seal`; the
+/// authoritative store (P5b) must recompute `F` from the enumerated set under its fence.
 pub fn validate_transition(
     domain: &GovernanceDomainId,
     state: &PredecessorLifecycle,
@@ -417,12 +421,14 @@ pub enum DrainStatus {
     TerminalChangesCutoverBasis,
 }
 
-/// Classify a proposal from its real state and execution class plus two caller-supplied facts
-/// that this pure module cannot verify: whether its closure artifact is durable, and whether it
-/// changes a condition the cutover relies on (authority, membership, governance configuration).
+/// Classify a proposal from its real state and payload (whose
+/// [`ProposalPayload::execution_closure_class`] decides whether acceptance needs a closure
+/// artifact) plus two caller-supplied facts that this pure module cannot verify: whether that
+/// closure artifact is durable, and whether the proposal changes a condition the cutover relies on
+/// (authority, membership, governance configuration).
 pub fn classify(
     state: &ProposalState,
-    closure: ExecutionClosureClass,
+    payload: &ProposalPayload,
     closure_durable: bool,
     changes_cutover_basis: bool,
 ) -> DrainStatus {
@@ -440,7 +446,9 @@ pub fn classify(
     };
     if !accepted {
         DrainStatus::Terminal
-    } else if closure == ExecutionClosureClass::ExecutionRequired && !closure_durable {
+    } else if payload.execution_closure_class() == ExecutionClosureClass::ExecutionRequired
+        && !closure_durable
+    {
         DrainStatus::TerminalEffectsPending
     } else if changes_cutover_basis {
         DrainStatus::TerminalChangesCutoverBasis
