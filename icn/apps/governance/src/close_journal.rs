@@ -147,6 +147,70 @@ impl CloseReceipts {
 /// Persisted to the proposal state store (Db-B) keyed by `proposal.id` *before*
 /// any terminal-region provenance write, and deleted only after every artifact
 /// is durable. See the module docs for the full discipline.
+/// A durable close intent that contradicts the proposal's stored terminal state.
+///
+/// The intent records a decided close (its receipts may already be durable), yet
+/// the stored proposal is already closed with a *different* value. That can only
+/// arise from data written before veto and force-close completed a pending close
+/// first. Neither record is chosen automatically: recovery leaves both in place,
+/// every further terminal operation on the proposal is refused, and the
+/// contradiction is reported here until an authorized reconciliation resolves it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CloseConflict {
+    /// The proposal both records describe.
+    pub proposal_id: String,
+    /// The terminal state the durable close intent would commit.
+    pub journaled_state: String,
+    /// The terminal state actually stored.
+    pub stored_state: String,
+}
+
+impl std::fmt::Display for CloseConflict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Proposal '{}' has a durable close intent ({}) that contradicts its stored \
+             terminal state ({}); both are retained and the proposal is refused further \
+             terminal changes until an authorized reconciliation",
+            self.proposal_id, self.journaled_state, self.stored_state
+        )
+    }
+}
+
+impl std::error::Error for CloseConflict {}
+
+/// Short, stable name of a proposal state for conflict reports (no payload data).
+pub(crate) fn state_name(state: &icn_governance::ProposalState) -> String {
+    let debug = format!("{state:?}");
+    debug
+        .split(|c: char| !c.is_alphanumeric())
+        .next()
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// `Some(conflict)` when `stored` is closed and differs from the journaled
+/// terminal value; `None` when completing the intent is safe (the row is not yet
+/// closed, or already holds exactly the journaled value).
+pub(crate) fn detect_conflict(
+    entry: &CloseJournalEntry,
+    stored: Option<&Proposal>,
+) -> anyhow::Result<Option<CloseConflict>> {
+    let Some(stored) = stored else {
+        return Ok(None);
+    };
+    if !stored.state.is_closed()
+        || serde_json::to_value(stored)? == serde_json::to_value(&entry.proposal)?
+    {
+        return Ok(None);
+    }
+    Ok(Some(CloseConflict {
+        proposal_id: entry.proposal.id.0.clone(),
+        journaled_state: state_name(&entry.proposal.state),
+        stored_state: state_name(&stored.state),
+    }))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloseJournalEntry {
     /// The proposal in its terminal (closed) state — the terminal commit value.
