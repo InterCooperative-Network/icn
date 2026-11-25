@@ -88,8 +88,9 @@ pub use policy::{
 };
 pub use receipt::{ExecutionReceipt, ReceiptHash, SettlementMessage, SignatureBytes};
 pub use result_quorum::{
-    CollectedResult, QuorumStatus, ResultAggregator, ResultQuorumManager, TaskValue,
-    TaskVerification, VerificationConfig, CLOCK_SKEW_TOLERANCE_MS, DEFAULT_COLLECTION_WINDOW_MS,
+    CollectedResult, QuorumClock, QuorumClosure, QuorumDecision, QuorumRecord, QuorumRejection,
+    QuorumStatus, ResultAggregator, ResultQuorumManager, TaskValue, TaskVerification,
+    VerificationConfig, CLOCK_SKEW_TOLERANCE_MS, DEFAULT_COLLECTION_WINDOW_MS,
     MAX_CONCURRENT_VERIFICATIONS,
 };
 pub use scheduler::{
@@ -98,7 +99,7 @@ pub use scheduler::{
     PlacementOffer, PlacementPolicy, PlacementRequest, ResourceChangeType, ResourceProfile,
     ResourceRefreshConfig, ScopeContext,
 };
-pub use task::{TaskManager, TaskStatus};
+pub use task::{TaskManager, TaskStatus, TerminalState};
 pub use types::{
     ComputeMessage, ComputeResult, ComputeTask, ContentHash, DeterminismClass, ExecutionOutcome,
     ExecutorCapability, FuelLimit, PrivacyClass, TaskCode, TaskHash, TaskId, TaskPriority,

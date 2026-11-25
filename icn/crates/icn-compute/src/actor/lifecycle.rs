@@ -40,9 +40,26 @@ use super::ComputeActor;
 use crate::error::ComputeError;
 use crate::executor::Executor;
 use crate::policy::CharterPriority;
-use crate::result_quorum::{QuorumStatus, TaskVerification};
+use crate::result_quorum::{QuorumDecision, TaskVerification};
 use crate::task::{TaskManager, TaskStatus};
 use crate::types::{ComputeMessage, ComputeResult, ComputeTask, TaskHash, TaskPriority};
+
+/// What handling one task result did to its task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ResultAcceptance {
+    /// The quorum accepted a canonical result and the task was completed from it.
+    Accepted,
+    /// The quorum counted the result without accepting one: still collecting, or this result
+    /// closed it divergent or timed out.
+    Counted,
+    /// The result was refused and nothing changed: the task is registered for quorum
+    /// verification and its quorum had closed or the aggregator rejected the result, or the task
+    /// is already terminal (completed, failed or cancelled; EX-019).
+    Refused,
+    /// The task was never registered for quorum verification; the single-executor path handled
+    /// the result. For a task this node holds, that means the result completed it.
+    Unregistered,
+}
 use crate::{MIN_TRUST_EXECUTE, MIN_TRUST_SUBMIT};
 
 /// Release a commons credit reservation on non-success task termination.
@@ -84,6 +101,21 @@ async fn consume_commons_reservation(
     pending_reservations.lock().await.remove(task_id);
 }
 
+/// Separate a terminal-state refusal from every other outcome of a status transition.
+///
+/// `Ok(Ok(()))`: the transition happened. `Ok(Err(state))`: the task was already terminal and
+/// nothing changed (EX-019), so the caller must skip the transition's effects. `Err`: any other
+/// error, propagated unchanged.
+fn refuse_if_terminal(
+    transition: Result<(), ComputeError>,
+) -> Result<Result<(), crate::task::TerminalState>, ComputeError> {
+    match transition {
+        Ok(()) => Ok(Ok(())),
+        Err(ComputeError::TaskTerminal { state, .. }) => Ok(Err(state)),
+        Err(other) => Err(other),
+    }
+}
+
 impl ComputeActor {
     /// Determine verification requirements for a task based on its estimated value
     /// or explicit verification configuration.
@@ -107,6 +139,18 @@ impl ComputeActor {
 
     /// Handle task result with consensus checking
     pub(super) async fn on_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
+        self.accept_task_result(result).await.map(|_| ())
+    }
+
+    /// Handle a task result and report what it did to the task.
+    ///
+    /// A task registered for quorum verification completes only from the canonical result its
+    /// quorum accepts, exactly once. Only a task that was never registered (`TaskNotFound` from
+    /// the quorum) may complete through the single-executor path.
+    pub(super) async fn accept_task_result(
+        &self,
+        result: ComputeResult,
+    ) -> Result<ResultAcceptance, ComputeError> {
         let task_hash_str = hex::encode(result.task_hash);
 
         tracing::debug!(
@@ -175,107 +219,27 @@ impl ComputeActor {
         );
         icn_obs::metrics::compute::signatures_verified_inc();
 
-        // Check if this task is registered for multi-executor verification (Issue #511)
-        let quorum_result = self.quorum_manager.submit_result(result.clone());
-
-        // Handle quorum-based verification if task is registered
-        if let Ok(status) = quorum_result {
-            match status {
-                QuorumStatus::Collecting { received, required } => {
-                    tracing::debug!(
-                        task_hash = %task_hash_str,
-                        received = received,
-                        required = required,
-                        "Multi-executor task: collecting results"
-                    );
-                    return Ok(()); // Wait for more results
-                }
-                QuorumStatus::Consensus {
-                    result_hash,
-                    agreeing,
-                    total,
-                } => {
-                    tracing::info!(
-                        task_hash = %task_hash_str,
-                        agreeing = agreeing,
-                        total = total,
-                        result_hash = %hex::encode(result_hash),
-                        "Multi-executor task: consensus reached"
-                    );
-
-                    // Record quorum metrics
-                    icn_obs::metrics::compute::quorum_consensus_inc("multi_executor");
-
-                    // Get canonical result and proceed to completion
-                    if let Ok(Some(canonical)) =
-                        self.quorum_manager.get_canonical_result(&result.task_hash)
-                    {
-                        // Clean up quorum tracking
-                        let _ = self.quorum_manager.remove_task(&result.task_hash);
-                        return self.complete_task_result(canonical).await;
-                    }
-                }
-                QuorumStatus::Divergent {
-                    result_groups,
-                    total,
-                } => {
-                    tracing::warn!(
-                        task_hash = %task_hash_str,
-                        result_groups = result_groups,
-                        total = total,
-                        "Multi-executor task: results diverge, escalating to dispute"
-                    );
-
-                    // Record quorum metrics
-                    icn_obs::metrics::compute::quorum_divergent_inc(
-                        "multi_executor",
-                        result_groups,
-                    );
-
-                    // Get executor groups for dispute evidence
-                    if let Ok(groups) = self.quorum_manager.get_executor_groups(&result.task_hash) {
-                        // File disputes for divergent results
-                        self.handle_divergent_results(&result.task_hash, groups)
-                            .await;
-                    }
-
-                    // Accept majority result if available (before cleanup)
-                    let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
-
-                    // Clean up quorum tracking
-                    let _ = self.quorum_manager.remove_task(&result.task_hash);
-
-                    if let Ok(Some(canonical)) = canonical {
-                        return self.complete_task_result(canonical).await;
-                    }
-                    return Ok(()); // No canonical result
-                }
-                QuorumStatus::Timeout { received, required } => {
-                    tracing::warn!(
-                        task_hash = %task_hash_str,
-                        received = received,
-                        required = required,
-                        "Multi-executor task: collection timed out"
-                    );
-
-                    // Record quorum metrics
-                    icn_obs::metrics::compute::quorum_timeout_inc(
-                        "multi_executor",
-                        received,
-                        required,
-                    );
-
-                    // Proceed with available results if any (before cleanup)
-                    let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
-
-                    // Clean up quorum tracking
-                    let _ = self.quorum_manager.remove_task(&result.task_hash);
-
-                    if let Ok(Some(canonical)) = canonical {
-                        return self.complete_task_result(canonical).await;
-                    }
-                    return Ok(());
-                }
+        // Quorum verification (Issue #511). The decision, including the canonical result, comes
+        // from one locked step of the quorum manager, which also closes the quorum.
+        match self.quorum_manager.submit(result.clone()) {
+            Ok(decision) => {
+                return self
+                    .apply_quorum_decision(&result.task_hash, &task_hash_str, decision)
+                    .await
+            }
+            // Never registered: the single-executor path below applies.
+            Err(ComputeError::TaskNotFound(_)) => {}
+            // Registered, and this result is refused: the quorum has closed, or the aggregator
+            // rejected it (duplicate executor, collection window closed, bad signature). It
+            // must not fall through to the single-executor path.
+            Err(refusal) => {
+                tracing::debug!(
+                    task_hash = %task_hash_str,
+                    executor = %result.executor,
+                    error = %refusal,
+                    "Quorum refused result; not completing the task"
+                );
+                return Ok(ResultAcceptance::Refused);
             }
         }
 
@@ -408,7 +372,18 @@ impl ComputeActor {
                 .get(&accepted_result.task_hash)
                 .map(|t| (t.id.clone(), t.scope, t.submitter.clone()));
             if task_reservation_info.is_some() {
-                mgr.complete(accepted_result)?;
+                // EX-019: a terminal task is final. A replayed, late or conflicting result is
+                // refused here, before any completion effect (load, event, settlement, clearing).
+                if let Err(refusal) = refuse_if_terminal(mgr.complete(accepted_result))? {
+                    drop(mgr);
+                    tracing::debug!(
+                        task_hash = %task_hash_str,
+                        executor = %executor_did,
+                        state = %refusal,
+                        "Result for a terminal task refused; nothing changed"
+                    );
+                    return Ok(ResultAcceptance::Refused);
+                }
             }
             drop(mgr);
 
@@ -458,11 +433,80 @@ impl ComputeActor {
             }
         }
 
-        Ok(())
+        Ok(ResultAcceptance::Unregistered)
     }
 
-    /// Complete a task with the given result (used by both quorum and legacy paths)
-    async fn complete_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
+    /// Act on what the quorum decided for a counted result.
+    async fn apply_quorum_decision(
+        &self,
+        task_hash: &TaskHash,
+        task_hash_str: &str,
+        decision: QuorumDecision,
+    ) -> Result<ResultAcceptance, ComputeError> {
+        match decision {
+            QuorumDecision::Collecting { received, required } => {
+                tracing::debug!(
+                    task_hash = %task_hash_str,
+                    received = received,
+                    required = required,
+                    "Multi-executor task: collecting results"
+                );
+                Ok(ResultAcceptance::Counted)
+            }
+            QuorumDecision::Accepted {
+                canonical,
+                result_hash,
+                agreeing,
+                total,
+            } => {
+                tracing::info!(
+                    task_hash = %task_hash_str,
+                    agreeing = agreeing,
+                    total = total,
+                    result_hash = %hex::encode(result_hash),
+                    "Multi-executor task: consensus reached"
+                );
+                icn_obs::metrics::compute::quorum_consensus_inc("multi_executor");
+                if self.complete_task_result(canonical).await? {
+                    Ok(ResultAcceptance::Accepted)
+                } else {
+                    Ok(ResultAcceptance::Refused)
+                }
+            }
+            QuorumDecision::Divergent {
+                result_groups,
+                total,
+                executor_groups,
+            } => {
+                tracing::warn!(
+                    task_hash = %task_hash_str,
+                    result_groups = result_groups,
+                    total = total,
+                    "Multi-executor task: results diverge, escalating to dispute"
+                );
+                icn_obs::metrics::compute::quorum_divergent_inc("multi_executor", result_groups);
+                self.handle_divergent_results(task_hash, executor_groups)
+                    .await;
+                Ok(ResultAcceptance::Counted)
+            }
+            QuorumDecision::TimedOut { received, required } => {
+                tracing::warn!(
+                    task_hash = %task_hash_str,
+                    received = received,
+                    required = required,
+                    "Multi-executor task: collection timed out"
+                );
+                icn_obs::metrics::compute::quorum_timeout_inc("multi_executor", received, required);
+                Ok(ResultAcceptance::Counted)
+            }
+        }
+    }
+
+    /// Complete a task from a quorum's canonical result.
+    ///
+    /// Returns `false`, with no completion effect, when the task is already terminal (EX-019),
+    /// for example when it failed its deadline before the quorum accepted.
+    async fn complete_task_result(&self, result: ComputeResult) -> Result<bool, ComputeError> {
         let executor_did = result.executor.clone();
         let task_hash = result.task_hash;
         let outcome = result.outcome.clone();
@@ -474,7 +518,16 @@ impl ComputeActor {
             .get(&task_hash)
             .map(|t| (t.id.clone(), t.scope, t.submitter.clone()));
         if task_reservation_info.is_some() {
-            mgr.complete(result)?;
+            if let Err(refusal) = refuse_if_terminal(mgr.complete(result))? {
+                drop(mgr);
+                tracing::warn!(
+                    task_hash = %hex::encode(task_hash),
+                    executor = %executor_did,
+                    state = %refusal,
+                    "Quorum accepted a result for a terminal task; not completing it"
+                );
+                return Ok(false);
+            }
         }
         drop(mgr);
 
@@ -523,7 +576,7 @@ impl ComputeActor {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     /// Handle divergent results from multi-executor verification (Issue #511)
@@ -687,8 +740,14 @@ impl ComputeActor {
             timestamps.remove(&task_hash);
         }
 
-        // Clean up quorum tracking if task was registered
-        let _ = self.quorum_manager.remove_task(&task_hash);
+        // Close the quorum, if the task was registered, so later results are refused
+        if let Err(e) = self.quorum_manager.cancel_task(&task_hash) {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                error = %e,
+                "Failed to close the quorum of a cancelled task"
+            );
+        }
 
         tracing::info!(
             task_hash = %task_hash_str,
@@ -759,17 +818,59 @@ impl ComputeActor {
             }
         }
 
-        // Store task
-        let _hash = self.task_manager.lock().await.submit(task.clone())?;
+        // Store task. A task this node already holds keeps its stored state (EX-019): the
+        // submission is not re-applied, so it cannot reset a claimed or terminal task to
+        // Pending. Claiming below still runs, and it only picks Pending tasks, so a re-delivered
+        // submission of a still-pending task is executed exactly as before, and one of a
+        // completed, failed or cancelled task is never executed again.
+        match self.task_manager.lock().await.submit(task.clone()) {
+            Ok(_) => {}
+            Err(ComputeError::DuplicateTask { .. }) => {
+                tracing::debug!(
+                    task_id = %task.id,
+                    task_hash = %task_hash_str,
+                    "Submission of a task already held; keeping its stored state"
+                );
+            }
+            Err(e) => return Err(e),
+        }
 
-        // Find highest-priority pending task we can execute
+        // Find the highest-priority pending task we can execute and are eligible for. The
+        // candidate is not necessarily the task just received, so placement constraints are
+        // checked here, on every candidate (#2918), with the rule placement negotiation uses.
+        // An excluded task stays Pending and untouched, available to eligible executors.
         let highest_priority_task = {
             let mgr = self.task_manager.lock().await;
             let pending = mgr.pending_by_priority();
             let executor = self.executor.read().await;
+            let own_capabilities = executor.capabilities();
             pending
                 .into_iter()
-                .find(|(_, t)| executor.can_execute(t))
+                .find(|(h, t)| {
+                    if !executor.can_execute(t) {
+                        return false;
+                    }
+                    let Some(constraints) = t.placement_constraints.as_ref() else {
+                        return true;
+                    };
+                    match super::placement::placement_exclusion(
+                        constraints,
+                        &self.own_did,
+                        self.own_region.as_deref(),
+                        &own_capabilities,
+                    ) {
+                        None => true,
+                        Some(exclusion) => {
+                            tracing::debug!(
+                                task_id = %t.id,
+                                task_hash = %hex::encode(h),
+                                exclusion = ?exclusion,
+                                "Skipping task: placement constraints exclude this executor"
+                            );
+                            false
+                        }
+                    }
+                })
                 .map(|(h, _)| h)
         };
 
@@ -1032,8 +1133,28 @@ impl ComputeActor {
             }
         }
 
-        // Record completion
-        self.task_manager.lock().await.complete(result.clone())?;
+        // Record completion. Execution runs inline in the command loop, so no cancel or result
+        // command can interleave between the claim and here; only the timeout sweep, which runs
+        // beside the loop, can. If it failed the task meanwhile, `complete` refuses with
+        // `TaskTerminal` (EX-019) and the `?` skips every effect below: no result broadcast, no
+        // event, no recorded execution, no settlement, and no load or scope-queue release,
+        // because the sweep already released both for this claim. Moving execution off the
+        // command loop would break that argument: a refusal here would then have to release
+        // this node's own load.
+        //
+        // The one exception is the policy concurrency claim taken above for this claim. The
+        // sweep does not touch policy usage (it cannot tell a local claim from a remote or
+        // never-claimed task), so this refusal is its only release point: release it once here.
+        #[cfg(test)]
+        if let Some((reached, proceed)) = &self.pre_complete_gate {
+            reached.notify_one();
+            proceed.notified().await;
+        }
+        let completion = self.task_manager.lock().await.complete(result.clone());
+        if matches!(completion, Err(ComputeError::TaskTerminal { .. })) {
+            self.release_local_policy_claim(&claimed_task).await;
+        }
+        completion?;
 
         // Decrement our own executor load
         let mut registry = self.executor_registry.lock().await;
@@ -1212,11 +1333,31 @@ impl ComputeActor {
     ) -> Result<(), ComputeError> {
         // Single lock: look up submitter and claim atomically to avoid a
         // race where the task is removed between two separate locks.
+        //
+        // Load and scope-queue accounting below is the effect of a claim, so it runs only
+        // when `TaskManager::claim` actually moved the task Pending -> Claimed. A refused
+        // claim (unknown task, already claimed, or terminal) changes nothing. In particular
+        // a node receives its own `TaskClaimed` gossip after it has executed and completed
+        // the task inline; counting that echo leaked one unit of own load per task until
+        // `at_capacity()` refused all further work (#2913 BLOCKER 1).
         let submitter = {
             let mut mgr = self.task_manager.lock().await;
-            let submitter = mgr.get(&task_hash).map(|t| t.submitter.clone());
-            if submitter.is_some() {
-                let _ = mgr.claim(&task_hash, executor.clone());
+            let Some(submitter) = mgr.get(&task_hash).map(|t| t.submitter.clone()) else {
+                tracing::debug!(
+                    task_hash = %hex::encode(task_hash),
+                    executor = %executor,
+                    "Claim for an unknown task ignored; no accounting change"
+                );
+                return Ok(());
+            };
+            if let Err(refusal) = mgr.claim(&task_hash, executor.clone()) {
+                tracing::debug!(
+                    task_hash = %hex::encode(task_hash),
+                    executor = %executor,
+                    reason = %refusal,
+                    "Claim refused; no accounting change"
+                );
+                return Ok(());
             }
             submitter
         };
@@ -1229,23 +1370,47 @@ impl ComputeActor {
         drop(registry);
 
         // Epic 2 (#933): Track per-scope queue depth
-        if let Some(submitter) = submitter {
-            let scope = match &self.cell_service {
-                Some(cs) => cs.peer_scope(&submitter),
-                None => icn_kernel_api::ScopeLevel::Commons,
-            };
-            {
-                let mut depths = self.scope_queue_depths.lock().await;
-                *depths.entry(scope).or_insert(0) += 1;
-            }
-            {
-                let mut map = self.task_scope_map.lock().await;
-                map.insert(task_hash, scope);
-                icn_obs::metrics::compute::task_scope_map_size_set(map.len() as f64);
-            }
+        let scope = match &self.cell_service {
+            Some(cs) => cs.peer_scope(&submitter),
+            None => icn_kernel_api::ScopeLevel::Commons,
+        };
+        {
+            let mut depths = self.scope_queue_depths.lock().await;
+            *depths.entry(scope).or_insert(0) += 1;
+        }
+        {
+            let mut map = self.task_scope_map.lock().await;
+            map.insert(task_hash, scope);
+            icn_obs::metrics::compute::task_scope_map_size_set(map.len() as f64);
         }
 
         Ok(())
+    }
+
+    /// Release the policy concurrency claim `on_task_submitted` took for a local claim of
+    /// `task`, when that claim ends without a recorded completion. Mirrors the increment's
+    /// conditions (policy manager present, parseable submitter, `coop_id` or `"default"`), so it
+    /// decrements exactly the counter that was incremented, and only when it was.
+    async fn release_local_policy_claim(&self, task: &ComputeTask) {
+        let Some(ref policy_manager) = self.policy_manager else {
+            return;
+        };
+        let Ok(submitter_did) = icn_identity::Did::from_str(&task.submitter) else {
+            return;
+        };
+        let coop_id = task.coop_id.as_deref().unwrap_or("default");
+        if let Err(e) = policy_manager
+            .usage_tracker()
+            .task_completed(coop_id, &submitter_did)
+            .await
+        {
+            tracing::warn!(
+                task_id = %task.id,
+                submitter = %task.submitter,
+                error = %e,
+                "Failed to release policy concurrency claim"
+            );
+        }
     }
 
     /// Check for timed-out tasks and mark them as failed
@@ -1290,8 +1455,20 @@ impl ComputeActor {
             // task_scope covers Pending tasks that were never claimed (no task_scope_map entry)
             let task_scope = mgr.get(&hash).map(|t| t.scope);
 
-            // Mark as failed
-            mgr.fail(&hash, "Deadline exceeded".to_string())?;
+            // Mark as failed. The sweep runs beside the command loop, so the task may have
+            // completed or been cancelled since `find_timed_out` released the lock. A terminal
+            // task is final (EX-019): skip it, with none of the timeout's effects below.
+            if let Err(state) =
+                refuse_if_terminal(mgr.fail(&hash, "Deadline exceeded".to_string()))?
+            {
+                drop(mgr);
+                tracing::debug!(
+                    task_hash = %task_hash_str,
+                    state = %state,
+                    "Task became terminal before the timeout sweep reached it; skipping"
+                );
+                continue;
+            }
             drop(mgr);
 
             icn_obs::metrics::compute::tasks_timeout_inc();
@@ -1415,6 +1592,81 @@ impl ComputeActor {
             });
         }
 
+        // Derive the task exactly as it will be stored, before any side effect (EX-019): the
+        // policy and charter adjustments below change the task, and so the hash it is held
+        // under. `check_submission` and the charter ordering only read state. A policy rejection
+        // is recorded here and returned at its original place, after the commons checks.
+
+        // Check policy compliance (Phase 16E)
+        let mut adjusted_task = task.clone();
+        let mut policy_rejection: Option<(String, String)> = None;
+        if let Some(ref policy_manager) = self.policy_manager {
+            // Parse submitter DID
+            let submitter_did = icn_identity::Did::from_str(&task.submitter)
+                .map_err(|e| ComputeError::InvalidInput(format!("Invalid submitter DID: {e}")))?;
+
+            // Extract coop_id from task (default to "default" if not specified)
+            let coop_id = task.coop_id.as_deref().unwrap_or("default");
+
+            // Check policy
+            match policy_manager
+                .check_submission(&task, &submitter_did, coop_id)
+                .await?
+            {
+                crate::policy::PolicyDecision::Reject { reason } => {
+                    policy_rejection = Some((coop_id.to_string(), reason));
+                }
+                crate::policy::PolicyDecision::Allow {
+                    adjusted_priority,
+                    placement_constraints,
+                } => {
+                    // Apply policy adjustments
+                    adjusted_task.priority = adjusted_priority;
+                    adjusted_task.placement_constraints = Some(placement_constraints.clone());
+                    tracing::debug!(
+                        task_id = %task.id,
+                        original_priority = ?task.priority,
+                        adjusted_priority = ?adjusted_priority,
+                        has_constraints = placement_constraints.required_region.is_some(),
+                        "Policy check passed with adjustments"
+                    );
+                }
+            }
+        }
+
+        // Apply charter-defined priority ordering (E7 - #1134).
+        // Charter priority may cap or reorder priorities relative to member standing.
+        // This runs after `CoopSchedulingPolicy` adjustments so both layers compose.
+        if let Some(ref policy) = self.commons_pool_policy {
+            let original = adjusted_task.priority;
+            adjusted_task.priority = apply_commons_charter_priority(policy, &adjusted_task, trust);
+            if adjusted_task.priority != original {
+                tracing::debug!(
+                    task_id = %task.id,
+                    original_priority = ?original,
+                    charter_priority = ?adjusted_task.priority,
+                    charter_policy = ?policy.priority,
+                    "Charter priority applied"
+                );
+            }
+        }
+
+        // A task already held, in any state, is refused before the commons checks and the
+        // credit reservation, so a duplicate submission has no effect at all (EX-019).
+        // `TaskManager::submit` refuses it again below; that is the authoritative check.
+        let stored_hash = adjusted_task.hash();
+        if self.task_manager.lock().await.get(&stored_hash).is_some() {
+            tracing::debug!(
+                task_id = %task.id,
+                task_hash = %hex::encode(stored_hash),
+                submitter = %task.submitter,
+                "Duplicate task submission refused"
+            );
+            return Err(ComputeError::DuplicateTask {
+                task: hex::encode(stored_hash),
+            });
+        }
+
         // Commons pool governance checks (E7 - #1134)
         // Standing and credit ceiling validation gate access to shared compute resources.
         if let Some(ref policy) = self.commons_pool_policy {
@@ -1525,64 +1777,15 @@ impl ComputeActor {
             }
         }
 
-        // Check policy compliance (Phase 16E)
-        let mut adjusted_task = task.clone();
-        if let Some(ref policy_manager) = self.policy_manager {
-            // Parse submitter DID
-            let submitter_did = icn_identity::Did::from_str(&task.submitter)
-                .map_err(|e| ComputeError::InvalidInput(format!("Invalid submitter DID: {e}")))?;
-
-            // Extract coop_id from task (default to "default" if not specified)
-            let coop_id = task.coop_id.as_deref().unwrap_or("default");
-
-            // Check policy
-            match policy_manager
-                .check_submission(&task, &submitter_did, coop_id)
-                .await?
-            {
-                crate::policy::PolicyDecision::Reject { reason } => {
-                    tracing::warn!(
-                        task_id = %task.id,
-                        submitter = %task.submitter,
-                        coop_id = %coop_id,
-                        reason = %reason,
-                        "Task rejected by policy"
-                    );
-                    return Err(ComputeError::PolicyViolation(reason));
-                }
-                crate::policy::PolicyDecision::Allow {
-                    adjusted_priority,
-                    placement_constraints,
-                } => {
-                    // Apply policy adjustments
-                    adjusted_task.priority = adjusted_priority;
-                    adjusted_task.placement_constraints = Some(placement_constraints.clone());
-                    tracing::debug!(
-                        task_id = %task.id,
-                        original_priority = ?task.priority,
-                        adjusted_priority = ?adjusted_priority,
-                        has_constraints = placement_constraints.required_region.is_some(),
-                        "Policy check passed with adjustments"
-                    );
-                }
-            }
-        }
-
-        // Apply charter-defined priority ordering (E7 - #1134).
-        // Charter priority may cap or reorder priorities relative to member standing.
-        // This runs after `CoopSchedulingPolicy` adjustments so both layers compose.
-        if let Some(ref policy) = self.commons_pool_policy {
-            let original = adjusted_task.priority;
-            adjusted_task.priority = apply_commons_charter_priority(policy, &adjusted_task, trust);
-            if adjusted_task.priority != original {
-                tracing::debug!(
-                    task_id = %task.id,
-                    original_priority = ?original,
-                    charter_priority = ?adjusted_task.priority,
-                    charter_policy = ?policy.priority,
-                    "Charter priority applied"
-                );
-            }
+        if let Some((coop_id, reason)) = policy_rejection {
+            tracing::warn!(
+                task_id = %task.id,
+                submitter = %task.submitter,
+                coop_id = %coop_id,
+                reason = %reason,
+                "Task rejected by policy"
+            );
+            return Err(ComputeError::PolicyViolation(reason));
         }
 
         // Add to local task manager (use adjusted task)
@@ -1671,7 +1874,11 @@ impl ComputeActor {
                     "Using legacy claiming (no resource profile)"
                 );
 
-                cb(ComputeMessage::TaskSubmitted(Box::new(task)));
+                // Gossip the task exactly as stored (#2914): the policy and charter adjustments
+                // are part of its canonical encoding, so `adjusted_task.hash()` is `hash`. The raw
+                // `task` would be held by every receiver, this node's own self-delivery included,
+                // under a different hash.
+                cb(ComputeMessage::TaskSubmitted(Box::new(adjusted_task)));
             }
         }
 
@@ -1707,6 +1914,16 @@ impl ComputeActor {
         let mut mgr = self.task_manager.lock().await;
         mgr.cancel(task_hash, requester, reason.clone())?;
         drop(mgr);
+
+        // Close the quorum, if the task was registered, so results that arrive after the
+        // cancellation are refused rather than completing the task.
+        if let Err(e) = self.quorum_manager.cancel_task(task_hash) {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                error = %e,
+                "Failed to close the quorum of a cancelled task"
+            );
+        }
 
         icn_obs::metrics::compute::tasks_cancelled_inc();
 
