@@ -123,6 +123,64 @@ pub struct ComputeConfig {
     /// Maximum number of actors this node will host
     #[serde(default = "default_max_actors")]
     pub max_actors: usize,
+
+    /// The compute region this node's operator asserts it executes in (#2920).
+    ///
+    /// A task whose placement constraints require a region (for example from a coop's
+    /// `DataSovereignty` scheduling rule) is executed here only if that region equals this value
+    /// exactly: byte-for-byte, case-sensitive, no aliasing. `None` (the default, and the value
+    /// when the key is absent) means no compute region, and every region-constrained task is
+    /// refused (fail closed).
+    ///
+    /// Must satisfy [`validate_compute_region`]; `Config::validate` rejects anything else, and
+    /// the value is never trimmed, coerced to `None`, or replaced by a placeholder.
+    ///
+    /// Deliberately separate from `topology.region`, which is a network-topology label (it
+    /// defaults to `"default"` and peers report it about themselves) and never supplies this.
+    ///
+    /// **Trust boundary:** this is the operator's assertion about their own node, not
+    /// independently authenticated geography or jurisdiction. Enforcement is cooperative: an
+    /// honest executor refuses tasks outside its region, but nothing stops a dishonest operator
+    /// misstating it, and submitters do not verify an executor's region.
+    #[serde(default)]
+    pub region: Option<String>,
+}
+
+/// Maximum length, in bytes, of `compute.region`.
+pub const COMPUTE_REGION_MAX_LEN: usize = 64;
+
+/// Check a `compute.region` value against its grammar.
+///
+/// Grammar: 1 to [`COMPUTE_REGION_MAX_LEN`] ASCII characters from `A-Z a-z 0-9 . _ -`, beginning
+/// and ending with a letter or digit. This excludes empty values, any whitespace (so a padded
+/// value is refused, never trimmed), separators such as `/` or `:`, and non-ASCII look-alikes.
+/// Case is preserved and significant.
+pub fn validate_compute_region(region: &str) -> Result<(), String> {
+    if region.is_empty() {
+        return Err("compute.region must not be empty (omit the key for no region)".to_string());
+    }
+    if region.len() > COMPUTE_REGION_MAX_LEN {
+        return Err(format!(
+            "compute.region must be at most {COMPUTE_REGION_MAX_LEN} bytes, got {}",
+            region.len()
+        ));
+    }
+    if let Some(bad) = region
+        .chars()
+        .find(|c| !(c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-')))
+    {
+        return Err(format!(
+            "compute.region {region:?} contains {bad:?}; allowed characters are A-Z a-z 0-9 . _ - \
+             (whitespace is never trimmed)"
+        ));
+    }
+    let edge_ok = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric());
+    if !edge_ok(region.chars().next()) || !edge_ok(region.chars().last()) {
+        return Err(format!(
+            "compute.region {region:?} must begin and end with a letter or digit"
+        ));
+    }
+    Ok(())
 }
 
 impl Default for ComputeConfig {
@@ -133,6 +191,7 @@ impl Default for ComputeConfig {
             verification: VerificationConfig::default(),
             actor_model_enabled: default_false(),
             max_actors: default_max_actors(),
+            region: None,
         }
     }
 }
@@ -276,12 +335,14 @@ mod tests {
             },
             actor_model_enabled: true,
             max_actors: 200,
+            region: Some("eu-central".into()),
         };
 
         let toml_str = toml::to_string(&config).unwrap();
         let deserialized: ComputeConfig = toml::from_str(&toml_str).unwrap();
 
         assert_eq!(deserialized.max_concurrent_tasks, 20);
+        assert_eq!(deserialized.region.as_deref(), Some("eu-central"));
         assert!(deserialized.actor_model_enabled);
         assert_eq!(deserialized.max_actors, 200);
 
