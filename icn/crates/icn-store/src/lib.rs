@@ -408,17 +408,25 @@ pub trait Store: Send + Sync {
     ///   nothing is written and [`CompareAndWrite::Conflict`] names the first failing expectation
     ///   (in the caller's order) with the value actually found. A conflict is an expected outcome
     ///   under concurrency, not an error.
-    /// * **Errors are not applied durably.** `Err` means the backend could not answer. After a
-    ///   crash, reopen or restart, no write of a call that returned `Err` is visible: an
-    ///   interrupted commit is never partially recovered. Within the running process, a storage
-    ///   error in the middle of a commit may leave some of its writes visible until restart (the
-    ///   same limit as [`Store::delete_atomic`]), so the caller must treat the state of every key
-    ///   in `writes` as unknown after an `Err` and re-read before acting on it.
+    /// * **An error leaves the outcome unknown.** Only a [`CompareAndWriteInvalid`] or
+    ///   [`CompareAndWriteUnsupported`] refusal guarantees that nothing was read or written. Any
+    ///   other `Err` means the backend could not answer, and the call may have applied none,
+    ///   some or all of `writes`: within the running process, *and after a restart*. On sled
+    ///   0.34.7 a storage error after the commit has begun can leave a prefix of the writes
+    ///   visible in memory, and when the error does not stop sled's log writer, the batch's
+    ///   atomic-recovery marker is cancelled (not sealed), so the writes already linked can also
+    ///   be recovered from disk. The error's kind (an abort reason or a storage error) is not a
+    ///   reliable classification of what happened. A caller that needs all-or-nothing across
+    ///   failures must detect and reconcile, for example by fencing on a key whose expected value
+    ///   commits to the whole write set and re-reading it after reopening, and must not act on
+    ///   any key in `writes` until it has done so.
     /// * **Request validation.** `writes` must be non-empty; neither list may name a key twice;
     ///   neither list may exceed [`MAX_COMPARE_AND_WRITE_ENTRIES`]. A malformed request is refused
     ///   with [`CompareAndWriteInvalid`] before anything is read or written. A key may appear in
     ///   both lists (the usual read-check-replace).
-    /// * **Durability** matches [`Store::put`]: not forced to disk until [`Store::flush`].
+    /// * **Durability** matches [`Store::put`]: not forced to disk until [`Store::flush`]. An
+    ///   `Ok(Applied)` is visible in the process at once but may be lost by a crash before a later
+    ///   `flush` returns `Ok`; a `flush` error leaves its durability unknown.
     /// * **Interoperation.** On a backend that implements this, single-key writes to the same keys
     ///   ([`Store::put`], [`Store::compare_and_put`], [`Store::delete`]) are serialized with it:
     ///   none can land between the comparison and the write of a compare-and-write.
