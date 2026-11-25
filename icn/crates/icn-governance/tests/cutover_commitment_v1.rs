@@ -225,6 +225,28 @@ fn cutover_round_trips_and_decoding_is_strict() {
         CutoverCommitmentV1::decode(&invalid),
         Err(CutoverError::Encoding("invalid UTF-8"))
     );
+    // Invalid UTF-8 in S (S's first content byte follows L's frame).
+    let s_content = version_at + 6 + "legacy.coop.example".len() + 4;
+    let mut invalid_s = bytes.clone();
+    invalid_s[s_content] = 0xFF;
+    assert_eq!(
+        CutoverCommitmentV1::decode(&invalid_s),
+        Err(CutoverError::Encoding("invalid UTF-8"))
+    );
+    // Decoding re-validates the empty-roster and zero-M placeholders.
+    let n = bytes.len();
+    let mut empty_roster = bytes.clone();
+    empty_roster[n - 64..n - 32].copy_from_slice(&genesis_roster_commitment(C, &[]).unwrap());
+    assert_eq!(
+        CutoverCommitmentV1::decode(&empty_roster),
+        Err(CutoverError::EmptyRoster)
+    );
+    let mut zero_m = bytes.clone();
+    zero_m[n - 32..].copy_from_slice(&[0; 32]);
+    assert_eq!(
+        CutoverCommitmentV1::decode(&zero_m),
+        Err(CutoverError::ZeroRecognitionMap)
+    );
     // Decoding re-validates: an encoding of L == S is refused.
     let mut same = Vec::new();
     same.extend_from_slice(&bytes[..version_at + 2]);

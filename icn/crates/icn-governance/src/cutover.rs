@@ -140,6 +140,11 @@ impl CutoverCommitmentV1 {
     }
 
     /// The structural rules every commitment must meet. They do not establish succession.
+    ///
+    /// The empty-roster and all-zero-`M` refusals catch placeholders only; they prove nothing
+    /// about an electorate or a map. Only `M` gets a placeholder check because it is the one field
+    /// this slice cannot recompute or relate to anything: `C` and `h1` are checked by P6 against
+    /// the inception and genesis evidence, and `R` is recomputed from that genesis.
     pub fn validate(&self) -> Result<(), CutoverError> {
         if self.predecessor.0.is_empty() || self.successor.0.is_empty() {
             return Err(CutoverError::EmptyDomain);
