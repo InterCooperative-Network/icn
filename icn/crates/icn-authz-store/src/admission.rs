@@ -346,6 +346,16 @@ impl AdmissionRegistryV0 {
         Ok(())
     }
 
+    /// Test-only: insert without the install-time checks, to prove the admission boundary
+    /// refuses unsupported stored versions on its own.
+    #[cfg(test)]
+    pub(crate) fn install_unchecked_for_test(
+        &mut self,
+        verifier: Arc<dyn CustodianAdmissionVerifierV0>,
+    ) {
+        self.verifiers.insert(verifier.policy(), verifier);
+    }
+
     pub(crate) fn get(
         &self,
         policy: &AdmissionPolicyRefV0,

@@ -1016,6 +1016,14 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
                 "pool does not declare a custodian admission policy".into(),
             ));
         };
+        // F-1 boundary invariant: a pool stored at an unsupported policy version is refused here,
+        // before any verifier is selected, whatever the registry contains and whatever any
+        // verifier reports about itself. The record is not migrated or reinterpreted.
+        if policy.version > MAX_SUPPORTED_ADMISSION_POLICY_VERSION {
+            return Err(ReservationError::UnsupportedAdmissionPolicyVersion(
+                policy.version,
+            ));
+        }
         let verifier = self.admission.get(&policy).ok_or_else(|| {
             ReservationError::AdmissionUnavailable(
                 "no installed verifier for the pool's admission policy and version".into(),
@@ -2881,6 +2889,74 @@ mod tests {
         }
     }
 
+    /// A verifier that reports one identity at install and another afterwards.
+    struct ShiftingVerifier {
+        calls: std::sync::atomic::AtomicUsize,
+        first: AdmissionPolicyRefV0,
+        later: AdmissionPolicyRefV0,
+    }
+
+    impl crate::CustodianAdmissionVerifierV0 for ShiftingVerifier {
+        fn policy(&self) -> AdmissionPolicyRefV0 {
+            if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                self.first
+            } else {
+                self.later
+            }
+        }
+        fn preflight(
+            &self,
+            _: &CheckpointedEvidenceV0,
+            _: &dyn Any,
+            _: [u8; 32],
+            _: u64,
+        ) -> Result<crate::VerifiedAdmissionV0, crate::AdmissionRefusalV0> {
+            panic!("a verifier must never be consulted for an unsupported stored version");
+        }
+    }
+
+    /// The admission boundary refuses an unsupported stored version independently of the
+    /// registry: even a verifier keyed under that version (impossible through `install`, forced
+    /// here with a test-only path) or one whose reported identity shifts is never consulted, and
+    /// nothing is consumed or changed.
+    #[test]
+    fn the_admission_boundary_refuses_unsupported_stored_versions_regardless_of_the_registry() {
+        use AdmissionGradeV0::Production;
+        let v7 = AdmissionPolicyRefV0 {
+            id: [0xA1; 32],
+            version: 7,
+        };
+        let mut registry = AdmissionRegistryV0::new();
+        registry.install_unchecked_for_test(std::sync::Arc::new(NeverCalled(v7)));
+        registry
+            .install(std::sync::Arc::new(ShiftingVerifier {
+                calls: std::sync::atomic::AtomicUsize::new(0),
+                first: AdmissionPolicyRefV0 {
+                    id: [0xA2; 32],
+                    version: 1,
+                },
+                later: v7,
+            }))
+            .unwrap();
+        registry.install_clock(FixedClock::at(1_000)).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_admission(registry);
+        let legacy = pool_v1(policy(0xA1, 7, Production));
+        raw_pool_record(&store, legacy.clone());
+        assert_eq!(
+            store.reserve_admitted(&evidence(1_500), &(), &request()),
+            Err(ReservationError::UnsupportedAdmissionPolicyVersion(7))
+        );
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(legacy))
+        );
+        assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
+        assert!(store.inspect_reservation(CTX, OP).unwrap().is_none());
+    }
+
     #[test]
     fn a_stored_unsupported_version_record_is_not_reinterpreted_and_fails_closed() {
         use AdmissionGradeV0::Production;
@@ -2901,11 +2977,11 @@ mod tests {
             store.inspect_pool_record(CTX, POOL).unwrap(),
             Some(ResourcePoolRecord::V1(legacy.clone()))
         );
-        // Admission fails closed: no installed verifier answers to version 7.
-        assert!(matches!(
+        // Admission is refused at the boundary, before any verifier is consulted.
+        assert_eq!(
             store.reserve_admitted(&evidence(1_500), &(), &request()),
-            Err(ReservationError::AdmissionUnavailable(_))
-        ));
+            Err(ReservationError::UnsupportedAdmissionPolicyVersion(7))
+        );
         // Redeclaration refuses it (frozen), and nothing changes.
         assert_eq!(
             store.redeclare_pool_requirement(&admin, CTX, POOL, 0, policy(0xA2, 1, Production)),
