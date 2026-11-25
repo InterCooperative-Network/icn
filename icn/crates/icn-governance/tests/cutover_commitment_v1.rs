@@ -8,9 +8,10 @@
 use icn_authz::effect_v0::{ContextRef, MAX_INPUTS, MAX_ROLE_LEN};
 use icn_governance::cutover::{
     genesis_roster_commitment, CutoverCommitmentV1, CutoverError, CUTOVER_DOMAIN,
-    CUTOVER_ROSTER_DOMAIN,
+    CUTOVER_ROSTER_DOMAIN, MAX_CUTOVER_DOMAIN_ID_BYTES,
 };
 use icn_governance::domain::GovernanceDomainId;
+use icn_governance::institutional_domain::authority_binding::MAX_BINDING_DOMAIN_ID_BYTES;
 use icn_identity::authority_log::SubjectId;
 
 const C: ContextRef = ContextRef([0xC1; 32]);
@@ -303,4 +304,71 @@ fn the_two_tags_are_distinct_and_neither_is_a_prefix_of_the_other() {
     assert_ne!(CUTOVER_DOMAIN, CUTOVER_ROSTER_DOMAIN);
     assert!(!CUTOVER_ROSTER_DOMAIN.starts_with(CUTOVER_DOMAIN));
     assert!(!CUTOVER_DOMAIN.starts_with(CUTOVER_ROSTER_DOMAIN));
+}
+
+/// D-S20-11: one shared 1024-byte cap on `L` and `S`, the P2 binding's, enforced by the
+/// constructor, the encoder and the decoder alike; at the cap is accepted, one past is refused,
+/// and nothing is normalized or truncated.
+#[test]
+fn domain_ids_are_capped_at_the_shared_institutional_bound() {
+    assert_eq!(MAX_CUTOVER_DOMAIN_ID_BYTES, 1024);
+    assert_eq!(MAX_CUTOVER_DOMAIN_ID_BYTES, MAX_BINDING_DOMAIN_ID_BYTES);
+    let r = genesis_roster_commitment(C, &three()).unwrap();
+    let new = |l: String, s: String| CutoverCommitmentV1::new(domain(&l), domain(&s), C, H1, r, M);
+    let at = "l".repeat(MAX_CUTOVER_DOMAIN_ID_BYTES);
+    let over = "l".repeat(MAX_CUTOVER_DOMAIN_ID_BYTES + 1);
+
+    // At the cap, on either side, round-trips exactly.
+    let ok = new(at.clone(), "s".into()).unwrap();
+    assert_eq!(
+        CutoverCommitmentV1::decode(&ok.encode().unwrap()).unwrap(),
+        ok
+    );
+    let ok = new("l".into(), "s".repeat(MAX_CUTOVER_DOMAIN_ID_BYTES)).unwrap();
+    assert_eq!(
+        CutoverCommitmentV1::decode(&ok.encode().unwrap()).unwrap(),
+        ok
+    );
+
+    // One past, on either side, through the constructor.
+    assert_eq!(
+        new(over.clone(), "s".into()),
+        Err(CutoverError::DomainTooLong)
+    );
+    assert_eq!(
+        new("l".into(), over.clone()),
+        Err(CutoverError::DomainTooLong)
+    );
+
+    // A multi-byte id is measured in UTF-8 bytes, not characters: 512 two-byte chars fit,
+    // 513 do not.
+    assert!(new("ñ".repeat(512), "s".into()).is_ok());
+    assert_eq!(
+        new("ñ".repeat(513), "s".into()),
+        Err(CutoverError::DomainTooLong)
+    );
+
+    // The decoder refuses an over-long L or S framed correctly by hand (no constructor bypass).
+    let lp = |b: &[u8]| {
+        let mut v = (b.len() as u32).to_be_bytes().to_vec();
+        v.extend_from_slice(b);
+        v
+    };
+    for (l, s) in [(over.as_str(), "s"), ("l", over.as_str())] {
+        let mut bytes = lp(CUTOVER_DOMAIN);
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&lp(l.as_bytes()));
+        bytes.extend_from_slice(&lp(s.as_bytes()));
+        bytes.extend_from_slice(&C.0);
+        bytes.extend_from_slice(&H1);
+        bytes.extend_from_slice(&r);
+        bytes.extend_from_slice(&M);
+        assert_eq!(
+            CutoverCommitmentV1::decode(&bytes),
+            Err(CutoverError::DomainTooLong)
+        );
+    }
+
+    // The existing golden vector is unaffected (its ids are 19 and 22 bytes).
+    assert_eq!(hex(&example().encode().unwrap()), GOLDEN_ENCODING);
 }
