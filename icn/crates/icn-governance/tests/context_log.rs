@@ -23,6 +23,7 @@ use icn_authz::effect_v0::{
     RuleBinding, RuleError, RuleResolver, RuleSlot, Signed, SignedDesignation, SignedLogEntryV0,
     StandingV0, TransitionV0, Verdict, WriterDesignationV0,
 };
+use icn_authz_store::DurableConsumedSet;
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::vote::VoteChoice;
 use icn_identity::authority_log::{
@@ -1301,7 +1302,7 @@ impl ConsumedSet for Failing {
         _: [u8; 32],
         _: ConsumedEntry,
     ) -> Result<Option<ConsumedEntry>, ConsumedSetError> {
-        Err(ConsumedSetError("backend unavailable".into()))
+        Err(ConsumedSetError::Unavailable("backend unavailable".into()))
     }
 }
 
@@ -1319,7 +1320,7 @@ impl ConsumedSet for Shared {
     ) -> Result<Option<ConsumedEntry>, ConsumedSetError> {
         self.0
             .lock()
-            .map_err(|_| ConsumedSetError("poisoned".into()))?
+            .map_err(|_| ConsumedSetError::Unavailable("poisoned".into()))?
             .consume(context, operation_id, entry)
     }
 }
@@ -1910,7 +1911,7 @@ fn n_consumed_set_failure_fails_closed() {
     assert_eq!(
         w.admit(&ev, &w.frontier(1, None), NOW, &mut Failing)
             .unwrap_err(),
-        AdmissionRefusal::ConsumedSet(ConsumedSetError("backend unavailable".into()))
+        AdmissionRefusal::ConsumedSet(ConsumedSetError::Unavailable("backend unavailable".into()))
     );
 }
 
@@ -2067,4 +2068,133 @@ fn t_resigned_authorization_is_refused_without_consuming() {
     }
     assert_eq!(consumed.calls, 0);
     assert_not_consumed(&w, &mut consumed);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Durable admission across a restart (icn-authz-store): ADMITTED + PERSISTED. Nothing here is
+// reserved, executed or settled.
+// ---------------------------------------------------------------------------------------------
+
+fn durable(dir: &std::path::Path) -> DurableConsumedSet {
+    DurableConsumedSet::open(dir).unwrap()
+}
+
+/// A, B, C, O: an admission persisted by one target process is remembered by the next. After a
+/// close and reopen the identical authorization is a replay, a different one for the same
+/// operation id is a conflict attributable to the writer, and the stored record is the
+/// checkpointed variant with its writer and exact signed statement.
+#[test]
+fn durable_admission_survives_reopen() {
+    let w = world();
+    let dir = tempfile::tempdir().unwrap();
+    let (mut log, first) = w.honest();
+    w.admit(&first, &w.frontier(1, None), NOW, &mut durable(dir.path()))
+        .unwrap();
+
+    log.push(w.next(
+        &log,
+        grant(&Member::new(0x04)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+    ));
+    let second = w.authorize(
+        &log,
+        checkpoint(&w.state(&log)),
+        &w.writer,
+        // Four members after the grant: three votes meet the 2/3 quorum.
+        &[w.m(0), w.m(1), w.m(2)],
+    );
+
+    let mut set = durable(dir.path());
+    let stored = set.inspect(w.ctx, OP).unwrap().unwrap();
+    assert_eq!(
+        stored.authorization,
+        ConsumedAuthorization::Checkpointed(first.authorization.clone())
+    );
+    assert_eq!(stored.writer, World::pk(&w.writer));
+    assert_eq!(
+        w.admit(&first, &w.frontier(1, None), NOW, &mut set)
+            .unwrap_err(),
+        AdmissionRefusal::Replayed
+    );
+    let proof = equivocation(w.admit(&second, &w.frontier(1, None), NOW, &mut set));
+    assert_eq!(
+        proof.classify(),
+        Some(ConflictClass::Equivocation {
+            signer: World::pk(&w.writer)
+        })
+    );
+}
+
+/// D: the legacy/checkpointed collision on one operation id survives a restart, in both orders.
+#[test]
+fn durable_cross_format_collision_survives_reopen() {
+    let w = world();
+    let (_, checkpointed) = w.honest();
+    let legacy = w.legacy(OP, &[w.m(0), w.m(1)]);
+    let frontier = w.frontier(1, None);
+    for legacy_first in [true, false] {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let mut set = durable(dir.path());
+            if legacy_first {
+                w.admit_legacy(&legacy, &mut set).unwrap();
+            } else {
+                w.admit(&checkpointed, &frontier, NOW, &mut set).unwrap();
+            }
+        }
+        let mut set = durable(dir.path());
+        let proof = if legacy_first {
+            equivocation(w.admit(&checkpointed, &frontier, NOW, &mut set))
+        } else {
+            equivocation(w.admit_legacy(&legacy, &mut set))
+        };
+        assert_eq!(proof.classify(), Some(ConflictClass::CrossKind));
+        let replay = if legacy_first {
+            w.admit_legacy(&legacy, &mut set).map(|_| ())
+        } else {
+            w.admit(&checkpointed, &frontier, NOW, &mut set).map(|_| ())
+        };
+        assert_eq!(replay, Err(AdmissionRefusal::Replayed));
+    }
+}
+
+/// Q: refused authorizations persist nothing; after a restart the operation is still free.
+#[test]
+fn durable_refusals_persist_nothing() {
+    let w = world();
+    let dir = tempfile::tempdir().unwrap();
+    let log = vec![w.genesis()];
+    let cp = checkpoint(&w.state(&log));
+    let fail = w.authorize_op(
+        &log,
+        cp,
+        &w.writer,
+        &[w.m(0), w.m(1)],
+        VoteChoice::Against,
+        Verdict::Fail,
+        OP,
+    );
+    let (_, honest) = w.honest();
+    {
+        let mut set = durable(dir.path());
+        assert_eq!(
+            w.admit(&fail, &w.frontier(1, None), NOW, &mut set)
+                .unwrap_err(),
+            AdmissionRefusal::VerdictNotPass
+        );
+        assert_eq!(
+            w.admit(&honest, &w.frontier(1, None), NOT_AFTER + 1, &mut set)
+                .unwrap_err(),
+            AdmissionRefusal::Expired {
+                not_after: NOT_AFTER,
+                now: NOT_AFTER + 1
+            }
+        );
+    }
+    let mut set = durable(dir.path());
+    assert_eq!(set.inspect(w.ctx, OP), Ok(None));
+    assert!(w
+        .admit(&honest, &w.frontier(1, None), NOW, &mut set)
+        .is_ok());
 }

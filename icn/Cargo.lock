@@ -2935,6 +2935,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-authz-store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ed25519-dalek",
+ "icn-authz",
+ "icn-identity",
+ "icn-store",
+ "tempfile",
+]
+
+[[package]]
 name = "icn-baseline-lock"
 version = "0.1.0"
 dependencies = [
@@ -3392,6 +3404,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "icn-authz",
+ "icn-authz-store",
  "icn-encoding",
  "icn-entity",
  "icn-federation",

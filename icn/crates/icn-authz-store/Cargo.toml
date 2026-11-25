@@ -1,0 +1,22 @@
+[package]
+name = "icn-authz-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Durable replay consumption for icn-authz effect_v0 admission (experimental)"
+
+[dependencies]
+# Substrate adapter: icn-authz stays storage-free; this crate binds its ConsumedSet contract to
+# an explicitly durable icn-store backend (sled). No domain dependency.
+icn-authz = { path = "../icn-authz" }
+icn-store = { path = "../icn-store" }
+
+[dev-dependencies]
+anyhow.workspace = true
+ed25519-dalek.workspace = true
+icn-identity = { path = "../icn-identity" }
+tempfile = "3"
+
+[lints]
+workspace = true
