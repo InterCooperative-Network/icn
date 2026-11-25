@@ -72,6 +72,10 @@ use crate::Timestamp;
 /// domain's serialized form is unchanged (EXPERIMENTAL, unratified).
 pub mod authority_binding;
 
+/// A trust anchor derived from a stored authority binding and its context's founding evidence
+/// (EXPERIMENTAL, unratified).
+pub mod anchor_derivation;
+
 /// Content-addressed identifier for a [`DomainPolicy`] version.
 ///
 /// The blake3 hash of the policy's canonical content. Distinct, searchable
