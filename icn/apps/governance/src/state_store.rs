@@ -1532,6 +1532,33 @@ mod proposal_identity_tests {
     }
 
     #[test]
+    fn a_closed_proposal_keeps_its_metadata_too_not_only_its_state() {
+        // The whole closed value is final, not just `state`: a rewrite that keeps
+        // the terminal state but changes any other field is refused.
+        let (inner, state) = sled();
+        let mut p = proposal("d1", "p1", "decided");
+        p.veto("stop".into()).unwrap();
+        state.save_proposal(&p).unwrap();
+        let before = raw(inner.as_ref(), "p1").unwrap();
+
+        let mut retitled = p.clone();
+        retitled.title = "rewritten after the decision".into();
+        assert!(matches!(
+            refusal(state.save_proposal(&retitled).unwrap_err()),
+            ProposalWriteRefused::ClosedIsFinal { .. }
+        ));
+        let mut repayloaded = p.clone();
+        repayloaded.payload = ProposalPayload::Text {
+            body: "other".into(),
+        };
+        assert!(matches!(
+            refusal(state.save_proposal(&repayloaded).unwrap_err()),
+            ProposalWriteRefused::ClosedIsFinal { .. }
+        ));
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+    }
+
+    #[test]
     fn save_rechecks_against_a_row_that_changed_after_its_read() {
         // Another writer closes the proposal between save's read and its
         // compare-and-put. The stale write must not land; the re-read sees the
