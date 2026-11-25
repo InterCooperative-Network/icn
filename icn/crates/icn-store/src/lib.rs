@@ -408,9 +408,12 @@ pub trait Store: Send + Sync {
     ///   nothing is written and [`CompareAndWrite::Conflict`] names the first failing expectation
     ///   (in the caller's order) with the value actually found. A conflict is an expected outcome
     ///   under concurrency, not an error.
-    /// * **Errors write nothing.** `Err` means the backend could not answer; the caller must
-    ///   assume nothing was written. An interrupted commit is never partially visible after a
-    ///   crash, reopen or restart.
+    /// * **Errors are not applied durably.** `Err` means the backend could not answer. After a
+    ///   crash, reopen or restart, no write of a call that returned `Err` is visible: an
+    ///   interrupted commit is never partially recovered. Within the running process, a storage
+    ///   error in the middle of a commit may leave some of its writes visible until restart (the
+    ///   same limit as [`Store::delete_atomic`]), so the caller must treat the state of every key
+    ///   in `writes` as unknown after an `Err` and re-read before acting on it.
     /// * **Request validation.** `writes` must be non-empty; neither list may name a key twice;
     ///   neither list may exceed [`MAX_COMPARE_AND_WRITE_ENTRIES`]. A malformed request is refused
     ///   with [`CompareAndWriteInvalid`] before anything is read or written. A key may appear in
@@ -419,8 +422,17 @@ pub trait Store: Send + Sync {
     /// * **Interoperation.** On a backend that implements this, single-key writes to the same keys
     ///   ([`Store::put`], [`Store::compare_and_put`], [`Store::delete`]) are serialized with it:
     ///   none can land between the comparison and the write of a compare-and-write.
+    /// * **Cost.** A backend may hold a coarse lock for the whole call (sled holds a
+    ///   process-wide write lock that stalls every sled store in the process), so keep both lists
+    ///   small. Values are unbounded in size, as for [`Store::put`].
+    /// * **No snapshot reads elsewhere.** This makes the *write* atomic. Plain [`Store::get`] and
+    ///   [`Store::scan`] are not snapshot reads and may observe some keys before and some after a
+    ///   concurrent compare-and-write.
     ///
     /// The store gives the keys and values no meaning (Meaning Firewall).
+    ///
+    /// A wrapper `Store` that delegates to an inner store inherits the refusing default below; it
+    /// must forward this method deliberately if it wants the capability.
     ///
     /// # Unsupported backends fail closed
     ///
@@ -1189,6 +1201,11 @@ impl Store for SledStore {
         writes: &[Mutation<'_>],
     ) -> Result<CompareAndWrite> {
         validate_compare_and_write(expect, writes)?;
+        // ORDERING INVARIANT: every expectation is read before anything is staged. Sled commits
+        // whatever was staged when the closure returns `Ok`, including on the `Conflict` path,
+        // so staging a write before the last comparison (or "on conflict") would commit a
+        // partial write while reporting `Conflict`. Reads therefore always see the database,
+        // never a write staged by this call, which is also why a key may be in both lists.
         self.transaction(|tx| {
             for e in expect {
                 let current = tx.get(e.key)?;

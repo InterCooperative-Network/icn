@@ -166,6 +166,61 @@ fn malformed_requests_are_refused_before_any_write() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn with_several_failing_expectations_the_first_in_caller_order_is_reported() -> Result<()> {
+    let (_dir, sled) = sled();
+    let store: &dyn Store = &sled;
+    store.put(b"a", b"1")?;
+    store.put(b"b", b"2")?;
+    let before = store.scan(b"")?;
+    // Both fail. The caller's order, not key order, decides which one is named.
+    let outcome = store.compare_and_write(
+        &[exp(b"b", Some(b"wrong")), exp(b"a", Some(b"wrong"))],
+        &[set(b"c", b"X")],
+    )?;
+    assert_eq!(
+        outcome,
+        CompareAndWrite::Conflict {
+            key: b"b".to_vec(),
+            current: Some(b"2".to_vec()),
+        }
+    );
+    assert_eq!(store.scan(b"")?, before);
+    Ok(())
+}
+
+#[test]
+fn exactly_the_maximum_number_of_expectations_is_accepted_and_every_one_is_checked() -> Result<()> {
+    let (_dir, sled) = sled();
+    let store: &dyn Store = &sled;
+    let keys: Vec<Vec<u8>> = (0..MAX_COMPARE_AND_WRITE_ENTRIES)
+        .map(|i| format!("k{i:04}").into_bytes())
+        .collect();
+    for k in &keys {
+        store.put(k, b"v")?;
+    }
+    let holding: Vec<Expectation<'_>> = keys.iter().map(|k| exp(k, Some(b"v"))).collect();
+    assert_eq!(
+        store.compare_and_write(&holding, &[set(b"out", b"1")])?,
+        CompareAndWrite::Applied
+    );
+    assert_eq!(store.get(b"out")?, Some(b"1".to_vec()));
+
+    // Only the last of the maximum number of expectations fails: it is still checked.
+    let last = keys.last().unwrap();
+    store.put(last, b"changed")?;
+    let outcome = store.compare_and_write(&holding, &[set(b"out", b"2")])?;
+    assert_eq!(
+        outcome,
+        CompareAndWrite::Conflict {
+            key: last.clone(),
+            current: Some(b"changed".to_vec()),
+        }
+    );
+    assert_eq!(store.get(b"out")?, Some(b"1".to_vec()));
+    Ok(())
+}
+
 /// A backend that does not override `compare_and_write` refuses it; it never emulates it with
 /// sequential reads and writes.
 struct NoMultiKey(SledStore);
