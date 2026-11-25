@@ -2668,8 +2668,9 @@ fn a_v1_pool_consults_only_its_exact_verifier_and_never_falls_back() {
     assert_eq!((record.available_before, record.available_after), (10, 6));
 }
 
-/// A malformed or unknown policy version or identity is never interpreted: with no verifier
-/// installed under it, admission fails closed and nothing changes.
+/// A malformed or unknown policy version or identity is never interpreted: an unsupported version
+/// is refused at creation, and a supported version naming an identity no installed verifier answers
+/// to fails closed at admission. Nothing changes.
 #[test]
 fn an_unknown_or_malformed_policy_identity_fails_closed() {
     let inst = Institution::new(DOMAIN);
@@ -2677,8 +2678,28 @@ fn an_unknown_or_malformed_policy_identity_fails_closed() {
     let rehearsal = inst.trust(2, None);
     use InstitutionalAdmissionPolicyVersion::{V0, V1};
     let v1 = InstitutionalAdmissionVerifierV0::policy_ref_v1(&rehearsal);
+    // An unsupported version cannot even be declared through the typed API (F3 F-1).
+    let dir = tempfile::tempdir().unwrap();
+    let (target, admin) = LocalResourceReservations::open(dir.path(), inst.custodian)
+        .unwrap()
+        .with_pool_admin();
+    assert_eq!(
+        target.initialize_pool_v1(
+            &admin,
+            ResourcePoolV1 {
+                pool: inst.pool(10),
+                admission: AdmissionRequirementV1::Policy {
+                    policy: AdmissionPolicyRefV0 { version: 2, ..v1 },
+                    min_grade: AdmissionGradeV0::Rehearsal,
+                },
+            },
+        ),
+        Err(ReservationError::UnsupportedAdmissionPolicyVersion(2))
+    );
+    assert_eq!(target.inspect_pool_record(inst.ctx, POOL).unwrap(), None);
+    drop(target);
+    // Supported versions with a mismatched or unknown identity fail closed at admission.
     for malformed in [
-        AdmissionPolicyRefV0 { version: 2, ..v1 },
         AdmissionPolicyRefV0 { version: 0, ..v1 },
         AdmissionPolicyRefV0 {
             id: InstitutionalAdmissionVerifierV0::policy_ref(&rehearsal).id,
