@@ -320,6 +320,35 @@ fn domain_ids_are_bounded_and_keys_are_disjoint_and_unambiguous() {
 }
 
 #[test]
+fn an_over_long_stored_domain_id_is_refused_before_it_is_read() {
+    // A record whose L field claims 1025 bytes (framed correctly) is refused for its length, not
+    // read in full and then compared.
+    let over = "l".repeat(1025);
+    let mut b = Vec::new();
+    let lp = |out: &mut Vec<u8>, x: &[u8]| {
+        out.extend_from_slice(&(x.len() as u32).to_be_bytes());
+        out.extend_from_slice(x);
+    };
+    lp(&mut b, b"icn.governance.predecessor-lifecycle.v1");
+    b.extend_from_slice(&1u16.to_be_bytes());
+    lp(&mut b, over.as_bytes());
+    b.extend_from_slice(&[0; 64]);
+    assert_eq!(
+        LifecycleRecordV1::decode_for(&d(L), &b),
+        Err(E::InvalidDomain)
+    );
+    let mut w = Vec::new();
+    lp(&mut w, b"icn.governance.predecessor-lifecycle-witness.v1");
+    w.extend_from_slice(&1u16.to_be_bytes());
+    lp(&mut w, over.as_bytes());
+    w.extend_from_slice(&[0; 40]);
+    assert_eq!(
+        LifecycleWitnessV1::decode_for(&d(L), &w),
+        Err(E::InvalidDomain)
+    );
+}
+
+#[test]
 fn every_basis_input_changes_the_basis_and_the_pin_is_category_separated() {
     let pin = domain_record_pin(STORED_DOMAIN);
     let base = lifecycle_basis(&d(L), 1, &EL, &pin).unwrap();
