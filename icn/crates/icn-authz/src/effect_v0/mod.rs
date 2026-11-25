@@ -8,6 +8,9 @@
 //! bytes for this Subject" and "this target may act":
 //!
 //! - [`ContextInceptionV0`] / [`ContextRef`] — a self-certifying context and its founders;
+//! - [`ContextInceptionV1`] — the same, plus a required opaque `served_subject` commitment
+//!   (**experimental**, `icn.authz.v1.inception`); [`ContextInception`] / [`ContextInceptionRef`]
+//!   carry either version through replay, checkpointed verification and fork detection;
 //! - [`WriterDesignationV0`] — founders (≥ threshold) designate the epoch's single writer
 //!   (**provisional**: single-writer-per-context is unvalidated, T9 not run);
 //! - [`StandingV0`], [`RuleAdoptionV0`], [`AuthorizationV0`] — writer-signed statements;
@@ -26,7 +29,8 @@
 //! ## Status
 //!
 //! Formats are v0 experimental (`icn.authz.v0.*` domains, version 0), not gossiped, not persisted
-//! by any daemon, and droppable without migration. No context-kind byte is introduced.
+//! by any daemon, and droppable without migration. No context-kind byte is introduced. The one
+//! v1 format, [`ContextInceptionV1`], is equally experimental and unratified.
 //! [`InMemoryConsumedSet`] is not durable replay protection.
 
 mod codec;
@@ -46,12 +50,13 @@ pub use log::{
 };
 pub use statements::{
     roster_hash, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
-    ContextInceptionV0, ContextRef, EffectV0, FounderSignature, InputActV0, OutcomeReceiptV0,
-    RuleAdoptionV0, Signed, SignedDesignation, StandingV0, Verdict, WriterDesignationV0,
-    AUTHORIZATION_DOMAIN, AUTHZ_V0_VERSION, CONTEXT_REF_DOMAIN, DESIGNATION_DOMAIN,
-    EVIDENCE_DOMAIN, INCEPTION_DOMAIN, MAX_ACTION_LEN, MAX_FOUNDERS, MAX_INPUTS, MAX_ROLE_LEN,
-    MAX_RULE_ARTIFACT, MAX_VOTE_BUNDLE, OUTCOME_DOMAIN, ROSTER_DOMAIN, RULE_ADOPTION_DOMAIN,
-    STANDING_DOMAIN, SUBJECT_MATTER_DOMAIN, TARGET_DOMAIN,
+    ContextInception, ContextInceptionRef, ContextInceptionV0, ContextInceptionV1, ContextRef,
+    EffectV0, FounderSignature, InputActV0, OutcomeReceiptV0, RuleAdoptionV0, Signed,
+    SignedDesignation, StandingV0, Verdict, WriterDesignationV0, AUTHORIZATION_DOMAIN,
+    AUTHZ_V0_VERSION, CONTEXT_REF_DOMAIN, DESIGNATION_DOMAIN, EVIDENCE_DOMAIN, INCEPTION_DOMAIN,
+    INCEPTION_V1_DOMAIN, INCEPTION_V1_VERSION, MAX_ACTION_LEN, MAX_FOUNDERS, MAX_INPUTS,
+    MAX_ROLE_LEN, MAX_RULE_ARTIFACT, MAX_VOTE_BUNDLE, OUTCOME_DOMAIN, ROSTER_DOMAIN,
+    RULE_ADOPTION_DOMAIN, STANDING_DOMAIN, SUBJECT_MATTER_DOMAIN, TARGET_DOMAIN,
 };
 pub use verify::{
     admit, designation_equivocators, issue_outcome_receipt, verify_authorization,

@@ -29,6 +29,49 @@ impl std::fmt::Display for GovernanceDomainId {
     }
 }
 
+/// Domain tag of [`served_domain_commitment`] (EXPERIMENTAL, unratified).
+pub const SERVED_DOMAIN_DOMAIN: &[u8] = b"icn.governance.served-domain.v1";
+
+/// Why a [`GovernanceDomainId`] has no served-domain commitment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ServedDomainError {
+    /// The id is the empty string, which names no decision space.
+    #[error("governance domain id is empty")]
+    Empty,
+    /// The id's UTF-8 length does not fit the `u32be` length frame.
+    #[error("governance domain id exceeds the u32 length frame")]
+    TooLong,
+}
+
+/// The commitment a context inception's `served_subject` carries when the context serves the
+/// governance decision space `domain`:
+///
+/// `SHA-256( u32be(len(tag)) || tag || u32be(len(utf8 id)) || utf8 id )`, with
+/// `tag = icn.governance.served-domain.v1`.
+///
+/// The id is committed as its exact UTF-8 bytes — no trimming, case folding or normalization —
+/// and the empty id is refused. The commitment names a **decision space** only: it is not an
+/// `EntityId` and says nothing about which institution owns the domain. EXPERIMENTAL, unratified.
+pub fn served_domain_commitment(
+    domain: &GovernanceDomainId,
+) -> Result<[u8; 32], ServedDomainError> {
+    use sha2::{Digest, Sha256};
+
+    let id = domain.0.as_bytes();
+    if id.is_empty() {
+        return Err(ServedDomainError::Empty);
+    }
+    let id_len = u32::try_from(id.len()).map_err(|_| ServedDomainError::TooLong)?;
+    let tag_len =
+        u32::try_from(SERVED_DOMAIN_DOMAIN.len()).map_err(|_| ServedDomainError::TooLong)?;
+    let mut hasher = Sha256::new();
+    hasher.update(tag_len.to_be_bytes());
+    hasher.update(SERVED_DOMAIN_DOMAIN);
+    hasher.update(id_len.to_be_bytes());
+    hasher.update(id);
+    Ok(hasher.finalize().into())
+}
+
 /// A governance domain represents a decision space for a community
 ///
 /// Examples: a cooperative, a working group, a project team
@@ -229,5 +272,62 @@ mod tests {
     fn test_domain_id_display() {
         let id = GovernanceDomainId::new("test-domain");
         assert_eq!(format!("{id}"), "test-domain");
+    }
+
+    /// Reference vectors computed independently (Python `hashlib`, u32be framing), not by this
+    /// implementation.
+    #[test]
+    fn served_domain_commitment_reference_vectors() {
+        let vectors: &[(&str, &str)] = &[
+            (
+                "coop-a",
+                "dc0235281c57ac74fa3106a07927ff206c7bfe8117e340501d4a3df30d534e52",
+            ),
+            (
+                "a",
+                "2f3c66e82fbf13929f1c31e228d59d2e5551ee0fe75e41a0f170c1b86914a5ba",
+            ),
+            (
+                "coop:x:y",
+                "670ebf5440aa9f828b3f7f5079db92878f9180a69147d4bbf8bcd1d0ee638769",
+            ),
+            (
+                "Coop-A",
+                "596a472dc68ec12013789d8be6414d621cada5ce78a4cbad150710367c020a48",
+            ),
+            (
+                "coop-a ",
+                "77676cc359aa47a266137b101e00a122226e2a10bbd522d4175c21a7b034943d",
+            ),
+            (
+                "d\u{e9}f",
+                "5df8d0526a71db7bad00063fd0ffd8ded3e76a9005eece0c0763f67efb763951",
+            ),
+        ];
+        for (id, expected) in vectors {
+            let got = served_domain_commitment(&GovernanceDomainId::new(*id)).unwrap();
+            assert_eq!(hex::encode(got), *expected, "id {id:?}");
+        }
+    }
+
+    #[test]
+    fn served_domain_commitment_refuses_empty() {
+        assert_eq!(
+            served_domain_commitment(&GovernanceDomainId::new("")),
+            Err(ServedDomainError::Empty)
+        );
+    }
+
+    /// Exact bytes: no trimming or case folding, and distinct ids never share a commitment.
+    #[test]
+    fn served_domain_commitment_is_exact_and_injective_on_samples() {
+        let ids = [
+            "coop-a", "Coop-A", "coop-a ", " coop-a", "coop-a\0", "coop-b", "coop",
+        ];
+        let commits: std::collections::BTreeSet<[u8; 32]> = ids
+            .iter()
+            .map(|id| served_domain_commitment(&GovernanceDomainId::new(*id)).unwrap())
+            .collect();
+        assert_eq!(commits.len(), ids.len());
     }
 }

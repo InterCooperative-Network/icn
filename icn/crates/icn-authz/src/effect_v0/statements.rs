@@ -19,6 +19,10 @@ pub const AUTHZ_V0_VERSION: u16 = 0;
 pub const CONTEXT_REF_DOMAIN: &[u8] = b"icn.authz.v0.context";
 /// Domain of [`ContextInceptionV0`] bytes.
 pub const INCEPTION_DOMAIN: &[u8] = b"icn.authz.v0.inception";
+/// Domain of [`ContextInceptionV1`] bytes (EXPERIMENTAL).
+pub const INCEPTION_V1_DOMAIN: &[u8] = b"icn.authz.v1.inception";
+/// Version carried by [`ContextInceptionV1`] bytes.
+pub const INCEPTION_V1_VERSION: u16 = 1;
 /// Domain of [`WriterDesignationV0`] bytes.
 pub const DESIGNATION_DOMAIN: &[u8] = b"icn.authz.v0.designation";
 /// Domain of [`StandingV0`] bytes.
@@ -102,8 +106,10 @@ pub trait CanonicalV0: Sized {
 // Context
 // ---------------------------------------------------------------------------------------------
 
-/// A context's identity: `SHA-256(lp(CONTEXT_REF_DOMAIN) || canonical(ContextInceptionV0))`.
-/// Self-certifying: nobody signs an inception; whoever holds it can recompute the ref.
+/// A context's identity: `SHA-256(lp(CONTEXT_REF_DOMAIN) || lp(canonical inception))`, where the
+/// inception is a [`ContextInceptionV0`] or a [`ContextInceptionV1`] (one formula; the versions
+/// are separated by the inception's own leading domain tag). Self-certifying: nobody signs an
+/// inception; whoever holds it can recompute the ref.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ContextRef(pub [u8; 32]);
 
@@ -139,41 +145,51 @@ impl ContextInceptionV0 {
 
     /// Check the structural invariants that construction and decode enforce.
     pub fn validate(&self) -> Result<(), AuthzCodecError> {
-        if self.founders.is_empty() {
-            return Err(AuthzCodecError::InvalidValue { field: "founders" });
-        }
-        check_len("founders", self.founders.len(), MAX_FOUNDERS)?;
-        if !self
-            .founders
-            .windows(2)
-            .all(|w| w[0].as_bytes() < w[1].as_bytes())
-        {
-            return Err(AuthzCodecError::NotStrictlyAscending { field: "founders" });
-        }
-        // Quorum intersection: `2·threshold > founders`. Any two founder quorums then share a
-        // founder, so two conflicting writer designations for one epoch always carry a signature
-        // from someone who signed both (`designation_equivocators`). Without it, disjoint founder
-        // sets designate different writers with nobody misbehaving. Arrangements that want
-        // non-intersecting quorums (e.g. 1-of-2) need a multi-writer model, not this one.
-        let t = usize::from(self.threshold);
-        if t == 0 || t > self.founders.len() || 2 * t <= self.founders.len() {
-            return Err(AuthzCodecError::InvalidValue { field: "threshold" });
-        }
-        Ok(())
+        validate_founder_set(&self.founders, self.threshold)
     }
 
     /// This context's [`ContextRef`].
     pub fn context_ref(&self) -> ContextRef {
-        let mut w = Writer::new();
-        w.lp(CONTEXT_REF_DOMAIN);
-        w.lp(&self.canonical_bytes());
-        ContextRef(sha256(&w.finish()))
+        context_ref_of(&self.canonical_bytes())
     }
 
     /// Whether `key` is a founder.
     pub fn is_founder(&self, key: &PrincipalKey) -> bool {
         self.founders.iter().any(|f| f.as_bytes() == key.as_bytes())
     }
+}
+
+/// The founder-set invariants shared by every inception version.
+fn validate_founder_set(founders: &[PrincipalKey], threshold: u8) -> Result<(), AuthzCodecError> {
+    if founders.is_empty() {
+        return Err(AuthzCodecError::InvalidValue { field: "founders" });
+    }
+    check_len("founders", founders.len(), MAX_FOUNDERS)?;
+    if !founders
+        .windows(2)
+        .all(|w| w[0].as_bytes() < w[1].as_bytes())
+    {
+        return Err(AuthzCodecError::NotStrictlyAscending { field: "founders" });
+    }
+    // Quorum intersection: `2·threshold > founders`. Any two founder quorums then share a
+    // founder, so two conflicting writer designations for one epoch always carry a signature
+    // from someone who signed both (`designation_equivocators`). Without it, disjoint founder
+    // sets designate different writers with nobody misbehaving. Arrangements that want
+    // non-intersecting quorums (e.g. 1-of-2) need a multi-writer model, not this one.
+    let t = usize::from(threshold);
+    if t == 0 || t > founders.len() || 2 * t <= founders.len() {
+        return Err(AuthzCodecError::InvalidValue { field: "threshold" });
+    }
+    Ok(())
+}
+
+/// `SHA-256(lp(CONTEXT_REF_DOMAIN) || lp(inception_bytes))` — the one context-ref formula for
+/// every inception version. Versions are separated by the inception's own leading domain tag.
+fn context_ref_of(inception_bytes: &[u8]) -> ContextRef {
+    let mut w = Writer::new();
+    w.lp(CONTEXT_REF_DOMAIN);
+    w.lp(inception_bytes);
+    ContextRef(sha256(&w.finish()))
 }
 
 impl CanonicalV0 for ContextInceptionV0 {
@@ -209,6 +225,305 @@ impl CanonicalV0 for ContextInceptionV0 {
         };
         inception.validate()?;
         Ok(inception)
+    }
+}
+
+/// The founding statement of a context that serves a named subject: [`ContextInceptionV0`]'s
+/// founder set, threshold and label, plus a **required** `served_subject` commitment.
+///
+/// **EXPERIMENTAL, unratified.** Canonical bytes:
+/// `lp(INCEPTION_V1_DOMAIN) || u16(1) || count || founder·n || u8 threshold || label_hash ||
+/// served_subject`. The [`ContextRef`] formula is V0's, unchanged; it cannot collide with a V0
+/// context because the hashed inception bytes begin with a different domain tag.
+///
+/// `served_subject` is 32 opaque bytes: this crate never interprets it (Meaning Firewall). The
+/// consuming layer defines it — for a governance decision space, `served_domain_commitment` in
+/// `icn-governance`. All-zero is refused so that "unset" can never pass for a commitment.
+///
+/// Founders never sign an inception; they sign the genesis log entry, whose body carries the
+/// [`ContextRef`]. A founder quorum over a V1 context's genesis therefore commits to
+/// `served_subject` with no additional signed object.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextInceptionV1 {
+    /// Founder principals, strictly ascending by key bytes, 1..=[`MAX_FOUNDERS`].
+    pub founders: Vec<PrincipalKey>,
+    /// Founder signatures required: `founders.len() / 2 < threshold <= founders.len()`.
+    pub threshold: u8,
+    /// Hash of an off-protocol label. Bound, never interpreted.
+    pub label_hash: [u8; 32],
+    /// Commitment to the subject this context serves. Bound, never interpreted here; non-zero.
+    pub served_subject: [u8; 32],
+}
+
+impl ContextInceptionV1 {
+    /// Build a V1 inception, sorting founders. Refuses what [`ContextInceptionV0::new`] refuses,
+    /// and an all-zero `served_subject`.
+    pub fn new(
+        mut founders: Vec<PrincipalKey>,
+        threshold: u8,
+        label_hash: [u8; 32],
+        served_subject: [u8; 32],
+    ) -> Result<Self, AuthzCodecError> {
+        founders.sort_by_key(|k| k.as_bytes());
+        let inception = ContextInceptionV1 {
+            founders,
+            threshold,
+            label_hash,
+            served_subject,
+        };
+        inception.validate()?;
+        Ok(inception)
+    }
+
+    /// Check the structural invariants that construction and decode enforce.
+    pub fn validate(&self) -> Result<(), AuthzCodecError> {
+        validate_founder_set(&self.founders, self.threshold)?;
+        if self.served_subject == [0u8; 32] {
+            return Err(AuthzCodecError::InvalidValue {
+                field: "served_subject",
+            });
+        }
+        Ok(())
+    }
+
+    /// This context's [`ContextRef`] (the V0 formula over V1 bytes).
+    pub fn context_ref(&self) -> ContextRef {
+        context_ref_of(&self.canonical_bytes())
+    }
+
+    /// Whether `key` is a founder.
+    pub fn is_founder(&self, key: &PrincipalKey) -> bool {
+        self.founders.iter().any(|f| f.as_bytes() == key.as_bytes())
+    }
+}
+
+impl CanonicalV0 for ContextInceptionV1 {
+    fn canonical_bytes(&self) -> Vec<u8> {
+        let mut w = Writer::new();
+        w.lp(INCEPTION_V1_DOMAIN);
+        w.u16(INCEPTION_V1_VERSION);
+        w.count(self.founders.len());
+        for f in &self.founders {
+            write_principal(&mut w, f);
+        }
+        w.u8(self.threshold);
+        w.b32(&self.label_hash);
+        w.b32(&self.served_subject);
+        w.finish()
+    }
+
+    fn decode(bytes: &[u8]) -> Result<Self, AuthzCodecError> {
+        let mut r = Reader::new(bytes);
+        r.expect_domain(INCEPTION_V1_DOMAIN, "domain")?;
+        r.expect_version(INCEPTION_V1_VERSION)?;
+        let n = r.count("founders", MAX_FOUNDERS)?;
+        let mut founders = Vec::with_capacity(n);
+        for _ in 0..n {
+            founders.push(read_principal(&mut r, "founder")?);
+        }
+        let threshold = r.u8("threshold")?;
+        let label_hash = r.b32("label_hash")?;
+        let served_subject = r.b32("served_subject")?;
+        r.finish()?;
+        let inception = ContextInceptionV1 {
+            founders,
+            threshold,
+            label_hash,
+            served_subject,
+        };
+        inception.validate()?;
+        Ok(inception)
+    }
+}
+
+/// A context inception of any supported version. Owned form; carried by
+/// [`CheckpointedEvidenceV0`](super::CheckpointedEvidenceV0).
+///
+/// Its canonical bytes are exactly the inner version's: a V0 inception encodes byte-for-byte as
+/// before. [`CanonicalV0::decode`] dispatches on the leading domain tag and refuses any other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContextInception {
+    /// A [`ContextInceptionV0`].
+    V0(ContextInceptionV0),
+    /// A [`ContextInceptionV1`].
+    V1(ContextInceptionV1),
+}
+
+impl From<ContextInceptionV0> for ContextInception {
+    fn from(inception: ContextInceptionV0) -> Self {
+        ContextInception::V0(inception)
+    }
+}
+
+impl From<ContextInceptionV1> for ContextInception {
+    fn from(inception: ContextInceptionV1) -> Self {
+        ContextInception::V1(inception)
+    }
+}
+
+impl ContextInception {
+    /// A borrowed view of this inception.
+    pub fn as_view(&self) -> ContextInceptionRef<'_> {
+        match self {
+            ContextInception::V0(i) => ContextInceptionRef::V0(i),
+            ContextInception::V1(i) => ContextInceptionRef::V1(i),
+        }
+    }
+
+    /// See [`ContextInceptionRef::validate`].
+    pub fn validate(&self) -> Result<(), AuthzCodecError> {
+        self.as_view().validate()
+    }
+
+    /// See [`ContextInceptionRef::context_ref`].
+    pub fn context_ref(&self) -> ContextRef {
+        self.as_view().context_ref()
+    }
+
+    /// See [`ContextInceptionRef::founders`].
+    pub fn founders(&self) -> &[PrincipalKey] {
+        match self {
+            ContextInception::V0(i) => &i.founders,
+            ContextInception::V1(i) => &i.founders,
+        }
+    }
+
+    /// See [`ContextInceptionRef::threshold`].
+    pub fn threshold(&self) -> u8 {
+        self.as_view().threshold()
+    }
+
+    /// See [`ContextInceptionRef::label_hash`].
+    pub fn label_hash(&self) -> [u8; 32] {
+        self.as_view().label_hash()
+    }
+
+    /// See [`ContextInceptionRef::served_subject`].
+    pub fn served_subject(&self) -> Option<[u8; 32]> {
+        self.as_view().served_subject()
+    }
+
+    /// See [`ContextInceptionRef::is_founder`].
+    pub fn is_founder(&self, key: &PrincipalKey) -> bool {
+        self.as_view().is_founder(key)
+    }
+}
+
+/// `u32be(len(domain)) || domain` — the leading bytes of an inception of that domain.
+fn domain_prefix(domain: &[u8]) -> Vec<u8> {
+    let mut w = Writer::new();
+    w.lp(domain);
+    w.finish()
+}
+
+impl CanonicalV0 for ContextInception {
+    fn canonical_bytes(&self) -> Vec<u8> {
+        self.as_view().canonical_bytes()
+    }
+
+    fn decode(bytes: &[u8]) -> Result<Self, AuthzCodecError> {
+        if bytes.starts_with(&domain_prefix(INCEPTION_DOMAIN)) {
+            ContextInceptionV0::decode(bytes).map(ContextInception::V0)
+        } else if bytes.starts_with(&domain_prefix(INCEPTION_V1_DOMAIN)) {
+            ContextInceptionV1::decode(bytes).map(ContextInception::V1)
+        } else {
+            Err(AuthzCodecError::WrongDomain { field: "domain" })
+        }
+    }
+}
+
+/// A borrowed context inception of any supported version — what the log replay, checkpointed
+/// verification and fork-detection entry points take. `&ContextInceptionV0`,
+/// `&ContextInceptionV1` and `&ContextInception` all convert into it, so V0 callers are
+/// unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContextInceptionRef<'a> {
+    /// A [`ContextInceptionV0`].
+    V0(&'a ContextInceptionV0),
+    /// A [`ContextInceptionV1`].
+    V1(&'a ContextInceptionV1),
+}
+
+impl<'a> From<&'a ContextInceptionV0> for ContextInceptionRef<'a> {
+    fn from(inception: &'a ContextInceptionV0) -> Self {
+        ContextInceptionRef::V0(inception)
+    }
+}
+
+impl<'a> From<&'a ContextInceptionV1> for ContextInceptionRef<'a> {
+    fn from(inception: &'a ContextInceptionV1) -> Self {
+        ContextInceptionRef::V1(inception)
+    }
+}
+
+impl<'a> From<&'a ContextInception> for ContextInceptionRef<'a> {
+    fn from(inception: &'a ContextInception) -> Self {
+        inception.as_view()
+    }
+}
+
+impl<'a> ContextInceptionRef<'a> {
+    /// The inner version's structural invariants.
+    pub fn validate(self) -> Result<(), AuthzCodecError> {
+        match self {
+            ContextInceptionRef::V0(i) => i.validate(),
+            ContextInceptionRef::V1(i) => i.validate(),
+        }
+    }
+
+    /// The context's [`ContextRef`]; for V0 identical to [`ContextInceptionV0::context_ref`].
+    pub fn context_ref(self) -> ContextRef {
+        match self {
+            ContextInceptionRef::V0(i) => i.context_ref(),
+            ContextInceptionRef::V1(i) => i.context_ref(),
+        }
+    }
+
+    /// The founder principals.
+    pub fn founders(self) -> &'a [PrincipalKey] {
+        match self {
+            ContextInceptionRef::V0(i) => &i.founders,
+            ContextInceptionRef::V1(i) => &i.founders,
+        }
+    }
+
+    /// The founder threshold.
+    pub fn threshold(self) -> u8 {
+        match self {
+            ContextInceptionRef::V0(i) => i.threshold,
+            ContextInceptionRef::V1(i) => i.threshold,
+        }
+    }
+
+    /// The bound, uninterpreted label hash.
+    pub fn label_hash(self) -> [u8; 32] {
+        match self {
+            ContextInceptionRef::V0(i) => i.label_hash,
+            ContextInceptionRef::V1(i) => i.label_hash,
+        }
+    }
+
+    /// The served-subject commitment: `None` for V0, which commits to none.
+    pub fn served_subject(self) -> Option<[u8; 32]> {
+        match self {
+            ContextInceptionRef::V0(_) => None,
+            ContextInceptionRef::V1(i) => Some(i.served_subject),
+        }
+    }
+
+    /// Whether `key` is a founder.
+    pub fn is_founder(self, key: &PrincipalKey) -> bool {
+        self.founders()
+            .iter()
+            .any(|f| f.as_bytes() == key.as_bytes())
+    }
+
+    /// The inner version's canonical bytes.
+    pub fn canonical_bytes(self) -> Vec<u8> {
+        match self {
+            ContextInceptionRef::V0(i) => i.canonical_bytes(),
+            ContextInceptionRef::V1(i) => i.canonical_bytes(),
+        }
     }
 }
 

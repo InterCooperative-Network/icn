@@ -356,7 +356,7 @@ impl World {
             not_after: NOT_AFTER,
         };
         CheckpointedEvidenceV0 {
-            inception: self.inception.clone(),
+            inception: self.inception.clone().into(),
             log: log.to_vec(),
             authorization: sign_checkpointed_authorization(body, writer),
             vote_bundles,
@@ -1598,7 +1598,7 @@ fn d_wrong_context_is_refused_without_consuming() {
     );
     // This context's frontier, the other context's inception.
     let mut swapped = ev.clone();
-    swapped.inception = other.inception.clone();
+    swapped.inception = other.inception.clone().into();
     assert_eq!(
         w.admit(&swapped, &w.frontier(1, None), NOW, &mut consumed)
             .unwrap_err(),

@@ -17,7 +17,10 @@
 //! ## Bootstrap, operation, succession (the v0 experimental profile)
 //!
 //! - **Bootstrap.** Entry 1 is a [`TransitionV0::Genesis`] signed by a threshold of the context's
-//!   founders (the existing [`ContextInceptionV0`] quorum). It fixes the initial standing, the two
+//!   founders (the existing [`ContextInceptionV0`](super::ContextInceptionV0) quorum, or a
+//!   [`ContextInceptionV1`](super::ContextInceptionV1) one — the
+//!   genesis body carries the [`ContextRef`], so the quorum also commits to a V1 inception's
+//!   `served_subject`). It fixes the initial standing, the two
 //!   rules and the first writer. Founder authority ends there: afterwards founders act only
 //!   through standing they hold. A context that wants founders to keep a veto expresses that in
 //!   its transition rule; v0 does not choose it for them.
@@ -57,9 +60,9 @@ use thiserror::Error;
 
 use super::codec::{AuthzCodecError, Reader, Writer};
 use super::statements::{
-    read_principal, sha256, write_principal, CanonicalV0, ContextInceptionV0, ContextRef, EffectV0,
-    FounderSignature, InputActV0, Signed, Verdict, AUTHZ_V0_VERSION, MAX_ACTION_LEN, MAX_FOUNDERS,
-    MAX_INPUTS, MAX_ROLE_LEN, MAX_STATEMENT, MAX_VOTE_BUNDLE,
+    read_principal, sha256, write_principal, CanonicalV0, ContextInception, ContextInceptionRef,
+    ContextRef, EffectV0, FounderSignature, InputActV0, Signed, Verdict, AUTHZ_V0_VERSION,
+    MAX_ACTION_LEN, MAX_FOUNDERS, MAX_INPUTS, MAX_ROLE_LEN, MAX_STATEMENT, MAX_VOTE_BUNDLE,
 };
 use super::verify::{
     consume_once, prior_refusal, verify_input_acts, AdmissionRefusal, AdoptedRule, AuthzRefusal,
@@ -679,7 +682,7 @@ pub enum LogRefusal {
 }
 
 fn verify_founder_quorum(
-    inception: &ContextInceptionV0,
+    inception: ContextInceptionRef<'_>,
     bytes: &[u8],
     signatures: &[FounderSignature],
 ) -> Result<(), LogRefusal> {
@@ -698,10 +701,10 @@ fn verify_founder_quorum(
             .verify_strict(bytes, &Signature::from_bytes(&s.signature))
             .map_err(|_| LogRefusal::BadFounderSignature)?;
     }
-    if signatures.len() < usize::from(inception.threshold) {
+    if signatures.len() < usize::from(inception.threshold()) {
         return Err(LogRefusal::FounderQuorumNotMet {
             valid: signatures.len(),
-            threshold: inception.threshold,
+            threshold: inception.threshold(),
         });
     }
     Ok(())
@@ -746,7 +749,7 @@ fn decide(
 }
 
 fn genesis_state(
-    inception: &ContextInceptionV0,
+    inception: ContextInceptionRef<'_>,
     entry: &SignedLogEntryV0,
 ) -> Result<ContextStateV0, LogRefusal> {
     let context = inception.context_ref();
@@ -928,11 +931,15 @@ impl VerifiedContextLog {
 }
 
 /// Replay `entries` from genesis, accepting each only under the state before it.
-pub fn replay_context_log(
-    inception: &ContextInceptionV0,
+///
+/// `inception` is any [`ContextInceptionRef`]: a `&ContextInceptionV0`, `&ContextInceptionV1` or
+/// `&ContextInception`.
+pub fn replay_context_log<'a>(
+    inception: impl Into<ContextInceptionRef<'a>>,
     entries: &[SignedLogEntryV0],
     rules: &dyn RuleResolver,
 ) -> Result<VerifiedContextLog, LogRefusal> {
+    let inception = inception.into();
     inception.validate().map_err(LogRefusal::InvalidInception)?;
     let (first, rest) = entries.split_first().ok_or(LogRefusal::Empty)?;
     let mut state = genesis_state(inception, first)?;
@@ -1069,8 +1076,9 @@ impl CanonicalV0 for CheckpointedAuthorizationV0 {
 /// Everything needed to verify a checkpointed authorization offline.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckpointedEvidenceV0 {
-    /// The context's founding statement.
-    pub inception: ContextInceptionV0,
+    /// The context's founding statement, of any supported version. **Experimental transport
+    /// change:** a V0 inception is carried as [`ContextInception::V0`].
+    pub inception: ContextInception,
     /// The log from genesis through at least the checkpoint (and the pinned position).
     pub log: Vec<SignedLogEntryV0>,
     /// The writer-signed authorization.
@@ -1363,7 +1371,10 @@ pub struct LogForkProofV0 {
     pub second: SignedLogEntryV0,
 }
 
-fn valid_signers(inception: &ContextInceptionV0, entry: &SignedLogEntryV0) -> Vec<PrincipalKey> {
+fn valid_signers(
+    inception: ContextInceptionRef<'_>,
+    entry: &SignedLogEntryV0,
+) -> Vec<PrincipalKey> {
     let bytes = entry.body.canonical_bytes();
     let verifies = |key: &PrincipalKey, sig: &[u8; 64]| {
         key.verifying_key()
@@ -1394,7 +1405,11 @@ impl LogForkProofV0 {
     /// An empty list is still a conflict: two different principals each sequenced one side (a
     /// contested succession). The proof attributes signatures only; whether either side was
     /// *authorized* is decided by replaying it ([`replay_context_log`]).
-    pub fn equivocators(&self, inception: &ContextInceptionV0) -> Option<Vec<PrincipalKey>> {
+    pub fn equivocators<'a>(
+        &self,
+        inception: impl Into<ContextInceptionRef<'a>>,
+    ) -> Option<Vec<PrincipalKey>> {
+        let inception = inception.into();
         let (a, b) = (&self.first.body, &self.second.body);
         let context = inception.context_ref();
         if a.context != context || b.context != context {
@@ -1415,8 +1430,8 @@ impl LogForkProofV0 {
 /// The first position at which two presented histories of one context disagree, as a proof.
 /// `None` if one is a prefix of the other, or the first disagreement is not a checkable conflict
 /// (see [`LogForkProofV0::equivocators`]).
-pub fn find_log_fork(
-    inception: &ContextInceptionV0,
+pub fn find_log_fork<'a>(
+    inception: impl Into<ContextInceptionRef<'a>>,
     a: &[SignedLogEntryV0],
     b: &[SignedLogEntryV0],
 ) -> Option<LogForkProofV0> {
