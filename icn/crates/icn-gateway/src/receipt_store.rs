@@ -3011,48 +3011,39 @@ mod tests {
     }
 
     #[test]
-    fn concurrent_emissions_of_one_effect_store_exactly_one_record() {
-        use icn_governance_actor::institutional_effect::{
-            emit_accepted_effect, AcceptanceEmissionOutcome,
-        };
+    fn concurrent_writers_of_one_effect_identity_store_exactly_one_record() {
+        // Eight writers race to store the same (proposal, kind) under distinct record ids:
+        // the identity check and the writes are one transaction, so exactly one wins and every
+        // other is refused with the typed identity error (which `emit_accepted_effect` turns into
+        // `AlreadyEmitted`; that translation is tested in the governance crate).
         let store = std::sync::Arc::new(ReceiptStore::new(temp_db()));
-        let payload = icn_governance::ProposalPayload::FreezeMember {
-            member: Did::from_anchor_id(&[7u8; 32]),
-            reason: "audit".into(),
-            duration_seconds: None,
-        };
         let threads: Vec<_> = (0..8)
             .map(|i| {
                 let store = store.clone();
-                let payload = payload.clone();
                 std::thread::spawn(move || {
-                    emit_accepted_effect(store.as_ref(), "prop-race", "coop", None, &payload, i)
+                    let rec = ier("prop-race", "freeze_member", i);
+                    (rec.record_id.clone(), store.put_institutional_effect(&rec))
                 })
             })
             .collect();
-        let outcomes: Vec<_> = threads
-            .into_iter()
-            .map(|t| t.join().unwrap().unwrap())
+        let results: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        let winners: Vec<&String> = results
+            .iter()
+            .filter(|(_, r)| r.is_ok())
+            .map(|(id, _)| id)
             .collect();
+        assert_eq!(winners.len(), 1, "{results:?}");
+        for (_, r) in &results {
+            if let Err(e) = r {
+                assert!(e.starts_with(INSTITUTIONAL_EFFECT_IDENTITY_TAKEN), "{e}");
+                assert!(e.contains(winners[0].as_str()), "{e}");
+            }
+        }
         let listed = store
             .list_institutional_effects_by_proposal("prop-race")
             .unwrap();
-        assert_eq!(listed.len(), 1, "{outcomes:?}");
-        let winner = &listed[0].record_id;
-        let mut emitted = 0;
-        for o in &outcomes {
-            match o {
-                AcceptanceEmissionOutcome::Emitted { record_id } => {
-                    emitted += 1;
-                    assert_eq!(record_id, winner);
-                }
-                AcceptanceEmissionOutcome::AlreadyEmitted { record_id } => {
-                    assert_eq!(record_id, winner)
-                }
-                other => panic!("unexpected {other:?}"),
-            }
-        }
-        assert_eq!(emitted, 1, "{outcomes:?}");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(&listed[0].record_id, winners[0]);
     }
 
     #[test]
