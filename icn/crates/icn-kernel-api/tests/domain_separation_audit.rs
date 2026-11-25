@@ -282,6 +282,16 @@ const ACCEPTED: &[Accepted] = &[
 /// Literals the discovery scan finds that are deliberately not registered.
 /// Each is (literal, file under the repository root, reason).
 const NOT_REGISTERED: &[(&str, &str, &str)] = &[
+    (
+        "icn.governance.predecessor-lifecycle.v1",
+        "icn/crates/icn-governance/src/predecessor_lifecycle.rs",
+        "encoding tag of the stored P5b lifecycle record; the record is stored and compared, never hashed or signed",
+    ),
+    (
+        "icn.governance.predecessor-lifecycle-witness.v1",
+        "icn/crates/icn-governance/src/predecessor_lifecycle.rs",
+        "encoding tag of the stored P5b witness value; the witness is stored and compared, never hashed or signed",
+    ),
     ("icn:x:v1", CANONICAL_RS, CANONICAL_FIXTURE),
     ("icn:a:v1", CANONICAL_RS, CANONICAL_FIXTURE),
     ("icn:a:v1:x", CANONICAL_RS, CANONICAL_FIXTURE),
@@ -467,7 +477,11 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.governance.cutover-roster.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/cutover.rs", "icn/crates/icn-governance/tests/reference/cutover_commitment_reference.py"]),
     d(b"icn.governance.cutover.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/cutover.rs", "icn/crates/icn-governance/tests/reference/cutover_commitment_reference.py"]),
     d(b"icn.governance.institutional-admission-policy.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/institutional_admission.rs"]),
+    // P5b slice 1a (experimental): the store-local pin of L's stored domain record (not legitimacy evidence).
+    d(b"icn.governance.predecessor-domain-record-pin.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/predecessor_lifecycle.rs", "icn/crates/icn-governance/tests/reference/predecessor_lifecycle_reference.py"]),
     d(b"icn.governance.predecessor-final-set.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/predecessor_seal.rs", "icn/crates/icn-governance/tests/reference/predecessor_final_set_reference.py"]),
+    // P5b slice 1a (experimental): basis = categorized commitment to E and the record pin at Begin.
+    d(b"icn.governance.predecessor-lifecycle.basis.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/predecessor_lifecycle.rs", "icn/crates/icn-governance/tests/reference/predecessor_lifecycle_reference.py"]),
     d(b"icn.governance.served-domain.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/domain.rs"]),
     d(b"icn.governance.threshold-rule.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/authz_threshold.rs"]),
     d(b"icn.n1.authority-receipt.decisions.v1\0", Sha256, Raw, Production, &["icn/crates/icn-core/src/authority_registry.rs"]),
