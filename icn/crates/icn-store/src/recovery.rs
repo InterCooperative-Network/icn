@@ -803,6 +803,11 @@ mod tests {
         seed(&s);
         let j = j(&s);
         j.begin(&intent(1)).unwrap();
+        assert_eq!(
+            err(j.retire_torn(&[1; 16]).unwrap_err()),
+            RecoveryError::WrongState,
+            "an intact intent is not torn"
+        );
         // Intent without one of its locks: apply cannot land on it.
         s.delete(&j.lock_key(b"b")).unwrap();
         assert_eq!(one(&j), Outcome::Torn(intent(1)));
