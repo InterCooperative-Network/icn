@@ -294,6 +294,9 @@ pub enum AdmissionRegistryError {
     Duplicate,
     #[error("a custodian clock is already installed")]
     DuplicateClock,
+    /// The verifier answers to an admission-policy version this store does not support (F-1).
+    #[error("verifier policy version {0} is not supported")]
+    UnsupportedPolicyVersion(u32),
 }
 
 /// The custodian's verifiers, keyed by exact policy and version, and its admission clock.
@@ -315,6 +318,13 @@ impl AdmissionRegistryV0 {
         verifier: Arc<dyn CustodianAdmissionVerifierV0>,
     ) -> Result<(), AdmissionRegistryError> {
         let policy = verifier.policy();
+        // F-1 invariant: no installed verifier ever answers to an unsupported version, so a pool
+        // record stored at one (written before F-1, or by raw storage) always fails closed.
+        if policy.version > MAX_SUPPORTED_ADMISSION_POLICY_VERSION {
+            return Err(AdmissionRegistryError::UnsupportedPolicyVersion(
+                policy.version,
+            ));
+        }
         if self.verifiers.contains_key(&policy) {
             return Err(AdmissionRegistryError::Duplicate);
         }

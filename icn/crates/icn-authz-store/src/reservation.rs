@@ -680,7 +680,8 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
         self.authorize_pool_admin(admin)?;
         // F3 F-1: the typed API never creates a pool at an unsupported policy version. Records
         // already stored at one are not migrated or reinterpreted; they stay frozen (redeclaration
-        // refuses them) and fail closed at admission (no installed verifier answers to them).
+        // refuses them) and fail closed at admission: `AdmissionRegistryV0::install` refuses any
+        // verifier answering to an unsupported version, so none can ever be selected for them.
         if let AdmissionRequirementV1::Policy { policy, .. } = pool.admission {
             if policy.version > MAX_SUPPORTED_ADMISSION_POLICY_VERSION {
                 return Err(ReservationError::UnsupportedAdmissionPolicyVersion(
@@ -2853,6 +2854,30 @@ mod tests {
             let mut pool = pool_v1(requirement);
             pool.pool.pool_id = [pool_id; 32];
             store.initialize_pool_v1(&admin, pool).unwrap();
+        }
+    }
+
+    #[test]
+    fn the_registry_refuses_a_verifier_for_an_unsupported_version() {
+        let mut registry = AdmissionRegistryV0::new();
+        for version in [2, 7, u32::MAX] {
+            assert_eq!(
+                registry.install(std::sync::Arc::new(NeverCalled(AdmissionPolicyRefV0 {
+                    id: [0xA1; 32],
+                    version,
+                }))),
+                Err(crate::AdmissionRegistryError::UnsupportedPolicyVersion(
+                    version
+                ))
+            );
+        }
+        for version in [0, 1] {
+            registry
+                .install(std::sync::Arc::new(NeverCalled(AdmissionPolicyRefV0 {
+                    id: [0xA1; 32],
+                    version,
+                })))
+                .unwrap();
         }
     }
 
