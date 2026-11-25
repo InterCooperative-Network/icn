@@ -47,10 +47,15 @@
 //!   non-production. With [`RecognitionRequirement::ProductionGrade`] every v1 recognition is
 //!   refused. A [`VerifiedInstitutionalAuthorization`] under
 //!   [`RecognitionRequirement::RehearsalPermitted`] reports [`Legitimacy::RehearsalOnly`].
-//! - **Mandatory enforcement.** A custodian that calls the target's admission API directly with
-//!   an ungated resolver bypasses this gate; the target does not know which resolver its pool
-//!   requires. Closing that needs the target to bind a pool to a required admission policy (an
-//!   `icn-authz-store` change; see `institutional_gate_is_bypassed_by_a_direct_ungated_call`).
+//! - **Mandatory enforcement via [`admit_institutional`].** The closure path hands the target a
+//!   gated resolver, but the target cannot tell it from an ungated one. Mandatory enforcement is
+//!   [`InstitutionalAdmissionVerifierV0`]: the custodian installs it in the store and declares
+//!   its [`InstitutionalAdmissionVerifierV0::policy_ref`] on an (experimental) V1 pool, and the
+//!   store then refuses every caller-resolved reservation against that pool, including one
+//!   arriving through [`admit_institutional`].
+//! - **Anchor correctness.** Mandatory enforcement makes the *installed* anchor binding
+//!   unavoidable; it does not make that binding correct. A custodian that installs a verifier
+//!   anchored on the wrong context gets exactly that context's authority.
 //! - **Freshness from the network.** The frontier is whatever the relying party configured. Where
 //!   it comes from after a restore is an open seam (ADR-0092 review, B10).
 //! - **Institutional continuity.** `InstitutionalDomain` is keyed by `GovernanceDomainId` and has
@@ -59,14 +64,21 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use std::any::Any;
+
 use icn_authz::effect_v0::{
-    verify_checkpointed_authorization, AdoptedRule, CheckpointedEvidenceV0, ContextRef,
-    LogCheckpointV0, LogRefusal, RelyingFrontierV0, RuleBinding, RuleError, RuleResolver, Verdict,
-    VerifiedCheckpointedAuthorization,
+    preflight_checkpointed, verify_checkpointed_authorization, AdoptedRule, CheckpointedEvidenceV0,
+    ContextRef, LogCheckpointV0, LogRefusal, RelyingFrontierV0, RuleBinding, RuleError,
+    RuleResolver, Verdict, VerifiedCheckpointedAuthorization,
+};
+use icn_authz_store::{
+    AdmissionGradeV0, AdmissionPolicyRefV0, AdmissionRefusalV0, CustodianAdmissionVerifierV0,
+    VerifiedAdmissionV0,
 };
 use icn_identity::authority_log::SubjectId;
 use icn_identity::device_authority::VerifiedDeviceAct;
 use icn_identity::subject_context::SubjectContextGenesisV1;
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::authz_threshold::ThresholdRuleV0;
@@ -422,13 +434,12 @@ fn classify(refusal: LogRefusal, recognized: &RecognizedSubjects) -> Institution
 
 fn verify_with(
     anchor: &InstitutionalTrustAnchorV0,
-    evidence: &InstitutionalEvidenceV0,
+    authorization: &CheckpointedEvidenceV0,
     recognized: &RecognizedSubjects,
 ) -> Result<VerifiedInstitutionalAuthorization, InstitutionalRefusal> {
     let rules = GatedRules::new(anchor, recognized);
-    let verified =
-        verify_checkpointed_authorization(&evidence.authorization, &anchor.frontier(), &rules)
-            .map_err(|r| classify(r, recognized))?;
+    let verified = verify_checkpointed_authorization(authorization, &anchor.frontier(), &rules)
+        .map_err(|r| classify(r, recognized))?;
     let auth = verified.authorization();
     if auth.verdict != Verdict::Pass {
         return Err(InstitutionalRefusal::VerdictNotPass);
@@ -474,7 +485,7 @@ pub fn verify_institutional_authorization(
         return Err(InstitutionalRefusal::UntrustedContext);
     }
     let recognized = recognize(anchor, &evidence.recognitions)?;
-    verify_with(anchor, evidence, &recognized)
+    verify_with(anchor, &evidence.authorization, &recognized)
 }
 
 /// Why an institutional admission did not complete.
@@ -510,10 +521,111 @@ pub fn admit_institutional<T, E>(
     }
     let recognized =
         recognize(anchor, &evidence.recognitions).map_err(InstitutionalAdmissionError::Refused)?;
-    let verified =
-        verify_with(anchor, evidence, &recognized).map_err(InstitutionalAdmissionError::Refused)?;
+    let verified = verify_with(anchor, &evidence.authorization, &recognized)
+        .map_err(InstitutionalAdmissionError::Refused)?;
     let rules = GatedRules::new(anchor, &recognized);
     let outcome = target(&evidence.authorization, &anchor.frontier(), &rules)
         .map_err(InstitutionalAdmissionError::Target)?;
     Ok((verified, outcome))
+}
+
+/// Domain separator for [`InstitutionalAdmissionVerifierV0::policy_ref`].
+pub const INSTITUTIONAL_ADMISSION_POLICY_DOMAIN: &[u8] =
+    b"icn.governance.institutional-admission-policy.v0";
+/// Version of the institutional admission policy implemented here.
+pub const INSTITUTIONAL_ADMISSION_POLICY_VERSION: u32 = 0;
+
+/// The caller's untrusted input to [`InstitutionalAdmissionVerifierV0`]: the recognitions of the
+/// electorate. Passed to the store opaquely as the reservation `supplement`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstitutionalSupplementV0 {
+    pub recognitions: Vec<SubjectContextGenesisV1>,
+}
+
+/// Mandatory institutional admission at the resource target.
+///
+/// The custodian constructs this from its own [`InstitutionalTrustAnchorV0`] and installs it in
+/// `icn_authz_store::LocalResourceReservations::with_admission`. A pool that declares
+/// [`Self::policy_ref`] then accepts only reservations this verifier admitted, under the anchor's
+/// frontier and the recognition-gated rules, and refuses caller-resolved reservations.
+#[derive(Debug, Clone)]
+pub struct InstitutionalAdmissionVerifierV0 {
+    anchor: InstitutionalTrustAnchorV0,
+}
+
+impl InstitutionalAdmissionVerifierV0 {
+    pub fn new(anchor: InstitutionalTrustAnchorV0) -> Self {
+        Self { anchor }
+    }
+
+    pub fn anchor(&self) -> &InstitutionalTrustAnchorV0 {
+        &self.anchor
+    }
+
+    /// The policy identity a pool declares to require *this* anchor's domain and context.
+    ///
+    /// It binds the governance domain id and the authority context, so a verifier anchored on
+    /// one institution cannot satisfy a pool that names another. It does not bind the frontier
+    /// or rules, which the custodian may advance without re-declaring its pools.
+    pub fn policy_ref(anchor: &InstitutionalTrustAnchorV0) -> AdmissionPolicyRefV0 {
+        // `u32be(len) || bytes` framing, matching the governance `header` convention.
+        let mut h = Sha256::new();
+        h.update((INSTITUTIONAL_ADMISSION_POLICY_DOMAIN.len() as u32).to_be_bytes());
+        h.update(INSTITUTIONAL_ADMISSION_POLICY_DOMAIN);
+        h.update((anchor.domain.0.len() as u32).to_be_bytes());
+        h.update(anchor.domain.0.as_bytes());
+        h.update(anchor.context.0);
+        AdmissionPolicyRefV0 {
+            id: h.finalize().into(),
+            version: INSTITUTIONAL_ADMISSION_POLICY_VERSION,
+        }
+    }
+
+    /// Full institutional verification plus the target's non-consuming preflight, both under the
+    /// anchor's frontier and recognition-gated rules.
+    pub fn verify(
+        &self,
+        authorization: &CheckpointedEvidenceV0,
+        supplement: &InstitutionalSupplementV0,
+        target: [u8; 32],
+        now: u64,
+    ) -> Result<(VerifiedInstitutionalAuthorization, VerifiedAdmissionV0), AdmissionRefusalV0> {
+        let refuse = |e: InstitutionalRefusal| AdmissionRefusalV0(e.to_string());
+        if authorization.inception.context_ref() != self.anchor.context {
+            return Err(refuse(InstitutionalRefusal::UntrustedContext));
+        }
+        let recognized = recognize(&self.anchor, &supplement.recognitions).map_err(refuse)?;
+        let verified = verify_with(&self.anchor, authorization, &recognized).map_err(refuse)?;
+        let rules = GatedRules::new(&self.anchor, &recognized);
+        let preflight =
+            preflight_checkpointed(authorization, &self.anchor.frontier(), &rules, target, now)
+                .map_err(|e| AdmissionRefusalV0(format!("target preflight refused: {e}")))?;
+        let grade = match verified.legitimacy {
+            Legitimacy::ProductionGrade => AdmissionGradeV0::Production,
+            Legitimacy::RehearsalOnly => AdmissionGradeV0::Rehearsal,
+        };
+        Ok((verified, VerifiedAdmissionV0 { preflight, grade }))
+    }
+}
+
+impl CustodianAdmissionVerifierV0 for InstitutionalAdmissionVerifierV0 {
+    fn policy(&self) -> AdmissionPolicyRefV0 {
+        Self::policy_ref(&self.anchor)
+    }
+
+    fn preflight(
+        &self,
+        evidence: &CheckpointedEvidenceV0,
+        supplement: &dyn Any,
+        target: [u8; 32],
+        now: u64,
+    ) -> Result<VerifiedAdmissionV0, AdmissionRefusalV0> {
+        let Some(supplement) = supplement.downcast_ref::<InstitutionalSupplementV0>() else {
+            return Err(AdmissionRefusalV0(
+                "supplement is not an InstitutionalSupplementV0".into(),
+            ));
+        };
+        self.verify(evidence, supplement, target, now)
+            .map(|(_, admitted)| admitted)
+    }
 }

@@ -15,6 +15,8 @@ icn-encoding = { path = "../icn-encoding" }
 icn-kernel-api = { path = "../icn-kernel-api" }
 # authz_threshold: the governance AdoptedRule for the experimental effect_v0 spine.
 icn-authz = { path = "../icn-authz" }
+# Implements the store's custodian admission verifier trait (substrate adapter; no reverse edge).
+icn-authz-store = { path = "../icn-authz-store" }
 icn-entity = { path = "../icn-entity" }
 icn-federation = { path = "../icn-federation" }
 icn-identity = { path = "../icn-identity" }
@@ -34,7 +36,6 @@ tracing.workspace = true
 utoipa = { version = "5.4.0", optional = true }
 
 [dev-dependencies]
-icn-authz-store = { path = "../icn-authz-store" }
 icn-store = { path = "../icn-store" }
 serde_yaml = "0.9"
 tempfile = "3"

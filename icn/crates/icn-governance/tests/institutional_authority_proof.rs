@@ -42,15 +42,17 @@ use icn_authz::effect_v0::{
     TransitionV0, Verdict,
 };
 use icn_authz_store::{
+    AdmissionGradeV0, AdmissionPolicyRefV0, AdmissionRegistryV0, AdmissionRequirementV1,
     DurabilityBarrier, LocalReservationPolicyV0, LocalResourceReservations, ReservationError,
-    ReservationReconciliation, ReservationRequestV0, ResourcePoolV0,
+    ReservationReconciliation, ReservationRequestV0, ResourcePoolRecord, ResourcePoolV0,
+    ResourcePoolV1,
 };
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::domain::GovernanceDomainId;
 use icn_governance::institutional_admission::{
     admit_institutional, verify_institutional_authorization, InstitutionalAdmissionError,
-    InstitutionalEvidenceV0, InstitutionalRefusal, InstitutionalTrustAnchorV0, Legitimacy,
-    RecognitionRequirement,
+    InstitutionalAdmissionVerifierV0, InstitutionalEvidenceV0, InstitutionalRefusal,
+    InstitutionalSupplementV0, InstitutionalTrustAnchorV0, Legitimacy, RecognitionRequirement,
 };
 use icn_governance::subject_recognition::RecognitionError;
 use icn_governance::subject_recognition::{RecognitionBasisKind, SubjectRecognitionV1};
@@ -729,9 +731,9 @@ fn the_log_alone_accepts_standing_for_a_foreign_or_unrecognized_subject() {
         ))
     );
 
-    // The target called directly with a domain-blind resolver admits it: the gap is real at the
-    // target unless admission goes through the institutional gate (see
-    // `institutional_gate_is_bypassed_by_a_direct_ungated_call`).
+    // A V0 (caller-resolved) pool called directly with a domain-blind resolver admits it: that is
+    // the generic contract. A pool that declares institutional admission refuses the same call
+    // (see `direct_ungated_call_is_refused_for_an_institutional_policy_pool`).
     let dir = tempfile::tempdir().unwrap();
     let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
     target.initialize_pool(inst.pool(10)).unwrap();
@@ -1075,6 +1077,73 @@ fn untouched(target: &LocalResourceReservations, inst: &Institution, op: [u8; 32
         ReservationReconciliation::Absent
     ));
     assert_eq!(available(target, inst.ctx), 10);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Mandatory admission at the target (experimental V1 pool + custodian-installed verifier)
+// ---------------------------------------------------------------------------------------------
+
+fn registry_for(anchors: &[&InstitutionalTrustAnchorV0]) -> AdmissionRegistryV0 {
+    let mut registry = AdmissionRegistryV0::new();
+    for anchor in anchors {
+        registry
+            .install(std::sync::Arc::new(InstitutionalAdmissionVerifierV0::new(
+                (*anchor).clone(),
+            )))
+            .unwrap();
+    }
+    registry
+}
+
+fn institutional_pool(
+    inst: &Institution,
+    anchor: &InstitutionalTrustAnchorV0,
+    min_grade: AdmissionGradeV0,
+) -> ResourcePoolV1 {
+    ResourcePoolV1 {
+        pool: inst.pool(10),
+        admission: AdmissionRequirementV1::Policy {
+            policy: InstitutionalAdmissionVerifierV0::policy_ref(anchor),
+            min_grade,
+        },
+    }
+}
+
+/// The custodian's store: its own verifier installed, and a pool that requires it.
+fn policy_target(
+    inst: &Institution,
+    anchor: &InstitutionalTrustAnchorV0,
+    min_grade: AdmissionGradeV0,
+) -> (tempfile::TempDir, LocalResourceReservations) {
+    let dir = tempfile::tempdir().unwrap();
+    let target = LocalResourceReservations::open(dir.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry_for(&[anchor]));
+    target
+        .initialize_pool_v1(institutional_pool(inst, anchor, min_grade))
+        .unwrap();
+    (dir, target)
+}
+
+fn reserve_admitted(
+    target: &LocalResourceReservations,
+    evidence: &InstitutionalEvidenceV0,
+    request: &ReservationRequestV0,
+) -> Result<icn_authz_store::ReservationRecordV0, ReservationError> {
+    let supplement = InstitutionalSupplementV0 {
+        recognitions: evidence.recognitions.clone(),
+    };
+    target.reserve_admitted(&evidence.authorization, &supplement, NOW, request)
+}
+
+fn valid_admission(inst: &Institution) -> (InstitutionalEvidenceV0, ReservationRequestV0) {
+    let (log, fourth) = honest_history(inst);
+    let request = inst.request(OP, 4);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), &fourth], &request),
+        recognitions: members_and(inst, &[&fourth]),
+    };
+    (evidence, request)
 }
 
 /// A recognised, authorized electorate admits exactly one reservation through the gate; the
@@ -1478,8 +1547,11 @@ fn requester_cannot_substitute_context_domain_or_frontier() {
 /// pool requires. A custodian that calls `reserve_checkpointed` directly with a domain-blind
 /// resolver admits the foreign-standing authorization the gate refuses. Closing this needs the
 /// target to bind a pool to a required admission policy (an `icn-authz-store` change).
+/// The session-3 bypass, closed. With an institutional-policy pool the direct, ungated call (with
+/// the pool's correct `policy_hash`) is refused at the commit boundary, and so is the closure gate
+/// (the target cannot tell its resolver apart). The V0 pool keeps its caller-resolved contract.
 #[test]
-fn institutional_gate_is_bypassed_by_a_direct_ungated_call() {
+fn direct_ungated_call_is_refused_for_an_institutional_policy_pool() {
     let inst = Institution::new(DOMAIN);
     let foreign = GenASubject::incept(FOREIGN_DOMAIN, 0x05);
     let mut log = vec![inst.genesis_entry()];
@@ -1500,14 +1572,39 @@ fn institutional_gate_is_bypassed_by_a_direct_ungated_call() {
         ),
         recognitions: members_and(&inst, &[]),
     };
-    let (_dir, target) = fresh_target(&inst);
-    let reached = std::cell::Cell::new(false);
+    let trust = inst.trust(2, None);
+    let (_dir, target) = policy_target(&inst, &trust, AdmissionGradeV0::Rehearsal);
+    assert_eq!(request.policy_hash, inst.pool(10).policy.policy_hash);
+
+    // Direct, ungated, correct policy hash: refused before anything is committed.
+    let direct = target.reserve_checkpointed(
+        &evidence.authorization,
+        &inst.frontier(2, None),
+        &rules(),
+        NOW,
+        &request,
+    );
     assert!(
-        reserve_via_gate(&target, &inst.trust(2, None), &evidence, &request, &reached).is_err()
+        matches!(direct, Err(ReservationError::AdmissionDenied(_))),
+        "{direct:?}"
     );
     untouched(&target, &inst, OP);
-    // Direct, ungated: admitted.
-    assert!(target
+
+    // The closure gate refuses first here (foreign standing); a valid authorization through it is
+    // refused by the pool too (`closure_gate_cannot_satisfy_an_institutional_policy_pool`).
+    let reached = std::cell::Cell::new(false);
+    assert!(reserve_via_gate(&target, &trust, &evidence, &request, &reached).is_err());
+    // The installed verifier refuses the foreign standing.
+    let admitted = reserve_admitted(&target, &evidence, &request);
+    assert!(
+        matches!(admitted, Err(ReservationError::AdmissionRefused(_))),
+        "{admitted:?}"
+    );
+    untouched(&target, &inst, OP);
+
+    // Compatibility: a V0 pool keeps the pre-existing caller-resolved contract.
+    let (_dir0, generic) = fresh_target(&inst);
+    assert!(generic
         .reserve_checkpointed(
             &evidence.authorization,
             &inst.frontier(2, None),
@@ -1516,7 +1613,7 @@ fn institutional_gate_is_bypassed_by_a_direct_ungated_call() {
             &request
         )
         .is_ok());
-    assert_eq!(available(&target, inst.ctx), 9);
+    assert_eq!(available(&generic, inst.ctx), 9);
 }
 
 /// The resolver the gate hands the target is itself gated: inside a successful admission, the
@@ -1590,4 +1687,438 @@ fn duplicate_recognition_for_one_subject_is_refused() {
         verify_institutional_authorization(&inst.trust(2, None), &evidence),
         Err(InstitutionalRefusal::DuplicateRecognition { index: 4 })
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Mandatory admission: adversarial matrix
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn mandatory_admission_reserves_once_and_the_requirement_survives_restart() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    let (dir, target) = policy_target(&inst, &trust, AdmissionGradeV0::Rehearsal);
+    let record = reserve_admitted(&target, &evidence, &request).unwrap();
+    assert_eq!((record.available_before, record.available_after), (10, 6));
+    drop(target);
+
+    let target = LocalResourceReservations::open(dir.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry_for(&[&trust]));
+    let Some(ResourcePoolRecord::V1(stored)) = target.inspect_pool_record(inst.ctx, POOL).unwrap()
+    else {
+        panic!("the institutional pool must still be a V1 record after commit and restart");
+    };
+    assert_eq!(
+        stored.admission,
+        institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal).admission
+    );
+    assert!(matches!(
+        target.reconcile(inst.ctx, OP).unwrap(),
+        ReservationReconciliation::Committed { .. }
+    ));
+    // Replay of the same valid admission allocates nothing.
+    assert_eq!(
+        reserve_admitted(&target, &evidence, &request),
+        Err(ReservationError::Authorization(AdmissionRefusal::Replayed))
+    );
+    // A fresh operation through the direct path is still refused after restart.
+    let request2 = inst.request([0x0b; 32], 1);
+    let (log, fourth) = honest_history(&inst);
+    // Signed for revision 0 so it passes the caller-resolved preflight; the pool refuses it on
+    // its admission requirement, which is checked before the revision.
+    let evidence2 = inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), &fourth], &request2);
+    assert!(matches!(
+        target.reserve_checkpointed(
+            &evidence2,
+            &inst.frontier(2, None),
+            &rules(),
+            NOW,
+            &request2
+        ),
+        Err(ReservationError::AdmissionDenied(_))
+    ));
+    assert_eq!(available(&target, inst.ctx), 6);
+}
+
+/// The closure gate hands the target a gated resolver, but the pool cannot verify that; it is
+/// refused like any caller-resolved admission. Only the installed verifier satisfies the pool.
+#[test]
+fn closure_gate_cannot_satisfy_an_institutional_policy_pool() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    let (_dir, target) = policy_target(&inst, &trust, AdmissionGradeV0::Rehearsal);
+    let reached = std::cell::Cell::new(false);
+    let result = reserve_via_gate(&target, &trust, &evidence, &request, &reached);
+    assert!(reached.get());
+    assert!(
+        matches!(
+            result,
+            Err(InstitutionalAdmissionError::Target(
+                ReservationError::AdmissionDenied(_)
+            ))
+        ),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+}
+
+#[test]
+fn missing_or_unknown_admission_policy_fails_closed() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+
+    // Restarted without the verifier installed.
+    let (dir, target) = policy_target(&inst, &trust, AdmissionGradeV0::Rehearsal);
+    drop(target);
+    let bare = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
+    assert!(matches!(
+        reserve_admitted(&bare, &evidence, &request),
+        Err(ReservationError::AdmissionUnavailable(_))
+    ));
+    untouched(&bare, &inst, OP);
+    drop(bare);
+
+    // Only another institution's verifier installed: its policy id differs.
+    let other = Institution::new(FOREIGN_DOMAIN);
+    let other_trust = anchor(
+        FOREIGN_DOMAIN,
+        other.ctx,
+        2,
+        None,
+        RecognitionRequirement::RehearsalPermitted,
+    );
+    assert_ne!(
+        InstitutionalAdmissionVerifierV0::policy_ref(&other_trust),
+        InstitutionalAdmissionVerifierV0::policy_ref(&trust)
+    );
+    let wrong = LocalResourceReservations::open(dir.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry_for(&[&other_trust]));
+    assert!(matches!(
+        reserve_admitted(&wrong, &evidence, &request),
+        Err(ReservationError::AdmissionUnavailable(_))
+    ));
+    untouched(&wrong, &inst, OP);
+
+    // A pool that names an unknown version of the right policy.
+    let dir2 = tempfile::tempdir().unwrap();
+    let future = LocalResourceReservations::open(dir2.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry_for(&[&trust]));
+    let mut pool = institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal);
+    pool.admission = AdmissionRequirementV1::Policy {
+        policy: AdmissionPolicyRefV0 {
+            version: 1,
+            ..InstitutionalAdmissionVerifierV0::policy_ref(&trust)
+        },
+        min_grade: AdmissionGradeV0::Rehearsal,
+    };
+    future.initialize_pool_v1(pool).unwrap();
+    assert!(matches!(
+        reserve_admitted(&future, &evidence, &request),
+        Err(ReservationError::AdmissionUnavailable(_))
+    ));
+    untouched(&future, &inst, OP);
+
+    // A supplement of the wrong type is refused by the verifier, not ignored.
+    let (_dir3, target) = policy_target(&inst, &trust, AdmissionGradeV0::Rehearsal);
+    assert!(matches!(
+        target.reserve_admitted(
+            &evidence.authorization,
+            &evidence.recognitions,
+            NOW,
+            &request
+        ),
+        Err(ReservationError::AdmissionRefused(_))
+    ));
+    untouched(&target, &inst, OP);
+}
+
+#[test]
+fn admission_for_another_operation_pool_revision_or_context_is_refused() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    let (_dir, target) = policy_target(&inst, &trust, AdmissionGradeV0::Rehearsal);
+
+    let mut other_op = request.clone();
+    other_op.operation_id = [0x0c; 32];
+    let mut other_revision = request.clone();
+    other_revision.expected_pool_revision = 1;
+    let mut other_quantity = request.clone();
+    other_quantity.quantity = 5;
+    for (name, req) in [
+        ("operation", &other_op),
+        ("revision", &other_revision),
+        ("parameters", &other_quantity),
+    ] {
+        let result = reserve_admitted(&target, &evidence, req);
+        assert!(
+            matches!(result, Err(ReservationError::InvalidInput(_))),
+            "{name}: {result:?}"
+        );
+        assert_eq!(
+            target.inspect_consumed(inst.ctx, req.operation_id).unwrap(),
+            None
+        );
+    }
+    untouched(&target, &inst, OP);
+
+    // Another pool under the same requirement: the authorization names POOL, not this one.
+    let mut second = institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal);
+    second.pool.pool_id = [0x7f; 32];
+    target.initialize_pool_v1(second).unwrap();
+    let mut other_pool = request.clone();
+    other_pool.pool_id = [0x7f; 32];
+    assert!(matches!(
+        reserve_admitted(&target, &evidence, &other_pool),
+        Err(ReservationError::InvalidInput(_))
+    ));
+    untouched(&target, &inst, OP);
+
+    // Another institution's valid authorization, presented to this custodian's pool.
+    let foreign = Institution::new(FOREIGN_DOMAIN);
+    assert_ne!(foreign.ctx, inst.ctx);
+    let (foreign_evidence, _) = valid_admission(&foreign);
+    let result = reserve_admitted(&target, &foreign_evidence, &request);
+    // Refused by the verifier's first check, before recognition touches the foreign evidence.
+    assert!(
+        matches!(&result, Err(ReservationError::AdmissionRefused(reason))
+            if reason.contains("not for the trusted authority context")),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+}
+
+/// A faulty installed verifier that preflights against its own fixed target and/or clock instead of
+/// the ones the store passes. Used to show the store re-asserts those bindings itself.
+struct FaultyVerifier {
+    inner: InstitutionalAdmissionVerifierV0,
+    target: Option<[u8; 32]>,
+    now: Option<u64>,
+}
+
+impl icn_authz_store::CustodianAdmissionVerifierV0 for FaultyVerifier {
+    fn policy(&self) -> AdmissionPolicyRefV0 {
+        icn_authz_store::CustodianAdmissionVerifierV0::policy(&self.inner)
+    }
+
+    fn preflight(
+        &self,
+        evidence: &CheckpointedEvidenceV0,
+        supplement: &dyn std::any::Any,
+        target: [u8; 32],
+        now: u64,
+    ) -> Result<icn_authz_store::VerifiedAdmissionV0, icn_authz_store::AdmissionRefusalV0> {
+        icn_authz_store::CustodianAdmissionVerifierV0::preflight(
+            &self.inner,
+            evidence,
+            supplement,
+            self.target.unwrap_or(target),
+            self.now.unwrap_or(now),
+        )
+    }
+}
+
+/// An authorization for one custodian cannot commit at another custodian's store, even when that
+/// store's installed verifier wrongly preflights it against the original target: the store checks
+/// the preflighted target against its own.
+#[test]
+fn store_refuses_a_preflight_for_another_target_even_from_its_own_verifier() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+
+    let elsewhere = [0x5e; 32];
+    assert_ne!(elsewhere, inst.custodian);
+    let mut registry = AdmissionRegistryV0::new();
+    registry
+        .install(std::sync::Arc::new(FaultyVerifier {
+            inner: InstitutionalAdmissionVerifierV0::new(trust.clone()),
+            target: Some(inst.custodian),
+            now: None,
+        }))
+        .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let store = LocalResourceReservations::open(dir.path(), elsewhere)
+        .unwrap()
+        .with_admission(registry);
+    let mut pool = institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal);
+    pool.pool.custodian = elsewhere;
+    store.initialize_pool_v1(pool).unwrap();
+
+    let result = reserve_admitted(&store, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::InvalidInput(_))),
+        "{result:?}"
+    );
+    untouched(&store, &inst, OP);
+}
+
+/// An expired authorization cannot commit even when the installed verifier wrongly evaluates it at
+/// an earlier time: the store checks expiry against its own `now`.
+#[test]
+fn store_refuses_an_expired_authorization_even_from_its_own_verifier() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+    let not_after = evidence.authorization.authorization.body.not_after;
+
+    let mut registry = AdmissionRegistryV0::new();
+    registry
+        .install(std::sync::Arc::new(FaultyVerifier {
+            inner: InstitutionalAdmissionVerifierV0::new(trust.clone()),
+            target: None,
+            now: Some(NOW),
+        }))
+        .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let store = LocalResourceReservations::open(dir.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry);
+    store
+        .initialize_pool_v1(institutional_pool(
+            &inst,
+            &trust,
+            AdmissionGradeV0::Rehearsal,
+        ))
+        .unwrap();
+
+    assert!(NOW <= not_after);
+    let supplement = InstitutionalSupplementV0 {
+        recognitions: evidence.recognitions.clone(),
+    };
+    let result = store.reserve_admitted(
+        &evidence.authorization,
+        &supplement,
+        not_after + 1,
+        &request,
+    );
+    assert!(
+        matches!(result, Err(ReservationError::InvalidInput(_))),
+        "{result:?}"
+    );
+    untouched(&store, &inst, OP);
+}
+
+/// The admitted path is not a way into a pool that declares no custodian policy: a V0 pool and an
+/// explicit generic V1 pool both refuse it as `AdmissionDenied`, even with a verifier installed
+/// and otherwise valid evidence, and nothing is consumed.
+#[test]
+fn admitted_path_is_refused_by_a_pool_without_a_custodian_policy() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let trust = inst.trust(2, None);
+
+    let dir0 = tempfile::tempdir().unwrap();
+    let v0 = LocalResourceReservations::open(dir0.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry_for(&[&trust]));
+    v0.initialize_pool(inst.pool(10)).unwrap();
+
+    let dir1 = tempfile::tempdir().unwrap();
+    let generic_v1 = LocalResourceReservations::open(dir1.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry_for(&[&trust]));
+    generic_v1
+        .initialize_pool_v1(ResourcePoolV1 {
+            pool: inst.pool(10),
+            admission: AdmissionRequirementV1::CallerResolved,
+        })
+        .unwrap();
+
+    for (name, target) in [("v0", &v0), ("generic v1", &generic_v1)] {
+        let result = reserve_admitted(target, &evidence, &request);
+        assert!(
+            matches!(result, Err(ReservationError::AdmissionDenied(_))),
+            "{name}: {result:?}"
+        );
+        untouched(target, &inst, OP);
+    }
+}
+
+#[test]
+fn stale_frontier_is_refused_by_the_installed_verifier() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    // The custodian's anchor has advanced past the presented checkpoint (tip seq 2).
+    let advanced = inst.trust(3, None);
+    let (_dir, target) = policy_target(&inst, &advanced, AdmissionGradeV0::Rehearsal);
+    let result = reserve_admitted(&target, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionRefused(_))),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+    // The caller has no way to supply its own, weaker frontier for this pool.
+    assert!(matches!(
+        target.reserve_checkpointed(
+            &evidence.authorization,
+            &inst.frontier(0, None),
+            &rules(),
+            NOW,
+            &request
+        ),
+        Err(ReservationError::AdmissionDenied(_))
+    ));
+    untouched(&target, &inst, OP);
+}
+
+#[test]
+fn recognized_but_ineligible_subject_is_refused_at_the_target() {
+    let inst = Institution::new(DOMAIN);
+    let (log, fourth) = honest_history(&inst);
+    let outsider = GenASubject::incept(DOMAIN, 0x07);
+    let request = inst.request(OP, 4);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(
+            &log,
+            &[inst.m(0), inst.m(1), &outsider],
+            &request,
+        ),
+        recognitions: members_and(&inst, &[&fourth, &outsider]),
+    };
+    let (_dir, target) = policy_target(&inst, &inst.trust(2, None), AdmissionGradeV0::Rehearsal);
+    let result = reserve_admitted(&target, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionRefused(_))),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+}
+
+#[test]
+fn rehearsal_recognition_never_satisfies_a_production_pool() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+
+    // Rehearsal-permitting anchor: verification succeeds at Rehearsal grade, and the pool's
+    // Production minimum refuses it at commit.
+    let (_dir, target) = policy_target(&inst, &inst.trust(2, None), AdmissionGradeV0::Production);
+    let result = reserve_admitted(&target, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionDenied(_))),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+
+    // Production-grade anchor: every v1 (rehearsal) recognition is refused by the verifier.
+    let production = anchor(
+        DOMAIN,
+        inst.ctx,
+        2,
+        None,
+        RecognitionRequirement::ProductionGrade,
+    );
+    let (_dir2, target) = policy_target(&inst, &production, AdmissionGradeV0::Production);
+    let result = reserve_admitted(&target, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionRefused(_))),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
 }

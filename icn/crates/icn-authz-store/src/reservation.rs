@@ -3,6 +3,7 @@
 //! These records carry only generic capacity constraints and opaque hashes. Institution-specific
 //! allocation meaning stays in the governance rule and the custodian's policy artifact.
 
+use std::any::Any;
 use std::path::Path;
 
 use icn_authz::effect_v0::{
@@ -12,7 +13,19 @@ use icn_authz::effect_v0::{
 use icn_store::{CompareAndPut, SledStore, Store, TransactionalStore};
 use sha2::{Digest, Sha256};
 
+use crate::admission::{
+    AdmissionGradeV0, AdmissionPolicyRefV0, AdmissionRegistryV0, AdmissionRequirementV1,
+    AdmittedUnder,
+};
+
 const VERSION: u16 = 0;
+/// Version of the experimental V1 pool record. V0 records keep `VERSION`.
+const POOL_V1_VERSION: u16 = 1;
+/// Distinct from `POOL_RECORD_DOMAIN`: a V0-only decoder refuses a V1 record (domain mismatch)
+/// instead of reading it as a generic pool.
+const POOL_RECORD_V1_DOMAIN: &[u8] = b"icn.authz-store.v1.resource-pool";
+const REQUIREMENT_CALLER_RESOLVED: u8 = 1;
+const REQUIREMENT_POLICY: u8 = 2;
 const MAX_UNIT_LEN: usize = 64;
 const REQUEST_DOMAIN: &[u8] = b"icn.authz-store.v0.reservation-request";
 const POOL_RECORD_DOMAIN: &[u8] = b"icn.authz-store.v0.resource-pool";
@@ -61,6 +74,15 @@ pub enum ReservationError {
     /// Storage could not complete an operation before acknowledgement.
     #[error("reservation storage unavailable: {0}")]
     Unavailable(String),
+    /// The admission does not satisfy the pool's authoritative admission requirement.
+    #[error("pool admission requirement not satisfied: {0}")]
+    AdmissionDenied(String),
+    /// The pool requires an admission policy this custodian has no verifier for.
+    #[error("required admission policy is unavailable: {0}")]
+    AdmissionUnavailable(String),
+    /// The custodian-installed verifier refused the evidence.
+    #[error("custodian admission verifier refused: {0}")]
+    AdmissionRefused(String),
 }
 
 /// The persistent key for a custodian-owned pool.
@@ -213,6 +235,141 @@ impl ResourcePoolV0 {
     }
 }
 
+/// EXPERIMENTAL V1 pool record: a V0 pool plus the custodian's durable admission requirement.
+///
+/// Stored under the same key as a V0 pool, so one pool has exactly one record. Not a ratified
+/// format: it awaits review by the reservation lane owner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourcePoolV1 {
+    pub pool: ResourcePoolV0,
+    pub admission: AdmissionRequirementV1,
+}
+
+impl ResourcePoolV1 {
+    pub fn validate(&self) -> Result<(), ReservationError> {
+        self.pool.validate()
+    }
+
+    pub fn encode(&self) -> Result<Vec<u8>, ReservationError> {
+        self.validate()?;
+        let p = &self.pool;
+        let mut w = Writer::with_version(POOL_RECORD_V1_DOMAIN, POOL_V1_VERSION);
+        w.b32(&p.context.0);
+        w.b32(&p.pool_id);
+        w.b32(&p.custodian);
+        w.lp(p.unit.as_bytes())?;
+        w.u64(p.total_capacity);
+        w.u64(p.available_capacity);
+        w.u64(p.revision);
+        w.u8(u8::from(p.policy.enabled));
+        w.u64(p.policy.max_quantity_per_reservation);
+        w.b32(&p.policy.policy_hash);
+        match self.admission {
+            AdmissionRequirementV1::CallerResolved => w.u8(REQUIREMENT_CALLER_RESOLVED),
+            AdmissionRequirementV1::Policy { policy, min_grade } => {
+                w.u8(REQUIREMENT_POLICY);
+                w.b32(&policy.id);
+                w.u32(policy.version);
+                w.u8(min_grade.tag());
+            }
+        }
+        Ok(w.finish())
+    }
+
+    pub fn decode(bytes: &[u8]) -> Result<Self, ReservationError> {
+        let mut r = Reader::with_version(bytes, POOL_RECORD_V1_DOMAIN, POOL_V1_VERSION)?;
+        let pool = ResourcePoolV0 {
+            context: ContextRef(r.b32("context")?),
+            pool_id: r.b32("pool_id")?,
+            custodian: r.b32("custodian")?,
+            unit: r.text("unit")?,
+            total_capacity: r.u64("total_capacity")?,
+            available_capacity: r.u64("available_capacity")?,
+            revision: r.u64("revision")?,
+            policy: LocalReservationPolicyV0 {
+                enabled: r.boolean("policy_enabled")?,
+                max_quantity_per_reservation: r.u64("policy_maximum")?,
+                policy_hash: r.b32("policy_hash")?,
+            },
+        };
+        // Unknown requirement tags and grades are corruption, never a default.
+        let admission = match r.u8("admission_requirement")? {
+            REQUIREMENT_CALLER_RESOLVED => AdmissionRequirementV1::CallerResolved,
+            REQUIREMENT_POLICY => {
+                let id = r.b32("admission_policy_id")?;
+                let version = r.u32("admission_policy_version")?;
+                let min_grade = AdmissionGradeV0::from_tag(r.u8("admission_min_grade")?)
+                    .ok_or_else(|| ReservationError::Corrupt("unknown admission grade".into()))?;
+                AdmissionRequirementV1::Policy {
+                    policy: AdmissionPolicyRefV0 { id, version },
+                    min_grade,
+                }
+            }
+            _ => {
+                return Err(ReservationError::Corrupt(
+                    "unknown admission requirement".into(),
+                ))
+            }
+        };
+        r.finish()?;
+        let value = ResourcePoolV1 { pool, admission };
+        value.validate().map_err(as_corrupt)?;
+        Ok(value)
+    }
+}
+
+/// Whichever pool record version is stored under a pool key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourcePoolRecord {
+    V0(ResourcePoolV0),
+    V1(ResourcePoolV1),
+}
+
+impl ResourcePoolRecord {
+    /// Dispatch on the record's own domain tag. Anything else is corruption.
+    pub fn decode(bytes: &[u8]) -> Result<Self, ReservationError> {
+        let mut peek = Reader { bytes, pos: 0 };
+        let domain = peek.lp("domain")?;
+        if domain == POOL_RECORD_DOMAIN {
+            ResourcePoolV0::decode(bytes).map(ResourcePoolRecord::V0)
+        } else if domain == POOL_RECORD_V1_DOMAIN {
+            ResourcePoolV1::decode(bytes).map(ResourcePoolRecord::V1)
+        } else {
+            Err(ReservationError::Corrupt("record domain mismatch".into()))
+        }
+    }
+
+    /// Re-encode in the record's own version, so a commit never changes a pool's version.
+    pub fn encode(&self) -> Result<Vec<u8>, ReservationError> {
+        match self {
+            ResourcePoolRecord::V0(pool) => pool.encode(),
+            ResourcePoolRecord::V1(pool) => pool.encode(),
+        }
+    }
+
+    pub fn pool(&self) -> &ResourcePoolV0 {
+        match self {
+            ResourcePoolRecord::V0(pool) => pool,
+            ResourcePoolRecord::V1(pool) => &pool.pool,
+        }
+    }
+
+    fn pool_mut(&mut self) -> &mut ResourcePoolV0 {
+        match self {
+            ResourcePoolRecord::V0(pool) => pool,
+            ResourcePoolRecord::V1(pool) => &mut pool.pool,
+        }
+    }
+
+    /// A V0 record predates admission requirements; its existing contract is caller-resolved.
+    pub fn admission(&self) -> AdmissionRequirementV1 {
+        match self {
+            ResourcePoolRecord::V0(_) => AdmissionRequirementV1::CallerResolved,
+            ResourcePoolRecord::V1(pool) => pool.admission,
+        }
+    }
+}
+
 /// Complete immutable witness of one local capacity reservation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReservationRecordV0 {
@@ -324,6 +481,8 @@ pub struct LocalResourceReservations<B: DurabilityBarrier = SledDurabilityBarrie
     store: SledStore,
     target: [u8; 32],
     barrier: B,
+    /// Custodian-installed verifiers. Set only while the custodian owns the store by value.
+    admission: AdmissionRegistryV0,
 }
 
 impl LocalResourceReservations<SledDurabilityBarrier> {
@@ -340,15 +499,34 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
             store,
             target,
             barrier,
+            admission: AdmissionRegistryV0::new(),
         }
+    }
+
+    /// Install the custodian's admission verifiers. Takes the store by value: code that only
+    /// holds `&LocalResourceReservations` (every reservation caller) cannot add or swap one.
+    /// Without a verifier for a pool's declared policy, that pool refuses every reservation.
+    pub fn with_admission(mut self, registry: AdmissionRegistryV0) -> Self {
+        self.admission = registry;
+        self
     }
 
     pub fn target(&self) -> [u8; 32] {
         self.target
     }
 
-    /// Create a new, full pool without overwriting any existing record.
+    /// Create a new, full V0 pool (caller-resolved admission) without overwriting any record.
     pub fn initialize_pool(&self, pool: ResourcePoolV0) -> Result<(), ReservationError> {
+        self.initialize_record(ResourcePoolRecord::V0(pool))
+    }
+
+    /// Create a new, full EXPERIMENTAL V1 pool that durably declares its admission requirement.
+    pub fn initialize_pool_v1(&self, pool: ResourcePoolV1) -> Result<(), ReservationError> {
+        self.initialize_record(ResourcePoolRecord::V1(pool))
+    }
+
+    fn initialize_record(&self, record: ResourcePoolRecord) -> Result<(), ReservationError> {
+        let pool = record.pool();
         pool.validate()?;
         if pool.custodian != self.target {
             return Err(ReservationError::InvalidInput(
@@ -361,7 +539,7 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
             ));
         }
         let key = pool_key(pool.context, self.target, pool.pool_id);
-        let encoded = pool.encode()?;
+        let encoded = record.encode()?;
         match Store::compare_and_put(&self.store, &key, None, &encoded)
             .map_err(|error| ReservationError::Unavailable(error.to_string()))?
         {
@@ -381,11 +559,23 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
         }
     }
 
+    /// The capacity fields of a pool of either record version.
     pub fn inspect_pool(
         &self,
         context: ContextRef,
         pool_id: [u8; 32],
     ) -> Result<Option<ResourcePoolV0>, ReservationError> {
+        Ok(self
+            .inspect_pool_record(context, pool_id)?
+            .map(|record| record.pool().clone()))
+    }
+
+    /// The stored pool record, including its admission requirement.
+    pub fn inspect_pool_record(
+        &self,
+        context: ContextRef,
+        pool_id: [u8; 32],
+    ) -> Result<Option<ResourcePoolRecord>, ReservationError> {
         Store::get(&self.store, &pool_key(context, self.target, pool_id))
             .map_err(|error| ReservationError::Unavailable(error.to_string()))?
             .map(|bytes| decode_pool_for_key(&bytes, context, self.target, pool_id))
@@ -450,8 +640,11 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
         Ok(result)
     }
 
-    /// Verify institutional authority without consuming, then commit consumption, capacity and
-    /// reservation together. `admit_checkpointed` is deliberately not called.
+    /// Caller-resolved admission: the caller supplies the frontier and rule resolver.
+    ///
+    /// Valid only for pools whose authoritative requirement is `CallerResolved` (every V0 pool,
+    /// and V1 pools that declare it explicitly). A pool that declares a custodian admission
+    /// policy refuses this call inside the commit transaction, whatever the caller supplies.
     pub fn reserve_checkpointed(
         &self,
         evidence: &CheckpointedEvidenceV0,
@@ -462,8 +655,69 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
     ) -> Result<ReservationRecordV0, ReservationError> {
         let preflight = preflight_checkpointed(evidence, frontier, rules, self.target, now)
             .map_err(ReservationError::Authorization)?;
+        self.commit_preflight(preflight, AdmittedUnder::CallerResolved, now, request)
+    }
+
+    /// Custodian-policy admission. The pool's stored requirement selects the verifier; the
+    /// caller supplies only untrusted evidence and an opaque supplement for that verifier.
+    pub fn reserve_admitted(
+        &self,
+        evidence: &CheckpointedEvidenceV0,
+        supplement: &dyn Any,
+        now: u64,
+        request: &ReservationRequestV0,
+    ) -> Result<ReservationRecordV0, ReservationError> {
+        request.validate()?;
+        let record = self
+            .inspect_pool_record(request.context, request.pool_id)?
+            .ok_or(ReservationError::PoolNotFound)?;
+        let AdmissionRequirementV1::Policy { policy, .. } = record.admission() else {
+            return Err(ReservationError::AdmissionDenied(
+                "pool does not declare a custodian admission policy".into(),
+            ));
+        };
+        let verifier = self.admission.get(&policy).ok_or_else(|| {
+            ReservationError::AdmissionUnavailable(
+                "no installed verifier for the pool's admission policy and version".into(),
+            )
+        })?;
+        let verified = verifier
+            .preflight(evidence, supplement, self.target, now)
+            .map_err(|refusal| ReservationError::AdmissionRefused(refusal.0))?;
+        // The requirement read above is advisory; the binding check runs again in the commit
+        // transaction against the pool record read there.
+        self.commit_preflight(
+            verified.preflight,
+            AdmittedUnder::Policy {
+                policy,
+                grade: verified.grade,
+            },
+            now,
+            request,
+        )
+    }
+
+    fn commit_preflight(
+        &self,
+        preflight: CheckpointedPreflight,
+        admitted: AdmittedUnder,
+        now: u64,
+        request: &ReservationRequestV0,
+    ) -> Result<ReservationRecordV0, ReservationError> {
         let auth = preflight.verified().authorization();
         request.validate()?;
+        // Defence in depth: on the admitted path the preflight was produced by a verifier, so the
+        // store itself re-asserts the target binding and expiry rather than trusting it to.
+        if preflight.target() != self.target || auth.effect.target != self.target {
+            return Err(ReservationError::InvalidInput(
+                "authorization was not preflighted for this local target".into(),
+            ));
+        }
+        if now > auth.not_after {
+            return Err(ReservationError::InvalidInput(
+                "authorization has expired".into(),
+            ));
+        }
         if auth.context != request.context || auth.operation_id != request.operation_id {
             return Err(ReservationError::InvalidInput(
                 "authorization does not name the request context and operation".into(),
@@ -477,7 +731,7 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
             ));
         }
 
-        let binding = CommitBinding::from_preflight(&preflight);
+        let binding = CommitBinding::from_preflight(&preflight, admitted);
         match self.commit_atomic(&binding, request, now, |_| Ok(()))? {
             AtomicOutcome::Reserved(record) => {
                 self.barrier
@@ -556,7 +810,7 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
                 let Some(pool_bytes) = tx.get(&pool_key)? else {
                     return Ok(AtomicOutcome::Rejected(ReservationError::PoolNotFound));
                 };
-                let pool = match decode_pool_for_key(
+                let pool_record = match decode_pool_for_key(
                     &pool_bytes,
                     request.context,
                     self.target,
@@ -565,6 +819,14 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
                     Ok(value) => value,
                     Err(error) => return Ok(AtomicOutcome::Rejected(error)),
                 };
+                // Authoritative admission check: the requirement in the record read by this
+                // transaction, not the one observed before verification.
+                if let Err(reason) = binding.admitted.satisfies(pool_record.admission()) {
+                    return Ok(AtomicOutcome::Rejected(ReservationError::AdmissionDenied(
+                        reason,
+                    )));
+                }
+                let pool = pool_record.pool();
                 if request.expected_pool_revision != pool.revision {
                     return Ok(AtomicOutcome::Rejected(ReservationError::StalePool {
                         expected: request.expected_pool_revision,
@@ -609,9 +871,9 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
                     ));
                 };
 
-                let mut next_pool = pool.clone();
-                next_pool.available_capacity = available_after;
-                next_pool.revision = revision_after;
+                let mut next_pool = pool_record.clone();
+                next_pool.pool_mut().available_capacity = available_after;
+                next_pool.pool_mut().revision = revision_after;
                 let record = ReservationRecordV0 {
                     context: request.context,
                     operation_id: request.operation_id,
@@ -654,14 +916,16 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
 struct CommitBinding {
     consumed: ConsumedEntry,
     authorization_hash: [u8; 32],
+    admitted: AdmittedUnder,
 }
 
 impl CommitBinding {
-    fn from_preflight(preflight: &CheckpointedPreflight) -> Self {
+    fn from_preflight(preflight: &CheckpointedPreflight, admitted: AdmittedUnder) -> Self {
         let consumed = preflight.consumed_entry();
         CommitBinding {
             authorization_hash: hash_consumed(&consumed),
             consumed,
+            admitted,
         }
     }
 }
@@ -688,14 +952,15 @@ fn decode_pool_for_key(
     context: ContextRef,
     target: [u8; 32],
     pool_id: [u8; 32],
-) -> Result<ResourcePoolV0, ReservationError> {
-    let pool = ResourcePoolV0::decode(bytes)?;
+) -> Result<ResourcePoolRecord, ReservationError> {
+    let record = ResourcePoolRecord::decode(bytes)?;
+    let pool = record.pool();
     if pool.context != context || pool.custodian != target || pool.pool_id != pool_id {
         return Err(ReservationError::Corrupt(
             "pool record does not name its storage key".into(),
         ));
     }
-    Ok(pool)
+    Ok(record)
 }
 
 fn decode_reservation_for_key(
@@ -791,11 +1056,15 @@ struct Writer {
 
 impl Writer {
     fn new(domain: &[u8]) -> Self {
+        Self::with_version(domain, VERSION)
+    }
+
+    fn with_version(domain: &[u8], version: u16) -> Self {
         let mut writer = Writer { bytes: Vec::new() };
         // Every caller passes one of this module's short constant domains.
         writer.u32(domain.len() as u32);
         writer.bytes.extend_from_slice(domain);
-        writer.u16(VERSION);
+        writer.u16(version);
         writer
     }
 
@@ -839,11 +1108,19 @@ struct Reader<'a> {
 
 impl<'a> Reader<'a> {
     fn new(bytes: &'a [u8], domain: &[u8]) -> Result<Self, ReservationError> {
+        Self::with_version(bytes, domain, VERSION)
+    }
+
+    fn with_version(
+        bytes: &'a [u8],
+        domain: &[u8],
+        version: u16,
+    ) -> Result<Self, ReservationError> {
         let mut reader = Reader { bytes, pos: 0 };
         if reader.lp("domain")? != domain {
             return Err(ReservationError::Corrupt("record domain mismatch".into()));
         }
-        if reader.u16("version")? != VERSION {
+        if reader.u16("version")? != version {
             return Err(ReservationError::Corrupt(
                 "unsupported record version".into(),
             ));
@@ -1000,6 +1277,7 @@ mod tests {
         CommitBinding {
             authorization_hash: hash_consumed(&consumed),
             consumed,
+            admitted: AdmittedUnder::CallerResolved,
         }
     }
 
@@ -1149,5 +1427,359 @@ mod tests {
         assert!(matches!(outcome, AtomicOutcome::Reserved(_)));
         store.barrier.sync(&store.store).unwrap();
         std::process::abort();
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Pool admission requirement (experimental V1 record)
+    // ---------------------------------------------------------------------------------------
+
+    const ADMISSION: AdmissionPolicyRefV0 = AdmissionPolicyRefV0 {
+        id: [0x8a; 32],
+        version: 0,
+    };
+
+    fn pool_v1(admission: AdmissionRequirementV1) -> ResourcePoolV1 {
+        ResourcePoolV1 {
+            pool: pool(),
+            admission,
+        }
+    }
+
+    fn requires(min_grade: AdmissionGradeV0) -> AdmissionRequirementV1 {
+        AdmissionRequirementV1::Policy {
+            policy: ADMISSION,
+            min_grade,
+        }
+    }
+
+    fn admitted(policy: AdmissionPolicyRefV0, grade: AdmissionGradeV0) -> CommitBinding {
+        CommitBinding {
+            admitted: AdmittedUnder::Policy { policy, grade },
+            ..binding()
+        }
+    }
+
+    fn rejected(outcome: AtomicOutcome) -> ReservationError {
+        match outcome {
+            AtomicOutcome::Rejected(error) => error,
+            AtomicOutcome::Reserved(_) => panic!("expected a rejection, got a reservation"),
+            AtomicOutcome::Prior(_) => panic!("expected a rejection, got a prior consumption"),
+        }
+    }
+
+    fn v1_store(
+        dir: &tempfile::TempDir,
+        admission: AdmissionRequirementV1,
+    ) -> LocalResourceReservations {
+        let store = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
+        store.initialize_pool_v1(pool_v1(admission)).unwrap();
+        store
+    }
+
+    #[test]
+    fn policy_pool_refuses_a_caller_resolved_commit_and_stays_pristine() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = v1_store(&dir, requires(AdmissionGradeV0::Rehearsal));
+        let error = rejected(
+            store
+                .commit_atomic(&binding(), &request(), 900, |_| Ok(()))
+                .unwrap(),
+        );
+        assert!(
+            matches!(error, ReservationError::AdmissionDenied(_)),
+            "{error:?}"
+        );
+        // The request carries the pool's policy_hash; that alone is not admission.
+        assert_eq!(request().policy_hash, pool().policy.policy_hash);
+        assert_pristine(&store);
+    }
+
+    #[test]
+    fn policy_pool_accepts_only_its_exact_policy_version_and_grade() {
+        let other_id = AdmissionPolicyRefV0 {
+            id: [0x8b; 32],
+            ..ADMISSION
+        };
+        let other_version = AdmissionPolicyRefV0 {
+            version: 1,
+            ..ADMISSION
+        };
+        for (binding, why) in [
+            (
+                admitted(other_id, AdmissionGradeV0::Production),
+                "other policy",
+            ),
+            (
+                admitted(other_version, AdmissionGradeV0::Production),
+                "other version",
+            ),
+            (
+                admitted(ADMISSION, AdmissionGradeV0::Rehearsal),
+                "grade too low",
+            ),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let store = v1_store(&dir, requires(AdmissionGradeV0::Production));
+            let error = rejected(
+                store
+                    .commit_atomic(&binding, &request(), 900, |_| Ok(()))
+                    .unwrap(),
+            );
+            assert!(
+                matches!(error, ReservationError::AdmissionDenied(_)),
+                "{why}: {error:?}"
+            );
+            assert_pristine(&store);
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let store = v1_store(&dir, requires(AdmissionGradeV0::Production));
+        let outcome = store
+            .commit_atomic(
+                &admitted(ADMISSION, AdmissionGradeV0::Production),
+                &request(),
+                900,
+                |_| Ok(()),
+            )
+            .unwrap();
+        assert!(matches!(outcome, AtomicOutcome::Reserved(_)));
+    }
+
+    #[test]
+    fn explicit_generic_v1_pool_keeps_the_caller_resolved_contract() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = v1_store(&dir, AdmissionRequirementV1::CallerResolved);
+        let error = rejected(
+            store
+                .commit_atomic(
+                    &admitted(ADMISSION, AdmissionGradeV0::Production),
+                    &request(),
+                    900,
+                    |_| Ok(()),
+                )
+                .unwrap(),
+        );
+        assert!(
+            matches!(error, ReservationError::AdmissionDenied(_)),
+            "{error:?}"
+        );
+        let outcome = store
+            .commit_atomic(&binding(), &request(), 900, |_| Ok(()))
+            .unwrap();
+        assert!(matches!(outcome, AtomicOutcome::Reserved(_)));
+    }
+
+    #[test]
+    fn commit_keeps_the_v1_record_and_requirement_across_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let required = requires(AdmissionGradeV0::Production);
+        {
+            let store = v1_store(&dir, required);
+            let outcome = store
+                .commit_atomic(
+                    &admitted(ADMISSION, AdmissionGradeV0::Production),
+                    &request(),
+                    900,
+                    |_| Ok(()),
+                )
+                .unwrap();
+            assert!(matches!(outcome, AtomicOutcome::Reserved(_)));
+            store.barrier.sync(&store.store).unwrap();
+        }
+        let store = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
+        let Some(ResourcePoolRecord::V1(stored)) = store.inspect_pool_record(CTX, POOL).unwrap()
+        else {
+            panic!("a commit must not rewrite a V1 pool as V0");
+        };
+        assert_eq!(stored.admission, required);
+        assert_eq!(
+            (stored.pool.revision, stored.pool.available_capacity),
+            (1, 3)
+        );
+        assert!(matches!(
+            store.reconcile(CTX, OP).unwrap(),
+            ReservationReconciliation::Committed { .. }
+        ));
+    }
+
+    #[test]
+    fn requirement_changed_after_verification_is_enforced_at_commit() {
+        // Stands in for a future policy-update path or a concurrent writer: verification ran
+        // under ADMISSION v0, then the authoritative pool record moved to v1 before the commit.
+        let dir = tempfile::tempdir().unwrap();
+        let store = v1_store(&dir, requires(AdmissionGradeV0::Rehearsal));
+        let verified = admitted(ADMISSION, AdmissionGradeV0::Production);
+        let moved = pool_v1(AdmissionRequirementV1::Policy {
+            policy: AdmissionPolicyRefV0 {
+                version: 1,
+                ..ADMISSION
+            },
+            min_grade: AdmissionGradeV0::Rehearsal,
+        });
+        Store::put(
+            &store.store,
+            &pool_key(CTX, TARGET, POOL),
+            &moved.encode().unwrap(),
+        )
+        .unwrap();
+        let error = rejected(
+            store
+                .commit_atomic(&verified, &request(), 900, |_| Ok(()))
+                .unwrap(),
+        );
+        assert!(
+            matches!(error, ReservationError::AdmissionDenied(_)),
+            "{error:?}"
+        );
+        assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
+        assert_eq!(store.inspect_pool(CTX, POOL).unwrap(), Some(pool()));
+    }
+
+    #[test]
+    fn v1_records_are_strict_and_unreadable_by_a_v0_decoder() {
+        let record = pool_v1(requires(AdmissionGradeV0::Production));
+        let bytes = record.encode().unwrap();
+        assert_eq!(ResourcePoolV1::decode(&bytes).unwrap(), record);
+        assert_eq!(
+            ResourcePoolRecord::decode(&bytes).unwrap(),
+            ResourcePoolRecord::V1(record.clone())
+        );
+        // An old binary only knows V0: it refuses the record instead of reading a generic pool.
+        assert!(matches!(
+            ResourcePoolV0::decode(&bytes),
+            Err(ReservationError::Corrupt(_))
+        ));
+        let corrupt = |mutate: &dyn Fn(&mut Vec<u8>)| {
+            let mut b = bytes.clone();
+            mutate(&mut b);
+            ResourcePoolRecord::decode(&b)
+        };
+        let len = bytes.len();
+        // Layout tail: requirement tag, policy id (32), version (4), grade (1).
+        let tag_at = len - 38;
+        for (name, result) in [
+            ("unknown requirement tag", corrupt(&|b| b[tag_at] = 9)),
+            ("unknown grade", corrupt(&|b| b[len - 1] = 0)),
+            ("truncated", corrupt(&|b| b.truncate(len - 1))),
+            ("trailing byte", corrupt(&|b| b.push(0))),
+            ("record version 0 under the V1 domain", {
+                let domain_end = 4 + POOL_RECORD_V1_DOMAIN.len();
+                corrupt(&|b| b[domain_end + 1] = 0)
+            }),
+        ] {
+            assert!(
+                matches!(result, Err(ReservationError::Corrupt(_))),
+                "{name}: {result:?}"
+            );
+        }
+        assert_eq!(bytes[tag_at], REQUIREMENT_POLICY);
+    }
+
+    #[test]
+    fn corrupt_policy_record_refuses_rather_than_reopening_generic_admission() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = v1_store(&dir, requires(AdmissionGradeV0::Rehearsal));
+        let mut bytes = pool_v1(requires(AdmissionGradeV0::Rehearsal))
+            .encode()
+            .unwrap();
+        let tag_at = bytes.len() - 38;
+        bytes[tag_at] = 0;
+        Store::put(&store.store, &pool_key(CTX, TARGET, POOL), &bytes).unwrap();
+        let error = rejected(
+            store
+                .commit_atomic(&binding(), &request(), 900, |_| Ok(()))
+                .unwrap(),
+        );
+        assert!(matches!(error, ReservationError::Corrupt(_)), "{error:?}");
+        assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
+    }
+
+    /// Isolates the unknown-tag and unknown-grade arms from the trailing-bytes check: each record
+    /// is otherwise well formed, so only a fail-closed decode refuses it. A generic V1 record is
+    /// the shortest form: its last byte is the requirement tag.
+    #[test]
+    fn unknown_requirement_tag_or_grade_is_corrupt_without_trailing_bytes() {
+        let generic = pool_v1(AdmissionRequirementV1::CallerResolved)
+            .encode()
+            .unwrap();
+        let policy = pool_v1(requires(AdmissionGradeV0::Rehearsal))
+            .encode()
+            .unwrap();
+        assert!(ResourcePoolRecord::decode(&generic).is_ok());
+        assert!(ResourcePoolRecord::decode(&policy).is_ok());
+        for tag in [0u8, 3, 0xff] {
+            let mut bytes = generic.clone();
+            *bytes.last_mut().unwrap() = tag;
+            assert!(
+                matches!(
+                    ResourcePoolRecord::decode(&bytes),
+                    Err(ReservationError::Corrupt(_))
+                ),
+                "requirement tag {tag}"
+            );
+        }
+        for grade in [0u8, 3, 0xff] {
+            let mut bytes = policy.clone();
+            *bytes.last_mut().unwrap() = grade;
+            assert!(
+                matches!(
+                    ResourcePoolRecord::decode(&bytes),
+                    Err(ReservationError::Corrupt(_))
+                ),
+                "grade {grade}"
+            );
+        }
+    }
+
+    /// KNOWN LIMIT, pinned: the gate is an API boundary, not storage integrity. An adversary
+    /// with raw write access can replace a policy pool with a well-formed V0 record, which then
+    /// admits caller-resolved reservations. No API path writes such a record.
+    #[test]
+    fn raw_storage_downgrade_is_outside_the_api_gate() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = v1_store(&dir, requires(AdmissionGradeV0::Production));
+        // The API itself refuses to overwrite the pool with a V0 record.
+        assert_eq!(
+            store.initialize_pool(pool()),
+            Err(ReservationError::PoolAlreadyExists)
+        );
+        Store::put(
+            &store.store,
+            &pool_key(CTX, TARGET, POOL),
+            &pool().encode().unwrap(),
+        )
+        .unwrap();
+        let outcome = store
+            .commit_atomic(&binding(), &request(), 900, |_| Ok(()))
+            .unwrap();
+        assert!(matches!(outcome, AtomicOutcome::Reserved(_)));
+    }
+
+    struct NeverCalled(AdmissionPolicyRefV0);
+
+    impl crate::CustodianAdmissionVerifierV0 for NeverCalled {
+        fn policy(&self) -> AdmissionPolicyRefV0 {
+            self.0
+        }
+        fn preflight(
+            &self,
+            _: &CheckpointedEvidenceV0,
+            _: &dyn Any,
+            _: [u8; 32],
+            _: u64,
+        ) -> Result<crate::VerifiedAdmissionV0, crate::AdmissionRefusalV0> {
+            panic!("a verifier for another policy or version must never be consulted")
+        }
+    }
+
+    #[test]
+    fn registry_refuses_a_second_verifier_for_the_same_policy() {
+        let mut registry = AdmissionRegistryV0::new();
+        registry
+            .install(std::sync::Arc::new(NeverCalled(ADMISSION)))
+            .unwrap();
+        assert_eq!(
+            registry.install(std::sync::Arc::new(NeverCalled(ADMISSION))),
+            Err(crate::AdmissionRegistryError::Duplicate)
+        );
     }
 }
