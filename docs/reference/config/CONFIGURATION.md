@@ -272,6 +272,35 @@ name = "My Cooperative"
 description = "A community cooperative"
 ```
 
+### 10. Compute Region (Optional)
+
+```toml
+[compute]
+region = "eu-central"
+```
+
+`compute.region` is the region this node's operator asserts the node executes compute tasks in.
+A task whose placement constraints require a region (for example from a cooperative's
+`DataSovereignty` scheduling rule) is claimed only by a node whose `compute.region` equals that
+region **exactly**: byte-for-byte, case-sensitive, with no aliasing or normalisation.
+
+- **Absent (the default):** the node has no compute region. It still executes unconstrained tasks,
+  but it refuses every region-constrained task (fail closed).
+- **Grammar:** 1–64 ASCII characters from `A–Z a–z 0–9 . _ -`, beginning and ending with a letter or
+  digit. Anything else — an empty value, leading or trailing whitespace, other characters, or an
+  overlong value — is a configuration error, and `icnd` refuses to start. The value is never trimmed,
+  coerced to absent, or replaced by a placeholder.
+- **Not `topology.region`:** `[topology] region` is a network-topology label for neighbour selection
+  (it defaults to `"default"`, and peers report it about themselves). It never supplies the compute
+  region.
+
+**Trust boundary.** `compute.region` is the operator's own assertion about their node. It is not
+independent evidence of geography or jurisdiction, and nothing verifies it. Enforcement is
+cooperative: an honest node refuses tasks outside its configured region, but a dishonest operator
+can misstate the region, a submitter can omit constraints, and a submitter does not verify an
+executor's region before accepting its claim or result. Do not rely on it as proof of data
+residency.
+
 ---
 
 ## Environment Variables

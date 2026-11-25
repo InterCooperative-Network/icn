@@ -64,6 +64,28 @@ pub enum ComputeError {
     #[error("invalid result: {0}")]
     InvalidResult(String),
 
+    /// The task is registered for quorum verification and its quorum has closed, so the result
+    /// is refused. Distinct from [`ComputeError::TaskNotFound`], which a quorum submission
+    /// returns only for a task that was never registered.
+    #[error("quorum closed for task {task}: {closure:?}")]
+    QuorumClosed {
+        task: String,
+        closure: crate::result_quorum::QuorumClosure,
+    },
+
+    /// The task is already terminal (completed, failed or cancelled), and its status is final.
+    /// Nothing changed: a late result, a late failure or a replay cannot overwrite it (EX-019).
+    #[error("task {task} is already {state}; its status is final")]
+    TaskTerminal {
+        task: String,
+        state: crate::task::TerminalState,
+    },
+
+    /// A task with this hash is already held, in any state. The submission is refused and
+    /// changes nothing: it cannot reset the existing task to Pending (EX-019).
+    #[error("task {task} is already submitted")]
+    DuplicateTask { task: String },
+
     /// Dispute closed
     #[error("dispute closed")]
     DisputeClosed,
