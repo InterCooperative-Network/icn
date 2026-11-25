@@ -31,7 +31,9 @@
 //! * **Changing a requirement is custodian-only (Part 8 F3).**
 //!   [`crate::LocalResourceReservations::redeclare_pool_requirement`] takes the same
 //!   `PoolAdminV0` and the pool's current revision, replaces only the requirement, and advances
-//!   the revision in one transaction. An admission verified under the previous requirement is
+//!   the revision in one transaction. A monotonic protection floor (D-F3c), checked against the
+//!   stored requirement in that transaction, refuses every ordinary downgrade: policy to
+//!   caller-resolved, an older or unsupported policy version, or a lower minimum grade. An admission verified under the previous requirement is
 //!   refused at commit, because the commit compares the exact policy reference read in its own
 //!   transaction. There is no fallback between policy versions: the store consults only the
 //!   verifier installed under the exact reference the pool declares.
@@ -92,6 +94,80 @@ pub enum AdmissionRequirementV1 {
         policy: AdmissionPolicyRefV0,
         min_grade: AdmissionGradeV0,
     },
+}
+
+/// The highest admission-policy version an ordinary redeclaration may name (D-F3c). Versions 0
+/// and 1 are the institutional policy identities defined by governance; any other value is
+/// unsupported and is never treated as a weaker recognised version.
+pub const MAX_SUPPORTED_ADMISSION_POLICY_VERSION: u32 = 1;
+
+/// Why an ordinary redeclaration was refused by the monotonic protection floor (maintainer
+/// decision D-F3c). Each variant is one specific axis. Rule sets are not ordered by strength: two
+/// different policy identities at the same version and grade are a permitted replacement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum RequirementDowngrade {
+    /// A pool that requires a custodian admission policy cannot become caller-resolved.
+    #[error("a policy-controlled pool cannot be redeclared as caller-resolved")]
+    ToCallerResolved,
+    /// The new policy version is older than the stored one (for example V1 to V0).
+    #[error("policy version {current} cannot be replaced by older version {new}")]
+    OlderPolicyVersion { current: u32, new: u32 },
+    /// The new policy version is not one this store supports.
+    #[error("policy version {0} is not supported")]
+    UnsupportedPolicyVersion(u32),
+    /// The new minimum grade is lower than the stored one (for example production to rehearsal).
+    #[error("minimum admission grade {current:?} cannot be lowered to {new:?}")]
+    LowerGrade {
+        current: AdmissionGradeV0,
+        new: AdmissionGradeV0,
+    },
+}
+
+impl AdmissionRequirementV1 {
+    /// The D-F3c protection floor, evaluated against the requirement **stored** in the pool record
+    /// (`self`) inside the redeclaration transaction. Permits upgrades (caller-resolved to policy,
+    /// a newer supported version, a higher grade) and same-level replacement; refuses each
+    /// downgrade axis. An exceptional downgrade would need separate institutional authorization
+    /// and is not provided.
+    pub(crate) fn check_redeclaration(
+        self,
+        new: AdmissionRequirementV1,
+    ) -> Result<(), RequirementDowngrade> {
+        let AdmissionRequirementV1::Policy {
+            policy: next,
+            min_grade: next_grade,
+        } = new
+        else {
+            return match self {
+                AdmissionRequirementV1::CallerResolved => Ok(()),
+                AdmissionRequirementV1::Policy { .. } => {
+                    Err(RequirementDowngrade::ToCallerResolved)
+                }
+            };
+        };
+        if next.version > MAX_SUPPORTED_ADMISSION_POLICY_VERSION {
+            return Err(RequirementDowngrade::UnsupportedPolicyVersion(next.version));
+        }
+        if let AdmissionRequirementV1::Policy {
+            policy: current,
+            min_grade: current_grade,
+        } = self
+        {
+            if next.version < current.version {
+                return Err(RequirementDowngrade::OlderPolicyVersion {
+                    current: current.version,
+                    new: next.version,
+                });
+            }
+            if next_grade < current_grade {
+                return Err(RequirementDowngrade::LowerGrade {
+                    current: current_grade,
+                    new: next_grade,
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 /// What a successful verification was performed under. Minted only inside this crate.

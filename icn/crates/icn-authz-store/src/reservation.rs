@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 
 use crate::admission::{
     AdmissionGradeV0, AdmissionPolicyRefV0, AdmissionRegistryV0, AdmissionRequirementV1,
-    AdmittedUnder,
+    AdmittedUnder, RequirementDowngrade,
 };
 
 const VERSION: u16 = 0;
@@ -90,6 +90,9 @@ pub enum ReservationError {
     /// The custodian-installed verifier refused the evidence.
     #[error("custodian admission verifier refused: {0}")]
     AdmissionRefused(String),
+    /// An ordinary redeclaration would weaken the pool's stored admission requirement (D-F3c).
+    #[error("admission requirement downgrade refused: {0}")]
+    RequirementDowngrade(RequirementDowngrade),
 }
 
 /// The persistent key for a custodian-owned pool.
@@ -721,7 +724,11 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
     /// * only the admission requirement changes, and the revision advances by one. Capacity, unit,
     ///   local policy, the record's V1 domain and its version are never touched, so resource
     ///   conservation and every committed reservation's reconciliation are unaffected;
-    /// * a V0 pool is refused: it has no requirement, and converting it would change its version.
+    /// * a V0 pool is refused: it has no requirement, and converting it would change its version;
+    /// * the monotonic protection floor (D-F3c) refuses a policy pool becoming caller-resolved,
+    ///   an older or unsupported policy version, and a lower minimum grade, compared against the
+    ///   stored requirement in the same transaction. Upgrades and same-level replacement (another
+    ///   identity at the same version and grade) are permitted; rule sets are not ordered.
     ///
     /// **Atomicity boundary:** the pool record inside the store transaction. A reservation commit
     /// reads the same record in its own transaction and re-checks the requirement (exact policy
@@ -729,9 +736,8 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
     /// reservation commits first (and this call then fails with `StalePool`), or the redeclaration
     /// commits first (and an admission verified under the old requirement is refused at commit).
     ///
-    /// The new requirement is the custodian's choice, exactly as at creation. Whether a verifier
-    /// for it is installed is not checked here; a reservation against a policy with no installed
-    /// verifier fails closed with `AdmissionUnavailable`.
+    /// Whether a verifier for the new requirement is installed is not checked here; a reservation
+    /// against a policy with no installed verifier fails closed with `AdmissionUnavailable`.
     pub fn redeclare_pool_requirement(
         &self,
         admin: &PoolAdminV0,
@@ -762,6 +768,11 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
                         expected: expected_revision,
                         actual: current.pool.revision,
                     }));
+                }
+                // D-F3c: the protection floor compares the requirement stored in this very
+                // transaction, never an earlier read or a caller-supplied value.
+                if let Err(downgrade) = current.admission.check_redeclaration(new) {
+                    return Ok(Err(ReservationError::RequirementDowngrade(downgrade)));
                 }
                 let Some(revision_after) = current.pool.revision.checked_add(1) else {
                     return Ok(Err(ReservationError::ArithmeticOverflow(
@@ -843,9 +854,10 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
             self.inspect_consumed(context, operation_id)?,
             self.inspect_reservation(context, operation_id)?,
         )?;
-        // v0 pools are initialized once, and the only supported mutation reserves capacity.
-        // Later reservations may advance the revision and lower availability, but never reverse
-        // those changes. Do not claim a coherent reservation when its pool is missing or has
+        // A pool is initialized once. Its supported mutations are reservations (which advance the
+        // revision and lower availability) and, for V1 pools, a custodian redeclaration of the
+        // admission requirement (which advances the revision only). Neither reverses a revision
+        // or raises availability. Do not claim a coherent reservation when its pool is missing or has
         // regressed. This is a local consistency check, not a full aggregate capacity audit.
         if let ReservationReconciliation::Committed { reservation, .. } = &result {
             let pool = self
@@ -2606,17 +2618,11 @@ mod tests {
                 actual: 1
             })
         );
-        let generic = store
-            .redeclare_pool_requirement(
-                &admin,
-                CTX,
-                POOL,
-                1,
-                AdmissionRequirementV1::CallerResolved,
-            )
+        let replaced = store
+            .redeclare_pool_requirement(&admin, CTX, POOL, 1, same_level())
             .unwrap();
-        assert_eq!(generic.pool.revision, 2);
-        assert_eq!(generic.admission, AdmissionRequirementV1::CallerResolved);
+        assert_eq!(replaced.pool.revision, 2);
+        assert_eq!(replaced.admission, same_level());
     }
 
     #[test]
@@ -2727,67 +2733,233 @@ mod tests {
         ));
     }
 
+    /// Ordering 1, deterministic: the reservation commits first. A redeclaration prepared
+    /// against the revision the custodian read earlier is stale; the reservation stands.
     #[test]
-    fn concurrent_reservation_and_redeclaration_serialize_on_the_pool_record() {
-        let (mut reserved_first, mut redeclared_first) = (0, 0);
-        for _ in 0..32 {
-            let dir = tempfile::tempdir().unwrap();
-            let (store, admin) = admin_v1_store(&dir);
-            let gate = std::sync::Barrier::new(2);
-            let (reservation, redeclaration) = std::thread::scope(|scope| {
-                let reserve = scope.spawn(|| {
-                    gate.wait();
-                    store
-                        .commit_atomic(
-                            &admitted(ADMISSION, AdmissionGradeV0::Production),
-                            &request(),
-                            900,
-                            |_| Ok(()),
-                        )
-                        .unwrap()
-                });
-                let redeclare = scope.spawn(|| {
-                    gate.wait();
-                    store.redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared())
-                });
-                (reserve.join().unwrap(), redeclare.join().unwrap())
-            });
-            let stored = store.inspect_pool_record(CTX, POOL).unwrap();
-            match (reservation, redeclaration) {
-                (AtomicOutcome::Reserved(record), Err(error)) => {
-                    reserved_first += 1;
-                    assert_eq!(
-                        error,
-                        ReservationError::StalePool {
-                            expected: 0,
-                            actual: 1
-                        }
-                    );
-                    let mut expected = pool_v1(requires(AdmissionGradeV0::Production));
-                    expected.pool.revision = 1;
-                    expected.pool.available_capacity = 3;
-                    assert_eq!(stored, Some(ResourcePoolRecord::V1(expected)));
-                    assert_eq!(store.inspect_reservation(CTX, OP).unwrap(), Some(record));
-                }
-                (AtomicOutcome::Rejected(error), Ok(next)) => {
-                    redeclared_first += 1;
-                    assert!(
-                        matches!(error, ReservationError::AdmissionDenied(_)),
-                        "{error:?}"
-                    );
-                    assert_eq!(next, redeclared_at(1, 5));
-                    assert_eq!(stored, Some(ResourcePoolRecord::V1(redeclared_at(1, 5))));
-                    assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
-                    assert!(store.inspect_reservation(CTX, OP).unwrap().is_none());
-                }
-                (reservation, redeclaration) => panic!(
-                    "both or neither committed: reserved={} redeclared={:?}",
-                    matches!(reservation, AtomicOutcome::Reserved(_)),
-                    redeclaration
-                ),
-            }
+    fn a_reservation_committed_before_redeclaration_makes_it_stale() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_v1_store(&dir);
+        let read = store.inspect_pool(CTX, POOL).unwrap().unwrap().revision;
+        let AtomicOutcome::Reserved(record) = store
+            .commit_atomic(
+                &admitted(ADMISSION, AdmissionGradeV0::Production),
+                &request(),
+                900,
+                |_| Ok(()),
+            )
+            .unwrap()
+        else {
+            panic!("expected a reservation");
+        };
+        assert_eq!(
+            store.redeclare_pool_requirement(&admin, CTX, POOL, read, redeclared()),
+            Err(ReservationError::StalePool {
+                expected: 0,
+                actual: 1
+            })
+        );
+        let mut expected = pool_v1(requires(AdmissionGradeV0::Production));
+        expected.pool.revision = 1;
+        expected.pool.available_capacity = 3;
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(expected))
+        );
+        assert_eq!(store.inspect_reservation(CTX, OP).unwrap(), Some(record));
+    }
+
+    // D-F3c: the monotonic protection floor on ordinary redeclaration.
+
+    fn same_level() -> AdmissionRequirementV1 {
+        policy(0x8c, 1, AdmissionGradeV0::Production)
+    }
+
+    fn policy(id: u8, version: u32, min_grade: AdmissionGradeV0) -> AdmissionRequirementV1 {
+        AdmissionRequirementV1::Policy {
+            policy: AdmissionPolicyRefV0 {
+                id: [id; 32],
+                version,
+            },
+            min_grade,
         }
-        assert_eq!(reserved_first + redeclared_first, 32);
+    }
+
+    /// A store whose pool already requires `current` (written at creation), with its admin.
+    fn floor_store(
+        dir: &tempfile::TempDir,
+        current: AdmissionRequirementV1,
+    ) -> (LocalResourceReservations, PoolAdminV0) {
+        let (store, admin) = admin_store(dir);
+        store.initialize_pool_v1(&admin, pool_v1(current)).unwrap();
+        (store, admin)
+    }
+
+    #[test]
+    fn the_floor_refuses_each_downgrade_axis_and_changes_nothing() {
+        use AdmissionGradeV0::{Production, Rehearsal};
+        let cases = [
+            (
+                policy(0xA1, 1, Rehearsal),
+                AdmissionRequirementV1::CallerResolved,
+                RequirementDowngrade::ToCallerResolved,
+            ),
+            (
+                policy(0xA1, 1, Production),
+                policy(0xA2, 0, Production),
+                RequirementDowngrade::OlderPolicyVersion { current: 1, new: 0 },
+            ),
+            (
+                policy(0xA1, 0, Production),
+                policy(0xA1, 0, Rehearsal),
+                RequirementDowngrade::LowerGrade {
+                    current: Production,
+                    new: Rehearsal,
+                },
+            ),
+            (
+                policy(0xA1, 1, Production),
+                policy(0xA1, 2, Production),
+                RequirementDowngrade::UnsupportedPolicyVersion(2),
+            ),
+            (
+                AdmissionRequirementV1::CallerResolved,
+                policy(0xA1, u32::MAX, Production),
+                RequirementDowngrade::UnsupportedPolicyVersion(u32::MAX),
+            ),
+            (
+                // A stored version above the supported range is never "replaced" by a supported
+                // one: that would read the unknown version as weaker than a recognised one.
+                policy(0xA1, 7, Production),
+                policy(0xA2, 1, Production),
+                RequirementDowngrade::OlderPolicyVersion { current: 7, new: 1 },
+            ),
+        ];
+        for (current, new, why) in cases {
+            let dir = tempfile::tempdir().unwrap();
+            let (store, admin) = floor_store(&dir, current);
+            assert_eq!(
+                store.redeclare_pool_requirement(&admin, CTX, POOL, 0, new),
+                Err(ReservationError::RequirementDowngrade(why)),
+                "{current:?} -> {new:?}"
+            );
+            // Revision, capacity and requirement unchanged; nothing consumed or reserved.
+            assert_eq!(
+                store.inspect_pool_record(CTX, POOL).unwrap(),
+                Some(ResourcePoolRecord::V1(pool_v1(current)))
+            );
+            assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
+            assert!(store.inspect_reservation(CTX, OP).unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn the_floor_permits_upgrades_and_same_level_replacement() {
+        use AdmissionGradeV0::{Production, Rehearsal};
+        let cases = [
+            // Caller-resolved to policy, and caller-resolved kept.
+            (
+                AdmissionRequirementV1::CallerResolved,
+                policy(0xA1, 0, Rehearsal),
+            ),
+            (
+                AdmissionRequirementV1::CallerResolved,
+                AdmissionRequirementV1::CallerResolved,
+            ),
+            // V0 to V1.
+            (policy(0xA1, 0, Rehearsal), policy(0xA2, 1, Rehearsal)),
+            // Rehearsal to production.
+            (policy(0xA1, 1, Rehearsal), policy(0xA1, 1, Production)),
+            // Same version and grade, another identity: rule sets are not ordered.
+            (policy(0xA1, 1, Production), policy(0xA2, 1, Production)),
+            (policy(0xA1, 0, Rehearsal), policy(0xA2, 0, Rehearsal)),
+            // The identical requirement (still advances the revision).
+            (policy(0xA1, 1, Production), policy(0xA1, 1, Production)),
+        ];
+        for (current, new) in cases {
+            let dir = tempfile::tempdir().unwrap();
+            let (store, admin) = floor_store(&dir, current);
+            let next = store
+                .redeclare_pool_requirement(&admin, CTX, POOL, 0, new)
+                .unwrap_or_else(|e| panic!("{current:?} -> {new:?}: {e:?}"));
+            assert_eq!((next.pool.revision, next.admission), (1, new));
+        }
+    }
+
+    /// The floor is evaluated against the stored requirement in the redeclaration transaction:
+    /// after an upgrade commits, going back is a downgrade, also after a restart and with a newly
+    /// issued admin.
+    #[test]
+    fn the_floor_uses_the_stored_requirement_and_survives_restart() {
+        use AdmissionGradeV0::{Production, Rehearsal};
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = floor_store(&dir, policy(0xA1, 0, Rehearsal));
+        store
+            .redeclare_pool_requirement(&admin, CTX, POOL, 0, policy(0xA2, 1, Production))
+            .unwrap();
+        drop(store);
+        let (store, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_pool_admin();
+        for (back, why) in [
+            (
+                policy(0xA1, 0, Production),
+                RequirementDowngrade::OlderPolicyVersion { current: 1, new: 0 },
+            ),
+            (
+                policy(0xA2, 1, Rehearsal),
+                RequirementDowngrade::LowerGrade {
+                    current: Production,
+                    new: Rehearsal,
+                },
+            ),
+            (
+                AdmissionRequirementV1::CallerResolved,
+                RequirementDowngrade::ToCallerResolved,
+            ),
+        ] {
+            assert_eq!(
+                store.redeclare_pool_requirement(&admin, CTX, POOL, 1, back),
+                Err(ReservationError::RequirementDowngrade(why))
+            );
+        }
+        let mut expected = pool_v1(policy(0xA2, 1, Production));
+        expected.pool.revision = 1;
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(expected))
+        );
+    }
+
+    /// A refused downgrade between a reservation's verification and its commit neither advances
+    /// the revision nor changes the requirement, so the in-flight reservation still commits.
+    #[test]
+    fn a_refused_downgrade_does_not_disturb_an_in_flight_reservation() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_v1_store(&dir);
+        let in_flight = admitted(ADMISSION, AdmissionGradeV0::Production);
+        assert_eq!(
+            store.redeclare_pool_requirement(
+                &admin,
+                CTX,
+                POOL,
+                0,
+                AdmissionRequirementV1::CallerResolved
+            ),
+            Err(ReservationError::RequirementDowngrade(
+                RequirementDowngrade::ToCallerResolved
+            ))
+        );
+        let outcome = store
+            .commit_atomic(&in_flight, &request(), 900, |_| Ok(()))
+            .unwrap();
+        assert!(matches!(outcome, AtomicOutcome::Reserved(_)));
+        let mut expected = pool_v1(requires(AdmissionGradeV0::Production));
+        expected.pool.revision = 1;
+        expected.pool.available_capacity = 3;
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(expected))
+        );
     }
 
     struct FailingSync;
@@ -2822,13 +2994,7 @@ mod tests {
         let (uncertain, admin) =
             LocalResourceReservations::with_barrier(sled, TARGET, FailingSync).with_pool_admin();
         assert!(matches!(
-            uncertain.redeclare_pool_requirement(
-                &admin,
-                CTX,
-                POOL,
-                1,
-                AdmissionRequirementV1::CallerResolved
-            ),
+            uncertain.redeclare_pool_requirement(&admin, CTX, POOL, 1, same_level()),
             Err(ReservationError::CommitUncertain(_))
         ));
     }

@@ -2804,3 +2804,209 @@ fn custodian_redeclares_v0_to_v1_and_stale_evidence_is_refused() {
         Err(ReservationError::PoolAdminMismatch)
     );
 }
+
+/// The custodian's real verifier, paused after verification and before the store's commit:
+/// it signals `verified`, then waits for `proceed`. This makes the window between the advisory
+/// pool read / verifier selection and the commit-time re-check deterministic.
+struct PausedVerifier {
+    inner: InstitutionalAdmissionVerifierV0,
+    verified: std::sync::mpsc::Sender<()>,
+    proceed: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
+}
+
+impl icn_authz_store::CustodianAdmissionVerifierV0 for PausedVerifier {
+    fn policy(&self) -> AdmissionPolicyRefV0 {
+        icn_authz_store::CustodianAdmissionVerifierV0::policy(&self.inner)
+    }
+
+    fn preflight(
+        &self,
+        evidence: &CheckpointedEvidenceV0,
+        supplement: &dyn std::any::Any,
+        target: [u8; 32],
+        now: u64,
+    ) -> Result<icn_authz_store::VerifiedAdmissionV0, icn_authz_store::AdmissionRefusalV0> {
+        let verified = icn_authz_store::CustodianAdmissionVerifierV0::preflight(
+            &self.inner,
+            evidence,
+            supplement,
+            target,
+            now,
+        );
+        self.verified.send(()).unwrap();
+        self.proceed
+            .lock()
+            .unwrap()
+            .recv_timeout(std::time::Duration::from_secs(60))
+            .expect("the test never released the paused admission");
+        verified
+    }
+}
+
+/// A custodian store whose V0 verifier for `trust` pauses mid-admission (plus an ordinary V1
+/// verifier), and a pool requiring the V0 identity at Rehearsal minimum.
+#[allow(clippy::type_complexity)]
+fn paused_store(
+    inst: &Institution,
+    trust: &InstitutionalTrustAnchorV0,
+) -> (
+    tempfile::TempDir,
+    LocalResourceReservations,
+    icn_authz_store::PoolAdminV0,
+    std::sync::mpsc::Receiver<()>,
+    std::sync::mpsc::Sender<()>,
+) {
+    let (verified_tx, verified_rx) = std::sync::mpsc::channel();
+    let (proceed_tx, proceed_rx) = std::sync::mpsc::channel();
+    let mut registry = AdmissionRegistryV0::new();
+    registry
+        .install(std::sync::Arc::new(PausedVerifier {
+            inner: InstitutionalAdmissionVerifierV0::new(trust.clone()),
+            verified: verified_tx,
+            proceed: std::sync::Mutex::new(proceed_rx),
+        }))
+        .unwrap();
+    registry
+        .install(verifier(trust, InstitutionalAdmissionPolicyVersion::V1))
+        .unwrap();
+    registry.install_clock(clock_at(NOW)).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let (target, admin) = LocalResourceReservations::open(dir.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry)
+        .with_pool_admin();
+    target
+        .initialize_pool_v1(
+            &admin,
+            ResourcePoolV1 {
+                pool: inst.pool(10),
+                admission: AdmissionRequirementV1::Policy {
+                    policy: InstitutionalAdmissionVerifierV0::policy_ref(trust),
+                    min_grade: AdmissionGradeV0::Rehearsal,
+                },
+            },
+        )
+        .unwrap();
+    (dir, target, admin, verified_rx, proceed_tx)
+}
+
+/// Ordering 2, deterministic, through the public `reserve_admitted` path: the store reads the
+/// V0 requirement, selects and runs the V0 verifier, and is paused before committing. The
+/// custodian then upgrades the pool to the V1 identity. The authorization verified under the
+/// obsolete requirement cannot commit, and nothing changes.
+#[test]
+fn an_authorization_verified_under_an_obsolete_requirement_cannot_commit_after_redeclaration() {
+    let inst = Institution::new(DOMAIN);
+    let trust = inst.trust(2, None);
+    let (evidence, request) = valid_admission(&inst);
+    let (_dir, target, admin, verified, proceed) = paused_store(&inst, &trust);
+    let v1 = AdmissionRequirementV1::Policy {
+        policy: InstitutionalAdmissionVerifierV0::policy_ref_v1(&trust),
+        min_grade: AdmissionGradeV0::Rehearsal,
+    };
+    let result = std::thread::scope(|scope| {
+        let reservation = scope.spawn(|| reserve_admitted(&target, &evidence, &request));
+        verified
+            .recv_timeout(std::time::Duration::from_secs(60))
+            .expect("the reservation never reached verification");
+        // The custodian's upgrade commits while the reservation is between verify and commit.
+        let next = target
+            .redeclare_pool_requirement(&admin, inst.ctx, POOL, 0, v1)
+            .unwrap();
+        assert_eq!((next.pool.revision, next.admission), (1, v1));
+        proceed.send(()).unwrap();
+        reservation.join().unwrap()
+    });
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionDenied(_))),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+    assert_eq!(
+        target
+            .inspect_pool_record(inst.ctx, POOL)
+            .unwrap()
+            .unwrap()
+            .admission(),
+        v1
+    );
+}
+
+/// D-F3c under concurrent activity, through the public path: a downgrade attempted while a
+/// reservation is paused between verification and commit is refused and changes nothing, so the
+/// reservation commits. Then ordering 1: a redeclaration based on the revision read before the
+/// reservation is stale, and the reservation and accounting stand.
+#[test]
+fn a_concurrent_downgrade_is_refused_and_the_reservation_and_accounting_stand() {
+    let inst = Institution::new(DOMAIN);
+    let trust = inst.trust(2, None);
+    let (evidence, request) = valid_admission(&inst);
+    let (_dir, target, admin, verified, proceed) = paused_store(&inst, &trust);
+    let before = target.inspect_pool_record(inst.ctx, POOL).unwrap().unwrap();
+    let result = std::thread::scope(|scope| {
+        let reservation = scope.spawn(|| reserve_admitted(&target, &evidence, &request));
+        verified
+            .recv_timeout(std::time::Duration::from_secs(60))
+            .expect("the reservation never reached verification");
+        assert_eq!(
+            target.redeclare_pool_requirement(
+                &admin,
+                inst.ctx,
+                POOL,
+                0,
+                AdmissionRequirementV1::CallerResolved
+            ),
+            Err(ReservationError::RequirementDowngrade(
+                icn_authz_store::RequirementDowngrade::ToCallerResolved
+            ))
+        );
+        assert_eq!(
+            target.inspect_pool_record(inst.ctx, POOL).unwrap().unwrap(),
+            before
+        );
+        proceed.send(()).unwrap();
+        reservation.join().unwrap()
+    });
+    let record = result.unwrap();
+    assert_eq!(
+        (
+            record.available_before,
+            record.available_after,
+            record.pool_revision_after
+        ),
+        (10, 6, 1)
+    );
+
+    // Ordering 1: the custodian's redeclaration was prepared against revision 0.
+    let v1 = AdmissionRequirementV1::Policy {
+        policy: InstitutionalAdmissionVerifierV0::policy_ref_v1(&trust),
+        min_grade: AdmissionGradeV0::Rehearsal,
+    };
+    assert_eq!(
+        target.redeclare_pool_requirement(&admin, inst.ctx, POOL, 0, v1),
+        Err(ReservationError::StalePool {
+            expected: 0,
+            actual: 1
+        })
+    );
+    target
+        .redeclare_pool_requirement(&admin, inst.ctx, POOL, 1, v1)
+        .unwrap();
+    let stored = target.inspect_pool_record(inst.ctx, POOL).unwrap().unwrap();
+    assert_eq!(
+        (
+            stored.pool().revision,
+            stored.pool().available_capacity,
+            stored.admission()
+        ),
+        (2, 6, v1)
+    );
+    assert_eq!(
+        target.inspect_reservation(inst.ctx, OP).unwrap(),
+        Some(record)
+    );
+    assert!(matches!(
+        target.reconcile(inst.ctx, OP).unwrap(),
+        ReservationReconciliation::Committed { .. }
+    ));
+}

@@ -670,8 +670,10 @@ impl InstitutionalAdmissionVerifierV0 {
 
     /// The V1 policy identity (Part 8 F3): the V0 bindings plus the anchor's governing rules (as
     /// a sorted set of rule hashes) and its recognition requirement. A weaker rule set or a
-    /// downgraded recognition requirement therefore yields a different identity, which a pool
-    /// declaring the stronger one refuses at commit. Distinct from every V0 identity by its
+    /// downgraded recognition requirement therefore yields a different identity. A pool declaring
+    /// the stronger identity selects no verifier for it, so admission fails closed with
+    /// `AdmissionUnavailable` before verification; an admission verified under any other
+    /// identity is also refused at commit by the exact reference comparison. Distinct from every V0 identity by its
     /// domain separator and its version.
     pub fn policy_ref_v1(anchor: &InstitutionalTrustAnchorV0) -> AdmissionPolicyRefV0 {
         let rule_hashes: Vec<[u8; 32]> = anchor.rules.iter().map(|r| r.rule_hash()).collect();

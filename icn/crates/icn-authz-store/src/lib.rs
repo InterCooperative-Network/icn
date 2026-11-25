@@ -54,7 +54,7 @@ mod reservation;
 pub use admission::{
     AdmissionGradeV0, AdmissionPolicyRefV0, AdmissionRefusalV0, AdmissionRegistryError,
     AdmissionRegistryV0, AdmissionRequirementV1, CustodianAdmissionVerifierV0, CustodianClockV0,
-    VerifiedAdmissionV0,
+    RequirementDowngrade, VerifiedAdmissionV0, MAX_SUPPORTED_ADMISSION_POLICY_VERSION,
 };
 pub use reservation::{
     pool_key, reservation_key, DurabilityBarrier, LocalReservationPolicyV0,
