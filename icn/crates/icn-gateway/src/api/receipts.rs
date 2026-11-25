@@ -221,17 +221,22 @@ pub struct DecisionExecutionTruthResponse {
     pub execution_complete: bool,
 }
 
-/// Parse hex hash or return error response
-fn parse_hash(hex_str: &str) -> Result<Hash, HttpResponse> {
+/// Parse hex hash or return error response.
+///
+/// The error response is boxed because `HttpResponse` exceeds clippy's
+/// `result_large_err` threshold since actix-web 4.15 grew `actix_web::Error`.
+fn parse_hash(hex_str: &str) -> Result<Hash, Box<HttpResponse>> {
     let bytes = hex::decode(hex_str).map_err(|_| {
-        HttpResponse::BadRequest().json(serde_json::json!({
+        Box::new(HttpResponse::BadRequest().json(serde_json::json!({
             "error": "Invalid hex hash"
-        }))
+        })))
     })?;
     if bytes.len() != 32 {
-        return Err(HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Hash must be 32 bytes"
-        })));
+        return Err(Box::new(HttpResponse::BadRequest().json(
+            serde_json::json!({
+                "error": "Hash must be 32 bytes"
+            }),
+        )));
     }
     let mut hash = [0u8; 32];
     hash.copy_from_slice(&bytes);
@@ -287,7 +292,7 @@ pub async fn get_allocation(
     let hash_hex = path.into_inner();
     let hash = match parse_hash(&hash_hex) {
         Ok(h) => h,
-        Err(resp) => return resp,
+        Err(resp) => return *resp,
     };
 
     match receipt_store.get_allocation(&hash) {
@@ -310,7 +315,7 @@ pub async fn get_intent(
     let hash_hex = path.into_inner();
     let hash = match parse_hash(&hash_hex) {
         Ok(h) => h,
-        Err(resp) => return resp,
+        Err(resp) => return *resp,
     };
 
     match receipt_store.get_intent(&hash) {
@@ -344,7 +349,7 @@ pub async fn get_chain(
 
     let hash = match parse_hash(hex) {
         Ok(h) => h,
-        Err(resp) => return resp,
+        Err(resp) => return *resp,
     };
 
     match receipt_store.get_chain_by_decision(&hash) {
@@ -390,7 +395,7 @@ pub async fn get_full_chain(
     let hash_hex = path.into_inner();
     let hash = match parse_hash(&hash_hex) {
         Ok(h) => h,
-        Err(resp) => return resp,
+        Err(resp) => return *resp,
     };
 
     // Fetch governance receipt
@@ -575,7 +580,7 @@ pub async fn list_allocations(
         None => receipt_store.list_all_allocations(),
         Some(hex) => match parse_hash(hex) {
             Ok(hash) => receipt_store.list_allocations_by_decision(&hash),
-            Err(resp) => return resp,
+            Err(resp) => return *resp,
         },
     };
 
@@ -604,7 +609,7 @@ pub async fn list_intents(
         None => receipt_store.list_all_intents(),
         Some(hex) => match parse_hash(hex) {
             Ok(hash) => receipt_store.list_intents_by_decision(&hash),
-            Err(resp) => return resp,
+            Err(resp) => return *resp,
         },
     };
 

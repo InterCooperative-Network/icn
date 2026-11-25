@@ -3099,7 +3099,7 @@ category = "reference"
 status = "living"
 title = "ICN Configuration Management Guide"
 description = "Complete configuration reference for ICN nodes"
-last_updated = "2026-03-10"
+last_updated = "2026-11-21"
 owner = "matt"
 audiences = ["operators", "developers"]
 
