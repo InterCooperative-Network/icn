@@ -67,6 +67,11 @@ use crate::domain::GovernanceDomainId;
 use crate::mandate::{Mandate, MandateStatus};
 use crate::Timestamp;
 
+/// The set-once institutional authority binding of a domain to its authority context: a sibling
+/// record owned by this module, deliberately **not** a field of [`InstitutionalDomain`] so the
+/// domain's serialized form is unchanged (EXPERIMENTAL, unratified).
+pub mod authority_binding;
+
 /// Content-addressed identifier for a [`DomainPolicy`] version.
 ///
 /// The blake3 hash of the policy's canonical content. Distinct, searchable

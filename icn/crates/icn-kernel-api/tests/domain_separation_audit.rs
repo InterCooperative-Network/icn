@@ -344,6 +344,12 @@ const NOT_REGISTERED: &[(&str, &str, &str)] = &[
         "never leads a preimage: the vote is the LP-framed payload of an `icn.n4.device-act` act, \
          so it is hashed and signed only after that act's own domain (N4-D)",
     ),
+    (
+        "icn.governance.institutional-authority-binding.v1",
+        "icn/crates/icn-governance/src/institutional_domain/authority_binding.rs",
+        "storage record only (EXPERIMENTAL, unratified): an institutional authority binding is \
+         strictly encoded and persisted set-once, never hashed or signed",
+    ),
 ];
 
 const CANONICAL_RS: &str = "icn/crates/icn-kernel-api/src/canonical.rs";
