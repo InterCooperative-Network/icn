@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 
 use ed25519_dalek::SigningKey;
 use icn_authz::effect_v0::{
-    admit, admit_checkpointed, find_log_fork, replay_context_log, roster_hash,
-    sign_checkpointed_authorization, target_id, transition_subject_matter,
+    admit, admit_checkpointed, find_log_fork, preflight_checkpointed, replay_context_log,
+    roster_hash, sign_checkpointed_authorization, target_id, transition_subject_matter,
     verify_checkpointed_authorization, Admission, AdmissionRefusal, AdoptedRule,
     AuthorizationEvidenceV0, AuthorizationV0, AuthzRefusal, CanonicalV0, CheckpointedAdmission,
     CheckpointedAuthorizationV0, CheckpointedEvidenceV0, ConflictClass, ConsumedAuthorization,
@@ -23,7 +23,10 @@ use icn_authz::effect_v0::{
     RuleBinding, RuleError, RuleResolver, RuleSlot, Signed, SignedDesignation, SignedLogEntryV0,
     StandingV0, TransitionV0, Verdict, WriterDesignationV0,
 };
-use icn_authz_store::DurableConsumedSet;
+use icn_authz_store::{
+    DurabilityBarrier, DurableConsumedSet, LocalReservationPolicyV0, LocalResourceReservations,
+    ReservationError, ReservationReconciliation, ReservationRequestV0, ResourcePoolV0,
+};
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::vote::VoteChoice;
 use icn_identity::authority_log::{
@@ -32,6 +35,7 @@ use icn_identity::authority_log::{
 };
 use icn_identity::device_authority::{sign_device_act, DeviceActV1};
 use icn_identity::evidence_bundle::EvidenceBundle;
+use icn_store::{SledStore, Store};
 
 const ROLE: &str = "member";
 const OP: [u8; 32] = [0x09; 32];
@@ -301,7 +305,31 @@ impl World {
         verdict: Verdict,
         op: [u8; 32],
     ) -> CheckpointedEvidenceV0 {
-        let effect = self.effect();
+        self.authorize_effect(
+            log,
+            checkpoint,
+            writer,
+            voters,
+            choice,
+            verdict,
+            self.effect(),
+            op,
+        )
+    }
+
+    /// [`World::authorize_op`] with an exact caller-supplied effect.
+    #[allow(clippy::too_many_arguments)]
+    fn authorize_effect(
+        &self,
+        log: &[SignedLogEntryV0],
+        checkpoint: LogCheckpointV0,
+        writer: &SigningKey,
+        voters: &[&Member],
+        choice: VoteChoice,
+        verdict: Verdict,
+        effect: EffectV0,
+        op: [u8; 32],
+    ) -> CheckpointedEvidenceV0 {
         let matter = effect.commitment(self.ctx, op);
         let mut vote_bundles: Vec<EvidenceBundle> = voters
             .iter()
@@ -1476,6 +1504,36 @@ fn a_valid_checkpointed_pass_admits_once() {
     );
 }
 
+/// Atomic effects need every target-side check without a standalone consumed-set write. The
+/// sealed preflight carries that verification result, consumes nothing itself, and ordinary
+/// admission remains exactly the preflight followed by one consumption.
+#[test]
+fn checkpointed_preflight_verifies_without_consuming() {
+    let w = world();
+    let (log, ev) = w.honest();
+    let cp = checkpoint(&w.state(&log));
+    let frontier = w.frontier(1, Some(cp));
+
+    let preflight = preflight_checkpointed(&ev, &frontier, &rules(), w.target, NOW).unwrap();
+    assert_eq!(preflight.target(), w.target);
+    assert_eq!(preflight.verified().signed(), &ev.authorization);
+    assert_eq!(preflight.verified().presented_tip(), cp);
+    assert_eq!(
+        preflight.consumed_entry().authorization,
+        ConsumedAuthorization::Checkpointed(ev.authorization.clone())
+    );
+    assert_eq!(
+        preflight.refusal_for_prior(preflight.consumed_entry()),
+        AdmissionRefusal::Replayed
+    );
+
+    let mut consumed = Counting::default();
+    assert_eq!(consumed.calls, 0);
+    let admission = w.admit(&ev, &frontier, NOW, &mut consumed).unwrap();
+    assert_eq!(admission.verified(), preflight.verified());
+    assert_eq!(consumed.calls, 1);
+}
+
 /// B: an honestly reported Fail is a verified decision, and is still not admitted.
 #[test]
 fn b_fail_verdict_is_refused_without_consuming() {
@@ -2197,4 +2255,533 @@ fn durable_refusals_persist_nothing() {
     assert!(w
         .admit(&honest, &w.frontier(1, None), NOW, &mut set)
         .is_ok());
+}
+
+// ---------------------------------------------------------------------------------------------
+// Atomic local resource reservation: VERIFIED -> RESERVED in one durable local transaction.
+// Physical fulfillment remains outside this slice.
+// ---------------------------------------------------------------------------------------------
+
+const RESOURCE_POOL: [u8; 32] = [0x71; 32];
+const RESOURCE_POLICY: [u8; 32] = [0x72; 32];
+
+fn reservation_request(
+    w: &World,
+    operation_id: [u8; 32],
+    revision: u64,
+    quantity: u64,
+) -> ReservationRequestV0 {
+    ReservationRequestV0 {
+        context: w.ctx,
+        operation_id,
+        pool_id: RESOURCE_POOL,
+        expected_pool_revision: revision,
+        quantity,
+        unit: "hours".into(),
+        request_params_hash: [0x73; 32],
+        policy_hash: RESOURCE_POLICY,
+    }
+}
+
+fn resource_pool(w: &World, capacity: u64) -> ResourcePoolV0 {
+    ResourcePoolV0 {
+        context: w.ctx,
+        pool_id: RESOURCE_POOL,
+        custodian: w.target,
+        unit: "hours".into(),
+        total_capacity: capacity,
+        available_capacity: capacity,
+        revision: 0,
+        policy: LocalReservationPolicyV0 {
+            enabled: true,
+            max_quantity_per_reservation: capacity,
+            policy_hash: RESOURCE_POLICY,
+        },
+    }
+}
+
+fn reservation_evidence(
+    w: &World,
+    log: &[SignedLogEntryV0],
+    request: &ReservationRequestV0,
+) -> CheckpointedEvidenceV0 {
+    w.authorize_effect(
+        log,
+        checkpoint(&w.state(log)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+        VoteChoice::For,
+        Verdict::Pass,
+        request.effect(w.target).unwrap(),
+        request.operation_id,
+    )
+}
+
+#[test]
+fn atomic_reservation_persists_all_three_records_and_reduces_capacity() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let request = reservation_request(&w, OP, 0, 4);
+    let evidence = reservation_evidence(&w, &log, &request);
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
+        reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+        let record = reservations
+            .reserve_checkpointed(&evidence, &w.frontier(1, None), &rules(), NOW, &request)
+            .unwrap();
+        assert_eq!(record.available_before, 10);
+        assert_eq!(record.available_after, 6);
+        assert_eq!(record.pool_revision_after, 1);
+        assert!(reservations.inspect_consumed(w.ctx, OP).unwrap().is_some());
+        assert_eq!(
+            reservations.inspect_reservation(w.ctx, OP).unwrap(),
+            Some(record)
+        );
+        let pool = reservations
+            .inspect_pool(w.ctx, RESOURCE_POOL)
+            .unwrap()
+            .unwrap();
+        assert_eq!((pool.available_capacity, pool.revision), (6, 1));
+    }
+
+    let reopened = LocalResourceReservations::open(dir.path(), w.target).unwrap();
+    assert!(matches!(
+        reopened.reconcile(w.ctx, OP).unwrap(),
+        ReservationReconciliation::Committed { .. }
+    ));
+    assert_eq!(
+        reopened
+            .inspect_pool(w.ctx, RESOURCE_POOL)
+            .unwrap()
+            .unwrap()
+            .available_capacity,
+        6
+    );
+}
+
+#[test]
+fn reservation_commit_isolated_to_its_context_and_resource_pool() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let request = reservation_request(&w, OP, 0, 2);
+    let evidence = reservation_evidence(&w, &log, &request);
+    let other_pool_id = [0x75; 32];
+    let mut other_pool = resource_pool(&w, 9);
+    other_pool.pool_id = other_pool_id;
+    let dir = tempfile::tempdir().unwrap();
+    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
+    reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+    reservations.initialize_pool(other_pool.clone()).unwrap();
+
+    reservations
+        .reserve_checkpointed(&evidence, &w.frontier(1, None), &rules(), NOW, &request)
+        .unwrap();
+
+    assert_eq!(
+        reservations
+            .inspect_pool(w.ctx, RESOURCE_POOL)
+            .unwrap()
+            .unwrap()
+            .available_capacity,
+        8
+    );
+    assert_eq!(
+        reservations.inspect_pool(w.ctx, other_pool_id).unwrap(),
+        Some(other_pool)
+    );
+    assert!(reservations
+        .inspect_pool(ContextRef([0x76; 32]), RESOURCE_POOL)
+        .unwrap()
+        .is_none());
+    assert!(reservations
+        .inspect_reservation(ContextRef([0x76; 32]), OP)
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn insufficient_or_tampered_reservation_never_consumes_the_operation() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let first_request = reservation_request(&w, OP, 0, 7);
+    let first_evidence = reservation_evidence(&w, &log, &first_request);
+    let second_op = [0x0a; 32];
+    let second_request = reservation_request(&w, second_op, 1, 4);
+    let second_evidence = reservation_evidence(&w, &log, &second_request);
+    let dir = tempfile::tempdir().unwrap();
+    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
+    reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+    reservations
+        .reserve_checkpointed(
+            &first_evidence,
+            &w.frontier(1, None),
+            &rules(),
+            NOW,
+            &first_request,
+        )
+        .unwrap();
+
+    assert_eq!(
+        reservations.reserve_checkpointed(
+            &second_evidence,
+            &w.frontier(1, None),
+            &rules(),
+            NOW,
+            &second_request,
+        ),
+        Err(ReservationError::Insufficient {
+            requested: 4,
+            available: 3
+        })
+    );
+    assert!(reservations
+        .inspect_consumed(w.ctx, second_op)
+        .unwrap()
+        .is_none());
+    assert!(reservations
+        .inspect_reservation(w.ctx, second_op)
+        .unwrap()
+        .is_none());
+
+    let mut tampered = second_request.clone();
+    tampered.quantity = 3;
+    assert!(matches!(
+        reservations.reserve_checkpointed(
+            &second_evidence,
+            &w.frontier(1, None),
+            &rules(),
+            NOW,
+            &tampered,
+        ),
+        Err(ReservationError::InvalidInput(_))
+    ));
+    assert_eq!(
+        reservations
+            .inspect_pool(w.ctx, RESOURCE_POOL)
+            .unwrap()
+            .unwrap()
+            .available_capacity,
+        3
+    );
+}
+
+struct FailingReservationBarrier;
+
+impl DurabilityBarrier for FailingReservationBarrier {
+    fn sync(&self, _: &SledStore) -> Result<(), String> {
+        Err("injected barrier failure".into())
+    }
+}
+
+#[test]
+fn uncertain_reservation_reconciles_without_duplicate_allocation() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let request = reservation_request(&w, OP, 0, 4);
+    let evidence = reservation_evidence(&w, &log, &request);
+    let dir = tempfile::tempdir().unwrap();
+    LocalResourceReservations::open(dir.path(), w.target)
+        .unwrap()
+        .initialize_pool(resource_pool(&w, 10))
+        .unwrap();
+
+    let reservations = LocalResourceReservations::with_barrier(
+        SledStore::open(dir.path()).unwrap(),
+        w.target,
+        FailingReservationBarrier,
+    );
+    assert_eq!(
+        reservations
+            .reserve_checkpointed(&evidence, &w.frontier(1, None), &rules(), NOW, &request,),
+        Err(ReservationError::CommitUncertain(
+            "injected barrier failure".into()
+        ))
+    );
+    assert!(matches!(
+        reservations.reconcile(w.ctx, OP).unwrap(),
+        ReservationReconciliation::Committed { .. }
+    ));
+    assert!(matches!(
+        reservations
+            .reserve_checkpointed(&evidence, &w.frontier(1, None), &rules(), NOW, &request,),
+        Err(ReservationError::Authorization(AdmissionRefusal::Replayed))
+    ));
+    assert_eq!(
+        reservations
+            .inspect_pool(w.ctx, RESOURCE_POOL)
+            .unwrap()
+            .unwrap()
+            .available_capacity,
+        6
+    );
+}
+
+#[test]
+fn concurrent_reservations_cannot_overallocate_the_final_unit() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let requests = [
+        reservation_request(&w, [0x31; 32], 0, 1),
+        reservation_request(&w, [0x32; 32], 0, 1),
+    ];
+    let evidence = [
+        reservation_evidence(&w, &log, &requests[0]),
+        reservation_evidence(&w, &log, &requests[1]),
+    ];
+    let dir = tempfile::tempdir().unwrap();
+    let reservations = Arc::new(LocalResourceReservations::open(dir.path(), w.target).unwrap());
+    reservations.initialize_pool(resource_pool(&w, 1)).unwrap();
+    let frontier = w.frontier(1, None);
+    let results = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..2)
+            .map(|index| {
+                let reservations = Arc::clone(&reservations);
+                let request = &requests[index];
+                let evidence = &evidence[index];
+                let frontier = &frontier;
+                scope.spawn(move || {
+                    reservations.reserve_checkpointed(evidence, frontier, &rules(), NOW, request)
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert_eq!(
+        reservations
+            .inspect_pool(w.ctx, RESOURCE_POOL)
+            .unwrap()
+            .unwrap()
+            .available_capacity,
+        0
+    );
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|request| reservations
+                .inspect_consumed(w.ctx, request.operation_id)
+                .unwrap()
+                .is_some())
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn reservation_authorization_refusals_leave_every_record_unchanged() {
+    let w = world();
+    let other = world_in([0x2b; 32]);
+    let log = vec![w.genesis()];
+    let request = reservation_request(&w, OP, 0, 2);
+    let valid = reservation_evidence(&w, &log, &request);
+    let fail = w.authorize_effect(
+        &log,
+        checkpoint(&w.state(&log)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+        VoteChoice::Against,
+        Verdict::Fail,
+        request.effect(w.target).unwrap(),
+        OP,
+    );
+    let wrong_target = w.authorize_effect(
+        &log,
+        checkpoint(&w.state(&log)),
+        &w.writer,
+        &[w.m(0), w.m(1)],
+        VoteChoice::For,
+        Verdict::Pass,
+        request.effect([0xc2; 32]).unwrap(),
+        OP,
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
+    reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+
+    let attempts = [
+        reservations.reserve_checkpointed(&fail, &w.frontier(1, None), &rules(), NOW, &request),
+        reservations.reserve_checkpointed(
+            &valid,
+            &w.frontier(1, None),
+            &rules(),
+            NOT_AFTER + 1,
+            &request,
+        ),
+        reservations.reserve_checkpointed(&valid, &w.frontier(2, None), &rules(), NOW, &request),
+        reservations.reserve_checkpointed(
+            &valid,
+            &other.frontier(1, None),
+            &rules(),
+            NOW,
+            &request,
+        ),
+        reservations.reserve_checkpointed(
+            &wrong_target,
+            &w.frontier(1, None),
+            &rules(),
+            NOW,
+            &request,
+        ),
+    ];
+    assert!(attempts
+        .iter()
+        .all(|attempt| matches!(attempt, Err(ReservationError::Authorization(_)))));
+    assert_eq!(
+        reservations.reconcile(w.ctx, OP).unwrap(),
+        ReservationReconciliation::Absent
+    );
+    assert_eq!(
+        reservations.inspect_pool(w.ctx, RESOURCE_POOL).unwrap(),
+        Some(resource_pool(&w, 10))
+    );
+}
+
+#[test]
+fn replay_conflict_and_distinct_operations_allocate_at_most_once_each() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let first = reservation_request(&w, OP, 0, 4);
+    let first_evidence = reservation_evidence(&w, &log, &first);
+    let dir = tempfile::tempdir().unwrap();
+    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
+    reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+    reservations
+        .reserve_checkpointed(&first_evidence, &w.frontier(1, None), &rules(), NOW, &first)
+        .unwrap();
+    assert!(matches!(
+        reservations.reserve_checkpointed(
+            &first_evidence,
+            &w.frontier(1, None),
+            &rules(),
+            NOW,
+            &first,
+        ),
+        Err(ReservationError::Authorization(AdmissionRefusal::Replayed))
+    ));
+
+    let mut conflict = reservation_request(&w, OP, 1, 1);
+    conflict.request_params_hash = [0x74; 32];
+    let conflict_evidence = reservation_evidence(&w, &log, &conflict);
+    let result = reservations.reserve_checkpointed(
+        &conflict_evidence,
+        &w.frontier(1, None),
+        &rules(),
+        NOW,
+        &conflict,
+    );
+    assert!(matches!(
+        result,
+        Err(ReservationError::Authorization(
+            AdmissionRefusal::Equivocation(_)
+        ))
+    ));
+
+    let second = reservation_request(&w, [0x0a; 32], 1, 6);
+    let second_evidence = reservation_evidence(&w, &log, &second);
+    reservations
+        .reserve_checkpointed(
+            &second_evidence,
+            &w.frontier(1, None),
+            &rules(),
+            NOW,
+            &second,
+        )
+        .unwrap();
+    assert_eq!(
+        reservations
+            .inspect_pool(w.ctx, RESOURCE_POOL)
+            .unwrap()
+            .unwrap()
+            .available_capacity,
+        0
+    );
+    assert!(reservations
+        .inspect_reservation(w.ctx, OP)
+        .unwrap()
+        .is_some());
+    assert!(reservations
+        .inspect_reservation(w.ctx, second.operation_id)
+        .unwrap()
+        .is_some());
+}
+
+#[test]
+fn legacy_consumption_blocks_checkpointed_reservation_in_the_shared_key_space() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let request = reservation_request(&w, OP, 0, 2);
+    let checkpointed = reservation_evidence(&w, &log, &request);
+    let legacy = w.legacy(OP, &[w.m(0), w.m(1)]);
+    let dir = tempfile::tempdir().unwrap();
+    LocalResourceReservations::open(dir.path(), w.target)
+        .unwrap()
+        .initialize_pool(resource_pool(&w, 10))
+        .unwrap();
+    {
+        let mut consumed = durable(dir.path());
+        w.admit_legacy(&legacy, &mut consumed).unwrap();
+    }
+    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
+    let result = reservations.reserve_checkpointed(
+        &checkpointed,
+        &w.frontier(1, None),
+        &rules(),
+        NOW,
+        &request,
+    );
+    let Err(ReservationError::Authorization(AdmissionRefusal::Equivocation(proof))) = result else {
+        panic!("expected cross-format conflict, got {result:?}");
+    };
+    assert_eq!(proof.classify(), Some(ConflictClass::CrossKind));
+    assert_eq!(
+        reservations.inspect_pool(w.ctx, RESOURCE_POOL).unwrap(),
+        Some(resource_pool(&w, 10))
+    );
+    assert!(reservations
+        .inspect_reservation(w.ctx, OP)
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn revision_overflow_fails_closed_without_consuming() {
+    let w = world();
+    let log = vec![w.genesis()];
+    let request = reservation_request(&w, OP, u64::MAX, 1);
+    let evidence = reservation_evidence(&w, &log, &request);
+    let dir = tempfile::tempdir().unwrap();
+    let mut exhausted = resource_pool(&w, 5);
+    exhausted.revision = u64::MAX;
+    {
+        let store = SledStore::open(dir.path()).unwrap();
+        Store::put(
+            &store,
+            &icn_authz_store::pool_key(w.ctx, w.target, RESOURCE_POOL),
+            &exhausted.encode().unwrap(),
+        )
+        .unwrap();
+        Store::flush(&store).unwrap();
+    }
+    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
+    assert!(matches!(
+        reservations
+            .reserve_checkpointed(&evidence, &w.frontier(1, None), &rules(), NOW, &request,),
+        Err(ReservationError::ArithmeticOverflow(_))
+    ));
+    assert!(reservations.inspect_consumed(w.ctx, OP).unwrap().is_none());
+    assert!(reservations
+        .inspect_reservation(w.ctx, OP)
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        reservations
+            .inspect_pool(w.ctx, RESOURCE_POOL)
+            .unwrap()
+            .unwrap(),
+        exhausted
+    );
 }
