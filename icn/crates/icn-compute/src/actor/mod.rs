@@ -117,6 +117,11 @@ pub struct ComputeActor {
     /// When set, all task submissions are validated against this policy:
     /// standing checks, credit ceiling enforcement, and charter priority ordering.
     commons_pool_policy: Option<crate::policy::CommonsPoolPolicy>,
+    /// Test-only scheduling seam: when set, local execution signals `.0` after executing a
+    /// claimed task and waits on `.1` before recording its completion, so a test can run the
+    /// timeout sweep in exactly that window. Compiled out of non-test builds.
+    #[cfg(test)]
+    pre_complete_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
     /// Callback for querying submitter ledger balances (E7 - #1134).
     /// Required for credit ceiling enforcement via `CommonsPoolPolicy::validate_submitter_credit`.
     balance_callback: Option<BalanceCallback>,
@@ -195,6 +200,8 @@ impl ComputeActor {
             commons_pool: Arc::new(RwLock::new(crate::commons_pool::CommonsPool::new())),
             stale_participant_max_age: None,
             commons_pool_policy: None,
+            #[cfg(test)]
+            pre_complete_gate: None,
             balance_callback: None,
             commons_required_credits_callback: None,
             commons_settlement_callback: None,
@@ -330,8 +337,12 @@ impl ComputeActor {
 
     /// Set the node's region identifier
     ///
-    /// Used for region-based task placement constraints.
+    /// Used for region-based task placement constraints, matched by exact string equality.
     /// Region identifiers should follow a consistent naming scheme (e.g., "us-west", "eu-central").
+    ///
+    /// In the daemon this is set from the operator's `compute.region` before spawn (#2920). It is
+    /// the operator's assertion about this node, not authenticated geography: enforcement is
+    /// cooperative, and with no region set a region-constrained task is refused (fail closed).
     pub fn set_region(&mut self, region: String) {
         self.own_region = Some(region);
     }
@@ -385,6 +396,13 @@ impl ComputeActor {
     /// - Critical tasks above `high_value_threshold` require 5 executors
     pub fn set_verification_config(&mut self, config: VerificationConfig) {
         self.quorum_manager = Arc::new(ResultQuorumManager::new(config));
+    }
+
+    /// Replace the quorum manager, for example with one built by
+    /// [`ResultQuorumManager::with_clock`]. Call before [`Self::spawn`]: the expiry sweep holds the
+    /// manager it finds at spawn.
+    pub fn set_quorum_manager(&mut self, manager: Arc<ResultQuorumManager>) {
+        self.quorum_manager = manager;
     }
 
     /// Get a reference to the quorum manager for result verification
