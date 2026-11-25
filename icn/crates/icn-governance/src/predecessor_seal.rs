@@ -25,7 +25,7 @@
 
 use sha2::{Digest, Sha256};
 
-use crate::cutover::{CutoverCommitmentV1, CutoverError};
+use crate::cutover::{CutoverCommitmentV1, CutoverError, MAX_CUTOVER_DOMAIN_ID_BYTES};
 use crate::domain::GovernanceDomainId;
 use crate::proposal::{ExecutionClosureClass, ProposalPayload, ProposalState};
 use crate::ProposalOutcome;
@@ -354,13 +354,15 @@ pub fn validate_transition(
 ///
 /// with ids strictly ascending by UTF-8 bytes, each non-empty and at most
 /// [`MAX_PROPOSAL_ID_LEN`] bytes, and `1 <= n <= MAX_FINAL_SET`. Refused, never sorted.
+/// `L` is non-empty and at most [`MAX_CUTOVER_DOMAIN_ID_BYTES`] (1024) UTF-8 bytes: the same
+/// bound as the cutover commitment that names it (D-S20-11).
 pub fn final_set_commitment(
     domain: &GovernanceDomainId,
     attempt: u64,
     commitment_hash: &[u8; 32],
     ids: &[&str],
 ) -> Result<[u8; 32], SealRefusal> {
-    if domain.0.is_empty() || domain.0.len() > u32::MAX as usize {
+    if domain.0.is_empty() || domain.0.len() > MAX_CUTOVER_DOMAIN_ID_BYTES {
         return Err(SealRefusal::FinalSet("invalid predecessor domain id"));
     }
     if attempt == 0 {

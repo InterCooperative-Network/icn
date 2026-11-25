@@ -420,6 +420,15 @@ fn final_set_refuses_malformed_input_and_never_sorts() {
     assert!(!refuse(&l(), 1, &[at_limit.as_str()]));
     assert!(refuse(&l(), 0, &["a"]));
     assert!(refuse(&GovernanceDomainId(String::new()), 1, &["a"]));
+    // L is capped at the shared 1024-byte bound, measured in UTF-8 bytes (D-S20-11).
+    let cap = icn_governance::cutover::MAX_CUTOVER_DOMAIN_ID_BYTES;
+    assert!(!refuse(&GovernanceDomainId("l".repeat(cap)), 1, &["a"]));
+    assert!(refuse(&GovernanceDomainId("l".repeat(cap + 1)), 1, &["a"]));
+    assert!(refuse(
+        &GovernanceDomainId("ñ".repeat(cap / 2 + 1)),
+        1,
+        &["a"]
+    ));
 }
 
 #[test]
