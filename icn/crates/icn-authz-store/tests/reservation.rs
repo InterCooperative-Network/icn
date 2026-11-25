@@ -3,8 +3,8 @@
 use icn_authz::effect_v0::ContextRef;
 use icn_authz_store::{
     pool_key, reservation_key, LocalReservationPolicyV0, LocalResourceReservations,
-    ReservationError, ReservationRecordV0, ReservationRequestV0, ResourcePoolV0,
-    RESERVATION_ACTION,
+    ReservationError, ReservationRecordV0, ReservationRequestV0, ResourcePoolRecord,
+    ResourcePoolV0, RESERVATION_ACTION,
 };
 use icn_store::{SledStore, Store};
 
@@ -190,12 +190,16 @@ fn keys_isolate_context_custodian_pool_and_operation() {
 fn pool_initialization_is_durable_and_never_overwrites() {
     let dir = tempfile::tempdir().unwrap();
     {
-        let reservations = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
-        reservations.initialize_pool(pool()).unwrap();
+        let (reservations, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_pool_admin();
+        reservations.initialize_pool(&admin, pool()).unwrap();
         assert_eq!(reservations.inspect_pool(CTX, POOL).unwrap(), Some(pool()));
         assert_eq!(
-            reservations.initialize_pool(pool()),
-            Err(ReservationError::PoolAlreadyExists)
+            reservations.initialize_pool(&admin, pool()),
+            Err(ReservationError::PoolAlreadyExists {
+                existing: Box::new(ResourcePoolRecord::V0(pool()))
+            })
         );
     }
     let reopened = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
@@ -206,8 +210,10 @@ fn pool_initialization_is_durable_and_never_overwrites() {
 fn malformed_persistent_pool_and_reservation_records_fail_closed() {
     let dir = tempfile::tempdir().unwrap();
     {
-        let reservations = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
-        reservations.initialize_pool(pool()).unwrap();
+        let (reservations, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_pool_admin();
+        reservations.initialize_pool(&admin, pool()).unwrap();
     }
     {
         let store = SledStore::open(dir.path()).unwrap();

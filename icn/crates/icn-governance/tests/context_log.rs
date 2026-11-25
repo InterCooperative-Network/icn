@@ -2325,8 +2325,12 @@ fn atomic_reservation_persists_all_three_records_and_reduces_capacity() {
     let evidence = reservation_evidence(&w, &log, &request);
     let dir = tempfile::tempdir().unwrap();
     {
-        let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
-        reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+        let (reservations, admin) = LocalResourceReservations::open(dir.path(), w.target)
+            .unwrap()
+            .with_pool_admin();
+        reservations
+            .initialize_pool(&admin, resource_pool(&w, 10))
+            .unwrap();
         let record = reservations
             .reserve_checkpointed(&evidence, &w.frontier(1, None), &rules(), NOW, &request)
             .unwrap();
@@ -2370,9 +2374,15 @@ fn reservation_commit_isolated_to_its_context_and_resource_pool() {
     let mut other_pool = resource_pool(&w, 9);
     other_pool.pool_id = other_pool_id;
     let dir = tempfile::tempdir().unwrap();
-    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
-    reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
-    reservations.initialize_pool(other_pool.clone()).unwrap();
+    let (reservations, admin) = LocalResourceReservations::open(dir.path(), w.target)
+        .unwrap()
+        .with_pool_admin();
+    reservations
+        .initialize_pool(&admin, resource_pool(&w, 10))
+        .unwrap();
+    reservations
+        .initialize_pool(&admin, other_pool.clone())
+        .unwrap();
 
     reservations
         .reserve_checkpointed(&evidence, &w.frontier(1, None), &rules(), NOW, &request)
@@ -2410,8 +2420,12 @@ fn insufficient_or_tampered_reservation_never_consumes_the_operation() {
     let second_request = reservation_request(&w, second_op, 1, 4);
     let second_evidence = reservation_evidence(&w, &log, &second_request);
     let dir = tempfile::tempdir().unwrap();
-    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
-    reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+    let (reservations, admin) = LocalResourceReservations::open(dir.path(), w.target)
+        .unwrap()
+        .with_pool_admin();
+    reservations
+        .initialize_pool(&admin, resource_pool(&w, 10))
+        .unwrap();
     reservations
         .reserve_checkpointed(
             &first_evidence,
@@ -2481,10 +2495,14 @@ fn uncertain_reservation_reconciles_without_duplicate_allocation() {
     let request = reservation_request(&w, OP, 0, 4);
     let evidence = reservation_evidence(&w, &log, &request);
     let dir = tempfile::tempdir().unwrap();
-    LocalResourceReservations::open(dir.path(), w.target)
-        .unwrap()
-        .initialize_pool(resource_pool(&w, 10))
-        .unwrap();
+    {
+        let (provisioner, admin) = LocalResourceReservations::open(dir.path(), w.target)
+            .unwrap()
+            .with_pool_admin();
+        provisioner
+            .initialize_pool(&admin, resource_pool(&w, 10))
+            .unwrap();
+    }
 
     let reservations = LocalResourceReservations::with_barrier(
         SledStore::open(dir.path()).unwrap(),
@@ -2530,8 +2548,13 @@ fn concurrent_reservations_cannot_overallocate_the_final_unit() {
         reservation_evidence(&w, &log, &requests[1]),
     ];
     let dir = tempfile::tempdir().unwrap();
-    let reservations = Arc::new(LocalResourceReservations::open(dir.path(), w.target).unwrap());
-    reservations.initialize_pool(resource_pool(&w, 1)).unwrap();
+    let (reservations, admin) = LocalResourceReservations::open(dir.path(), w.target)
+        .unwrap()
+        .with_pool_admin();
+    let reservations = Arc::new(reservations);
+    reservations
+        .initialize_pool(&admin, resource_pool(&w, 1))
+        .unwrap();
     let frontier = w.frontier(1, None);
     let results = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..2)
@@ -2599,8 +2622,12 @@ fn reservation_authorization_refusals_leave_every_record_unchanged() {
         OP,
     );
     let dir = tempfile::tempdir().unwrap();
-    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
-    reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+    let (reservations, admin) = LocalResourceReservations::open(dir.path(), w.target)
+        .unwrap()
+        .with_pool_admin();
+    reservations
+        .initialize_pool(&admin, resource_pool(&w, 10))
+        .unwrap();
 
     let attempts = [
         reservations.reserve_checkpointed(&fail, &w.frontier(1, None), &rules(), NOW, &request),
@@ -2647,8 +2674,12 @@ fn replay_conflict_and_distinct_operations_allocate_at_most_once_each() {
     let first = reservation_request(&w, OP, 0, 4);
     let first_evidence = reservation_evidence(&w, &log, &first);
     let dir = tempfile::tempdir().unwrap();
-    let reservations = LocalResourceReservations::open(dir.path(), w.target).unwrap();
-    reservations.initialize_pool(resource_pool(&w, 10)).unwrap();
+    let (reservations, admin) = LocalResourceReservations::open(dir.path(), w.target)
+        .unwrap()
+        .with_pool_admin();
+    reservations
+        .initialize_pool(&admin, resource_pool(&w, 10))
+        .unwrap();
     reservations
         .reserve_checkpointed(&first_evidence, &w.frontier(1, None), &rules(), NOW, &first)
         .unwrap();
@@ -2717,10 +2748,14 @@ fn legacy_consumption_blocks_checkpointed_reservation_in_the_shared_key_space() 
     let checkpointed = reservation_evidence(&w, &log, &request);
     let legacy = w.legacy(OP, &[w.m(0), w.m(1)]);
     let dir = tempfile::tempdir().unwrap();
-    LocalResourceReservations::open(dir.path(), w.target)
-        .unwrap()
-        .initialize_pool(resource_pool(&w, 10))
-        .unwrap();
+    {
+        let (provisioner, admin) = LocalResourceReservations::open(dir.path(), w.target)
+            .unwrap()
+            .with_pool_admin();
+        provisioner
+            .initialize_pool(&admin, resource_pool(&w, 10))
+            .unwrap();
+    }
     {
         let mut consumed = durable(dir.path());
         w.admit_legacy(&legacy, &mut consumed).unwrap();

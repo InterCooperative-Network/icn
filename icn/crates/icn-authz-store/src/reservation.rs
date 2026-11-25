@@ -5,6 +5,7 @@
 
 use std::any::Any;
 use std::path::Path;
+use std::sync::Arc;
 
 use icn_authz::effect_v0::{
     preflight_checkpointed, AdmissionRefusal, CheckpointedEvidenceV0, CheckpointedPreflight,
@@ -53,9 +54,15 @@ pub enum ReservationError {
     /// No local pool exists under the requested identity.
     #[error("resource pool not found")]
     PoolNotFound,
-    /// Pool initialization tried to overwrite an existing pool.
+    /// Pool initialization tried to overwrite an existing pool. `existing` is the stored record,
+    /// so a custodian can compare it with what it meant to create instead of treating the
+    /// conflict as idempotent success.
     #[error("resource pool already exists")]
-    PoolAlreadyExists,
+    PoolAlreadyExists { existing: Box<ResourcePoolRecord> },
+    /// The presented [`PoolAdminV0`] was not issued by this store instance, or has been revoked
+    /// by a later [`LocalResourceReservations::with_pool_admin`].
+    #[error("pool administration capability is not valid for this store")]
+    PoolAdminMismatch,
     /// The request is not permitted by the custodian's local pool policy.
     #[error("local reservation policy denied the request: {0}")]
     PolicyDenied(String),
@@ -476,6 +483,71 @@ pub enum ReservationReconciliation {
     },
 }
 
+/// Authority to create pools in ONE opened [`LocalResourceReservations`] instance (design-spec
+/// Part 8 F2, experimental).
+///
+/// Pool administration is separate from reservation authority. Every reservation caller holds
+/// `&LocalResourceReservations`; only the holder of this value can create pools.
+///
+/// * **Issued only at the custodian construction boundary.**
+///   [`LocalResourceReservations::with_pool_admin`] takes the store by value, so a holder of
+///   `&LocalResourceReservations` cannot obtain one. The field is private, and the type is
+///   neither `Clone` nor `Default`, so it cannot be built or duplicated outside this crate:
+///
+///   ```compile_fail
+///   fn forge() -> icn_authz_store::PoolAdminV0 {
+///       icn_authz_store::PoolAdminV0 { binding: unimplemented!() }
+///   }
+///   ```
+///
+///   ```compile_fail
+///   fn duplicate(admin: icn_authz_store::PoolAdminV0) -> (icn_authz_store::PoolAdminV0, icn_authz_store::PoolAdminV0) {
+///       (admin.clone(), admin)
+///   }
+///   ```
+///
+///   while obtaining one from the owned store compiles:
+///
+///   ```
+///   fn obtain(
+///       store: icn_authz_store::LocalResourceReservations,
+///   ) -> (icn_authz_store::LocalResourceReservations, icn_authz_store::PoolAdminV0) {
+///       store.with_pool_admin()
+///   }
+///   ```
+/// * **Bound to the issuing instance.** Presented to any other store instance, or after a later
+///   `with_pool_admin` call has revoked it, creation is refused with
+///   [`ReservationError::PoolAdminMismatch`] before anything is read or written. A store is bound
+///   to one custodian `target`, and pool keys are `(context, target, pool_id)`, so the capability
+///   covers exactly that custodian's pool namespace in that open store.
+/// * **Per opened instance, not per database.** It is not persisted and does not survive
+///   reopening the store: a reopened instance has no valid capability until its owner issues one.
+///   Two instances over the same database (possible only for code holding the storage itself, see
+///   below) each issue their own capabilities.
+///
+/// # What this does not protect against
+///
+/// * **Process trust.** This is an in-process Rust capability, not a credential. Any code that
+///   holds the store **by value** (before it is shared), or that can `open` its database path once
+///   the custodian has released it, is the custodian and can issue a capability. Nothing here
+///   authenticates across a process boundary.
+/// * **Raw storage.** Code with direct access to the underlying database (an owned `SledStore`,
+///   its `db()` handle, or the files on disk) can write or delete pool records without any
+///   capability. The gate stops reservation callers holding `&LocalResourceReservations`; it does
+///   not protect against an adversary who already owns the storage.
+pub struct PoolAdminV0 {
+    binding: Arc<PoolAdminBinding>,
+}
+
+/// The identity a [`PoolAdminV0`] shares with the store that issued it (compared by allocation).
+struct PoolAdminBinding;
+
+impl std::fmt::Debug for PoolAdminV0 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("PoolAdminV0 { .. }")
+    }
+}
+
 /// One local custodian's atomic finite-capacity reservation store.
 pub struct LocalResourceReservations<B: DurabilityBarrier = SledDurabilityBarrier> {
     store: SledStore,
@@ -483,6 +555,9 @@ pub struct LocalResourceReservations<B: DurabilityBarrier = SledDurabilityBarrie
     barrier: B,
     /// Custodian-installed verifiers. Set only while the custodian owns the store by value.
     admission: AdmissionRegistryV0,
+    /// The binding of the one valid [`PoolAdminV0`], if one has been issued. Set only while the
+    /// custodian owns the store by value.
+    pool_admin: Option<Arc<PoolAdminBinding>>,
 }
 
 impl LocalResourceReservations<SledDurabilityBarrier> {
@@ -500,6 +575,41 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
             target,
             barrier,
             admission: AdmissionRegistryV0::new(),
+            pool_admin: None,
+        }
+    }
+
+    /// Issue this store instance's pool-administration capability ([`PoolAdminV0`]).
+    ///
+    /// Takes the store by value, like [`Self::with_admission`]: code that only holds
+    /// `&LocalResourceReservations` (every reservation caller) cannot call it.
+    ///
+    /// ```compile_fail
+    /// fn escalate(store: &icn_authz_store::LocalResourceReservations) {
+    ///     let (_store, _admin) = store.with_pool_admin();
+    /// }
+    /// ```
+    ///
+    /// ```
+    /// fn issue(store: icn_authz_store::LocalResourceReservations) {
+    ///     let (_store, _admin) = store.with_pool_admin();
+    /// }
+    /// ```
+    ///
+    /// At most one capability is valid at a time. Issuing again revokes the previous one: from
+    /// then on it is refused with [`ReservationError::PoolAdminMismatch`].
+    pub fn with_pool_admin(mut self) -> (Self, PoolAdminV0) {
+        let binding = Arc::new(PoolAdminBinding);
+        self.pool_admin = Some(Arc::clone(&binding));
+        (self, PoolAdminV0 { binding })
+    }
+
+    /// Refuse unless `admin` is this instance's current capability. Checked before any read,
+    /// validation or write.
+    fn authorize_pool_admin(&self, admin: &PoolAdminV0) -> Result<(), ReservationError> {
+        match &self.pool_admin {
+            Some(current) if Arc::ptr_eq(current, &admin.binding) => Ok(()),
+            _ => Err(ReservationError::PoolAdminMismatch),
         }
     }
 
@@ -521,12 +631,47 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
     }
 
     /// Create a new, full V0 pool (caller-resolved admission) without overwriting any record.
-    pub fn initialize_pool(&self, pool: ResourcePoolV0) -> Result<(), ReservationError> {
+    /// Requires this instance's [`PoolAdminV0`]; a reservation caller holding only `&self` has
+    /// none, and there is no other public way to create a pool:
+    ///
+    /// ```compile_fail
+    /// fn provision(
+    ///     store: &icn_authz_store::LocalResourceReservations,
+    ///     pool: icn_authz_store::ResourcePoolV0,
+    /// ) {
+    ///     let _ = store.initialize_pool(pool);
+    /// }
+    /// ```
+    ///
+    /// ```
+    /// fn provision(
+    ///     store: &icn_authz_store::LocalResourceReservations,
+    ///     admin: &icn_authz_store::PoolAdminV0,
+    ///     pool: icn_authz_store::ResourcePoolV0,
+    /// ) {
+    ///     let _ = store.initialize_pool(admin, pool);
+    /// }
+    /// ```
+    ///
+    /// An existing pool is never overwritten: the conflict returns
+    /// [`ReservationError::PoolAlreadyExists`] carrying the stored record.
+    pub fn initialize_pool(
+        &self,
+        admin: &PoolAdminV0,
+        pool: ResourcePoolV0,
+    ) -> Result<(), ReservationError> {
+        self.authorize_pool_admin(admin)?;
         self.initialize_record(ResourcePoolRecord::V0(pool))
     }
 
     /// Create a new, full EXPERIMENTAL V1 pool that durably declares its admission requirement.
-    pub fn initialize_pool_v1(&self, pool: ResourcePoolV1) -> Result<(), ReservationError> {
+    /// Requires this instance's [`PoolAdminV0`], exactly as [`Self::initialize_pool`] does.
+    pub fn initialize_pool_v1(
+        &self,
+        admin: &PoolAdminV0,
+        pool: ResourcePoolV1,
+    ) -> Result<(), ReservationError> {
+        self.authorize_pool_admin(admin)?;
         self.initialize_record(ResourcePoolRecord::V1(pool))
     }
 
@@ -555,8 +700,11 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
             CompareAndPut::Conflict {
                 current: Some(existing),
             } => {
-                decode_pool_for_key(&existing, pool.context, self.target, pool.pool_id)?;
-                Err(ReservationError::PoolAlreadyExists)
+                let existing =
+                    decode_pool_for_key(&existing, pool.context, self.target, pool.pool_id)?;
+                Err(ReservationError::PoolAlreadyExists {
+                    existing: Box::new(existing),
+                })
             }
             CompareAndPut::Conflict { current: None } => Err(ReservationError::Corrupt(
                 "backend reported a pool conflict on an absent key".into(),
@@ -1383,8 +1531,10 @@ mod tests {
     #[test]
     fn well_formed_tampered_reservation_is_not_reconciled_as_committed() {
         let dir = tempfile::tempdir().unwrap();
-        let store = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
-        store.initialize_pool(pool()).unwrap();
+        let (store, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_pool_admin();
+        store.initialize_pool(&admin, pool()).unwrap();
         let outcome = store
             .commit_atomic(&binding(), &request(), 900, |_| Ok(()))
             .unwrap();
@@ -1411,8 +1561,10 @@ mod tests {
     #[test]
     fn missing_or_regressed_pool_never_reconciles_as_committed() {
         let dir = tempfile::tempdir().unwrap();
-        let store = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
-        store.initialize_pool(pool()).unwrap();
+        let (store, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_pool_admin();
+        store.initialize_pool(&admin, pool()).unwrap();
         let outcome = store
             .commit_atomic(&binding(), &request(), 900, |_| Ok(()))
             .unwrap();
@@ -1443,8 +1595,10 @@ mod tests {
     #[test]
     fn transaction_faults_after_staged_writes_commit_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        let store = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
-        store.initialize_pool(pool()).unwrap();
+        let (store, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_pool_admin();
+        store.initialize_pool(&admin, pool()).unwrap();
         for fail_at in [CommitStage::Consumed, CommitStage::Capacity] {
             let result = store.commit_atomic(&binding(), &request(), 900, |stage| {
                 if stage == fail_at {
@@ -1464,8 +1618,10 @@ mod tests {
         for mode in ["mid-consumed", "mid-capacity", "after-barrier"] {
             let dir = tempfile::tempdir().unwrap();
             {
-                let store = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
-                store.initialize_pool(pool()).unwrap();
+                let (store, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+                    .unwrap()
+                    .with_pool_admin();
+                store.initialize_pool(&admin, pool()).unwrap();
             }
             let status = Command::new(std::env::current_exe().unwrap())
                 .args([
@@ -1564,8 +1720,12 @@ mod tests {
         dir: &tempfile::TempDir,
         admission: AdmissionRequirementV1,
     ) -> LocalResourceReservations {
-        let store = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
-        store.initialize_pool_v1(pool_v1(admission)).unwrap();
+        let (store, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_pool_admin();
+        store
+            .initialize_pool_v1(&admin, pool_v1(admission))
+            .unwrap();
         store
     }
 
@@ -1829,11 +1989,16 @@ mod tests {
     #[test]
     fn raw_storage_downgrade_is_outside_the_api_gate() {
         let dir = tempfile::tempdir().unwrap();
-        let store = v1_store(&dir, requires(AdmissionGradeV0::Production));
-        // The API itself refuses to overwrite the pool with a V0 record.
+        let (store, admin) =
+            v1_store(&dir, requires(AdmissionGradeV0::Production)).with_pool_admin();
+        // The API itself refuses to overwrite the pool with a V0 record, and returns the stored one.
         assert_eq!(
-            store.initialize_pool(pool()),
-            Err(ReservationError::PoolAlreadyExists)
+            store.initialize_pool(&admin, pool()),
+            Err(ReservationError::PoolAlreadyExists {
+                existing: Box::new(ResourcePoolRecord::V1(pool_v1(requires(
+                    AdmissionGradeV0::Production
+                ))))
+            })
         );
         Store::put(
             &store.store,
@@ -1970,11 +2135,12 @@ mod tests {
         if let Some(clock) = clock {
             registry.install_clock(clock).unwrap();
         }
-        let store = LocalResourceReservations::open(dir.path(), TARGET)
+        let (store, admin) = LocalResourceReservations::open(dir.path(), TARGET)
             .unwrap()
-            .with_admission(registry);
+            .with_admission(registry)
+            .with_pool_admin();
         store
-            .initialize_pool_v1(pool_v1(requires(AdmissionGradeV0::Rehearsal)))
+            .initialize_pool_v1(&admin, pool_v1(requires(AdmissionGradeV0::Rehearsal)))
             .unwrap();
         store
     }
@@ -2095,5 +2261,165 @@ mod tests {
             Err(crate::AdmissionRegistryError::DuplicateClock)
         );
         assert!(format!("{registry:?}").contains("clock_installed: true"));
+    }
+
+    // ---- Part 8 F2: pool-administration capability ------------------------------------------
+
+    fn admin_store(dir: &tempfile::TempDir) -> (LocalResourceReservations, PoolAdminV0) {
+        LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_pool_admin()
+    }
+
+    fn other_pool_id() -> ResourcePoolV0 {
+        let mut other = pool();
+        other.pool_id = [0x8F; 32];
+        other
+    }
+
+    fn already_exists(record: ResourcePoolRecord) -> Result<(), ReservationError> {
+        Err(ReservationError::PoolAlreadyExists {
+            existing: Box::new(record),
+        })
+    }
+
+    #[test]
+    fn the_custodian_admin_creates_v0_and_v1_pools() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_store(&dir);
+        store.initialize_pool(&admin, pool()).unwrap();
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V0(pool()))
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_store(&dir);
+        let v1 = pool_v1(requires(AdmissionGradeV0::Production));
+        store.initialize_pool_v1(&admin, v1.clone()).unwrap();
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(v1))
+        );
+    }
+
+    #[test]
+    fn a_duplicate_pool_returns_the_existing_record_and_overwrites_nothing() {
+        // V0 first: every later attempt at the same key returns the original V0 record.
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_store(&dir);
+        store.initialize_pool(&admin, pool()).unwrap();
+        let mut larger = pool();
+        larger.total_capacity += 1;
+        larger.available_capacity = larger.total_capacity;
+        for attempt in [
+            store.initialize_pool(&admin, pool()),
+            store.initialize_pool(&admin, larger),
+            store.initialize_pool_v1(&admin, pool_v1(requires(AdmissionGradeV0::Rehearsal))),
+        ] {
+            assert_eq!(attempt, already_exists(ResourcePoolRecord::V0(pool())));
+        }
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V0(pool()))
+        );
+
+        // V1 first: a V0 (generic) attempt cannot downgrade it and returns the V1 record.
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_store(&dir);
+        let v1 = pool_v1(requires(AdmissionGradeV0::Production));
+        store.initialize_pool_v1(&admin, v1.clone()).unwrap();
+        assert_eq!(
+            store.initialize_pool(&admin, pool()),
+            already_exists(ResourcePoolRecord::V1(v1.clone()))
+        );
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(v1))
+        );
+    }
+
+    #[test]
+    fn another_stores_admin_is_refused_and_nothing_is_written() {
+        let dir_a = tempfile::tempdir().unwrap();
+        let (_store_a, admin_a) = admin_store(&dir_a);
+        // A store that issued its own admin, and one that never issued any.
+        let dir_b = tempfile::tempdir().unwrap();
+        let (store_b, _admin_b) = admin_store(&dir_b);
+        let dir_c = tempfile::tempdir().unwrap();
+        let store_c = LocalResourceReservations::open(dir_c.path(), TARGET).unwrap();
+        for store in [&store_b, &store_c] {
+            assert_eq!(
+                store.initialize_pool(&admin_a, pool()),
+                Err(ReservationError::PoolAdminMismatch)
+            );
+            assert_eq!(
+                store.initialize_pool_v1(&admin_a, pool_v1(requires(AdmissionGradeV0::Rehearsal))),
+                Err(ReservationError::PoolAdminMismatch)
+            );
+            assert_eq!(store.inspect_pool_record(CTX, POOL).unwrap(), None);
+        }
+    }
+
+    #[test]
+    fn issuing_again_revokes_the_previous_admin() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, first) = admin_store(&dir);
+        let (store, second) = store.with_pool_admin();
+        assert_eq!(
+            store.initialize_pool(&first, pool()),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+        assert_eq!(store.inspect_pool_record(CTX, POOL).unwrap(), None);
+        store.initialize_pool(&second, pool()).unwrap();
+    }
+
+    #[test]
+    fn the_admin_check_precedes_validation_and_any_storage_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_store(&dir);
+        let other = tempfile::tempdir().unwrap();
+        let (_other, foreign) = admin_store(&other);
+        // An invalid pool is refused for the admin, not for its content.
+        let mut invalid = pool();
+        invalid.revision = 1;
+        assert_eq!(
+            store.initialize_pool(&foreign, invalid.clone()),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+        assert!(matches!(
+            store.initialize_pool(&admin, invalid),
+            Err(ReservationError::InvalidInput(_))
+        ));
+        // An existing pool is not revealed to a foreign admin (no PoolAlreadyExists).
+        store.initialize_pool(&admin, pool()).unwrap();
+        assert_eq!(
+            store.initialize_pool(&foreign, pool()),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+    }
+
+    #[test]
+    fn an_admin_does_not_survive_reopening_the_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, old_admin) = admin_store(&dir);
+        store.initialize_pool(&old_admin, pool()).unwrap();
+        drop(store);
+
+        let reopened = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
+        assert_eq!(
+            reopened.initialize_pool(&old_admin, other_pool_id()),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+        let (reopened, admin) = reopened.with_pool_admin();
+        assert_eq!(
+            reopened.initialize_pool(&admin, pool()),
+            already_exists(ResourcePoolRecord::V0(pool()))
+        );
+        reopened.initialize_pool(&admin, other_pool_id()).unwrap();
+        assert_eq!(
+            reopened.inspect_pool(CTX, [0x8F; 32]).unwrap(),
+            Some(other_pool_id())
+        );
     }
 }

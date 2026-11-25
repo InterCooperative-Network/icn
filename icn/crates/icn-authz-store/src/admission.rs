@@ -20,12 +20,14 @@
 //! * **In-process only.** The admitted result never leaves this process. A remote custodian must
 //!   re-verify raw evidence with its own installed verifier; a Rust value is not proof across a
 //!   process boundary, and no attestation protocol is defined here.
-//! * **Pool creation is not capability-gated (known limit).** `initialize_pool` and
-//!   `initialize_pool_v1` take `&self`, like `reserve_*`, so any holder of the store can create a
-//!   pool id first, including as a generic pool. Creation never overwrites
-//!   (`PoolAlreadyExists`), so a custodian must treat that error as a conflict and compare
-//!   [`crate::LocalResourceReservations::inspect_pool_record`]'s requirement with its own, never
-//!   as idempotent success. A custodian-only creation capability is follow-up work.
+//! * **Pool creation is custodian-only (Part 8 F2).** `initialize_pool` and `initialize_pool_v1`
+//!   require the [`crate::PoolAdminV0`] that the by-value
+//!   [`crate::LocalResourceReservations::with_pool_admin`] issues, so a reservation caller holding
+//!   `&LocalResourceReservations` cannot create a pool or pre-empt a pool id. Creation never
+//!   overwrites: a conflict returns `PoolAlreadyExists { existing }` with the stored record, which
+//!   a custodian must compare with its own requirement, never treat as idempotent success. The
+//!   capability is in-process only and does not cover raw storage access (see
+//!   [`crate::PoolAdminV0`]).
 //! * **Not a storage-integrity mechanism.** Anyone with raw write access to the underlying
 //!   database can rewrite or delete a pool record, including replacing a policy pool with a
 //!   generic one. The API gate prevents the *caller* from choosing weaker admission; it does not

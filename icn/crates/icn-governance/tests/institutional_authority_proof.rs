@@ -650,7 +650,8 @@ fn lifecycle_gen_a_to_durable_reservation_survives_restart() {
     let dir = tempfile::tempdir().unwrap();
     {
         let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
-        target.initialize_pool(inst.pool(10)).unwrap();
+        let (target, admin) = target.with_pool_admin();
+        target.initialize_pool(&admin, inst.pool(10)).unwrap();
         let record = target
             .reserve_checkpointed(&evidence, &inst.frontier(2, None), &rules(), NOW, &request)
             .unwrap();
@@ -736,7 +737,8 @@ fn the_log_alone_accepts_standing_for_a_foreign_or_unrecognized_subject() {
     // (see `direct_ungated_call_is_refused_for_an_institutional_policy_pool`).
     let dir = tempfile::tempdir().unwrap();
     let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
-    target.initialize_pool(inst.pool(10)).unwrap();
+    let (target, admin) = target.with_pool_admin();
+    target.initialize_pool(&admin, inst.pool(10)).unwrap();
     assert!(target
         .reserve_checkpointed(&evidence, &inst.frontier(2, None), &rules(), NOW, &request)
         .is_ok());
@@ -833,7 +835,8 @@ fn wrong_context_or_wrong_domain_binding_is_refused() {
     // The target's pool lives in `inst.ctx`; the other context's evidence names `other.ctx`.
     let dir = tempfile::tempdir().unwrap();
     let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
-    target.initialize_pool(inst.pool(10)).unwrap();
+    let (target, admin) = target.with_pool_admin();
+    target.initialize_pool(&admin, inst.pool(10)).unwrap();
     assert_eq!(
         target.reserve_checkpointed(&oev, &inst.frontier(2, None), &rules(), NOW, &request),
         Err(ReservationError::Authorization(
@@ -874,7 +877,8 @@ fn stale_checkpoint_is_refused_by_verifier_and_target() {
     );
     let dir = tempfile::tempdir().unwrap();
     let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
-    target.initialize_pool(inst.pool(10)).unwrap();
+    let (target, admin) = target.with_pool_admin();
+    target.initialize_pool(&admin, inst.pool(10)).unwrap();
     assert_eq!(
         target.reserve_checkpointed(&stale, &inst.frontier(2, None), &rules(), NOW, &request),
         Err(ReservationError::Authorization(AdmissionRefusal::Log(
@@ -917,7 +921,8 @@ fn conflicting_histories_yield_a_fork_proof_and_the_pin_decides() {
     );
     let dir = tempfile::tempdir().unwrap();
     let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
-    target.initialize_pool(inst.pool(10)).unwrap();
+    let (target, admin) = target.with_pool_admin();
+    target.initialize_pool(&admin, inst.pool(10)).unwrap();
     assert!(matches!(
         target.reserve_checkpointed(
             &on_b,
@@ -960,7 +965,8 @@ fn repeated_operation_id_allocates_once_across_restart() {
     let dir = tempfile::tempdir().unwrap();
     {
         let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
-        target.initialize_pool(inst.pool(10)).unwrap();
+        let (target, admin) = target.with_pool_admin();
+        target.initialize_pool(&admin, inst.pool(10)).unwrap();
         target
             .reserve_checkpointed(&first, &inst.frontier(2, None), &rules(), NOW, &first_req)
             .unwrap();
@@ -989,10 +995,12 @@ fn storage_failure_is_uncertain_and_reconciles_once_after_restart() {
     let request = inst.request(OP, 4);
     let evidence = inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), &fourth], &request);
     let dir = tempfile::tempdir().unwrap();
-    LocalResourceReservations::open(dir.path(), inst.custodian)
-        .unwrap()
-        .initialize_pool(inst.pool(10))
-        .unwrap();
+    {
+        let (provisioner, admin) = LocalResourceReservations::open(dir.path(), inst.custodian)
+            .unwrap()
+            .with_pool_admin();
+        provisioner.initialize_pool(&admin, inst.pool(10)).unwrap();
+    }
     {
         let failing = LocalResourceReservations::with_barrier(
             SledStore::open(dir.path()).unwrap(),
@@ -1065,7 +1073,8 @@ fn reserve_via_gate(
 fn fresh_target(inst: &Institution) -> (tempfile::TempDir, LocalResourceReservations) {
     let dir = tempfile::tempdir().unwrap();
     let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
-    target.initialize_pool(inst.pool(10)).unwrap();
+    let (target, admin) = target.with_pool_admin();
+    target.initialize_pool(&admin, inst.pool(10)).unwrap();
     (dir, target)
 }
 
@@ -1140,8 +1149,9 @@ fn policy_target(
     let target = LocalResourceReservations::open(dir.path(), inst.custodian)
         .unwrap()
         .with_admission(registry_for(&[anchor]));
+    let (target, admin) = target.with_pool_admin();
     target
-        .initialize_pool_v1(institutional_pool(inst, anchor, min_grade))
+        .initialize_pool_v1(&admin, institutional_pool(inst, anchor, min_grade))
         .unwrap();
     (dir, target)
 }
@@ -1182,7 +1192,8 @@ fn institutional_admission_reserves_once_and_survives_restart() {
     let dir = tempfile::tempdir().unwrap();
     {
         let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
-        target.initialize_pool(inst.pool(10)).unwrap();
+        let (target, admin) = target.with_pool_admin();
+        target.initialize_pool(&admin, inst.pool(10)).unwrap();
         let reached = std::cell::Cell::new(false);
         let (verified, record) =
             reserve_via_gate(&target, &trust, &evidence, &request, &reached).unwrap();
@@ -1838,7 +1849,8 @@ fn missing_or_unknown_admission_policy_fails_closed() {
         },
         min_grade: AdmissionGradeV0::Rehearsal,
     };
-    future.initialize_pool_v1(pool).unwrap();
+    let (future, admin) = future.with_pool_admin();
+    future.initialize_pool_v1(&admin, pool).unwrap();
     assert!(matches!(
         reserve_admitted(&future, &evidence, &request),
         Err(ReservationError::AdmissionUnavailable(_))
@@ -1887,7 +1899,8 @@ fn admission_for_another_operation_pool_revision_or_context_is_refused() {
     // Another pool under the same requirement: the authorization names POOL, not this one.
     let mut second = institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal);
     second.pool.pool_id = [0x7f; 32];
-    target.initialize_pool_v1(second).unwrap();
+    let (target, admin) = target.with_pool_admin();
+    target.initialize_pool_v1(&admin, second).unwrap();
     let mut other_pool = request.clone();
     other_pool.pool_id = [0x7f; 32];
     assert!(matches!(
@@ -1966,7 +1979,8 @@ fn store_refuses_a_preflight_for_another_target_even_from_its_own_verifier() {
         .with_admission(registry);
     let mut pool = institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal);
     pool.pool.custodian = elsewhere;
-    store.initialize_pool_v1(pool).unwrap();
+    let (store, admin) = store.with_pool_admin();
+    store.initialize_pool_v1(&admin, pool).unwrap();
 
     let result = reserve_admitted(&store, &evidence, &request);
     assert!(
@@ -1999,12 +2013,12 @@ fn store_refuses_an_expired_authorization_even_from_its_own_verifier() {
     let store = LocalResourceReservations::open(dir.path(), inst.custodian)
         .unwrap()
         .with_admission(registry);
+    let (store, admin) = store.with_pool_admin();
     store
-        .initialize_pool_v1(institutional_pool(
-            &inst,
-            &trust,
-            AdmissionGradeV0::Rehearsal,
-        ))
+        .initialize_pool_v1(
+            &admin,
+            institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal),
+        )
         .unwrap();
 
     assert!(NOW <= not_after);
@@ -2032,17 +2046,22 @@ fn admitted_path_is_refused_by_a_pool_without_a_custodian_policy() {
     let v0 = LocalResourceReservations::open(dir0.path(), inst.custodian)
         .unwrap()
         .with_admission(registry_for(&[&trust]));
-    v0.initialize_pool(inst.pool(10)).unwrap();
+    let (v0, admin) = v0.with_pool_admin();
+    v0.initialize_pool(&admin, inst.pool(10)).unwrap();
 
     let dir1 = tempfile::tempdir().unwrap();
     let generic_v1 = LocalResourceReservations::open(dir1.path(), inst.custodian)
         .unwrap()
         .with_admission(registry_for(&[&trust]));
+    let (generic_v1, admin) = generic_v1.with_pool_admin();
     generic_v1
-        .initialize_pool_v1(ResourcePoolV1 {
-            pool: inst.pool(10),
-            admission: AdmissionRequirementV1::CallerResolved,
-        })
+        .initialize_pool_v1(
+            &admin,
+            ResourcePoolV1 {
+                pool: inst.pool(10),
+                admission: AdmissionRequirementV1::CallerResolved,
+            },
+        )
         .unwrap();
 
     for (name, target) in [("v0", &v0), ("generic v1", &generic_v1)] {
@@ -2150,16 +2169,16 @@ fn custodian_store(
     now: Option<u64>,
     init: bool,
 ) -> LocalResourceReservations {
-    let store = LocalResourceReservations::open(dir, inst.custodian)
+    let (store, admin) = LocalResourceReservations::open(dir, inst.custodian)
         .unwrap()
-        .with_admission(registry_at(&[anchor], now));
+        .with_admission(registry_at(&[anchor], now))
+        .with_pool_admin();
     if init {
         store
-            .initialize_pool_v1(institutional_pool(
-                inst,
-                anchor,
-                AdmissionGradeV0::Rehearsal,
-            ))
+            .initialize_pool_v1(
+                &admin,
+                institutional_pool(inst, anchor, AdmissionGradeV0::Rehearsal),
+            )
             .unwrap();
     }
     store
@@ -2354,12 +2373,12 @@ fn one_custodian_clock_reading_serves_verifier_expiry_check_and_reserved_at() {
     let store = LocalResourceReservations::open(dir.path(), inst.custodian)
         .unwrap()
         .with_admission(registry);
+    let (store, admin) = store.with_pool_admin();
     store
-        .initialize_pool_v1(institutional_pool(
-            &inst,
-            &trust,
-            AdmissionGradeV0::Rehearsal,
-        ))
+        .initialize_pool_v1(
+            &admin,
+            institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal),
+        )
         .unwrap();
 
     let record = reserve_admitted(&store, &evidence, &request).unwrap();
@@ -2414,12 +2433,12 @@ fn unavailable_custodian_time_refuses_any_expiry_without_consuming() {
         let store = LocalResourceReservations::open(dir.path(), inst.custodian)
             .unwrap()
             .with_admission(registry);
+        let (store, admin) = store.with_pool_admin();
         store
-            .initialize_pool_v1(institutional_pool(
-                &inst,
-                &trust,
-                AdmissionGradeV0::Rehearsal,
-            ))
+            .initialize_pool_v1(
+                &admin,
+                institutional_pool(&inst, &trust, AdmissionGradeV0::Rehearsal),
+            )
             .unwrap();
 
         for call in 1..=2 {
