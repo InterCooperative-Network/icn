@@ -712,6 +712,79 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
         }
     }
 
+    /// Replace a V1 pool's admission requirement (design-spec Part 8 F3, experimental).
+    ///
+    /// Custodian-only: requires this instance's current [`PoolAdminV0`], checked before any read.
+    /// A compare-and-swap on the pool's revision inside one store transaction:
+    ///
+    /// * the stored revision must equal `expected_revision`, else [`ReservationError::StalePool`];
+    /// * only the admission requirement changes, and the revision advances by one. Capacity, unit,
+    ///   local policy, the record's V1 domain and its version are never touched, so resource
+    ///   conservation and every committed reservation's reconciliation are unaffected;
+    /// * a V0 pool is refused: it has no requirement, and converting it would change its version.
+    ///
+    /// **Atomicity boundary:** the pool record inside the store transaction. A reservation commit
+    /// reads the same record in its own transaction and re-checks the requirement (exact policy
+    /// reference and grade) and the revision there, so every interleaving serializes: either the
+    /// reservation commits first (and this call then fails with `StalePool`), or the redeclaration
+    /// commits first (and an admission verified under the old requirement is refused at commit).
+    ///
+    /// The new requirement is the custodian's choice, exactly as at creation. Whether a verifier
+    /// for it is installed is not checked here; a reservation against a policy with no installed
+    /// verifier fails closed with `AdmissionUnavailable`.
+    pub fn redeclare_pool_requirement(
+        &self,
+        admin: &PoolAdminV0,
+        context: ContextRef,
+        pool_id: [u8; 32],
+        expected_revision: u64,
+        new: AdmissionRequirementV1,
+    ) -> Result<ResourcePoolV1, ReservationError> {
+        self.authorize_pool_admin(admin)?;
+        let key = pool_key(context, self.target, pool_id);
+        let outcome = self
+            .store
+            .transaction(|tx| {
+                let Some(bytes) = tx.get(&key)? else {
+                    return Ok(Err(ReservationError::PoolNotFound));
+                };
+                let record = match decode_pool_for_key(&bytes, context, self.target, pool_id) {
+                    Ok(record) => record,
+                    Err(error) => return Ok(Err(error)),
+                };
+                let ResourcePoolRecord::V1(current) = record else {
+                    return Ok(Err(ReservationError::InvalidInput(
+                        "a V0 pool has no admission requirement to redeclare".into(),
+                    )));
+                };
+                if current.pool.revision != expected_revision {
+                    return Ok(Err(ReservationError::StalePool {
+                        expected: expected_revision,
+                        actual: current.pool.revision,
+                    }));
+                }
+                let Some(revision_after) = current.pool.revision.checked_add(1) else {
+                    return Ok(Err(ReservationError::ArithmeticOverflow(
+                        "pool revision overflow".into(),
+                    )));
+                };
+                let mut next = current;
+                next.pool.revision = revision_after;
+                next.admission = new;
+                let encoded = match next.encode() {
+                    Ok(encoded) => encoded,
+                    Err(error) => return Ok(Err(error)),
+                };
+                tx.set(&key, &encoded)?;
+                Ok(Ok(next))
+            })
+            .map_err(|error| ReservationError::Unavailable(error.to_string()))??;
+        self.barrier
+            .sync(&self.store)
+            .map_err(ReservationError::CommitUncertain)?;
+        Ok(outcome)
+    }
+
     /// The capacity fields of a pool of either record version.
     pub fn inspect_pool(
         &self,
@@ -2421,5 +2494,342 @@ mod tests {
             reopened.inspect_pool(CTX, [0x8F; 32]).unwrap(),
             Some(other_pool_id())
         );
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Part 8 F3: custodian-only redeclaration of a pool's admission requirement.
+    // ---------------------------------------------------------------------------------------
+
+    const REDECLARED: AdmissionPolicyRefV0 = AdmissionPolicyRefV0 {
+        id: [0x8b; 32],
+        version: 1,
+    };
+
+    fn redeclared() -> AdmissionRequirementV1 {
+        AdmissionRequirementV1::Policy {
+            policy: REDECLARED,
+            min_grade: AdmissionGradeV0::Production,
+        }
+    }
+
+    fn admin_v1_store(dir: &tempfile::TempDir) -> (LocalResourceReservations, PoolAdminV0) {
+        let (store, admin) = admin_store(dir);
+        store
+            .initialize_pool_v1(&admin, pool_v1(requires(AdmissionGradeV0::Production)))
+            .unwrap();
+        (store, admin)
+    }
+
+    fn original_record() -> Option<ResourcePoolRecord> {
+        Some(ResourcePoolRecord::V1(pool_v1(requires(
+            AdmissionGradeV0::Production,
+        ))))
+    }
+
+    fn redeclared_at(revision: u64, available: u64) -> ResourcePoolV1 {
+        let mut expected = pool_v1(redeclared());
+        expected.pool.revision = revision;
+        expected.pool.available_capacity = available;
+        expected
+    }
+
+    #[test]
+    fn redeclare_requires_this_instances_current_admin_before_any_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_v1_store(&dir);
+        let other_dir = tempfile::tempdir().unwrap();
+        let (_other, foreign) = admin_store(&other_dir);
+        // A foreign admin is refused, even for a pool that does not exist: no read happened.
+        for pool_id in [POOL, [0x8F; 32]] {
+            assert_eq!(
+                store.redeclare_pool_requirement(&foreign, CTX, pool_id, 0, redeclared()),
+                Err(ReservationError::PoolAdminMismatch)
+            );
+        }
+        // An instance without an issued admin refuses every capability.
+        let plain_dir = tempfile::tempdir().unwrap();
+        let plain = LocalResourceReservations::open(plain_dir.path(), TARGET).unwrap();
+        assert_eq!(
+            plain.redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared()),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+        // Re-issuing revokes the previous admin.
+        let (store, current) = store.with_pool_admin();
+        assert_eq!(
+            store.redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared()),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            original_record()
+        );
+        store
+            .redeclare_pool_requirement(&current, CTX, POOL, 0, redeclared())
+            .unwrap();
+    }
+
+    #[test]
+    fn redeclare_is_a_revision_cas_that_changes_only_the_requirement() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_v1_store(&dir);
+        for stale in [1, u64::MAX] {
+            assert_eq!(
+                store.redeclare_pool_requirement(&admin, CTX, POOL, stale, redeclared()),
+                Err(ReservationError::StalePool {
+                    expected: stale,
+                    actual: 0
+                })
+            );
+        }
+        assert_eq!(
+            store.redeclare_pool_requirement(&admin, CTX, [0x8F; 32], 0, redeclared()),
+            Err(ReservationError::PoolNotFound)
+        );
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            original_record()
+        );
+
+        let next = store
+            .redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared())
+            .unwrap();
+        assert_eq!(next, redeclared_at(1, 5));
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(redeclared_at(1, 5)))
+        );
+        // The previous revision is now stale; the current one advances again.
+        assert_eq!(
+            store.redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared()),
+            Err(ReservationError::StalePool {
+                expected: 0,
+                actual: 1
+            })
+        );
+        let generic = store
+            .redeclare_pool_requirement(
+                &admin,
+                CTX,
+                POOL,
+                1,
+                AdmissionRequirementV1::CallerResolved,
+            )
+            .unwrap();
+        assert_eq!(generic.pool.revision, 2);
+        assert_eq!(generic.admission, AdmissionRequirementV1::CallerResolved);
+    }
+
+    #[test]
+    fn a_v0_pool_cannot_be_redeclared_or_converted() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_store(&dir);
+        store.initialize_pool(&admin, pool()).unwrap();
+        assert!(matches!(
+            store.redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared()),
+            Err(ReservationError::InvalidInput(_))
+        ));
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V0(pool()))
+        );
+    }
+
+    #[test]
+    fn an_admission_verified_under_the_previous_requirement_is_refused_at_commit() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_v1_store(&dir);
+        store
+            .redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared())
+            .unwrap();
+        // Stale evidence: verified under the old policy, whether it names the old or the current
+        // revision. The requirement comparison refuses it before capacity is considered.
+        for revision in [0, 1] {
+            let mut stale_request = request();
+            stale_request.expected_pool_revision = revision;
+            let error = rejected(
+                store
+                    .commit_atomic(
+                        &admitted(ADMISSION, AdmissionGradeV0::Production),
+                        &stale_request,
+                        900,
+                        |_| Ok(()),
+                    )
+                    .unwrap(),
+            );
+            assert!(
+                matches!(error, ReservationError::AdmissionDenied(_)),
+                "{error:?}"
+            );
+            assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
+            assert!(store.inspect_reservation(CTX, OP).unwrap().is_none());
+            assert_eq!(
+                store.inspect_pool_record(CTX, POOL).unwrap(),
+                Some(ResourcePoolRecord::V1(redeclared_at(1, 5)))
+            );
+        }
+        // An admission under the new exact reference, at the current revision, commits.
+        let mut current = request();
+        current.expected_pool_revision = 1;
+        let outcome = store
+            .commit_atomic(
+                &admitted(REDECLARED, AdmissionGradeV0::Production),
+                &current,
+                900,
+                |_| Ok(()),
+            )
+            .unwrap();
+        assert!(matches!(outcome, AtomicOutcome::Reserved(_)));
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(redeclared_at(2, 3)))
+        );
+    }
+
+    #[test]
+    fn redeclaring_preserves_committed_reservations_and_conservation() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_v1_store(&dir);
+        let reserved = store
+            .commit_atomic(
+                &admitted(ADMISSION, AdmissionGradeV0::Production),
+                &request(),
+                900,
+                |_| Ok(()),
+            )
+            .unwrap();
+        let AtomicOutcome::Reserved(record) = reserved else {
+            panic!("expected a reservation");
+        };
+        // The reservation advanced the revision, so a redeclaration based on revision 0 is stale.
+        assert_eq!(
+            store.redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared()),
+            Err(ReservationError::StalePool {
+                expected: 0,
+                actual: 1
+            })
+        );
+        store
+            .redeclare_pool_requirement(&admin, CTX, POOL, 1, redeclared())
+            .unwrap();
+        let pool = store.inspect_pool(CTX, POOL).unwrap().unwrap();
+        assert_eq!(
+            (pool.total_capacity, pool.available_capacity, pool.revision),
+            (5, 3, 2)
+        );
+        assert_eq!(
+            pool.total_capacity - pool.available_capacity,
+            record.quantity
+        );
+        assert_eq!(store.inspect_reservation(CTX, OP).unwrap(), Some(record));
+        assert!(matches!(
+            store.reconcile(CTX, OP).unwrap(),
+            ReservationReconciliation::Committed { .. }
+        ));
+    }
+
+    #[test]
+    fn concurrent_reservation_and_redeclaration_serialize_on_the_pool_record() {
+        let (mut reserved_first, mut redeclared_first) = (0, 0);
+        for _ in 0..32 {
+            let dir = tempfile::tempdir().unwrap();
+            let (store, admin) = admin_v1_store(&dir);
+            let gate = std::sync::Barrier::new(2);
+            let (reservation, redeclaration) = std::thread::scope(|scope| {
+                let reserve = scope.spawn(|| {
+                    gate.wait();
+                    store
+                        .commit_atomic(
+                            &admitted(ADMISSION, AdmissionGradeV0::Production),
+                            &request(),
+                            900,
+                            |_| Ok(()),
+                        )
+                        .unwrap()
+                });
+                let redeclare = scope.spawn(|| {
+                    gate.wait();
+                    store.redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared())
+                });
+                (reserve.join().unwrap(), redeclare.join().unwrap())
+            });
+            let stored = store.inspect_pool_record(CTX, POOL).unwrap();
+            match (reservation, redeclaration) {
+                (AtomicOutcome::Reserved(record), Err(error)) => {
+                    reserved_first += 1;
+                    assert_eq!(
+                        error,
+                        ReservationError::StalePool {
+                            expected: 0,
+                            actual: 1
+                        }
+                    );
+                    let mut expected = pool_v1(requires(AdmissionGradeV0::Production));
+                    expected.pool.revision = 1;
+                    expected.pool.available_capacity = 3;
+                    assert_eq!(stored, Some(ResourcePoolRecord::V1(expected)));
+                    assert_eq!(store.inspect_reservation(CTX, OP).unwrap(), Some(record));
+                }
+                (AtomicOutcome::Rejected(error), Ok(next)) => {
+                    redeclared_first += 1;
+                    assert!(
+                        matches!(error, ReservationError::AdmissionDenied(_)),
+                        "{error:?}"
+                    );
+                    assert_eq!(next, redeclared_at(1, 5));
+                    assert_eq!(stored, Some(ResourcePoolRecord::V1(redeclared_at(1, 5))));
+                    assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
+                    assert!(store.inspect_reservation(CTX, OP).unwrap().is_none());
+                }
+                (reservation, redeclaration) => panic!(
+                    "both or neither committed: reserved={} redeclared={:?}",
+                    matches!(reservation, AtomicOutcome::Reserved(_)),
+                    redeclaration
+                ),
+            }
+        }
+        assert_eq!(reserved_first + redeclared_first, 32);
+    }
+
+    struct FailingSync;
+
+    impl DurabilityBarrier for FailingSync {
+        fn sync(&self, _: &SledStore) -> Result<(), String> {
+            Err("injected sync failure".into())
+        }
+    }
+
+    #[test]
+    fn a_redeclared_requirement_survives_restart_and_the_admin_does_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_v1_store(&dir);
+        store
+            .redeclare_pool_requirement(&admin, CTX, POOL, 0, redeclared())
+            .unwrap();
+        drop(store);
+        let reopened = LocalResourceReservations::open(dir.path(), TARGET).unwrap();
+        assert_eq!(
+            reopened.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(redeclared_at(1, 5)))
+        );
+        assert_eq!(
+            reopened.redeclare_pool_requirement(&admin, CTX, POOL, 1, redeclared()),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+        drop(reopened);
+
+        // A failed durability barrier reports uncertainty, never success.
+        let sled = SledStore::open(dir.path()).unwrap();
+        let (uncertain, admin) =
+            LocalResourceReservations::with_barrier(sled, TARGET, FailingSync).with_pool_admin();
+        assert!(matches!(
+            uncertain.redeclare_pool_requirement(
+                &admin,
+                CTX,
+                POOL,
+                1,
+                AdmissionRequirementV1::CallerResolved
+            ),
+            Err(ReservationError::CommitUncertain(_))
+        ));
     }
 }

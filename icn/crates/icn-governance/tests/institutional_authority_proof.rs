@@ -51,8 +51,9 @@ use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::domain::GovernanceDomainId;
 use icn_governance::institutional_admission::{
     admit_institutional, verify_institutional_authorization, InstitutionalAdmissionError,
-    InstitutionalAdmissionVerifierV0, InstitutionalEvidenceV0, InstitutionalRefusal,
-    InstitutionalSupplementV0, InstitutionalTrustAnchorV0, Legitimacy, RecognitionRequirement,
+    InstitutionalAdmissionPolicyVersion, InstitutionalAdmissionVerifierV0, InstitutionalEvidenceV0,
+    InstitutionalRefusal, InstitutionalSupplementV0, InstitutionalTrustAnchorV0, Legitimacy,
+    RecognitionRequirement,
 };
 use icn_governance::subject_recognition::RecognitionError;
 use icn_governance::subject_recognition::{RecognitionBasisKind, SubjectRecognitionV1};
@@ -2485,4 +2486,321 @@ fn a_real_reading_admits_never_expiring_evidence_and_stamps_that_reading() {
             Some(record)
         );
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Part 8 F3: V1 policy identity (rules + recognition) and custodian redeclaration
+// (maintainer decisions D-F3a: recognition tags 0x01/0x02; D-F3b: version-specific verifiers,
+// no fallback, exact reference at commit)
+// ---------------------------------------------------------------------------------------------
+
+fn production_trust(inst: &Institution) -> InstitutionalTrustAnchorV0 {
+    anchor(
+        DOMAIN,
+        inst.ctx,
+        2,
+        None,
+        RecognitionRequirement::ProductionGrade,
+    )
+}
+
+/// The same domain, context and recognition as `inst.trust(2, None)`, under a weaker rule.
+fn weaker_rules_trust(inst: &Institution) -> InstitutionalTrustAnchorV0 {
+    InstitutionalTrustAnchorV0::new(
+        GovernanceDomainId(DOMAIN.into()),
+        inst.ctx,
+        2,
+        None,
+        vec![ThresholdRuleV0 {
+            role: ROLE.into(),
+            quorum: Ratio { num: 1, den: 3 },
+            approval: Ratio { num: 1, den: 3 },
+        }],
+        RecognitionRequirement::RehearsalPermitted,
+    )
+    .unwrap()
+}
+
+fn verifier(
+    anchor: &InstitutionalTrustAnchorV0,
+    version: InstitutionalAdmissionPolicyVersion,
+) -> std::sync::Arc<InstitutionalAdmissionVerifierV0> {
+    std::sync::Arc::new(InstitutionalAdmissionVerifierV0::with_policy_version(
+        anchor.clone(),
+        version,
+    ))
+}
+
+/// A custodian store with exactly `verifiers` installed, a clock at `NOW`, and one V1 pool
+/// declaring `policy` at Rehearsal minimum grade. Returns the custodian's admin.
+fn store_with(
+    inst: &Institution,
+    verifiers: Vec<std::sync::Arc<InstitutionalAdmissionVerifierV0>>,
+    policy: AdmissionPolicyRefV0,
+) -> (
+    tempfile::TempDir,
+    LocalResourceReservations,
+    icn_authz_store::PoolAdminV0,
+) {
+    let mut registry = AdmissionRegistryV0::new();
+    for verifier in verifiers {
+        registry.install(verifier).unwrap();
+    }
+    registry.install_clock(clock_at(NOW)).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let (target, admin) = LocalResourceReservations::open(dir.path(), inst.custodian)
+        .unwrap()
+        .with_admission(registry)
+        .with_pool_admin();
+    target
+        .initialize_pool_v1(
+            &admin,
+            ResourcePoolV1 {
+                pool: inst.pool(10),
+                admission: AdmissionRequirementV1::Policy {
+                    policy,
+                    min_grade: AdmissionGradeV0::Rehearsal,
+                },
+            },
+        )
+        .unwrap();
+    (dir, target, admin)
+}
+
+/// Valid institutional evidence for `request` (the honest electorate).
+fn admission_for(inst: &Institution, request: &ReservationRequestV0) -> InstitutionalEvidenceV0 {
+    let (log, fourth) = honest_history(inst);
+    InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), &fourth], request),
+        recognitions: members_and(inst, &[&fourth]),
+    }
+}
+
+/// V0 identities bind only the domain and context; V1 identities also commit to the governing
+/// rules and the recognition requirement, and never coincide with a V0 identity.
+#[test]
+fn v1_policy_identity_commits_to_rules_and_recognition_and_is_distinct_from_v0() {
+    let inst = Institution::new(DOMAIN);
+    let rehearsal = inst.trust(2, None);
+    let production = production_trust(&inst);
+    let weaker = weaker_rules_trust(&inst);
+    let v0 = InstitutionalAdmissionVerifierV0::policy_ref;
+    let v1 = InstitutionalAdmissionVerifierV0::policy_ref_v1;
+
+    // V0 conflates all three anchors: that is the gap V1 closes.
+    assert_eq!(v0(&rehearsal), v0(&production));
+    assert_eq!(v0(&rehearsal), v0(&weaker));
+    // V1 separates the recognition requirement and the rules.
+    assert_ne!(v1(&rehearsal), v1(&production));
+    assert_ne!(v1(&rehearsal), v1(&weaker));
+    assert_ne!(v1(&production), v1(&weaker));
+    for anchor in [&rehearsal, &production, &weaker] {
+        assert_eq!(v0(anchor).version, 0);
+        assert_eq!(v1(anchor).version, 1);
+        assert_ne!(v0(anchor).id, v1(anchor).id);
+    }
+    // The frontier is not bound: the custodian may advance it without redeclaring.
+    assert_eq!(v1(&rehearsal), v1(&inst.trust(3, None)));
+    // A verifier reports exactly the identity of its configured version.
+    use icn_authz_store::CustodianAdmissionVerifierV0;
+    assert_eq!(
+        verifier(&rehearsal, InstitutionalAdmissionPolicyVersion::V0).policy(),
+        v0(&rehearsal)
+    );
+    assert_eq!(
+        verifier(&rehearsal, InstitutionalAdmissionPolicyVersion::V1).policy(),
+        v1(&rehearsal)
+    );
+    assert_eq!(
+        InstitutionalAdmissionVerifierV0::new(rehearsal.clone()).policy(),
+        v0(&rehearsal)
+    );
+}
+
+/// The store consults only the verifier installed under the exact reference the pool declares.
+/// A refusal by it is final: an installed V0 verifier that would admit is never tried.
+#[test]
+fn a_v1_pool_consults_only_its_exact_verifier_and_never_falls_back() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let rehearsal = inst.trust(2, None);
+    let production = production_trust(&inst);
+    use InstitutionalAdmissionPolicyVersion::{V0, V1};
+    let v1 = InstitutionalAdmissionVerifierV0::policy_ref_v1;
+
+    // Failed V1 verification (production recognition refuses rehearsal evidence), with a V0
+    // verifier that WOULD admit this evidence installed beside it.
+    let (_d, target, _) = store_with(
+        &inst,
+        vec![verifier(&rehearsal, V0), verifier(&production, V1)],
+        v1(&production),
+    );
+    let result = reserve_admitted(&target, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionRefused(_))),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+
+    // A V1 pool whose exact verifier is absent fails closed, even with the same anchor's V0
+    // verifier installed.
+    let (_d, target, _) = store_with(&inst, vec![verifier(&rehearsal, V0)], v1(&rehearsal));
+    let result = reserve_admitted(&target, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionUnavailable(_))),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+
+    // Downgrade by configuration: the pool requires production recognition; a custodian that
+    // installs only a rehearsal-permitting V1 verifier has none for the pool's identity.
+    let (_d, target, _) = store_with(&inst, vec![verifier(&rehearsal, V1)], v1(&production));
+    let result = reserve_admitted(&target, &evidence, &request);
+    assert!(
+        matches!(result, Err(ReservationError::AdmissionUnavailable(_))),
+        "{result:?}"
+    );
+    untouched(&target, &inst, OP);
+
+    // The exact V1 verifier admits once.
+    let (_d, target, _) = store_with(&inst, vec![verifier(&rehearsal, V1)], v1(&rehearsal));
+    let record = reserve_admitted(&target, &evidence, &request).unwrap();
+    assert_eq!((record.available_before, record.available_after), (10, 6));
+}
+
+/// A malformed or unknown policy version or identity is never interpreted: with no verifier
+/// installed under it, admission fails closed and nothing changes.
+#[test]
+fn an_unknown_or_malformed_policy_identity_fails_closed() {
+    let inst = Institution::new(DOMAIN);
+    let (evidence, request) = valid_admission(&inst);
+    let rehearsal = inst.trust(2, None);
+    use InstitutionalAdmissionPolicyVersion::{V0, V1};
+    let v1 = InstitutionalAdmissionVerifierV0::policy_ref_v1(&rehearsal);
+    for malformed in [
+        AdmissionPolicyRefV0 { version: 2, ..v1 },
+        AdmissionPolicyRefV0 { version: 0, ..v1 },
+        AdmissionPolicyRefV0 {
+            id: InstitutionalAdmissionVerifierV0::policy_ref(&rehearsal).id,
+            version: 1,
+        },
+        AdmissionPolicyRefV0 {
+            id: [0; 32],
+            version: 1,
+        },
+    ] {
+        let (_d, target, _) = store_with(
+            &inst,
+            vec![verifier(&rehearsal, V0), verifier(&rehearsal, V1)],
+            malformed,
+        );
+        let result = reserve_admitted(&target, &evidence, &request);
+        assert!(
+            matches!(result, Err(ReservationError::AdmissionUnavailable(_))),
+            "{malformed:?}: {result:?}"
+        );
+        untouched(&target, &inst, OP);
+    }
+}
+
+/// The custodian migrates a pool from the V0 to the V1 identity. Only its current admin can;
+/// evidence prepared before the change is refused; fresh evidence admits under V1; the
+/// requirement and accounting survive restart.
+#[test]
+fn custodian_redeclares_v0_to_v1_and_stale_evidence_is_refused() {
+    let inst = Institution::new(DOMAIN);
+    let trust = inst.trust(2, None);
+    use InstitutionalAdmissionPolicyVersion::{V0, V1};
+    let v0_ref = InstitutionalAdmissionVerifierV0::policy_ref(&trust);
+    let v1_ref = InstitutionalAdmissionVerifierV0::policy_ref_v1(&trust);
+    let (dir, target, admin) = store_with(
+        &inst,
+        vec![verifier(&trust, V0), verifier(&trust, V1)],
+        v0_ref,
+    );
+    let v1_requirement = AdmissionRequirementV1::Policy {
+        policy: v1_ref,
+        min_grade: AdmissionGradeV0::Rehearsal,
+    };
+    let stale_request = inst.request(OP, 4);
+    let stale = admission_for(&inst, &stale_request);
+
+    // Foreign and revoked admins are refused, and change nothing.
+    let other_dir = tempfile::tempdir().unwrap();
+    let (_other, foreign) = LocalResourceReservations::open(other_dir.path(), inst.custodian)
+        .unwrap()
+        .with_pool_admin();
+    assert_eq!(
+        target.redeclare_pool_requirement(&foreign, inst.ctx, POOL, 0, v1_requirement),
+        Err(ReservationError::PoolAdminMismatch)
+    );
+    let (target, admin) = {
+        let revoked = admin;
+        let (target, current) = target.with_pool_admin();
+        assert_eq!(
+            target.redeclare_pool_requirement(&revoked, inst.ctx, POOL, 0, v1_requirement),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+        (target, current)
+    };
+    assert_eq!(
+        target
+            .inspect_pool_record(inst.ctx, POOL)
+            .unwrap()
+            .unwrap()
+            .admission(),
+        AdmissionRequirementV1::Policy {
+            policy: v0_ref,
+            min_grade: AdmissionGradeV0::Rehearsal
+        }
+    );
+
+    let redeclared = target
+        .redeclare_pool_requirement(&admin, inst.ctx, POOL, 0, v1_requirement)
+        .unwrap();
+    assert_eq!(redeclared.pool.revision, 1);
+    assert_eq!(redeclared.admission, v1_requirement);
+
+    // Evidence prepared under the previous requirement and revision is refused.
+    assert_eq!(
+        reserve_admitted(&target, &stale, &stale_request),
+        Err(ReservationError::StalePool {
+            expected: 0,
+            actual: 1
+        })
+    );
+    untouched(&target, &inst, OP);
+
+    // Fresh evidence for the current revision admits under the V1 identity.
+    let mut current = inst.request(OP, 4);
+    current.expected_pool_revision = 1;
+    let record = reserve_admitted(&target, &admission_for(&inst, &current), &current).unwrap();
+    assert_eq!(
+        (
+            record.available_before,
+            record.available_after,
+            record.pool_revision_after
+        ),
+        (10, 6, 2)
+    );
+    drop(target);
+
+    let reopened = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
+    let stored = reopened
+        .inspect_pool_record(inst.ctx, POOL)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.admission(), v1_requirement);
+    assert_eq!(
+        (stored.pool().revision, stored.pool().available_capacity),
+        (2, 6)
+    );
+    assert!(matches!(
+        reopened.reconcile(inst.ctx, OP).unwrap(),
+        ReservationReconciliation::Committed { .. }
+    ));
+    assert_eq!(
+        reopened.redeclare_pool_requirement(&admin, inst.ctx, POOL, 2, v1_requirement),
+        Err(ReservationError::PoolAdminMismatch)
+    );
 }

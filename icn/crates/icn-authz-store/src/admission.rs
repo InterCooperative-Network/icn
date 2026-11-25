@@ -28,6 +28,13 @@
 //!   a custodian must compare with its own requirement, never treat as idempotent success. The
 //!   capability is in-process only and does not cover raw storage access (see
 //!   [`crate::PoolAdminV0`]).
+//! * **Changing a requirement is custodian-only (Part 8 F3).**
+//!   [`crate::LocalResourceReservations::redeclare_pool_requirement`] takes the same
+//!   `PoolAdminV0` and the pool's current revision, replaces only the requirement, and advances
+//!   the revision in one transaction. An admission verified under the previous requirement is
+//!   refused at commit, because the commit compares the exact policy reference read in its own
+//!   transaction. There is no fallback between policy versions: the store consults only the
+//!   verifier installed under the exact reference the pool declares.
 //! * **Not a storage-integrity mechanism.** Anyone with raw write access to the underlying
 //!   database can rewrite or delete a pool record, including replacing a policy pool with a
 //!   generic one. The API gate prevents the *caller* from choosing weaker admission; it does not

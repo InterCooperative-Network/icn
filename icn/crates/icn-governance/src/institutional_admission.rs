@@ -102,6 +102,31 @@ pub enum RecognitionRequirement {
     ProductionGrade,
 }
 
+/// Canonical tag of [`RecognitionRequirement::RehearsalPermitted`] (maintainer decision D-F3a).
+pub const RECOGNITION_REHEARSAL_TAG: u8 = 0x01;
+/// Canonical tag of [`RecognitionRequirement::ProductionGrade`] (maintainer decision D-F3a).
+pub const RECOGNITION_PRODUCTION_TAG: u8 = 0x02;
+
+impl RecognitionRequirement {
+    /// The canonical one-byte tag committed into the V1 admission-policy identity.
+    pub fn tag(self) -> u8 {
+        match self {
+            RecognitionRequirement::RehearsalPermitted => RECOGNITION_REHEARSAL_TAG,
+            RecognitionRequirement::ProductionGrade => RECOGNITION_PRODUCTION_TAG,
+        }
+    }
+
+    /// Strict inverse of [`Self::tag`]. Every other value, including `0x00`, is refused: an
+    /// unknown tag is never read as rehearsal or as any other requirement.
+    pub fn from_tag(tag: u8) -> Option<Self> {
+        match tag {
+            RECOGNITION_REHEARSAL_TAG => Some(RecognitionRequirement::RehearsalPermitted),
+            RECOGNITION_PRODUCTION_TAG => Some(RecognitionRequirement::ProductionGrade),
+            _ => None,
+        }
+    }
+}
+
 /// How strong the recognition behind an admitted electorate is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Legitimacy {
@@ -535,6 +560,54 @@ pub const INSTITUTIONAL_ADMISSION_POLICY_DOMAIN: &[u8] =
 /// Version of the institutional admission policy implemented here.
 pub const INSTITUTIONAL_ADMISSION_POLICY_VERSION: u32 = 0;
 
+/// Domain separator for [`InstitutionalAdmissionVerifierV0::policy_ref_v1`] (Part 8 F3).
+pub const INSTITUTIONAL_ADMISSION_POLICY_V1_DOMAIN: &[u8] =
+    b"icn.governance.institutional-admission-policy.v1";
+/// Version of the V1 institutional admission policy identity.
+pub const INSTITUTIONAL_ADMISSION_POLICY_V1_VERSION: u32 = 1;
+
+/// Which admission-policy identity a verifier answers to (maintainer decision D-F3b).
+///
+/// Fixed by the custodian when it constructs the verifier. A verifier configured for one version
+/// reports exactly one policy reference and is installed under exactly that reference, so a pool
+/// selects it only by declaring that exact reference. There is no fallback between versions and
+/// no trial of several versions: a refusal by the selected verifier is final.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstitutionalAdmissionPolicyVersion {
+    /// Binds the governance domain and the authority context only.
+    V0,
+    /// Additionally binds the anchor's governing rules and its recognition requirement.
+    V1,
+}
+
+/// The V1 policy identity preimage (design-spec Part 8 F3):
+///
+/// `SHA-256(lp(tag) || lp(D) || C || u32be(n) || rule_hash_1 .. rule_hash_n || u8 recognition)`
+///
+/// where `lp(x) = u32be(len x) || x`, the rule hashes are sorted ascending, and `recognition` is
+/// the D-F3a tag. The frontier is excluded so the custodian can advance it.
+fn policy_id_v1(
+    domain: &GovernanceDomainId,
+    context: ContextRef,
+    rule_hashes: &[[u8; 32]],
+    recognition: RecognitionRequirement,
+) -> [u8; 32] {
+    let mut sorted = rule_hashes.to_vec();
+    sorted.sort_unstable();
+    let mut h = Sha256::new();
+    h.update((INSTITUTIONAL_ADMISSION_POLICY_V1_DOMAIN.len() as u32).to_be_bytes());
+    h.update(INSTITUTIONAL_ADMISSION_POLICY_V1_DOMAIN);
+    h.update((domain.0.len() as u32).to_be_bytes());
+    h.update(domain.0.as_bytes());
+    h.update(context.0);
+    h.update((sorted.len() as u32).to_be_bytes());
+    for rule_hash in &sorted {
+        h.update(rule_hash);
+    }
+    h.update([recognition.tag()]);
+    h.finalize().into()
+}
+
 /// The caller's untrusted input to [`InstitutionalAdmissionVerifierV0`]: the recognitions of the
 /// electorate. Passed to the store opaquely as the reservation `supplement`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -551,11 +624,25 @@ pub struct InstitutionalSupplementV0 {
 #[derive(Debug, Clone)]
 pub struct InstitutionalAdmissionVerifierV0 {
     anchor: InstitutionalTrustAnchorV0,
+    version: InstitutionalAdmissionPolicyVersion,
 }
 
 impl InstitutionalAdmissionVerifierV0 {
+    /// A verifier answering to the V0 policy identity ([`Self::policy_ref`]).
     pub fn new(anchor: InstitutionalTrustAnchorV0) -> Self {
-        Self { anchor }
+        Self::with_policy_version(anchor, InstitutionalAdmissionPolicyVersion::V0)
+    }
+
+    /// A verifier answering to exactly one policy identity version, chosen by the custodian.
+    pub fn with_policy_version(
+        anchor: InstitutionalTrustAnchorV0,
+        version: InstitutionalAdmissionPolicyVersion,
+    ) -> Self {
+        Self { anchor, version }
+    }
+
+    pub fn policy_version(&self) -> InstitutionalAdmissionPolicyVersion {
+        self.version
     }
 
     pub fn anchor(&self) -> &InstitutionalTrustAnchorV0 {
@@ -578,6 +665,32 @@ impl InstitutionalAdmissionVerifierV0 {
         AdmissionPolicyRefV0 {
             id: h.finalize().into(),
             version: INSTITUTIONAL_ADMISSION_POLICY_VERSION,
+        }
+    }
+
+    /// The V1 policy identity (Part 8 F3): the V0 bindings plus the anchor's governing rules (as
+    /// a sorted set of rule hashes) and its recognition requirement. A weaker rule set or a
+    /// downgraded recognition requirement therefore yields a different identity, which a pool
+    /// declaring the stronger one refuses at commit. Distinct from every V0 identity by its
+    /// domain separator and its version.
+    pub fn policy_ref_v1(anchor: &InstitutionalTrustAnchorV0) -> AdmissionPolicyRefV0 {
+        let rule_hashes: Vec<[u8; 32]> = anchor.rules.iter().map(|r| r.rule_hash()).collect();
+        AdmissionPolicyRefV0 {
+            id: policy_id_v1(
+                &anchor.domain,
+                anchor.context,
+                &rule_hashes,
+                anchor.recognition,
+            ),
+            version: INSTITUTIONAL_ADMISSION_POLICY_V1_VERSION,
+        }
+    }
+
+    /// The single policy identity this verifier answers to, per its configured version.
+    pub fn configured_policy_ref(&self) -> AdmissionPolicyRefV0 {
+        match self.version {
+            InstitutionalAdmissionPolicyVersion::V0 => Self::policy_ref(&self.anchor),
+            InstitutionalAdmissionPolicyVersion::V1 => Self::policy_ref_v1(&self.anchor),
         }
     }
 
@@ -610,7 +723,7 @@ impl InstitutionalAdmissionVerifierV0 {
 
 impl CustodianAdmissionVerifierV0 for InstitutionalAdmissionVerifierV0 {
     fn policy(&self) -> AdmissionPolicyRefV0 {
-        Self::policy_ref(&self.anchor)
+        self.configured_policy_ref()
     }
 
     fn preflight(
@@ -627,5 +740,126 @@ impl CustodianAdmissionVerifierV0 for InstitutionalAdmissionVerifierV0 {
         };
         self.verify(evidence, supplement, target, now)
             .map(|(_, admitted)| admitted)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const D: &str = "icn.test.domain";
+    const C: ContextRef = ContextRef([0xC0; 32]);
+    const R1: [u8; 32] = [0x11; 32];
+    const R2: [u8; 32] = [0x22; 32];
+
+    fn domain() -> GovernanceDomainId {
+        GovernanceDomainId(D.into())
+    }
+
+    fn hex(bytes: [u8; 32]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    #[test]
+    fn recognition_tags_are_canonical_and_unknown_tags_are_refused() {
+        assert_eq!(RecognitionRequirement::RehearsalPermitted.tag(), 0x01);
+        assert_eq!(RecognitionRequirement::ProductionGrade.tag(), 0x02);
+        for requirement in [
+            RecognitionRequirement::RehearsalPermitted,
+            RecognitionRequirement::ProductionGrade,
+        ] {
+            assert_eq!(
+                RecognitionRequirement::from_tag(requirement.tag()),
+                Some(requirement)
+            );
+        }
+        for unknown in (0..=u8::MAX).filter(|t| *t != 0x01 && *t != 0x02) {
+            assert_eq!(
+                RecognitionRequirement::from_tag(unknown),
+                None,
+                "{unknown:#04x}"
+            );
+        }
+    }
+
+    /// Independent reference: `tests/reference/admission_policy_v1_reference.py` (same inputs).
+    #[test]
+    fn policy_id_v1_golden_vectors() {
+        let rehearsal = policy_id_v1(
+            &domain(),
+            C,
+            &[R2, R1],
+            RecognitionRequirement::RehearsalPermitted,
+        );
+        let production = policy_id_v1(
+            &domain(),
+            C,
+            &[R1, R2],
+            RecognitionRequirement::ProductionGrade,
+        );
+        let single = policy_id_v1(
+            &domain(),
+            C,
+            &[R1],
+            RecognitionRequirement::RehearsalPermitted,
+        );
+        assert_eq!(hex(rehearsal), GOLDEN_REHEARSAL);
+        assert_eq!(hex(production), GOLDEN_PRODUCTION);
+        assert_eq!(hex(single), GOLDEN_SINGLE);
+    }
+
+    const GOLDEN_REHEARSAL: &str =
+        "6f0f5a428d44775a28a1388bafe7f77dcbba9d71c65eff14e0b0c8348a333ed4";
+    const GOLDEN_PRODUCTION: &str =
+        "a4237538be5971b5d949ccbeba45d0c340345bbab5af667e37973b92ce558abd";
+    const GOLDEN_SINGLE: &str = "b03ebb487c27dd9ddd726e33d64f48f989cab506fbb5c550037b756894908c34";
+
+    #[test]
+    fn policy_id_v1_binds_every_field_and_ignores_rule_order() {
+        let base = policy_id_v1(
+            &domain(),
+            C,
+            &[R1, R2],
+            RecognitionRequirement::ProductionGrade,
+        );
+        assert_eq!(
+            base,
+            policy_id_v1(
+                &domain(),
+                C,
+                &[R2, R1],
+                RecognitionRequirement::ProductionGrade
+            )
+        );
+        let variants = [
+            policy_id_v1(
+                &domain(),
+                C,
+                &[R1, R2],
+                RecognitionRequirement::RehearsalPermitted,
+            ),
+            policy_id_v1(&domain(), C, &[R1], RecognitionRequirement::ProductionGrade),
+            policy_id_v1(
+                &domain(),
+                C,
+                &[R1, [0x23; 32]],
+                RecognitionRequirement::ProductionGrade,
+            ),
+            policy_id_v1(
+                &GovernanceDomainId("icn.test.domaim".into()),
+                C,
+                &[R1, R2],
+                RecognitionRequirement::ProductionGrade,
+            ),
+            policy_id_v1(
+                &domain(),
+                ContextRef([0xC1; 32]),
+                &[R1, R2],
+                RecognitionRequirement::ProductionGrade,
+            ),
+        ];
+        for (i, variant) in variants.iter().enumerate() {
+            assert_ne!(*variant, base, "variant {i} collides");
+        }
     }
 }
