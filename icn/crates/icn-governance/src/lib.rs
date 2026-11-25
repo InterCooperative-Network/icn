@@ -62,6 +62,8 @@ pub mod membership;
 pub mod message;
 #[allow(missing_docs)]
 pub mod power_diff;
+/// Pure predecessor-seal lifecycle model (ADR-0092 §2; EXPERIMENTAL, unratified).
+pub mod predecessor_seal;
 pub mod profile;
 pub mod proof;
 #[allow(missing_docs)]

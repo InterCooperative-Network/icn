@@ -467,6 +467,7 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.governance.cutover-roster.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/cutover.rs", "icn/crates/icn-governance/tests/reference/cutover_commitment_reference.py"]),
     d(b"icn.governance.cutover.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/cutover.rs", "icn/crates/icn-governance/tests/reference/cutover_commitment_reference.py"]),
     d(b"icn.governance.institutional-admission-policy.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/institutional_admission.rs"]),
+    d(b"icn.governance.predecessor-final-set.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/predecessor_seal.rs", "icn/crates/icn-governance/tests/reference/predecessor_final_set_reference.py"]),
     d(b"icn.governance.served-domain.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/domain.rs"]),
     d(b"icn.governance.threshold-rule.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/authz_threshold.rs"]),
     d(b"icn.n1.authority-receipt.decisions.v1\0", Sha256, Raw, Production, &["icn/crates/icn-core/src/authority_registry.rs"]),
