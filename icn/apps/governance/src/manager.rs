@@ -4776,6 +4776,12 @@ impl GovernanceManager {
     /// effect "not durably recorded" in that case — the HTTP handler logs
     /// accordingly). Backend write failures are returned — the caller
     /// decides whether to escalate or degrade.
+    ///
+    /// **Test-only.** It writes a record with no deduplication and no decision
+    /// check, so in production it could mint closure evidence for a proposal
+    /// that was never accepted. Production code emits through
+    /// [`crate::institutional_effect::emit_accepted_effect`].
+    #[cfg(test)]
     pub fn record_institutional_effect(
         &self,
         record: &InstitutionalEffectRecord,
