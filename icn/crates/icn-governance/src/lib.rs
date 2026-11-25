@@ -40,6 +40,8 @@ pub mod charter;
 #[allow(missing_docs)]
 pub mod charter_store;
 pub mod config;
+/// Successor-domain cutover commitment (ADR-0092 §3; EXPERIMENTAL, unratified).
+pub mod cutover;
 #[allow(missing_docs)]
 pub mod delegation;
 #[allow(missing_docs)]
