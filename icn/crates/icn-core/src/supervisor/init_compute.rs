@@ -3,6 +3,7 @@
 //! This module extracts the compute actor setup from the supervisor,
 //! providing a cleaner separation of concerns for distributed compute.
 
+use icn_compute::ComputeActor;
 use icn_identity::Did;
 use icn_kernel_api::services::TrustService;
 use std::sync::Arc;
@@ -37,8 +38,8 @@ pub struct ComputeDeps {
     pub store_path: std::path::PathBuf,
     /// Contract registry for CclRef resolution (optional)
     pub contract_registry: Option<icn_ccl::ContractRegistryHandle>,
-    /// Governance policy thresholds for commons pool admission and cost estimation
-    pub policy_config: crate::config::ComputePolicyConfig,
+    /// The daemon's `[compute]` configuration, applied by [`configure_compute_actor`]
+    pub compute_config: crate::config::ComputeConfig,
     /// Handle to the receipt clearing queue for cross-entity clearing (optional).
     /// When set, a `FederationClearingCallback` is wired so that federated task
     /// completions are queued for periodic batch settlement.
@@ -291,6 +292,69 @@ pub async fn subscribe_compute_topics(gossip: &mut icn_gossip::GossipActor, did:
     }
 }
 
+/// Apply the daemon's `[compute]` configuration to a not-yet-spawned compute actor.
+///
+/// This is the one place `ComputeConfig` reaches the actor: [`init_compute_services`] calls it
+/// before `spawn()`, and the configuration-wiring tests call it too, so they exercise the
+/// production path rather than a test-only setter. It runs before spawn because the actor's
+/// setters take `&mut self`; a spawned actor never handles a task with a stale region.
+///
+/// Applies `compute.policy` and `compute.region`. The region is applied verbatim; `None` leaves
+/// the actor without a region, so it refuses every region-constrained task (fail closed). The
+/// region grammar is re-checked here, so a caller that skipped `Config::validate` gets an error
+/// and an unconfigured actor rather than an unvalidated region. The remaining fields
+/// (`max_concurrent_tasks`, `verification`, `actor_model_enabled`, `max_actors`) are not applied
+/// here (#2920 non-goal).
+///
+/// The region is an operator assertion, not authenticated geography; see
+/// [`crate::config::ComputeConfig::region`].
+pub fn configure_compute_actor(
+    actor: &mut ComputeActor,
+    config: &crate::config::ComputeConfig,
+) -> anyhow::Result<()> {
+    if let Some(region) = &config.region {
+        crate::config::validate_compute_region(region).map_err(|e| anyhow::anyhow!(e))?;
+    }
+
+    // Governance policy thresholds.
+    // min_standing, fuel_cost_divisor, credit_ceiling, and preemptable_priorities
+    // go into CommonsPoolPolicy (submission gate + preemption control).
+    // min_trust_score goes into SybilPolicy (pool admission gate).
+    let policy = &config.policy;
+    actor.set_commons_pool_policy(icn_compute::CommonsPoolPolicy {
+        min_standing: policy.min_standing,
+        fuel_cost_divisor: policy.fuel_cost_divisor,
+        credit_ceiling: policy.credit_ceiling,
+        preemptable_priorities: policy.preemptable_priorities.clone(),
+        ..icn_compute::CommonsPoolPolicy::default()
+    });
+    actor.set_commons_sybil_policy(icn_compute::SybilPolicy {
+        min_trust_score: policy.min_trust_score,
+        ..icn_compute::SybilPolicy::default()
+    });
+    info!(
+        "Policy manager initialized (min_standing={}, min_trust_score={}, fuel_cost_divisor={}, credit_ceiling={:?}, preemptable_priorities={:?})",
+        policy.min_standing,
+        policy.min_trust_score,
+        policy.fuel_cost_divisor,
+        policy.credit_ceiling,
+        policy.preemptable_priorities
+    );
+
+    // Operator-asserted compute region (#2920).
+    match &config.region {
+        Some(region) => {
+            actor.set_region(region.clone());
+            info!(
+                "Compute region set to {:?} (operator-asserted, not verified)",
+                region
+            );
+        }
+        None => info!("No compute region configured; region-constrained tasks will be refused"),
+    }
+    Ok(())
+}
+
 /// Initialize the compute actor and related services
 ///
 /// This sets up the compute actor with all required callbacks:
@@ -306,8 +370,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     let trust_callback = create_trust_callback(deps.trust_service.clone());
 
     // Create compute actor
-    let mut compute_actor =
-        icn_compute::ComputeActor::new(deps.own_did.to_string(), trust_callback);
+    let mut compute_actor = ComputeActor::new(deps.own_did.to_string(), trust_callback);
 
     // Set up send callback
     let send_callback = create_send_callback(deps.gossip_handle.clone());
@@ -349,33 +412,8 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     let policy_manager = Arc::new(icn_compute::PolicyManager::new(usage_tracker.clone()));
     compute_actor.set_policy_manager(policy_manager.clone());
 
-    // Apply governance policy thresholds from config.
-    // min_standing, fuel_cost_divisor, credit_ceiling, and preemptable_priorities
-    // go into CommonsPoolPolicy (submission gate + preemption control).
-    // min_trust_score goes into SybilPolicy (pool admission gate).
-    let commons_pool_policy = icn_compute::CommonsPoolPolicy {
-        min_standing: deps.policy_config.min_standing,
-        fuel_cost_divisor: deps.policy_config.fuel_cost_divisor,
-        credit_ceiling: deps.policy_config.credit_ceiling,
-        preemptable_priorities: deps.policy_config.preemptable_priorities.clone(),
-        ..icn_compute::CommonsPoolPolicy::default()
-    };
-    compute_actor.set_commons_pool_policy(commons_pool_policy);
-
-    let sybil_policy = icn_compute::SybilPolicy {
-        min_trust_score: deps.policy_config.min_trust_score,
-        ..icn_compute::SybilPolicy::default()
-    };
-    compute_actor.set_commons_sybil_policy(sybil_policy);
-
-    info!(
-        "Policy manager initialized (min_standing={}, min_trust_score={}, fuel_cost_divisor={}, credit_ceiling={:?}, preemptable_priorities={:?})",
-        deps.policy_config.min_standing,
-        deps.policy_config.min_trust_score,
-        deps.policy_config.fuel_cost_divisor,
-        deps.policy_config.credit_ceiling,
-        deps.policy_config.preemptable_priorities
-    );
+    // Apply the operator's [compute] configuration before the actor spawns.
+    configure_compute_actor(&mut compute_actor, &deps.compute_config)?;
 
     // Spawn DisputeActor with shared system
     let dispute_store_path = deps.store_path.join("disputes");
@@ -505,6 +543,31 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #2920: a caller that skipped `Config::validate` cannot push an invalid region into the
+    /// actor; configuration fails instead.
+    #[test]
+    fn issue2920_configure_refuses_an_unvalidated_region() {
+        for bad in ["", " eu-central", "eu central", "eu/central"] {
+            let mut actor =
+                ComputeActor::new("did:icn:configure-test".into(), Arc::new(|_: &str| 1.0));
+            let config = crate::config::ComputeConfig {
+                region: Some(bad.into()),
+                ..Default::default()
+            };
+            assert!(
+                configure_compute_actor(&mut actor, &config).is_err(),
+                "{bad:?} must be refused"
+            );
+        }
+        let mut actor = ComputeActor::new("did:icn:configure-test".into(), Arc::new(|_: &str| 1.0));
+        let config = crate::config::ComputeConfig {
+            region: Some("eu-central".into()),
+            ..Default::default()
+        };
+        assert!(configure_compute_actor(&mut actor, &config).is_ok());
+        assert!(configure_compute_actor(&mut actor, &Default::default()).is_ok());
+    }
 
     #[test]
     fn test_compute_deps_clone() {

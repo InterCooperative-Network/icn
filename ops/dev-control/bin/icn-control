@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# icn-control — open the ICN Development Control Center.
+#
+#   icn-control              open it in a persistent tmux session named 'icn-control'
+#                            (re-attaches if it is already running; never starts a second one)
+#   icn-control --here       run it directly in this terminal (no tmux)
+#   icn-control --report     print a plain-text report and exit (no terminal UI)
+#   icn-control --json       print the reconciled views as JSON and exit
+#   icn-control --inventory  print counts of sessions, worktrees and activities (JSON) and exit
+#   icn-control --status     say whether the control-center tmux session is running
+#   icn-control --restart    stop ONLY the control center's own tmux session, then open it again
+#   icn-control --return-key-status     is F12 free, already the "back to control center" key, or taken?
+#   icn-control --enable-return-key     opt in: F12 jumps back to the control center from any tmux session
+#   icn-control --disable-return-key    remove that F12 binding (only if it is ours)
+#   icn-control --help
+#
+# The control center observes and navigates. It starts a Claude session only through icn-session,
+# only when you choose Resume/Open and confirm, and it never stops, deletes or merges anything.
+set -euo pipefail
+
+SESSION="icn-control"
+self="$(readlink -f -- "${BASH_SOURCE[0]}")"
+here="$(dirname -- "$self")"
+
+# Code location: a repo checkout (bin/../icn_control) or an installed release
+# (<prefix>/bin/icn-control -> <prefix>/share/icn-control/current).
+if [[ -n "${ICN_CONTROL_HOME:-}" ]]; then
+  code="$ICN_CONTROL_HOME"
+elif [[ -d "$here/../icn_control" ]]; then
+  code="$(cd -- "$here/.." && pwd)"
+else
+  code="$(cd -- "$here/../share/icn-control/current" 2>/dev/null && pwd -P)" || {
+    echo "icn-control: no installed release found under $here/../share/icn-control/current" >&2
+    echo "             reinstall with ops/dev-control/install.sh from an icn worktree" >&2
+    exit 2
+  }
+fi
+
+# Isolated mode (-I): ignore PYTHONPATH/PYTHON* env, user site-packages, and never put the caller's
+# current directory on sys.path. The only import root is the resolved code directory.
+PYBOOT='import sys; sys.path.insert(0, sys.argv.pop(1)); from icn_control.__main__ import main; sys.exit(main(sys.argv[1:]))'
+py() { cd -- "$code" && exec python3 -I -c "$PYBOOT" "$code" "$@"; }
+
+is_ours() {  # is the existing tmux session really the control center (not someone else's)?
+  [[ "$(tmux show-options -qv -t "=$SESSION:" @icn_control 2>/dev/null || true)" == "1" ]]
+}
+
+open_tmux() {
+  if ! command -v tmux >/dev/null 2>&1; then
+    echo "icn-control: tmux not installed; running in this terminal instead." >&2
+    py
+  fi
+  if tmux has-session -t "=$SESSION" 2>/dev/null; then
+    if ! is_ours; then
+      echo "icn-control: a tmux session named '$SESSION' exists but was not created by icn-control." >&2
+      echo "             Not touching it. Use: icn-control --here" >&2
+      exit 4
+    fi
+  else
+    # The UI runs inside tmux so it survives SSH drops. If it ever exits with an error,
+    # keep the message on screen instead of letting the window vanish.
+    local cmd pfx
+    printf -v cmd 'python3 -I -c %q %q || { echo; echo "icn-control exited with an error (above). Press Enter to close."; read -r _; }' "$PYBOOT" "$code"
+    # Session and ownership marker are created in one tmux command, so no other caller can
+    # ever observe an unmarked 'icn-control' session that we made.
+    tmux new-session -d -s "$SESSION" -n control -c "$code" -x "${COLUMNS:-200}" -y "${LINES:-50}" "$cmd" \; \
+      set-option -t "=$SESSION:" @icn_control 1
+    # The prefix is read after the server is certainly running (e.g. first start after a reboot).
+    pfx="$(tmux show-options -gv prefix 2>/dev/null || true)"; pfx="${pfx/C-/Ctrl-}"; pfx="${pfx:-prefix}"
+    tmux set-option -t "=$SESSION:" status-right " $pfx d: leave running · $pfx s: sessions " \; \
+      set-option -t "=$SESSION:" status-right-length 60 || true
+  fi
+  if [[ -n "${TMUX:-}" ]]; then
+    exec tmux switch-client -t "=$SESSION"
+  fi
+  exec tmux attach-session -t "=$SESSION"
+}
+
+case "${1:-}" in
+  ""|--open)
+    if [[ ! -t 0 || ! -t 1 ]]; then
+      echo "icn-control: needs an interactive terminal (from Windows use: ssh -t ...). For text output: icn-control --report" >&2
+      exit 2
+    fi
+    open_tmux ;;
+  --here) shift; py "$@" ;;
+  --report|--json|--inventory) py "$@" ;;
+  --status)
+    if tmux has-session -t "=$SESSION" 2>/dev/null && is_ours; then
+      echo "running (tmux session '$SESSION', attached clients: $(tmux display-message -p -t "=$SESSION:" '#{session_attached}'))"
+    else
+      echo "not running"
+    fi ;;
+  --restart)
+    if tmux has-session -t "=$SESSION" 2>/dev/null; then
+      is_ours || { echo "icn-control: '$SESSION' is not ours; refusing to stop it" >&2; exit 4; }
+      tmux kill-session -t "=$SESSION"
+    fi
+    [[ -t 0 && -t 1 ]] || { echo "stopped; run icn-control from a terminal to reopen"; exit 0; }
+    open_tmux ;;
+  --version) py --version ;;
+  --return-key-status|--enable-return-key|--disable-return-key)
+    # Opt-in only. Binds in the RUNNING tmux server (not ~/.tmux.conf); it is gone after tmux restarts.
+    # Refuses to replace any existing F12 binding; removes only the binding this command installed.
+    command -v tmux >/dev/null 2>&1 || { echo "tmux not installed" >&2; exit 2; }
+    tmux has-session 2>/dev/null || { echo "no tmux server is running; open icn-control first" >&2; exit 2; }
+    cur="$(tmux list-keys -T root F12 2>/dev/null || true)"
+    if [[ -z $cur ]]; then state=free
+    elif [[ $cur == *"switch-client -t =$SESSION"* ]]; then state=ours
+    else state=taken; fi
+    case "$1" in
+      --return-key-status)
+        case $state in
+          free)  echo "F12 is free. Opt in with: icn-control --enable-return-key" ;;
+          ours)  echo "F12 returns to the control center (enabled in the running tmux server)." ;;
+          taken) echo "F12 is already bound to something else; it is left alone:"; echo "  $cur" ;;
+        esac ;;
+      --enable-return-key)
+        case $state in
+          ours)  echo "already enabled" ;;
+          taken) echo "refusing: F12 is already bound: $cur" >&2; exit 4 ;;
+          free)  tmux bind-key -T root F12 switch-client -t "=$SESSION"
+                 echo "enabled: F12 now jumps back to the control center from any tmux session."
+                 echo "note: applications inside tmux (including Claude Code) will no longer receive F12."
+                 echo "      This lasts until the tmux server restarts. Undo: icn-control --disable-return-key" ;;
+        esac ;;
+      --disable-return-key)
+        case $state in
+          ours)  tmux unbind-key -T root F12; echo "removed" ;;
+          free)  echo "nothing to remove" ;;
+          taken) echo "refusing: F12 is bound to something else, not by icn-control: $cur" >&2; exit 4 ;;
+        esac ;;
+    esac ;;
+  -h|--help) sed -n '2,18p' "$self" | sed 's/^# \{0,1\}//' ;;
+  *) echo "icn-control: unknown option '$1' (see icn-control --help)" >&2; exit 2 ;;
+esac
