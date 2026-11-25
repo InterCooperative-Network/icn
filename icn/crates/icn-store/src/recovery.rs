@@ -521,6 +521,112 @@ mod tests {
         assert!(j.require_clean().is_err(), "a faulted store admits nothing");
     }
 
+    /// Forwards to a real store and records the order of mutating calls and flushes.
+    struct Recording {
+        inner: SledStore,
+        log: std::sync::Mutex<Vec<&'static str>>,
+    }
+
+    impl Recording {
+        fn take(&self) -> Vec<&'static str> {
+            std::mem::take(&mut *self.log.lock().unwrap())
+        }
+        fn note(&self, op: &'static str) {
+            self.log.lock().unwrap().push(op);
+        }
+    }
+
+    impl Store for Recording {
+        fn get(&self, k: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+            self.inner.get(k)
+        }
+        fn put(&self, k: &[u8], v: &[u8]) -> anyhow::Result<()> {
+            self.note("put");
+            self.inner.put(k, v)
+        }
+        fn delete(&self, k: &[u8]) -> anyhow::Result<()> {
+            self.note("delete");
+            self.inner.delete(k)
+        }
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+            self.note("delete_atomic");
+            self.inner.delete_atomic(keys)
+        }
+        fn compare_and_put(
+            &self,
+            k: &[u8],
+            e: Option<&[u8]>,
+            n: &[u8],
+        ) -> anyhow::Result<CompareAndPut> {
+            self.note("compare_and_put");
+            self.inner.compare_and_put(k, e, n)
+        }
+        fn compare_and_write(
+            &self,
+            e: &[Expectation<'_>],
+            w: &[Mutation<'_>],
+        ) -> anyhow::Result<CompareAndWrite> {
+            self.note("compare_and_write");
+            self.inner.compare_and_write(e, w)
+        }
+        fn flush(&self) -> anyhow::Result<()> {
+            self.note("flush");
+            Store::flush(&self.inner)
+        }
+        fn scan(&self, p: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.inner.scan(p)
+        }
+        fn scan_count(&self, p: &[u8]) -> anyhow::Result<usize> {
+            self.inner.scan_count(p)
+        }
+        fn get_replica_metadata(
+            &self,
+            h: &crate::ContentHash,
+        ) -> anyhow::Result<Option<crate::ReplicaMetadata>> {
+            self.inner.get_replica_metadata(h)
+        }
+        fn put_replica_metadata(&self, m: &crate::ReplicaMetadata) -> anyhow::Result<()> {
+            self.inner.put_replica_metadata(m)
+        }
+        fn list_replica_hashes(&self) -> anyhow::Result<Vec<crate::ContentHash>> {
+            self.inner.list_replica_hashes()
+        }
+    }
+
+    #[test]
+    fn each_step_is_flushed_before_the_next_can_begin() {
+        let s = Recording {
+            inner: SledStore::temporary().unwrap(),
+            log: std::sync::Mutex::new(Vec::new()),
+        };
+        seed(&s);
+        s.take();
+        let j = RecoveryJournal::new(&s, P);
+        let i = intent(1);
+        j.begin(&i).unwrap();
+        assert_eq!(
+            s.take(),
+            ["compare_and_put", "flush"],
+            "intent durable first"
+        );
+        j.apply(&i).unwrap();
+        assert_eq!(
+            s.take(),
+            ["compare_and_write", "flush"],
+            "write durable before completion"
+        );
+        j.complete(&i.txid).unwrap();
+        assert_eq!(s.take(), ["delete", "flush"], "retirement durable");
+        // A conflicting apply writes nothing and therefore flushes nothing.
+        j.begin(&intent(2)).unwrap();
+        s.take();
+        assert!(matches!(
+            j.apply(&intent(2)).unwrap(),
+            CompareAndWrite::Conflict { .. }
+        ));
+        assert_eq!(s.take(), ["compare_and_write"]);
+    }
+
     #[test]
     fn the_intent_encoding_round_trips_and_every_truncation_is_refused() {
         let i = intent(7);
