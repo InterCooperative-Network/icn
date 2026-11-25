@@ -190,7 +190,7 @@ pub fn hash_edge(e: &CapabilityEdge) -> [u8; 32] {
     *hasher.finalize().as_bytes()
 }
 
-/// Deterministic BLAKE3 hash of an edge set (used by [`CapabilityGraph::hash`]).
+/// Deterministic BLAKE3 hash of an edge set (used by [`CapabilityGraph::hash`](crate::model::edge::CapabilityGraph::hash)).
 pub fn hash_edge_set(edges: &[CapabilityEdge]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&[TAG_EDGE_SET]);
