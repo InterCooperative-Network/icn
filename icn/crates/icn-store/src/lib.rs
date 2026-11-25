@@ -19,6 +19,7 @@ pub mod n2a_startup_gate;
 pub mod peer_cache;
 /// Proof-of-storage challenge system
 pub mod pos;
+pub mod recovery;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
