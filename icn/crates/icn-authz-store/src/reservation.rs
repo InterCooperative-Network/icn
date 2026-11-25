@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 
 use crate::admission::{
     AdmissionGradeV0, AdmissionPolicyRefV0, AdmissionRegistryV0, AdmissionRequirementV1,
-    AdmittedUnder, RequirementDowngrade,
+    AdmittedUnder, RequirementDowngrade, MAX_SUPPORTED_ADMISSION_POLICY_VERSION,
 };
 
 const VERSION: u16 = 0;
@@ -90,6 +90,9 @@ pub enum ReservationError {
     /// The custodian-installed verifier refused the evidence.
     #[error("custodian admission verifier refused: {0}")]
     AdmissionRefused(String),
+    /// Pool creation named an admission-policy version this store does not support (F3 F-1).
+    #[error("unsupported admission policy version {0}")]
+    UnsupportedAdmissionPolicyVersion(u32),
     /// An ordinary redeclaration would weaken the pool's stored admission requirement (D-F3c).
     #[error("admission requirement downgrade refused: {0}")]
     RequirementDowngrade(RequirementDowngrade),
@@ -675,6 +678,16 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
         pool: ResourcePoolV1,
     ) -> Result<(), ReservationError> {
         self.authorize_pool_admin(admin)?;
+        // F3 F-1: the typed API never creates a pool at an unsupported policy version. Records
+        // already stored at one are not migrated or reinterpreted; they stay frozen (redeclaration
+        // refuses them) and fail closed at admission (no installed verifier answers to them).
+        if let AdmissionRequirementV1::Policy { policy, .. } = pool.admission {
+            if policy.version > MAX_SUPPORTED_ADMISSION_POLICY_VERSION {
+                return Err(ReservationError::UnsupportedAdmissionPolicyVersion(
+                    policy.version,
+                ));
+            }
+        }
         self.initialize_record(ResourcePoolRecord::V1(pool))
     }
 
@@ -2790,8 +2803,96 @@ mod tests {
         current: AdmissionRequirementV1,
     ) -> (LocalResourceReservations, PoolAdminV0) {
         let (store, admin) = admin_store(dir);
-        store.initialize_pool_v1(&admin, pool_v1(current)).unwrap();
+        match current {
+            AdmissionRequirementV1::Policy { policy, .. }
+                if policy.version > MAX_SUPPORTED_ADMISSION_POLICY_VERSION =>
+            {
+                // A legacy record written before F-1 (or by raw storage): the typed API refuses it.
+                raw_pool_record(&store, pool_v1(current));
+            }
+            _ => store.initialize_pool_v1(&admin, pool_v1(current)).unwrap(),
+        }
         (store, admin)
+    }
+
+    /// Writes a pool record directly to storage, bypassing the typed API (isolated fixture).
+    fn raw_pool_record(store: &LocalResourceReservations, pool: ResourcePoolV1) {
+        let key = pool_key(CTX, TARGET, POOL);
+        let bytes = ResourcePoolRecord::V1(pool).encode().unwrap();
+        assert_eq!(
+            Store::compare_and_put(&store.store, &key, None, &bytes).unwrap(),
+            CompareAndPut::Applied
+        );
+    }
+
+    #[test]
+    fn creation_refuses_unsupported_policy_versions_and_writes_nothing() {
+        use AdmissionGradeV0::Production;
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = admin_store(&dir);
+        for version in [2, 7, u32::MAX] {
+            assert_eq!(
+                store.initialize_pool_v1(&admin, pool_v1(policy(0xA1, version, Production))),
+                Err(ReservationError::UnsupportedAdmissionPolicyVersion(version))
+            );
+            assert_eq!(store.inspect_pool_record(CTX, POOL).unwrap(), None);
+        }
+        // The capability check still comes first.
+        let other = tempfile::tempdir().unwrap();
+        let (_other, foreign) = admin_store(&other);
+        assert_eq!(
+            store.initialize_pool_v1(&foreign, pool_v1(policy(0xA1, 7, Production))),
+            Err(ReservationError::PoolAdminMismatch)
+        );
+        // Supported versions and caller-resolved pools are unaffected.
+        for (pool_id, requirement) in [
+            (0x01, policy(0xA1, 0, Production)),
+            (0x02, policy(0xA1, 1, Production)),
+            (0x03, AdmissionRequirementV1::CallerResolved),
+        ] {
+            let mut pool = pool_v1(requirement);
+            pool.pool.pool_id = [pool_id; 32];
+            store.initialize_pool_v1(&admin, pool).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_stored_unsupported_version_record_is_not_reinterpreted_and_fails_closed() {
+        use AdmissionGradeV0::Production;
+        let dir = tempfile::tempdir().unwrap();
+        let mut registry = AdmissionRegistryV0::new();
+        registry
+            .install(std::sync::Arc::new(NeverCalled(ADMISSION)))
+            .unwrap();
+        registry.install_clock(FixedClock::at(1_000)).unwrap();
+        let (store, admin) = LocalResourceReservations::open(dir.path(), TARGET)
+            .unwrap()
+            .with_admission(registry)
+            .with_pool_admin();
+        let legacy = pool_v1(policy(0xA1, 7, Production));
+        raw_pool_record(&store, legacy.clone());
+        // Read back exactly as stored: no migration, no reinterpretation.
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(legacy.clone()))
+        );
+        // Admission fails closed: no installed verifier answers to version 7.
+        assert!(matches!(
+            store.reserve_admitted(&evidence(1_500), &(), &request()),
+            Err(ReservationError::AdmissionUnavailable(_))
+        ));
+        // Redeclaration refuses it (frozen), and nothing changes.
+        assert_eq!(
+            store.redeclare_pool_requirement(&admin, CTX, POOL, 0, policy(0xA2, 1, Production)),
+            Err(ReservationError::RequirementDowngrade(
+                RequirementDowngrade::OlderPolicyVersion { current: 7, new: 1 }
+            ))
+        );
+        assert_eq!(
+            store.inspect_pool_record(CTX, POOL).unwrap(),
+            Some(ResourcePoolRecord::V1(legacy))
+        );
+        assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
     }
 
     #[test]
