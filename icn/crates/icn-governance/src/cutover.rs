@@ -37,6 +37,20 @@ use icn_identity::authority_log::SubjectId;
 use sha2::{Digest, Sha256};
 
 use crate::domain::GovernanceDomainId;
+use crate::institutional_domain::authority_binding::MAX_BINDING_DOMAIN_ID_BYTES;
+
+/// Largest `L` or `S`, in UTF-8 bytes, that a cutover commitment accepts (decision D-S20-11).
+///
+/// This is the same bound as the P2 authority binding's, by definition rather than by copy, so
+/// one constant governs every versioned institutional representation that names a domain: the
+/// binding, this commitment and the P5b lifecycle record. A commitment the lifecycle record could
+/// not store can therefore never be proposed. [`GovernanceDomainId`] itself stays unbounded, so a
+/// longer legacy domain keeps working; it just cannot enter a cutover. Ids are bytes as given:
+/// nothing is normalized or truncated.
+pub const MAX_CUTOVER_DOMAIN_ID_BYTES: usize = MAX_BINDING_DOMAIN_ID_BYTES;
+
+// The length frame is `u32be`, so the cap must fit in it (it does, by a wide margin).
+const _: () = assert!(MAX_CUTOVER_DOMAIN_ID_BYTES <= u32::MAX as usize);
 
 /// Domain tag of [`genesis_roster_commitment`] (decision D-R6).
 pub const CUTOVER_ROSTER_DOMAIN: &[u8] = b"icn.governance.cutover-roster.v1";
@@ -58,6 +72,10 @@ pub enum CutoverError {
     EmptyDomain,
     #[error("predecessor and successor domain ids are equal")]
     SameDomain,
+    #[error(
+        "a predecessor or successor domain id is longer than {MAX_CUTOVER_DOMAIN_ID_BYTES} bytes"
+    )]
+    DomainTooLong,
     #[error("the roster commitment is the empty roster's: a cutover needs a founding electorate")]
     EmptyRoster,
     #[error("the recognition-map commitment is the all-zero placeholder")]
@@ -149,12 +167,10 @@ impl CutoverCommitmentV1 {
         if self.predecessor.0.is_empty() || self.successor.0.is_empty() {
             return Err(CutoverError::EmptyDomain);
         }
-        if self.predecessor.0.len() > u32::MAX as usize
-            || self.successor.0.len() > u32::MAX as usize
+        if self.predecessor.0.len() > MAX_CUTOVER_DOMAIN_ID_BYTES
+            || self.successor.0.len() > MAX_CUTOVER_DOMAIN_ID_BYTES
         {
-            return Err(CutoverError::Encoding(
-                "domain id exceeds the u32 length frame",
-            ));
+            return Err(CutoverError::DomainTooLong);
         }
         if self.predecessor.0.as_bytes() == self.successor.0.as_bytes() {
             return Err(CutoverError::SameDomain);

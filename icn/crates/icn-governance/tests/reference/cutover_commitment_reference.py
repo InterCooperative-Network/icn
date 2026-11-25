@@ -30,6 +30,8 @@ def roster(context: bytes, standing) -> bytes:
 
 
 def canonical(l: str, s: str, context: bytes, h1: bytes, r: bytes, m: bytes) -> bytes:
+    # D-S20-11: L and S are 1..=1024 UTF-8 bytes (the shared institutional domain-id cap).
+    assert 0 < len(l.encode()) <= 1024 and 0 < len(s.encode()) <= 1024
     return (lp(CUTOVER_TAG) + struct.pack(">H", 1) + lp(l.encode()) + lp(s.encode())
             + context + h1 + r + m)
 
