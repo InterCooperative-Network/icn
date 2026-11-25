@@ -464,6 +464,8 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.gen.initial-device-binding-ref", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.gen.subject-context", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
     d(b"icn.gen.subject-context-ref", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/subject_context.rs", "icn/crates/icn-identity/tests/reference/gen_subject_context_reference.py"]),
+    d(b"icn.governance.cutover-roster.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/cutover.rs", "icn/crates/icn-governance/tests/reference/cutover_commitment_reference.py"]),
+    d(b"icn.governance.cutover.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/cutover.rs", "icn/crates/icn-governance/tests/reference/cutover_commitment_reference.py"]),
     d(b"icn.governance.institutional-admission-policy.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/institutional_admission.rs"]),
     d(b"icn.governance.served-domain.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/domain.rs"]),
     d(b"icn.governance.threshold-rule.v0", Sha256, U32BeLen, Production, &["icn/crates/icn-governance/src/authz_threshold.rs"]),
