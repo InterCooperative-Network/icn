@@ -519,3 +519,6 @@ fn independently_authorized_requests_at_one_revision_require_reauthorization() {
     let state = store.inspect_pool(w.ctx, pool_id).unwrap().unwrap();
     assert_eq!((state.revision, state.available_capacity), (2, 6));
 }
+
+#[path = "support/institutional_reservation_witness.rs"]
+mod institutional_reservation_witness;
