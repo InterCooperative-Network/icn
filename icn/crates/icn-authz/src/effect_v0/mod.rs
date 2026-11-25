@@ -15,7 +15,10 @@
 //! - [`verify_authorization`] — re-derives the verdict; the writer's signature is never trusted
 //!   for truth, only for order and attribution;
 //! - [`admit`] / [`ConsumedSet`] — target, expiry, epoch and one-time consumption;
-//! - [`OutcomeReceiptV0`] — the custodian's signed outcome boundary (no real effect runs).
+//! - [`OutcomeReceiptV0`] — the custodian's signed outcome boundary (no real effect runs);
+//! - [`log`] — the Context Authority Log: standing, rules and writer derived from authorized,
+//!   sequenced transitions instead of writer assertions, with relying-party frontiers and fork
+//!   proofs ([`verify_checkpointed_authorization`]).
 //!
 //! ## Status
 //!
@@ -24,10 +27,19 @@
 //! [`InMemoryConsumedSet`] is not durable replay protection.
 
 mod codec;
+pub mod log;
 mod statements;
 mod verify;
 
 pub use codec::AuthzCodecError;
+pub use log::{
+    apply_entry, find_log_fork, replay_context_log, sign_checkpointed_authorization,
+    transition_subject_matter, verify_checkpointed_authorization, CheckpointedAuthorizationV0,
+    CheckpointedEvidenceV0, ContextStateV0, DecisionAuthorityV0, EntryAuthorityV0, LogCheckpointV0,
+    LogEntryV0, LogForkProofV0, LogRefusal, RelyingFrontierV0, RuleResolver, RuleSlot,
+    SignedLogEntryV0, TransitionV0, VerifiedCheckpointedAuthorization, VerifiedContextLog,
+    CHECKPOINTED_AUTHORIZATION_DOMAIN, LOG_ENTRY_DOMAIN, LOG_TRANSITION_DOMAIN,
+};
 pub use statements::{
     roster_hash, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
     ContextInceptionV0, ContextRef, EffectV0, FounderSignature, InputActV0, OutcomeReceiptV0,

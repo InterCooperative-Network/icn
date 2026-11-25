@@ -10,14 +10,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use ed25519_dalek::SigningKey;
 use icn_identity::authority_log::{DeviceCapability, PrincipalKey, SubjectId};
 use icn_identity::device_authority::VerifiedDeviceAct;
-use icn_identity::evidence_bundle::{verify_evidence_bundle, EvidenceVerifyError};
+use icn_identity::evidence_bundle::{verify_evidence_bundle, EvidenceBundle, EvidenceVerifyError};
 use thiserror::Error;
 
 use super::codec::AuthzCodecError;
 use super::statements::{
     roster_hash, sha256, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
-    ContextInceptionV0, ContextRef, OutcomeReceiptV0, Signed, SignedDesignation, StandingV0,
-    Verdict,
+    ContextInceptionV0, ContextRef, InputActV0, OutcomeReceiptV0, Signed, SignedDesignation,
+    StandingV0, Verdict,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -254,6 +254,53 @@ fn check_writer_statement<T: CanonicalV0>(
     Ok(())
 }
 
+/// The vote path shared by every v0 verifier: `bundles` must be exactly the acts `inputs` lists
+/// (strictly ascending, no duplicate, none missing, none unlisted), and each must pass the
+/// **unchanged** N1 + N4-A verifier at its listed `(subject, position)` with capability `Sign`.
+///
+/// Standing is not checked here; each caller derives eligibility its own way.
+pub(crate) fn verify_input_acts(
+    inputs: &[InputActV0],
+    bundles: &[EvidenceBundle],
+) -> Result<Vec<VerifiedDeviceAct>, AuthzRefusal> {
+    if !inputs.windows(2).all(|w| w[0].act_id < w[1].act_id) {
+        return Err(AuthzRefusal::InputsNotCanonical);
+    }
+    let mut supplied = BTreeMap::new();
+    for bundle in bundles {
+        let act_id = bundle.act().act.act_id();
+        if supplied.insert(act_id, bundle).is_some() {
+            return Err(AuthzRefusal::DuplicateAct(act_id));
+        }
+    }
+    // Supplied ⊆ listed here; listed ⊆ supplied is enforced by the lookup in the loop below.
+    let listed: BTreeSet<[u8; 32]> = inputs.iter().map(|i| i.act_id).collect();
+    if let Some(unlisted) = supplied.keys().find(|id| !listed.contains(*id)) {
+        return Err(AuthzRefusal::UnlistedAct(*unlisted));
+    }
+
+    // Each vote through the unchanged N1 + N4-A verifier, at the writer-signed relying position.
+    let mut acts = Vec::with_capacity(inputs.len());
+    for input in inputs {
+        // A counted act with no supplied bundle (stripped in transit, or never attached).
+        let bundle = supplied
+            .get(&input.act_id)
+            .ok_or(AuthzRefusal::InputActMissing(input.act_id))?;
+        let verified =
+            verify_evidence_bundle(bundle, input.subject, input.position).map_err(|error| {
+                AuthzRefusal::VoteRefused {
+                    act_id: input.act_id,
+                    error,
+                }
+            })?;
+        if verified.act().capability != DeviceCapability::Sign {
+            return Err(AuthzRefusal::WrongCapability(input.act_id));
+        }
+        acts.push(verified);
+    }
+    Ok(acts)
+}
+
 /// Verify an authorization from its evidence alone. No node, store, network or secret.
 ///
 /// `rule` is the verifier's own implementation of the adopted rule (built from
@@ -368,42 +415,7 @@ pub fn verify_authorization(
         return Err(AuthzRefusal::RosterMismatch);
     }
 
-    // The supplied vote set must equal the signed input set.
-    if !auth.inputs_canonical() {
-        return Err(AuthzRefusal::InputsNotCanonical);
-    }
-    let mut supplied = BTreeMap::new();
-    for bundle in &evidence.vote_bundles {
-        let act_id = bundle.act().act.act_id();
-        if supplied.insert(act_id, bundle).is_some() {
-            return Err(AuthzRefusal::DuplicateAct(act_id));
-        }
-    }
-    // Supplied ⊆ listed here; listed ⊆ supplied is enforced by the lookup in the loop below.
-    let listed: BTreeSet<[u8; 32]> = auth.inputs.iter().map(|i| i.act_id).collect();
-    if let Some(unlisted) = supplied.keys().find(|id| !listed.contains(*id)) {
-        return Err(AuthzRefusal::UnlistedAct(*unlisted));
-    }
-
-    // Each vote through the unchanged N1 + N4-A verifier, at the writer-signed relying position.
-    let mut acts = Vec::with_capacity(auth.inputs.len());
-    for input in &auth.inputs {
-        // A counted act with no supplied bundle (stripped in transit, or never attached).
-        let bundle = supplied
-            .get(&input.act_id)
-            .ok_or(AuthzRefusal::InputActMissing(input.act_id))?;
-        let verified =
-            verify_evidence_bundle(bundle, input.subject, input.position).map_err(|error| {
-                AuthzRefusal::VoteRefused {
-                    act_id: input.act_id,
-                    error,
-                }
-            })?;
-        if verified.act().capability != DeviceCapability::Sign {
-            return Err(AuthzRefusal::WrongCapability(input.act_id));
-        }
-        acts.push(verified);
-    }
+    let acts = verify_input_acts(&auth.inputs, &evidence.vote_bundles)?;
 
     // Standing in force, for the rule's role, for every voter.
     let role = rule.required_role();
