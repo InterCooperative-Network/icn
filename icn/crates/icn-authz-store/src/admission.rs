@@ -32,8 +32,12 @@
 //!   [`crate::LocalResourceReservations::redeclare_pool_requirement`] takes the same
 //!   `PoolAdminV0` and the pool's current revision, replaces only the requirement, and advances
 //!   the revision in one transaction. A monotonic protection floor (D-F3c), checked against the
-//!   stored requirement in that transaction, refuses every ordinary downgrade: policy to
-//!   caller-resolved, an older or unsupported policy version, or a lower minimum grade. An admission verified under the previous requirement is
+//!   stored requirement in that transaction, refuses each ordinary downgrade axis: policy to
+//!   caller-resolved, an older or unsupported policy version, or a lower minimum grade. It orders
+//!   the *declared* `(version, grade)` labels of policy references, which a custodian-installed
+//!   verifier reports about itself; it does not rank rule sets by semantic strength, and a
+//!   same-level replacement may name a weaker rule set. A pool created at an unsupported version
+//!   can never be redeclared (every new version would be older or unsupported) and fails closed. An admission verified under the previous requirement is
 //!   refused at commit, because the commit compares the exact policy reference read in its own
 //!   transaction. There is no fallback between policy versions: the store consults only the
 //!   verifier installed under the exact reference the pool declares.
@@ -159,7 +163,7 @@ impl AdmissionRequirementV1 {
                     new: next.version,
                 });
             }
-            if next_grade < current_grade {
+            if next_grade.tag() < current_grade.tag() {
                 return Err(RequirementDowngrade::LowerGrade {
                     current: current_grade,
                     new: next_grade,

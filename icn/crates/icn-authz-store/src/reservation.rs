@@ -2853,6 +2853,57 @@ mod tests {
     }
 
     #[test]
+    fn the_floor_refuses_cross_axis_and_unsupported_stored_versions() {
+        use AdmissionGradeV0::{Production, Rehearsal};
+        for (current, new, why) in [
+            // A version upgrade does not license a grade downgrade.
+            (
+                policy(0xA1, 0, Production),
+                policy(0xA2, 1, Rehearsal),
+                RequirementDowngrade::LowerGrade {
+                    current: Production,
+                    new: Rehearsal,
+                },
+            ),
+            // A stored unsupported version cannot become caller-resolved either.
+            (
+                policy(0xA1, 7, Production),
+                AdmissionRequirementV1::CallerResolved,
+                RequirementDowngrade::ToCallerResolved,
+            ),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let (store, admin) = floor_store(&dir, current);
+            assert_eq!(
+                store.redeclare_pool_requirement(&admin, CTX, POOL, 0, new),
+                Err(ReservationError::RequirementDowngrade(why))
+            );
+            assert_eq!(
+                store.inspect_pool_record(CTX, POOL).unwrap(),
+                Some(ResourcePoolRecord::V1(pool_v1(current)))
+            );
+        }
+        // Precedence: a stale revision is reported before the floor; neither writes.
+        let dir = tempfile::tempdir().unwrap();
+        let (store, admin) = floor_store(&dir, policy(0xA1, 1, Production));
+        assert_eq!(
+            store.redeclare_pool_requirement(
+                &admin,
+                CTX,
+                POOL,
+                5,
+                AdmissionRequirementV1::CallerResolved
+            ),
+            Err(ReservationError::StalePool {
+                expected: 5,
+                actual: 0
+            })
+        );
+        // The grade floor follows the canonical grade tags, not enum declaration order.
+        assert!(Rehearsal.tag() < Production.tag());
+    }
+
+    #[test]
     fn the_floor_permits_upgrades_and_same_level_replacement() {
         use AdmissionGradeV0::{Production, Rehearsal};
         let cases = [
@@ -2930,10 +2981,11 @@ mod tests {
         );
     }
 
-    /// A refused downgrade between a reservation's verification and its commit neither advances
-    /// the revision nor changes the requirement, so the in-flight reservation still commits.
+    /// A refused downgrade between a reservation's preparation and its commit neither advances the
+    /// revision nor changes the requirement, so the prepared commit still succeeds. (Sequential;
+    /// the real verify/commit interleaving is exercised in the governance PausedVerifier tests.)
     #[test]
-    fn a_refused_downgrade_does_not_disturb_an_in_flight_reservation() {
+    fn a_refused_downgrade_does_not_disturb_a_prepared_reservation() {
         let dir = tempfile::tempdir().unwrap();
         let (store, admin) = admin_v1_store(&dir);
         let in_flight = admitted(ADMISSION, AdmissionGradeV0::Production);
