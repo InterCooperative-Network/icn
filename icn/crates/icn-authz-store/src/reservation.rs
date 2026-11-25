@@ -90,7 +90,8 @@ pub enum ReservationError {
     /// The custodian-installed verifier refused the evidence.
     #[error("custodian admission verifier refused: {0}")]
     AdmissionRefused(String),
-    /// Pool creation named an admission-policy version this store does not support (F3 F-1).
+    /// An admission-policy version this store does not support (F3 F-1): named at pool creation,
+    /// or found in a stored pool at admission.
     #[error("unsupported admission policy version {0}")]
     UnsupportedAdmissionPolicyVersion(u32),
     /// An ordinary redeclaration would weaken the pool's stored admission requirement (D-F3c).
@@ -680,8 +681,9 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
         self.authorize_pool_admin(admin)?;
         // F3 F-1: the typed API never creates a pool at an unsupported policy version. Records
         // already stored at one are not migrated or reinterpreted; they stay frozen (redeclaration
-        // refuses them) and fail closed at admission: `AdmissionRegistryV0::install` refuses any
-        // verifier answering to an unsupported version, so none can ever be selected for them.
+        // refuses them) and are refused at the admission boundary in `reserve_admitted`, before any
+        // verifier is selected. `AdmissionRegistryV0::install` refusing unsupported-version
+        // verifiers is defence in depth.
         if let AdmissionRequirementV1::Policy { policy, .. } = pool.admission {
             if policy.version > MAX_SUPPORTED_ADMISSION_POLICY_VERSION {
                 return Err(ReservationError::UnsupportedAdmissionPolicyVersion(
@@ -988,6 +990,10 @@ impl<B: DurabilityBarrier> LocalResourceReservations<B> {
     ///     let _custodian = store.with_admission(registry);
     /// }
     /// ```
+    ///
+    /// A pool stored at an unsupported admission-policy version is refused with
+    /// [`ReservationError::UnsupportedAdmissionPolicyVersion`] before any verifier is selected
+    /// (F3 F-1); nothing is consumed.
     pub fn reserve_admitted(
         &self,
         evidence: &CheckpointedEvidenceV0,
@@ -2928,16 +2934,15 @@ mod tests {
         };
         let mut registry = AdmissionRegistryV0::new();
         registry.install_unchecked_for_test(std::sync::Arc::new(NeverCalled(v7)));
-        registry
-            .install(std::sync::Arc::new(ShiftingVerifier {
-                calls: std::sync::atomic::AtomicUsize::new(0),
-                first: AdmissionPolicyRefV0 {
-                    id: [0xA2; 32],
-                    version: 1,
-                },
-                later: v7,
-            }))
-            .unwrap();
+        let shifting = std::sync::Arc::new(ShiftingVerifier {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+            first: AdmissionPolicyRefV0 {
+                id: [0xA2; 32],
+                version: 1,
+            },
+            later: v7,
+        });
+        registry.install(shifting.clone()).unwrap();
         registry.install_clock(FixedClock::at(1_000)).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let store = LocalResourceReservations::open(dir.path(), TARGET)
@@ -2954,7 +2959,12 @@ mod tests {
             Some(ResourcePoolRecord::V1(legacy))
         );
         assert!(store.inspect_consumed(CTX, OP).unwrap().is_none());
-        assert!(store.inspect_reservation(CTX, OP).unwrap().is_none());
+        assert!(store.inspect_reservation(CTX, OP).unwrap().is_none()); // The registry keyed the verifier by its identity at install; nothing re-queried it.
+        assert_eq!(
+            shifting.calls.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "policy() is read exactly once, at install"
+        );
     }
 
     #[test]
