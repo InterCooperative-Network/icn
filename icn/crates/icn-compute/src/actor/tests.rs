@@ -2258,3 +2258,1366 @@ fn test_unique_largest_group_ignores_hashmap_order() {
         }
     }
 }
+
+/// EX-019: the legacy single-executor path reports a late result for a terminal task as
+/// `Refused` (not an `Err` the gossip handler only logs, and not `Unregistered`), so callers such
+/// as `on_federated_task_result` take their no-effect early return.
+#[tokio::test]
+async fn ex019_legacy_late_result_for_terminal_task_is_refused() {
+    use super::lifecycle::ResultAcceptance;
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let actor = ComputeActor::new("did:icn:node".into(), trust_cb);
+    let task = make_task("ex019-refused", "did:icn:alice");
+    let task_hash = actor.handle_submit(task.clone()).await.unwrap();
+
+    let signed_by = |seed: u8, fuel: u64| {
+        let key = ed25519_dalek::SigningKey::from_bytes(&[seed; 32]);
+        let mut result = ComputeResult {
+            task_hash,
+            task_id: task.id.clone(),
+            executor: icn_identity::Did::from_public_key(&key.verifying_key()).to_string(),
+            outcome: crate::types::ExecutionOutcome::Success(b"42".to_vec()),
+            fuel_used: fuel,
+            duration_ms: 10,
+            completed_at: 1000,
+            signature: vec![],
+        };
+        result.sign(&key);
+        result
+    };
+
+    let first = actor
+        .accept_task_result(signed_by(0x0A, 100))
+        .await
+        .unwrap();
+    assert_eq!(
+        first,
+        ResultAcceptance::Unregistered,
+        "the first result completes"
+    );
+
+    for late in [
+        signed_by(0x0A, 100),
+        signed_by(0x0B, 100),
+        signed_by(0x0A, 9_000),
+    ] {
+        let acceptance = actor.accept_task_result(late).await;
+        assert!(
+            matches!(acceptance, Ok(ResultAcceptance::Refused)),
+            "a late result for a completed task must be Refused; got {acceptance:?}"
+        );
+    }
+    let status = actor.task_manager.lock().await.status(&task_hash).cloned();
+    match status {
+        Some(TaskStatus::Completed { result }) => assert_eq!(result.fuel_used, 100),
+        other => panic!("expected the first completion to hold, got {other:?}"),
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// #2913 BLOCKER 1: claim accounting follows the authoritative claim transition.
+// ---------------------------------------------------------------------------------------------
+
+/// Own executor load, total scope-queue depth, and `task_scope_map` size.
+async fn claim_accounting(actor: &ComputeActor, executor: &str) -> (usize, usize, usize) {
+    let load = actor
+        .executor_registry
+        .lock()
+        .await
+        .get(executor)
+        .map(|i| i.tasks_executing)
+        .unwrap_or_else(|| panic!("{executor} is not registered"));
+    let depth: usize = actor.scope_queue_depths.lock().await.values().sum();
+    let mapped = actor.task_scope_map.lock().await.len();
+    (load, depth, mapped)
+}
+
+/// RW1 shape from the independent review: a node that executes legacy tasks, has its own
+/// executor registry entry, and receives every message it sends (its own `TaskSubmitted`,
+/// `TaskClaimed` and `TaskResult`) back in send order, as production gossip delivers them.
+///
+/// The loopback is pumped by hand rather than by a forwarder task: each message is dispatched
+/// through the same `handle_message` the command loop uses, in FIFO order, until the node goes
+/// quiet. No sleeps, and the pump is bounded.
+///
+/// Before the fix the self-echoed `TaskClaimed` arrived after inline completion, `claim` failed,
+/// and load / scope depth / `task_scope_map` were incremented anyway; EX-019's refusal of the
+/// echoed `TaskResult` removed the decrement that used to cancel it, so tasks 3..N were never
+/// claimed once own load reached `max_concurrent_tasks` (2).
+#[tokio::test]
+async fn blocker2913_self_delivering_node_keeps_executing_without_load_drift() {
+    use std::collections::VecDeque;
+    use std::sync::Mutex as StdMutex;
+
+    const TASKS: usize = 6; // > max_concurrent_tasks (2) by enough to expose a +1/task leak
+    const PUMP_BOUND: usize = 64;
+
+    let key = ed25519_dalek::SigningKey::from_bytes(&[0x11; 32]);
+    let own = icn_identity::Did::from_public_key(&key.verifying_key()).to_string();
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let mut actor = ComputeActor::new(own.clone(), trust_cb);
+    actor.set_signing_key(key.to_bytes().to_vec());
+    actor.set_max_concurrent_tasks(2);
+
+    let outbox: Arc<StdMutex<VecDeque<ComputeMessage>>> = Arc::default();
+    let sink = Arc::clone(&outbox);
+    actor.set_send_callback(Arc::new(move |m: ComputeMessage| {
+        sink.lock().expect("outbox").push_back(m);
+    }));
+    let completed: Arc<StdMutex<HashMap<String, usize>>> = Arc::default();
+    let seen = Arc::clone(&completed);
+    actor.set_event_callback(Arc::new(move |e: ComputeEvent| {
+        if let ComputeEvent::TaskCompleted { task_hash, .. } = e {
+            *seen.lock().expect("events").entry(task_hash).or_insert(0) += 1;
+        }
+    }));
+
+    // The own registry entry (in production: the node's own self-delivered capacity announce).
+    actor
+        .on_executor_announce(own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+    assert_eq!(claim_accounting(&actor, &own).await, (0, 0, 0));
+
+    for i in 0..TASKS {
+        let hash = actor
+            .handle_submit(make_task(&format!("rw1-{i}"), &own))
+            .await
+            .unwrap();
+
+        let mut claims_by_self = 0;
+        let mut delivered = 0;
+        loop {
+            let next = outbox.lock().expect("outbox").pop_front();
+            let Some(msg) = next else { break };
+            delivered += 1;
+            assert!(
+                delivered <= PUMP_BOUND,
+                "task {i}: loopback did not go quiet"
+            );
+            if matches!(&msg, ComputeMessage::TaskClaimed { task_hash, executor }
+                if *task_hash == hash && *executor == own)
+            {
+                claims_by_self += 1;
+            }
+            actor.handle_message(msg).await.unwrap();
+        }
+
+        let status = actor.task_manager.lock().await.status(&hash).cloned();
+        assert!(
+            matches!(status, Some(TaskStatus::Completed { .. })),
+            "task {i}: expected Completed, got {status:?} (own load leaked?)"
+        );
+        assert_eq!(
+            claims_by_self, 1,
+            "task {i}: executed by this node exactly once"
+        );
+        assert_eq!(
+            completed.lock().expect("events").get(&hex::encode(hash)),
+            Some(&1),
+            "task {i}: exactly one TaskCompleted"
+        );
+        assert_eq!(
+            claim_accounting(&actor, &own).await,
+            (0, 0, 0),
+            "task {i}: (own load, scope depth, task_scope_map) must return to zero"
+        );
+    }
+}
+
+/// Every refused claim class leaves executor load, scope depth and `task_scope_map` untouched;
+/// a successful claim still counts once.
+#[tokio::test]
+async fn blocker2913_refused_claims_have_no_accounting_effect() {
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let actor = ComputeActor::new("did:icn:node".into(), trust_cb);
+    let (first, second) = ("did:icn:exec-a", "did:icn:exec-b");
+    for did in [first, second] {
+        actor
+            .on_executor_announce(did.into(), vec![ExecutorCapability::Ccl])
+            .await
+            .unwrap();
+    }
+
+    // Unknown task.
+    actor
+        .on_task_claimed([0xEE; 32], first.into())
+        .await
+        .unwrap();
+    assert_eq!(
+        claim_accounting(&actor, first).await,
+        (0, 0, 0),
+        "unknown task"
+    );
+
+    // Successful new claim: counted once (positive control).
+    let open = actor
+        .handle_submit(make_task("claim-open", "did:icn:alice"))
+        .await
+        .unwrap();
+    actor.on_task_claimed(open, first.into()).await.unwrap();
+    assert_eq!(
+        claim_accounting(&actor, first).await,
+        (1, 1, 1),
+        "new claim"
+    );
+
+    // Duplicate claim of an already-claimed task, by the same and by another executor.
+    actor.on_task_claimed(open, first.into()).await.unwrap();
+    actor.on_task_claimed(open, second.into()).await.unwrap();
+    assert_eq!(
+        claim_accounting(&actor, first).await,
+        (1, 1, 1),
+        "duplicate (same)"
+    );
+    assert_eq!(
+        claim_accounting(&actor, second).await.0,
+        0,
+        "duplicate (other)"
+    );
+
+    // Terminal tasks: completed, failed, cancelled.
+    let mut terminal = Vec::new();
+    for state in ["completed", "failed", "cancelled"] {
+        let hash = actor
+            .handle_submit(make_task(&format!("claim-{state}"), "did:icn:alice"))
+            .await
+            .unwrap();
+        let mut mgr = actor.task_manager.lock().await;
+        match state {
+            "completed" => mgr
+                .complete(ComputeResult {
+                    task_hash: hash,
+                    task_id: format!("claim-{state}"),
+                    executor: first.into(),
+                    outcome: crate::types::ExecutionOutcome::Success(b"42".to_vec()),
+                    fuel_used: 1,
+                    duration_ms: 1,
+                    completed_at: 1000,
+                    signature: vec![],
+                })
+                .unwrap(),
+            "failed" => mgr.fail(&hash, "Deadline exceeded".into()).unwrap(),
+            _ => mgr.cancel(&hash, "did:icn:alice", "stop".into()).unwrap(),
+        }
+        drop(mgr);
+        terminal.push((state, hash));
+    }
+    for (state, hash) in terminal {
+        for did in [first, second] {
+            actor.on_task_claimed(hash, did.into()).await.unwrap();
+        }
+        assert_eq!(
+            claim_accounting(&actor, first).await,
+            (1, 1, 1),
+            "{state}: first executor"
+        );
+        assert_eq!(
+            claim_accounting(&actor, second).await.0,
+            0,
+            "{state}: second executor"
+        );
+        let status = actor.task_manager.lock().await.status(&hash).cloned();
+        assert!(
+            status
+                .as_ref()
+                .and_then(TaskStatus::terminal_state)
+                .is_some(),
+            "{state}: a refused claim must not reopen the task; got {status:?}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Policy concurrency accounting when the timeout sweep wins against local execution
+// (post-merge review of #2913, ledger #2915).
+//
+// A local claim increments the submitter's policy `concurrent_tasks`; only local completion
+// decremented it. When the timeout sweep fails the task while it is executing inline, EX-019
+// refuses the late `complete()`, so the decrement was skipped and the sweep releases load, scope
+// and reservations but not policy usage: one phantom concurrent task per such timeout.
+//
+// Scheduling is deterministic: `pre_complete_gate` stops local execution between `execute` and
+// `complete`, the sweep runs in that window, then execution resumes. No sleeps.
+// ---------------------------------------------------------------------------------------------
+
+const POLICY_COOP: &str = "policy-coop";
+
+struct PolicyNode {
+    actor: ComputeActor,
+    own: String,
+    submitter: icn_identity::Did,
+    outbox: Arc<std::sync::Mutex<Vec<ComputeMessage>>>,
+    completed_events: Arc<std::sync::Mutex<usize>>,
+}
+
+/// A node with a scheduling policy for `POLICY_COOP` whose default quota allows
+/// `max_concurrent` concurrent tasks per member, and its own executor registry entry.
+async fn policy_node(max_concurrent: u32) -> PolicyNode {
+    let key = ed25519_dalek::SigningKey::from_bytes(&[0x21; 32]);
+    let own = icn_identity::Did::from_public_key(&key.verifying_key()).to_string();
+    let submitter_key = ed25519_dalek::SigningKey::from_bytes(&[0x22; 32]);
+    let submitter = icn_identity::Did::from_public_key(&submitter_key.verifying_key());
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let mut actor = ComputeActor::new(own.clone(), trust_cb);
+    actor.set_signing_key(key.to_bytes().to_vec());
+
+    let pm = Arc::new(crate::policy::PolicyManager::new(Arc::new(
+        crate::policy::UsageTracker::new(),
+    )));
+    pm.set_policy(crate::policy::CoopSchedulingPolicy {
+        coop_id: POLICY_COOP.into(),
+        governance_domain: None,
+        rules: vec![],
+        member_quotas: HashMap::new(),
+        default_quota: crate::policy::MemberQuota {
+            cpu_hours_per_month: 100.0,
+            max_concurrent_tasks: max_concurrent,
+            max_priority: TaskPriority::Critical,
+            credits_per_month: None,
+        },
+        enforcement_mode: crate::policy::EnforcementMode::Strict,
+    })
+    .await;
+    actor.set_policy_manager(pm);
+
+    let outbox: Arc<std::sync::Mutex<Vec<ComputeMessage>>> = Arc::default();
+    let sink = Arc::clone(&outbox);
+    actor.set_send_callback(Arc::new(move |m: ComputeMessage| {
+        sink.lock().expect("outbox").push(m);
+    }));
+    let completed_events: Arc<std::sync::Mutex<usize>> = Arc::default();
+    let seen = Arc::clone(&completed_events);
+    actor.set_event_callback(Arc::new(move |e: ComputeEvent| {
+        if matches!(e, ComputeEvent::TaskCompleted { .. }) {
+            *seen.lock().expect("events") += 1;
+        }
+    }));
+
+    actor
+        .on_executor_announce(own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+
+    PolicyNode {
+        actor,
+        own,
+        submitter,
+        outbox,
+        completed_events,
+    }
+}
+
+fn policy_task(node: &PolicyNode, id: &str, deadline: Option<u64>) -> ComputeTask {
+    let mut task = make_task(id, &node.submitter.to_string());
+    task.coop_id = Some(POLICY_COOP.into());
+    task.deadline = deadline;
+    task
+}
+
+/// The submitter's policy `concurrent_tasks` on this node.
+async fn policy_concurrent(node: &PolicyNode) -> u32 {
+    node.actor
+        .policy_manager
+        .as_ref()
+        .expect("policy manager")
+        .usage_tracker()
+        .get_usage(&node.submitter, POLICY_COOP)
+        .await
+        .unwrap()
+        .concurrent_tasks
+}
+
+/// Execution and submission refuse a deadline already passed, so a task that must time out is
+/// given one `DEADLINE_MARGIN_MS` ahead and the sweep waits until it has passed (as L4b does).
+const DEADLINE_MARGIN_MS: u64 = 500;
+
+fn wall_ms() -> u64 {
+    icn_time::current_timestamp_millis()
+}
+
+async fn wait_past(deadline: u64) {
+    while wall_ms() <= deadline {
+        let remaining = deadline + 1 - wall_ms().min(deadline);
+        tokio::time::sleep(std::time::Duration::from_millis(remaining)).await;
+    }
+}
+
+async fn run_timeout_sweep(actor: &ComputeActor) {
+    ComputeActor::check_timeouts(
+        &actor.task_manager,
+        &actor.executor_registry,
+        &actor.send_callback,
+        &actor.scope_queue_depths,
+        &actor.task_scope_map,
+        &actor.pending_reservations,
+        &actor.commons_release_callback,
+    )
+    .await
+    .unwrap();
+}
+
+/// Results this node signed itself as executor (as opposed to the sweep's `system` result).
+fn own_results(node: &PolicyNode) -> usize {
+    node.outbox
+        .lock()
+        .expect("outbox")
+        .iter()
+        .filter(|m| matches!(m, ComputeMessage::TaskResult(r) if r.executor == node.own))
+        .count()
+}
+
+/// Deliver `task` for local execution and let the timeout sweep fail it after execution but
+/// before completion is recorded. Returns the execution's result and the submitter's policy
+/// `concurrent_tasks` observed inside the window (while the claim is live).
+async fn execute_with_sweep_winning(
+    node: &mut PolicyNode,
+    task: ComputeTask,
+) -> (Result<(), ComputeError>, u32) {
+    let deadline = task.deadline.expect("a task that times out has a deadline");
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let proceed = Arc::new(tokio::sync::Notify::new());
+    node.actor.pre_complete_gate = Some((Arc::clone(&reached), Arc::clone(&proceed)));
+    let node_ref = &*node;
+    // If execution ends without reaching the window it still releases the sweep side, so a
+    // broken seam fails the `during` assertion instead of hanging.
+    let execution = async {
+        let r = node_ref.actor.on_task_submitted(task).await;
+        reached.notify_one();
+        r
+    };
+    let outcome = tokio::join!(execution, async {
+        reached.notified().await;
+        let during = policy_concurrent(node_ref).await;
+        wait_past(deadline).await;
+        run_timeout_sweep(&node_ref.actor).await;
+        proceed.notify_one();
+        during
+    });
+    node.actor.pre_complete_gate = None;
+    outcome
+}
+
+/// RED regression: the sweep wins while the task executes; the late completion is refused
+/// (EX-019) and the policy concurrency claim must still be released, so later legitimate work
+/// is admitted.
+#[tokio::test]
+async fn timeout_winner_releases_local_policy_concurrency_claim() {
+    let mut node = policy_node(1).await;
+    let task = policy_task(&node, "tw-1", Some(wall_ms() + DEADLINE_MARGIN_MS));
+    let hash = task.hash();
+    assert_eq!(policy_concurrent(&node).await, 0);
+
+    let (exec, during) = execute_with_sweep_winning(&mut node, task).await;
+
+    assert_eq!(during, 1, "the local claim is counted once while executing");
+    assert!(
+        matches!(exec, Err(ComputeError::TaskTerminal { .. })),
+        "late completion must be refused, got {exec:?}"
+    );
+    let status = node.actor.task_manager.lock().await.status(&hash).cloned();
+    assert!(
+        matches!(status, Some(TaskStatus::Failed { .. })),
+        "the timeout's terminal decision stands, got {status:?}"
+    );
+    assert_eq!(*node.completed_events.lock().expect("events"), 0);
+    assert_eq!(
+        own_results(&node),
+        0,
+        "no result broadcast for a refused completion"
+    );
+    assert_eq!(claim_accounting(&node.actor, &node.own).await, (0, 0, 0));
+
+    // Later legitimate work is not blocked by a phantom active task (quota is 1).
+    let next = node
+        .actor
+        .handle_submit(policy_task(&node, "tw-next", None))
+        .await;
+    assert!(next.is_ok(), "later submission rejected: {next:?}");
+    assert_eq!(
+        policy_concurrent(&node).await,
+        0,
+        "the timed-out local claim leaked a policy concurrency slot"
+    );
+}
+
+/// Positive control: normal local completion releases the claim once and completes once.
+#[tokio::test]
+async fn normal_local_completion_releases_policy_concurrency_claim() {
+    let node = policy_node(1).await;
+    let task = policy_task(&node, "nc-1", None);
+    let hash = task.hash();
+
+    node.actor.on_task_submitted(task).await.unwrap();
+
+    let status = node.actor.task_manager.lock().await.status(&hash).cloned();
+    assert!(
+        matches!(status, Some(TaskStatus::Completed { .. })),
+        "{status:?}"
+    );
+    assert_eq!(*node.completed_events.lock().expect("events"), 1);
+    assert_eq!(own_results(&node), 1);
+    assert_eq!(policy_concurrent(&node).await, 0);
+    assert_eq!(claim_accounting(&node.actor, &node.own).await, (0, 0, 0));
+}
+
+/// No double decrement, and another live claim of the same submitter is untouched: with one
+/// other claim already counted, the timed-out task's release returns the counter to 1, and a
+/// repeated sweep plus a never-claimed Pending task timing out change nothing further.
+#[tokio::test]
+async fn timeout_release_is_exactly_once_and_spares_other_live_claims() {
+    let mut node = policy_node(3).await;
+    // Another live claim for the same submitter (e.g. a task executing elsewhere on this node's
+    // books): counted, and must survive everything below.
+    node.actor
+        .policy_manager
+        .as_ref()
+        .expect("policy manager")
+        .usage_tracker()
+        .task_claimed(POLICY_COOP, &node.submitter)
+        .await
+        .unwrap();
+    assert_eq!(policy_concurrent(&node).await, 1);
+
+    let task = policy_task(&node, "ex-1", Some(wall_ms() + DEADLINE_MARGIN_MS));
+    let (exec, during) = execute_with_sweep_winning(&mut node, task).await;
+    assert_eq!(during, 2);
+    assert!(
+        matches!(exec, Err(ComputeError::TaskTerminal { .. })),
+        "{exec:?}"
+    );
+    assert_eq!(
+        policy_concurrent(&node).await,
+        1,
+        "released exactly this claim"
+    );
+
+    // Repeated sweep: the task is already terminal; nothing is released again.
+    run_timeout_sweep(&node.actor).await;
+    assert_eq!(policy_concurrent(&node).await, 1);
+
+    // A Pending task that was never claimed locally times out: no policy release.
+    let pending_deadline = wall_ms() + DEADLINE_MARGIN_MS;
+    let pending = node
+        .actor
+        .handle_submit(policy_task(&node, "ex-pending", Some(pending_deadline)))
+        .await
+        .unwrap();
+    wait_past(pending_deadline).await;
+    run_timeout_sweep(&node.actor).await;
+    let status = node
+        .actor
+        .task_manager
+        .lock()
+        .await
+        .status(&pending)
+        .cloned();
+    assert!(
+        matches!(status, Some(TaskStatus::Failed { .. })),
+        "{status:?}"
+    );
+    assert_eq!(
+        policy_concurrent(&node).await,
+        1,
+        "an unclaimed timeout released usage"
+    );
+    assert_eq!(*node.completed_events.lock().expect("events"), 0);
+    assert_eq!(own_results(&node), 0);
+    assert_eq!(claim_accounting(&node.actor, &node.own).await, (0, 0, 0));
+}
+
+// ---------------------------------------------------------------------------------------------
+// #2914: one task identity on the legacy path.
+//
+// With a `PolicyManager` wired (the daemon always wires one) `handle_submit` stores the
+// policy-adjusted task: `placement_constraints` becomes `Some(..)` even when the coop has no
+// policy, and the commons charter may cap the priority. `ComputeTask::hash()` covers the whole
+// encoding, so the stored task and the task gossiped in `TaskSubmitted` must be the same task,
+// or the submitter and every executor hold the task under different hashes.
+//
+// Nodes are wired as the daemon wires them (policy manager + commons charter, own DID = signing
+// key) and receive every message in send order, their own included, through a hand-pumped
+// FIFO loopback as in the RW1 test above. No sleeps; the pump is bounded.
+// ---------------------------------------------------------------------------------------------
+
+const IDENTITY_COOP: &str = "identity-coop";
+const IDENTITY_REGION: &str = "eu-central";
+const IDENTITY_PUMP_BOUND: usize = 64;
+
+struct IdentityNode {
+    actor: ComputeActor,
+    own: String,
+    outbox: Arc<std::sync::Mutex<std::collections::VecDeque<ComputeMessage>>>,
+    completed: Arc<std::sync::Mutex<HashMap<String, usize>>>,
+}
+
+/// The DID a node built from `seed` runs as.
+fn seed_did(seed: u8) -> String {
+    let key = ed25519_dalek::SigningKey::from_bytes(&[seed; 32]);
+    icn_identity::Did::from_public_key(&key.verifying_key()).to_string()
+}
+
+/// A node wired like the daemon: a `PolicyManager` (with a data-sovereignty rule for
+/// `IDENTITY_COOP`, so the placement adjustment is visible) and the default commons charter
+/// (`UbsFirst`, which caps a `High` task at `Normal`).
+///
+/// The node sits in `IDENTITY_REGION`, the region its own policy requires. Since #2918 a
+/// legacy executor honours `required_region`, so a node outside it would refuse the task.
+async fn identity_node(seed: u8, max_concurrent: usize) -> IdentityNode {
+    let rules = vec![crate::policy::SchedulingRule::DataSovereignty {
+        region: IDENTITY_REGION.into(),
+        tags: vec![],
+    }];
+    wired_node(
+        seed,
+        max_concurrent,
+        &[(IDENTITY_COOP, rules)],
+        Some(IDENTITY_REGION),
+    )
+    .await
+}
+
+/// A daemon-shaped node (see `identity_node`) with one scheduling policy per `(coop, rules)`
+/// entry, and `region` as its configured region (`None`: no region configured).
+async fn wired_node(
+    seed: u8,
+    max_concurrent: usize,
+    policies: &[(&str, Vec<crate::policy::SchedulingRule>)],
+    region: Option<&str>,
+) -> IdentityNode {
+    let key = ed25519_dalek::SigningKey::from_bytes(&[seed; 32]);
+    let own = icn_identity::Did::from_public_key(&key.verifying_key()).to_string();
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let mut actor = ComputeActor::new(own.clone(), trust_cb);
+    actor.set_signing_key(key.to_bytes().to_vec());
+    actor.set_max_concurrent_tasks(max_concurrent);
+    if let Some(region) = region {
+        actor.set_region(region.into());
+    }
+
+    let pm = Arc::new(crate::policy::PolicyManager::new(Arc::new(
+        crate::policy::UsageTracker::new(),
+    )));
+    for (coop, rules) in policies {
+        pm.set_policy(crate::policy::CoopSchedulingPolicy {
+            coop_id: (*coop).into(),
+            governance_domain: None,
+            rules: rules.clone(),
+            member_quotas: HashMap::new(),
+            default_quota: crate::policy::MemberQuota {
+                cpu_hours_per_month: 100.0,
+                max_concurrent_tasks: 10,
+                max_priority: TaskPriority::Critical,
+                credits_per_month: None,
+            },
+            enforcement_mode: crate::policy::EnforcementMode::Strict,
+        })
+        .await;
+    }
+    actor.set_policy_manager(pm);
+    actor.set_commons_pool_policy(CommonsPoolPolicy::default());
+
+    let outbox: Arc<std::sync::Mutex<std::collections::VecDeque<ComputeMessage>>> = Arc::default();
+    let sink = Arc::clone(&outbox);
+    actor.set_send_callback(Arc::new(move |m: ComputeMessage| {
+        sink.lock().expect("outbox").push_back(m);
+    }));
+    let completed: Arc<std::sync::Mutex<HashMap<String, usize>>> = Arc::default();
+    let seen = Arc::clone(&completed);
+    actor.set_event_callback(Arc::new(move |e: ComputeEvent| {
+        if let ComputeEvent::TaskCompleted { task_hash, .. } = e {
+            *seen.lock().expect("events").entry(task_hash).or_insert(0) += 1;
+        }
+    }));
+
+    actor
+        .on_executor_announce(own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+
+    IdentityNode {
+        actor,
+        own,
+        outbox,
+        completed,
+    }
+}
+
+/// A `High`-priority legacy task (no resource profile) for `IDENTITY_COOP`. Both adjustments
+/// apply to it: the policy adds placement constraints and the charter caps it at `Normal`.
+fn identity_task(id: &str) -> ComputeTask {
+    let submitter = ed25519_dalek::SigningKey::from_bytes(&[0x3F; 32]);
+    let submitter = icn_identity::Did::from_public_key(&submitter.verifying_key()).to_string();
+    let mut task = make_task(id, &submitter);
+    task.coop_id = Some(IDENTITY_COOP.into());
+    task.priority = TaskPriority::High;
+    task
+}
+
+/// What the pump observed: every `TaskSubmitted` payload, every `(task_hash, executor)` claim,
+/// and every error a delivery returned.
+#[derive(Default)]
+struct PumpLog {
+    submitted: Vec<ComputeTask>,
+    claims: Vec<(TaskHash, String)>,
+    errors: Vec<String>,
+}
+
+/// Deliver every queued message, FIFO across `nodes`, to every node (the sender included), until
+/// all outboxes are empty. Gossip reaches every subscriber, the sender among them.
+async fn pump(nodes: &[&IdentityNode]) -> PumpLog {
+    let mut log = PumpLog::default();
+    let mut delivered = 0;
+    loop {
+        let next = nodes
+            .iter()
+            .find_map(|n| n.outbox.lock().expect("outbox").pop_front());
+        let Some(msg) = next else { break };
+        delivered += 1;
+        assert!(
+            delivered <= IDENTITY_PUMP_BOUND,
+            "loopback did not go quiet"
+        );
+        match &msg {
+            ComputeMessage::TaskSubmitted(t) => log.submitted.push((**t).clone()),
+            ComputeMessage::TaskClaimed {
+                task_hash,
+                executor,
+            } => log.claims.push((*task_hash, executor.clone())),
+            _ => {}
+        }
+        for node in nodes {
+            if let Err(e) = node.actor.handle_message(msg.clone()).await {
+                log.errors.push(format!("{}: {e}", node.own));
+            }
+        }
+    }
+    log
+}
+
+/// RW3 shape: one self-delivering node submits and executes. The gossiped task is the stored
+/// task, the self-delivered copy is recognised as the task already held, and the task executes
+/// and completes exactly once under the one hash `submit` returned.
+#[tokio::test]
+async fn issue2914_self_delivered_submission_is_the_stored_task() {
+    let node = identity_node(0x31, 2).await;
+    let task = identity_task("identity-self");
+    let raw_hash = task.hash();
+
+    let hash = node.actor.handle_submit(task).await.unwrap();
+    assert_ne!(
+        hash, raw_hash,
+        "fixture: the policy and charter adjustments must change the task's identity"
+    );
+
+    let log = pump(&[&node]).await;
+    assert!(log.errors.is_empty(), "deliveries failed: {:?}", log.errors);
+
+    // 1. What was gossiped is exactly what is stored, adjustments included.
+    assert_eq!(log.submitted.len(), 1, "one submission broadcast");
+    let broadcast = &log.submitted[0];
+    assert_eq!(
+        hex::encode(broadcast.hash()),
+        hex::encode(hash),
+        "the gossiped task must hash to the stored identity"
+    );
+    // `hash()` is blake3 over the complete canonical encoding: equal hashes = the same task.
+    let stored = node
+        .actor
+        .task_manager
+        .lock()
+        .await
+        .get(&hash)
+        .map(|t| t.hash());
+    assert_eq!(
+        stored,
+        Some(broadcast.hash()),
+        "the gossiped task is the stored task"
+    );
+    // 7. The adjustments survive into what executors receive.
+    assert_eq!(
+        broadcast
+            .placement_constraints
+            .as_ref()
+            .and_then(|c| c.required_region.as_deref()),
+        Some(IDENTITY_REGION),
+        "policy placement constraints are part of the gossiped task"
+    );
+    assert_eq!(
+        broadcast.priority,
+        TaskPriority::Normal,
+        "the commons charter priority cap is part of the gossiped task"
+    );
+
+    // 2/3. Self-delivery created no second task: there is no copy under any other hash.
+    let mgr = node.actor.task_manager.lock().await;
+    assert!(mgr.get(&raw_hash).is_none(), "no copy under the raw hash");
+    // 4. Nothing is left orphaned in Pending.
+    assert_eq!(mgr.pending_count(), 0, "no orphaned Pending task");
+    let status = mgr.status(&hash).cloned();
+    drop(mgr);
+    assert!(
+        matches!(&status, Some(TaskStatus::Completed { result }) if result.executor == node.own),
+        "the stored task completed on this node, got {status:?}"
+    );
+
+    // 5. Executed at most once, and only under the stored identity.
+    assert_eq!(
+        log.claims,
+        vec![(hash, node.own.clone())],
+        "exactly one claim, of the stored task"
+    );
+    let completed = node.completed.lock().expect("events").clone();
+    assert_eq!(
+        completed,
+        HashMap::from([(hex::encode(hash), 1)]),
+        "exactly one TaskCompleted, for the stored task"
+    );
+}
+
+/// The submitter cannot execute (at capacity), so another node executes the gossiped task. The
+/// submitter must recognise that executor's claim and result: they name the hash it stored.
+#[tokio::test]
+async fn issue2914_submitter_recognises_remote_executor_result() {
+    let submitter = identity_node(0x32, 0).await; // at capacity: never executes
+    let executor = identity_node(0x33, 2).await;
+    // Each node's own capacity announcement, as gossip delivers it to the other.
+    submitter
+        .actor
+        .on_executor_announce(executor.own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+    executor
+        .actor
+        .on_executor_announce(submitter.own.clone(), vec![ExecutorCapability::Ccl])
+        .await
+        .unwrap();
+
+    let task = identity_task("identity-remote");
+    let raw_hash = task.hash();
+    let hash = submitter.actor.handle_submit(task).await.unwrap();
+    assert_ne!(hash, raw_hash, "fixture: adjustments must change identity");
+
+    let log = pump(&[&submitter, &executor]).await;
+    assert!(log.errors.is_empty(), "deliveries failed: {:?}", log.errors);
+
+    // 5. Executed once, by the executor, under the submitter's identity.
+    assert_eq!(
+        log.claims,
+        vec![(hash, executor.own.clone())],
+        "exactly one claim, by the executor, of the stored task"
+    );
+
+    for (name, node) in [("submitter", &submitter), ("executor", &executor)] {
+        let mgr = node.actor.task_manager.lock().await;
+        assert!(
+            mgr.get(&raw_hash).is_none(),
+            "{name}: no copy under the raw hash"
+        );
+        assert_eq!(mgr.pending_count(), 0, "{name}: no orphaned Pending task");
+        let status = mgr.status(&hash).cloned();
+        drop(mgr);
+        // 6. The submitter holds the executor's result under the hash it returned.
+        assert!(
+            matches!(&status, Some(TaskStatus::Completed { result })
+                if result.executor == executor.own && result.task_hash == hash),
+            "{name}: the stored task completed with the executor's result, got {status:?}"
+        );
+    }
+    assert_eq!(
+        submitter.completed.lock().expect("events").clone(),
+        HashMap::from([(hex::encode(hash), 1)]),
+        "submitter: exactly one TaskCompleted, for the stored task"
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// #2918: a legacy executor honours the task's placement constraints.
+//
+// A coop policy turns into `task.placement_constraints` at submission (`DataSovereignty` ->
+// `required_region`, `ExecutorFilter` -> allow/forbid lists, `RequireCapability` -> required
+// capability names), and since #2917 the gossiped `TaskSubmitted` carries them. The placement
+// negotiation path refuses a node those constraints exclude; the legacy path (no resource
+// profile) must refuse it too, for every task it claims: it claims the highest-priority Pending
+// task it holds, not necessarily the one just received.
+//
+// The submitter is at capacity (it never executes), so whatever runs, runs on the executor(s).
+// Nodes are wired like the daemon and pumped FIFO, their own messages included (`pump`).
+// ---------------------------------------------------------------------------------------------
+
+const PLACEMENT_COOP: &str = "placement-coop";
+const PLACEMENT_OPEN_COOP: &str = "placement-open-coop";
+const PLACEMENT_SUBMITTER_SEED: u8 = 0x41;
+const PLACEMENT_EXECUTOR_SEED: u8 = 0x42;
+const PLACEMENT_PEER_SEED: u8 = 0x43;
+const PLACEMENT_OTHER_REGION: &str = "us-west";
+
+/// Executor-side economic effects of executing a task.
+#[derive(Default)]
+struct EffectCounts {
+    payments: std::sync::Mutex<usize>,
+    commons: std::sync::Mutex<usize>,
+    clearing: std::sync::Mutex<usize>,
+}
+
+impl EffectCounts {
+    fn snapshot(&self) -> (usize, usize, usize) {
+        (
+            *self.payments.lock().expect("payments"),
+            *self.commons.lock().expect("commons"),
+            *self.clearing.lock().expect("clearing"),
+        )
+    }
+}
+
+struct PlacementNode {
+    node: IdentityNode,
+    effects: Arc<EffectCounts>,
+}
+
+/// A daemon-shaped node whose payment, commons-settlement and federation-clearing callbacks are
+/// counted.
+async fn placement_node(
+    seed: u8,
+    max_concurrent: usize,
+    policies: &[(&str, Vec<crate::policy::SchedulingRule>)],
+    region: Option<&str>,
+) -> PlacementNode {
+    let mut node = wired_node(seed, max_concurrent, policies, region).await;
+    let effects = Arc::new(EffectCounts::default());
+    let e = Arc::clone(&effects);
+    node.actor.set_payment_callback(Arc::new(move |_| {
+        *e.payments.lock().expect("payments") += 1;
+    }));
+    let e = Arc::clone(&effects);
+    node.actor
+        .set_commons_settlement_callback(Arc::new(move |_| {
+            *e.commons.lock().expect("commons") += 1;
+        }));
+    let e = Arc::clone(&effects);
+    node.actor
+        .set_federation_clearing_callback(Arc::new(move |_| {
+            *e.clearing.lock().expect("clearing") += 1;
+        }));
+    PlacementNode { node, effects }
+}
+
+/// Every node learns every other node's executor entry, as capacity gossip delivers it.
+async fn introduce(nodes: &[&PlacementNode]) {
+    for a in nodes {
+        for b in nodes {
+            if a.node.own != b.node.own {
+                a.node
+                    .actor
+                    .on_executor_announce(b.node.own.clone(), vec![ExecutorCapability::Ccl])
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+}
+
+/// A legacy (no resource profile) commons-scope task for `coop` with a payment rate and a
+/// contract that executes successfully, so a run has observable payment and
+/// commons-settlement effects on the executor.
+fn placement_task(id: &str, coop: &str) -> ComputeTask {
+    let mut task = make_commons_task(id, &seed_did(0x3F));
+    task.coop_id = Some(coop.into());
+    task.payment_rate = Some(1_000_000);
+    task
+}
+
+/// The executor's policy usage records for `coop`.
+async fn usage_records(node: &IdentityNode, coop: &str) -> usize {
+    node.actor
+        .policy_manager
+        .as_ref()
+        .expect("policy manager")
+        .usage_tracker()
+        .list_coop_usage(coop)
+        .await
+        .unwrap()
+        .len()
+}
+
+async fn stored_status(node: &IdentityNode, hash: &TaskHash) -> Option<TaskStatus> {
+    node.actor.task_manager.lock().await.status(hash).cloned()
+}
+
+/// `executor` refused `hash`: no claim, no execution, no completion, no economic effect and no
+/// accounting, and the task is still Pending (available) on both nodes.
+async fn assert_refused(
+    what: &str,
+    log: &PumpLog,
+    hash: TaskHash,
+    submitter: &PlacementNode,
+    executor: &PlacementNode,
+) {
+    assert!(
+        log.errors.is_empty(),
+        "{what}: deliveries failed: {:?}",
+        log.errors
+    );
+    assert!(
+        !log.claims.iter().any(|(h, _)| *h == hash),
+        "{what}: the task must not be claimed, claims = {:?}",
+        log.claims
+    );
+    for (name, n) in [("submitter", submitter), ("executor", executor)] {
+        let status = stored_status(&n.node, &hash).await;
+        assert!(
+            matches!(status, Some(TaskStatus::Pending)),
+            "{what}: {name} must still hold the task as Pending, got {status:?}"
+        );
+        assert!(
+            n.node.completed.lock().expect("events").is_empty(),
+            "{what}: {name} saw a TaskCompleted"
+        );
+    }
+    assert_eq!(
+        executor.effects.snapshot(),
+        (0, 0, 0),
+        "{what}: (payments, commons settlements, clearing notifications) on the executor"
+    );
+    assert_eq!(
+        claim_accounting(&executor.node.actor, &executor.node.own).await,
+        (0, 0, 0),
+        "{what}: (own load, scope depth, task_scope_map) on the executor"
+    );
+    assert_eq!(
+        usage_records(&executor.node, PLACEMENT_COOP).await,
+        0,
+        "{what}: the executor recorded policy usage for a task it must not run"
+    );
+}
+
+/// `executor` claimed and executed `hash` exactly once, with its normal effects.
+async fn assert_executed_once(
+    what: &str,
+    log: &PumpLog,
+    hash: TaskHash,
+    submitter: &PlacementNode,
+    executor: &PlacementNode,
+) {
+    assert!(
+        log.errors.is_empty(),
+        "{what}: deliveries failed: {:?}",
+        log.errors
+    );
+    assert_eq!(
+        log.claims,
+        vec![(hash, executor.node.own.clone())],
+        "{what}: exactly one claim, by the executor"
+    );
+    for (name, n) in [("submitter", submitter), ("executor", executor)] {
+        let status = stored_status(&n.node, &hash).await;
+        assert!(
+            matches!(&status, Some(TaskStatus::Completed { result })
+                if result.executor == executor.node.own
+                    && matches!(result.outcome, crate::types::ExecutionOutcome::Success(_))),
+            "{what}: {name} must hold the executor's successful result, got {status:?}"
+        );
+    }
+    assert_eq!(
+        submitter.node.completed.lock().expect("events").clone(),
+        HashMap::from([(hex::encode(hash), 1)]),
+        "{what}: exactly one TaskCompleted on the submitter"
+    );
+    // Positive control for the refusal assertions: these effects are live on this path.
+    let (payments, commons, clearing) = executor.effects.snapshot();
+    assert_eq!(
+        (payments, commons),
+        (1, 1),
+        "{what}: one payment and one commons settlement"
+    );
+    assert_eq!(clearing, 0, "{what}: a local legacy task clears nothing");
+    assert_eq!(
+        claim_accounting(&executor.node.actor, &executor.node.own).await,
+        (0, 0, 0),
+        "{what}: load and scope accounting balance after completion"
+    );
+}
+
+/// Submit one `PLACEMENT_COOP` task under `rules` from an at-capacity submitter to one executor
+/// configured with `region`, and pump until quiet.
+async fn run_one(
+    id: &str,
+    rules: Vec<crate::policy::SchedulingRule>,
+    region: Option<&str>,
+) -> (PumpLog, TaskHash, PlacementNode, PlacementNode) {
+    let policies = [(PLACEMENT_COOP, rules)];
+    let submitter = placement_node(PLACEMENT_SUBMITTER_SEED, 0, &policies, None).await;
+    let executor = placement_node(PLACEMENT_EXECUTOR_SEED, 2, &policies, region).await;
+    introduce(&[&submitter, &executor]).await;
+    let hash = submitter
+        .node
+        .actor
+        .handle_submit(placement_task(id, PLACEMENT_COOP))
+        .await
+        .unwrap();
+    let log = pump(&[&submitter.node, &executor.node]).await;
+    (log, hash, submitter, executor)
+}
+
+fn sovereignty(region: &str) -> crate::policy::SchedulingRule {
+    crate::policy::SchedulingRule::DataSovereignty {
+        region: region.into(),
+        tags: vec![],
+    }
+}
+
+fn executor_filter(
+    whitelist: Vec<String>,
+    blacklist: Vec<String>,
+) -> crate::policy::SchedulingRule {
+    crate::policy::SchedulingRule::ExecutorFilter {
+        whitelist,
+        blacklist,
+    }
+}
+
+fn require_capability(name: &str) -> crate::policy::SchedulingRule {
+    crate::policy::SchedulingRule::RequireCapability {
+        capability: name.into(),
+        min_version: None,
+    }
+}
+
+/// (1) An executor in the required region claims and executes the task.
+#[tokio::test]
+async fn issue2918_matching_region_executes() {
+    let (log, hash, submitter, executor) = run_one(
+        "region-match",
+        vec![sovereignty(IDENTITY_REGION)],
+        Some(IDENTITY_REGION),
+    )
+    .await;
+    assert_executed_once("matching region", &log, hash, &submitter, &executor).await;
+}
+
+/// (2) An executor in another region refuses the task.
+#[tokio::test]
+async fn issue2918_mismatched_region_refuses() {
+    let (log, hash, submitter, executor) = run_one(
+        "region-mismatch",
+        vec![sovereignty(IDENTITY_REGION)],
+        Some(PLACEMENT_OTHER_REGION),
+    )
+    .await;
+    assert_refused("mismatched region", &log, hash, &submitter, &executor).await;
+}
+
+/// (3) An executor with no configured region fails closed on a region-constrained task.
+#[tokio::test]
+async fn issue2918_no_configured_region_fails_closed() {
+    let (log, hash, submitter, executor) =
+        run_one("region-unknown", vec![sovereignty(IDENTITY_REGION)], None).await;
+    assert_refused("no configured region", &log, hash, &submitter, &executor).await;
+}
+
+/// (4) A non-empty allow-list that does not name the executor excludes it.
+#[tokio::test]
+async fn issue2918_executor_outside_allow_list_refuses() {
+    let (log, hash, submitter, executor) = run_one(
+        "allow-list",
+        vec![executor_filter(vec![seed_did(PLACEMENT_PEER_SEED)], vec![])],
+        None,
+    )
+    .await;
+    assert_refused("not on the allow-list", &log, hash, &submitter, &executor).await;
+}
+
+/// (5) A forbidden executor refuses, and the task stays available: an eligible peer executes
+/// it exactly once.
+#[tokio::test]
+async fn issue2918_forbidden_executor_refuses_and_peer_executes() {
+    let policies = [(
+        PLACEMENT_COOP,
+        vec![executor_filter(
+            vec![],
+            vec![seed_did(PLACEMENT_EXECUTOR_SEED)],
+        )],
+    )];
+    let submitter = placement_node(PLACEMENT_SUBMITTER_SEED, 0, &policies, None).await;
+    let forbidden = placement_node(PLACEMENT_EXECUTOR_SEED, 2, &policies, None).await;
+    let peer = placement_node(PLACEMENT_PEER_SEED, 2, &policies, None).await;
+    introduce(&[&submitter, &forbidden, &peer]).await;
+
+    let hash = submitter
+        .node
+        .actor
+        .handle_submit(placement_task("forbid-list", PLACEMENT_COOP))
+        .await
+        .unwrap();
+    // The forbidden executor receives every message before the peer does.
+    let log = pump(&[&submitter.node, &forbidden.node, &peer.node]).await;
+
+    assert_executed_once("eligible peer", &log, hash, &submitter, &peer).await;
+    assert_eq!(
+        forbidden.effects.snapshot(),
+        (0, 0, 0),
+        "forbidden executor: no economic effect"
+    );
+    assert_eq!(
+        usage_records(&forbidden.node, PLACEMENT_COOP).await,
+        0,
+        "forbidden executor: no policy usage"
+    );
+    let status = stored_status(&forbidden.node, &hash).await;
+    assert!(
+        matches!(&status, Some(TaskStatus::Completed { result }) if result.executor == peer.node.own),
+        "forbidden executor records the peer's result, got {status:?}"
+    );
+}
+
+/// (6) An executor satisfying every constraint at once (region, allow-list, forbid-list,
+/// required capability) executes the task.
+#[tokio::test]
+async fn issue2918_authorized_executor_satisfying_all_constraints_executes() {
+    let (log, hash, submitter, executor) = run_one(
+        "all-constraints",
+        vec![
+            sovereignty(IDENTITY_REGION),
+            executor_filter(
+                vec![seed_did(PLACEMENT_EXECUTOR_SEED)],
+                vec![seed_did(PLACEMENT_PEER_SEED)],
+            ),
+            require_capability("Ccl"),
+        ],
+        Some(IDENTITY_REGION),
+    )
+    .await;
+    assert_executed_once(
+        "all constraints satisfied",
+        &log,
+        hash,
+        &submitter,
+        &executor,
+    )
+    .await;
+}
+
+/// (7) A required capability the executor lacks excludes it.
+#[tokio::test]
+async fn issue2918_missing_required_capability_refuses() {
+    let (log, hash, submitter, executor) =
+        run_one("capability", vec![require_capability("Gpu")], None).await;
+    assert_refused("missing capability", &log, hash, &submitter, &executor).await;
+}
+
+/// (8) The legacy loop claims the highest-priority Pending task it holds, not the task just
+/// received. An ineligible task already Pending ahead of a newly arrived eligible one must be
+/// skipped: only the eligible task is claimed and executed.
+#[tokio::test]
+async fn issue2918_pending_ineligible_task_is_not_claimed_when_another_arrives() {
+    let policies = [
+        (
+            PLACEMENT_COOP,
+            vec![executor_filter(
+                vec![],
+                vec![seed_did(PLACEMENT_EXECUTOR_SEED)],
+            )],
+        ),
+        (PLACEMENT_OPEN_COOP, vec![]),
+    ];
+    let submitter = placement_node(PLACEMENT_SUBMITTER_SEED, 0, &policies, None).await;
+    let executor = placement_node(PLACEMENT_EXECUTOR_SEED, 2, &policies, None).await;
+    introduce(&[&submitter, &executor]).await;
+
+    // Ineligible task first: higher priority and older, so it heads the Pending order.
+    let mut ineligible = placement_task("pending-ineligible", PLACEMENT_COOP);
+    ineligible.priority = TaskPriority::Critical;
+    ineligible.created_at = 1000;
+    let ineligible = submitter
+        .node
+        .actor
+        .handle_submit(ineligible)
+        .await
+        .unwrap();
+    let first = pump(&[&submitter.node, &executor.node]).await;
+    assert_refused(
+        "ineligible on arrival",
+        &first,
+        ineligible,
+        &submitter,
+        &executor,
+    )
+    .await;
+
+    let mut eligible = placement_task("pending-eligible", PLACEMENT_OPEN_COOP);
+    eligible.priority = TaskPriority::Low;
+    eligible.created_at = 2000;
+    let eligible = submitter.node.actor.handle_submit(eligible).await.unwrap();
+
+    // Fixture: with both stored (as the tasks were adjusted and gossiped), the ineligible one
+    // heads the Pending order, so a selection that ignores constraints would pick it.
+    {
+        let held = submitter.node.actor.task_manager.lock().await;
+        let mut scratch = crate::task::TaskManager::default();
+        for h in [eligible, ineligible] {
+            scratch
+                .submit(held.get(&h).cloned().expect("submitted task"))
+                .unwrap();
+        }
+        let order: Vec<TaskHash> = scratch
+            .pending_by_priority()
+            .into_iter()
+            .map(|(h, _)| h)
+            .collect();
+        assert_eq!(order, vec![ineligible, eligible], "fixture: Pending order");
+    }
+
+    let second = pump(&[&submitter.node, &executor.node]).await;
+    assert!(
+        second.errors.is_empty(),
+        "deliveries failed: {:?}",
+        second.errors
+    );
+    assert_eq!(
+        second.claims,
+        vec![(eligible, executor.node.own.clone())],
+        "only the newly arrived eligible task is claimed"
+    );
+    let status = stored_status(&executor.node, &ineligible).await;
+    assert!(
+        matches!(status, Some(TaskStatus::Pending)),
+        "the ineligible task stays Pending, got {status:?}"
+    );
+    let status = stored_status(&executor.node, &eligible).await;
+    assert!(
+        matches!(&status, Some(TaskStatus::Completed { result }) if result.executor == executor.node.own),
+        "the eligible task completed on the executor, got {status:?}"
+    );
+    assert_eq!(
+        executor.effects.snapshot(),
+        (1, 1, 0),
+        "effects of one execution"
+    );
+    assert_eq!(
+        usage_records(&executor.node, PLACEMENT_COOP).await,
+        0,
+        "no policy usage for the ineligible task's coop"
+    );
+}
+
+/// (9) A legacy task whose coop has no placement rules still executes.
+#[tokio::test]
+async fn issue2918_unconstrained_legacy_task_executes() {
+    let (log, hash, submitter, executor) = run_one("unconstrained", vec![], None).await;
+    let stored = submitter
+        .node
+        .actor
+        .task_manager
+        .lock()
+        .await
+        .get(&hash)
+        .and_then(|t| t.placement_constraints.clone());
+    assert_eq!(
+        stored,
+        Some(crate::policy::PlacementConstraints::default()),
+        "fixture: a policy-wired submit attaches empty constraints"
+    );
+    assert_executed_once("unconstrained", &log, hash, &submitter, &executor).await;
+}

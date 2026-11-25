@@ -22,6 +22,7 @@ Useful areas:
 | `state/truth/` | Truth-owner, merge-policy, agent, and skill registries |
 | `coordination/` | Cross-repo coordination manifests/protocols |
 | `scripts/` | Operational validation/orientation scripts |
+| `dev-control/` | Read-only development control center TUI (`icn-control`); observes owners, owns no state |
 
 If this table and the current tree disagree, the tree plus the relevant registry wins. Update this routing table rather than treating it as a hidden second inventory.
 
