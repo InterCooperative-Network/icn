@@ -142,11 +142,6 @@ impl CloseReceipts {
     }
 }
 
-/// A self-contained write-ahead record of an in-flight proposal close.
-///
-/// Persisted to the proposal state store (Db-B) keyed by `proposal.id` *before*
-/// any terminal-region provenance write, and deleted only after every artifact
-/// is durable. See the module docs for the full discipline.
 /// A durable close intent that contradicts the proposal's stored terminal state.
 ///
 /// The intent records a decided close (its receipts may already be durable), yet
@@ -211,6 +206,11 @@ pub(crate) fn detect_conflict(
     }))
 }
 
+/// A self-contained write-ahead record of an in-flight proposal close.
+///
+/// Persisted to the proposal state store (Db-B) keyed by `proposal.id` *before*
+/// any terminal-region provenance write, and deleted only after every artifact
+/// is durable. See the module docs for the full discipline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloseJournalEntry {
     /// The proposal in its terminal (closed) state — the terminal commit value.

@@ -1502,7 +1502,10 @@ async fn interrupted_close_then_veto_completes_the_decision_and_refuses_the_veto
     fail_store.disarm();
 
     let err = handle.submit(veto(&id)).await.unwrap_err().to_string();
-    assert!(err.contains("Cannot veto a closed proposal"), "{err}");
+    assert!(
+        err.contains("was already decided; it has now been completed"),
+        "{err}"
+    );
     assert_decided_close_completed(&state, &backend, &id);
 }
 
@@ -1523,7 +1526,7 @@ async fn interrupted_close_then_force_close_completes_the_decision_and_refuses_i
             .unwrap_err()
             .to_string();
         assert!(
-            err.contains("Can only force close proposals in Deliberation or Open state"),
+            err.contains("was already decided; it has now been completed"),
             "{outcome:?}: {err}"
         );
         assert_decided_close_completed(&state, &backend, &id);
@@ -1654,4 +1657,31 @@ async fn a_historical_contradiction_is_retained_surfaced_and_blocks_terminal_cha
     assert_eq!(conflicts[0].proposal_id, id.0);
     assert_eq!(conflicts[0].journaled_state, "Accepted");
     assert_eq!(conflicts[0].stored_state, "Vetoed");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_completed_close_whose_intent_lingered_is_not_a_conflict() {
+    // The commit succeeded (stored row == journaled value) but clearing the
+    // intent did not: the most common real recovery case. It must be completed
+    // and cleared, never reported as a contradiction.
+    let tmp = tempfile::tempdir().unwrap();
+    let (backend, fail_store, handle, id, state) = interrupted_close(tmp.path()).await;
+    fail_store.disarm();
+    let lingering = state.list_close_intents().unwrap().remove(0);
+    handle.recover_incomplete_closes().await;
+    assert_decided_close_completed(&state, &backend, &id);
+    state.save_close_intent(&lingering).unwrap(); // the delete "failed"
+
+    assert!(handle.close_conflicts().await.unwrap().is_empty());
+    let err = handle.submit(veto(&id)).await.unwrap_err().to_string();
+    assert!(
+        err.contains("was already decided; it has now been completed"),
+        "{err}"
+    );
+    assert_decided_close_completed(&state, &backend, &id);
+
+    // Recovery alone also clears such an entry.
+    state.save_close_intent(&lingering).unwrap();
+    handle.recover_incomplete_closes().await;
+    assert_decided_close_completed(&state, &backend, &id);
 }

@@ -1608,18 +1608,8 @@ impl GovernanceActor {
         Some(icn_governance::ProposalThresholds::new(quorum, approval))
     }
 
-    /// Replay any lingering write-ahead close-journal entries to completion.
-    ///
-    /// Called once a receipt backend is installed — the point at which both the
-    /// proposal state store (Db-B) and the receipt store (Db-A) are available.
-    /// For each durable [`CloseJournalEntry`](crate::close_journal::CloseJournalEntry)
-    /// left behind by a close whose terminal commit did not finish (the process
-    /// crashed, or the terminal `save_proposal` failed after a receipt was
-    /// already durable), re-run `commit` — every artifact write is idempotent —
-    /// and clear the entry. This heals a phantom-accepted half-close: receipts
-    /// already durable in the receipt store are matched by the now-committed
-    /// terminal proposal state. Recovery never deletes an append-only receipt;
-    /// it only completes the close that was already decided.
+    /// Durable close intents that contradict their proposal's stored terminal
+    /// state. Read-only; see [`crate::close_journal::CloseConflict`].
     fn close_conflicts(&self) -> Result<Vec<crate::close_journal::CloseConflict>> {
         let mut out = Vec::new();
         for entry in self.store.list_close_intents()? {
@@ -1651,10 +1641,29 @@ impl GovernanceActor {
                     proposal_id.0
                 )
             })?;
+            // The decided close now stands, so the proposal is closed and the
+            // existing rule refuses this operation. Say so explicitly.
+            anyhow::bail!(
+                "Cannot {op} proposal '{}': a close of this proposal was already decided; it \
+                 has now been completed, and a closed proposal cannot be vetoed or force-closed",
+                proposal_id.0
+            );
         }
         Ok(())
     }
 
+    /// Replay any lingering write-ahead close-journal entries to completion.
+    ///
+    /// Called once a receipt backend is installed — the point at which both the
+    /// proposal state store (Db-B) and the receipt store (Db-A) are available.
+    /// For each durable [`CloseJournalEntry`](crate::close_journal::CloseJournalEntry)
+    /// left behind by a close whose terminal commit did not finish (the process
+    /// crashed, or the terminal `save_proposal` failed after a receipt was
+    /// already durable), re-run `commit` — every artifact write is idempotent —
+    /// and clear the entry. This heals a phantom-accepted half-close: receipts
+    /// already durable in the receipt store are matched by the now-committed
+    /// terminal proposal state. Recovery never deletes an append-only receipt;
+    /// it only completes the close that was already decided.
     async fn recover_incomplete_closes(&self) {
         let intents = match self.store.list_close_intents() {
             Ok(intents) => intents,
