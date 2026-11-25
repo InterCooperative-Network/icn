@@ -53,7 +53,6 @@ on:
   pull_request:
     # No paths filter: run on ALL PRs so any new skill/agent is checked for truth_contract
     # and registry entries. The check is fast (~5s) and catches silent drift early.
-    branches: [main]
   schedule:
     - cron: '0 9 * * 1'
 
