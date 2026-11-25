@@ -20,12 +20,13 @@
 //! - The institution is **synthetic**. The only recognition basis is GEN-B's
 //!   `BootstrapRehearsalV1`, which is explicitly non-production: no institution decided anything.
 //! - Founders are test keys. Nothing here shows they hold legitimate institutional authority.
-//! - The binding between the authz `ContextRef` and the GEN-A/GEN-B `GovernanceDomainId` is a
-//!   **harness-local convention** ([`harness_domain_binding`] placed in `label_hash`, which the
-//!   authz layer binds but never interprets). No production type carries that binding, and no
-//!   log transition carries recognition evidence. The tests below demonstrate that gap
-//!   (`the_log_alone_accepts_standing_for_a_foreign_or_unrecognized_subject`); the recognition
-//!   gate in [`independent_verify`] is test code, not a proposed format.
+//! - The binding between the authz `ContextRef` and the GEN-A/GEN-B `GovernanceDomainId` is the
+//!   relying party's own [`InstitutionalTrustAnchorV0`] (`icn_governance::institutional_admission`),
+//!   built here from test constants. It is trusted configuration, not a format: nothing reads the
+//!   inception's `label_hash` (the harness still sets one so the two synthetic contexts differ).
+//!   No log transition carries recognition evidence; the log-only gap is pinned by
+//!   `the_log_alone_accepts_standing_for_a_foreign_or_unrecognized_subject`, and the
+//!   institutional gate that closes it is exercised in the "Institutional admission" section.
 //! - "Reservation" is a durable local record that capacity was decremented. No Linux resource is
 //!   enforced, nothing is executed, nothing is settled, and there is no exactly-once claim beyond
 //!   one custodian's local store.
@@ -46,6 +47,12 @@ use icn_authz_store::{
 };
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::domain::GovernanceDomainId;
+use icn_governance::institutional_admission::{
+    admit_institutional, verify_institutional_authorization, InstitutionalAdmissionError,
+    InstitutionalEvidenceV0, InstitutionalRefusal, InstitutionalTrustAnchorV0, Legitimacy,
+    RecognitionRequirement,
+};
+use icn_governance::subject_recognition::RecognitionError;
 use icn_governance::subject_recognition::{RecognitionBasisKind, SubjectRecognitionV1};
 use icn_governance::vote::VoteChoice;
 use icn_identity::authority_log::{
@@ -73,9 +80,9 @@ const OP: [u8; 32] = [0x0a; 32];
 const POOL: [u8; 32] = [0x71; 32];
 const POLICY: [u8; 32] = [0x72; 32];
 
-/// HARNESS-LOCAL convention, not a format: the authz context's `label_hash` commits to the
-/// governance domain whose GEN-B recognitions populate its electorate.
-fn harness_domain_binding(domain: &str) -> [u8; 32] {
+/// An uninterpreted label so contexts founded for different synthetic domains differ. Nothing
+/// verifies it; the domain/context binding is the relying party's [`InstitutionalTrustAnchorV0`].
+fn harness_context_label(domain: &str) -> [u8; 32] {
     let mut h = CanonicalHasher::new(DomainTag::new(
         b"icn:test:harness:authz-context-domain-binding:v0",
     ));
@@ -219,7 +226,7 @@ impl Institution {
         let inception = ContextInceptionV0::new(
             founders.iter().map(pk).collect(),
             2,
-            harness_domain_binding(bound_domain),
+            harness_context_label(bound_domain),
         )
         .unwrap();
         Institution {
@@ -386,13 +393,16 @@ impl Institution {
         }
     }
 
-    /// The relying party's out-of-band trust for this institution.
-    fn trust(&self, min_seq: u64, pinned: Option<LogCheckpointV0>) -> VerifierTrust {
-        VerifierTrust {
-            domain: GovernanceDomainId(DOMAIN.into()),
-            context: self.ctx,
-            frontier: self.frontier(min_seq, pinned),
-        }
+    /// The relying party's out-of-band trust: `DOMAIN` is served by this context, at this
+    /// frontier, under the strict rule, rehearsal recognition permitted.
+    fn trust(&self, min_seq: u64, pinned: Option<LogCheckpointV0>) -> InstitutionalTrustAnchorV0 {
+        anchor(
+            DOMAIN,
+            self.ctx,
+            min_seq,
+            pinned,
+            RecognitionRequirement::RehearsalPermitted,
+        )
     }
 
     fn parts(&self) -> Vec<GenesisParts> {
@@ -484,48 +494,51 @@ impl EvidencePackage {
     }
 }
 
-/// What the relying party trusts out of band: which domain it serves, which authz context it
-/// accepts for that domain, and its own frontier (never the presenter's claim of currency).
-struct VerifierTrust {
-    domain: GovernanceDomainId,
+/// The relying party's anchor, from its own configuration.
+fn anchor(
+    domain: &str,
     context: ContextRef,
-    frontier: RelyingFrontierV0,
+    min_seq: u64,
+    pinned: Option<LogCheckpointV0>,
+    recognition: RecognitionRequirement,
+) -> InstitutionalTrustAnchorV0 {
+    InstitutionalTrustAnchorV0::new(
+        GovernanceDomainId(domain.into()),
+        context,
+        min_seq,
+        pinned,
+        vec![strict()],
+        recognition,
+    )
+    .unwrap()
 }
 
 #[derive(Debug, PartialEq, Eq)]
 enum IndependentRefusal {
     Decode(&'static str),
-    UntrustedContext,
-    DomainBindingMismatch,
-    Log(LogRefusal),
-    /// A Subject in the electorate at the checkpoint has no rehearsal recognition by the domain.
-    UnrecognizedStanding(SubjectId),
+    /// The library gate (`verify_institutional_authorization`) refused.
+    Institutional(InstitutionalRefusal),
 }
 
-/// What the independent verifier concludes. `rehearsal_only` is always true: the only recognition
-/// basis that exists is non-production.
+/// What the independent verifier concludes. The legitimacy is always `RehearsalOnly`: the only
+/// recognition basis that exists is non-production.
 #[derive(Debug, PartialEq, Eq)]
 struct IndependentVerdict {
     context: ContextRef,
     operation_id: [u8; 32],
     effect: EffectV0,
     checkpoint: LogCheckpointV0,
-    electorate: usize,
-    rehearsal_only: bool,
+    voters: usize,
+    legitimacy: Legitimacy,
 }
 
+/// Decode bytes, then run the library institutional verifier under the relying party's anchor.
 fn independent_verify(
     pkg: &EvidencePackage,
-    trust: &VerifierTrust,
+    trust: &InstitutionalTrustAnchorV0,
 ) -> Result<IndependentVerdict, IndependentRefusal> {
     let inception = ContextInceptionV0::decode(&pkg.inception)
         .map_err(|_| IndependentRefusal::Decode("inception"))?;
-    if inception.context_ref() != trust.context {
-        return Err(IndependentRefusal::UntrustedContext);
-    }
-    if inception.label_hash != harness_domain_binding(&trust.domain.0) {
-        return Err(IndependentRefusal::DomainBindingMismatch);
-    }
     let log = pkg
         .log
         .iter()
@@ -540,50 +553,31 @@ fn independent_verify(
         .map(|b| EvidenceBundle::decode(b))
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| IndependentRefusal::Decode("vote bundle"))?;
-    let evidence = CheckpointedEvidenceV0 {
-        inception: inception.clone(),
-        log: log.clone(),
-        authorization,
-        vote_bundles,
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: CheckpointedEvidenceV0 {
+            inception,
+            log,
+            authorization,
+            vote_bundles,
+        },
+        recognitions: pkg
+            .recognition_geneses
+            .iter()
+            .map(GenesisParts::genesis)
+            .collect(),
     };
-    // Re-derive the verdict from the log, the rule and the N4 acts. Nothing the writer asserts
-    // about the electorate, rule or verdict is taken on its word.
-    let verified = icn_authz::effect_v0::verify_checkpointed_authorization(
-        &evidence,
-        &trust.frontier,
-        &rules(),
-    )
-    .map_err(IndependentRefusal::Log)?;
-    let auth = verified.authorization().clone();
-
-    // Recognition gate (HARNESS): every Subject in the electorate at the checkpoint must have a
-    // GEN-B rehearsal recognition by the trusted domain, re-derived from its GEN-A genesis.
-    let replayed =
-        replay_context_log(&inception, &log, &rules()).map_err(IndependentRefusal::Log)?;
-    let state = replayed
-        .state_at(auth.checkpoint.seq)
-        .ok_or(IndependentRefusal::Decode("checkpoint state"))?;
-    let electorate = state.eligible(ROLE);
-    for subject in &electorate {
-        let recognized = pkg.recognition_geneses.iter().any(|parts| {
-            SubjectRecognitionV1::recognize_bootstrap_rehearsal(&trust.domain, &parts.genesis())
-                .map(|r| {
-                    r.subject() == subject
-                        && r.basis_kind() == RecognitionBasisKind::BootstrapRehearsalV1
-                })
-                .unwrap_or(false)
-        });
-        if !recognized {
-            return Err(IndependentRefusal::UnrecognizedStanding(*subject));
-        }
-    }
+    // Re-derive everything: log, rule, N4 acts, and GEN-B recognition of the whole electorate for
+    // the anchor's domain. Nothing the writer or presenter asserts is taken on its word.
+    let verified = verify_institutional_authorization(trust, &evidence)
+        .map_err(IndependentRefusal::Institutional)?;
+    let auth = verified.verified().authorization();
     Ok(IndependentVerdict {
         context: auth.context,
         operation_id: auth.operation_id,
         effect: auth.effect.clone(),
         checkpoint: auth.checkpoint,
-        electorate: electorate.len(),
-        rehearsal_only: true,
+        voters: verified.voters().len(),
+        legitimacy: verified.legitimacy(),
     })
 }
 
@@ -647,8 +641,8 @@ fn lifecycle_gen_a_to_durable_reservation_survives_restart() {
     assert_eq!(verdict.operation_id, OP);
     assert_eq!(verdict.effect, request.effect(inst.custodian).unwrap());
     assert_eq!(verdict.checkpoint.seq, 2);
-    assert_eq!(verdict.electorate, 4);
-    assert!(verdict.rehearsal_only);
+    assert_eq!(verdict.voters, 3);
+    assert_eq!(verdict.legitimacy, Legitimacy::RehearsalOnly);
 
     // Target-side admission + atomic local reservation, independently re-verified by the target.
     let dir = tempfile::tempdir().unwrap();
@@ -685,7 +679,7 @@ fn lifecycle_gen_a_to_durable_reservation_survives_restart() {
 
 /// The seam this harness exists to find: the log admits a standing grant for any `SubjectId`
 /// that a Subject decision names. It does not know about GEN-A context or GEN-B recognition. Only
-/// the (harness) recognition gate refuses it.
+/// the institutional gate (`icn_governance::institutional_admission`) refuses it.
 #[test]
 fn the_log_alone_accepts_standing_for_a_foreign_or_unrecognized_subject() {
     let inst = Institution::new(DOMAIN);
@@ -706,26 +700,38 @@ fn the_log_alone_accepts_standing_for_a_foreign_or_unrecognized_subject() {
     let request = inst.request(OP, 1);
     let evidence = inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), inst.m(2)], &request);
 
-    // Foreign genesis supplied: recognition for DOMAIN is not derivable from it.
+    // Foreign genesis supplied: it does not verify for DOMAIN, so the presentation is refused.
     let mut with_foreign = inst.parts();
     with_foreign.push(foreign.parts());
-    assert_eq!(
+    assert!(matches!(
         independent_verify(
             &EvidencePackage::of(&evidence, with_foreign),
             &inst.trust(2, None)
         ),
-        Err(IndependentRefusal::UnrecognizedStanding(foreign.subject))
-    );
-    // No genesis supplied at all.
+        Err(IndependentRefusal::Institutional(
+            InstitutionalRefusal::InvalidRecognition {
+                index: 3,
+                error: RecognitionError::Genesis(_)
+            }
+        ))
+    ));
+    // No recognition for it supplied at all: its standing in the electorate at seq 2 is refused.
     assert_eq!(
         independent_verify(
             &EvidencePackage::of(&evidence, inst.parts()),
             &inst.trust(2, None)
         ),
-        Err(IndependentRefusal::UnrecognizedStanding(foreign.subject))
+        Err(IndependentRefusal::Institutional(
+            InstitutionalRefusal::UnrecognizedStanding {
+                at: 2,
+                subject: foreign.subject
+            }
+        ))
     );
 
-    // The target, which has no recognition gate, admits it: the gap is real at the target.
+    // The target called directly with a domain-blind resolver admits it: the gap is real at the
+    // target unless admission goes through the institutional gate (see
+    // `institutional_gate_is_bypassed_by_a_direct_ungated_call`).
     let dir = tempfile::tempdir().unwrap();
     let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
     target.initialize_pool(inst.pool(10)).unwrap();
@@ -768,28 +774,59 @@ fn wrong_context_or_wrong_domain_binding_is_refused() {
 
     // A verifier serving a different authz context.
     let other = Institution::new(FOREIGN_DOMAIN);
-    let mut trust = inst.trust(2, None);
-    trust.context = other.ctx;
+    let trust = anchor(
+        DOMAIN,
+        other.ctx,
+        2,
+        None,
+        RecognitionRequirement::RehearsalPermitted,
+    );
     assert_eq!(
         independent_verify(&package, &trust),
-        Err(IndependentRefusal::UntrustedContext)
+        Err(IndependentRefusal::Institutional(
+            InstitutionalRefusal::UntrustedContext
+        ))
     );
 
-    // A context whose label binds another domain, trusted as if it served DOMAIN.
+    // A relying party misconfigured to trust another institution's context for DOMAIN. The
+    // binding itself is the relying party's, so nothing in the evidence can contradict it; what
+    // fails is that the other context's electorate is not recognised by DOMAIN.
     let (olog, ofourth) = honest_history(&other);
     let oreq = other.request(OP, 4);
     let oev = other.reservation_evidence(&olog, &[other.m(0), other.m(1), &ofourth], &oreq);
-    assert_eq!(
-        independent_verify(
-            &EvidencePackage::of(&oev, other.parts()),
-            &VerifierTrust {
-                domain: GovernanceDomainId(DOMAIN.into()),
-                context: other.ctx,
-                frontier: other.frontier(2, None),
-            }
-        ),
-        Err(IndependentRefusal::DomainBindingMismatch)
+    let misbound = anchor(
+        DOMAIN,
+        other.ctx,
+        2,
+        None,
+        RecognitionRequirement::RehearsalPermitted,
     );
+    // KNOWN LIMIT: `other`'s members are themselves recognised by DOMAIN (the harness incepts
+    // every member for DOMAIN), so the misbound anchor ACCEPTS. Nothing in the evidence can
+    // contradict the relying party's binding; its correctness rests on where the anchor came from
+    // (the institutional root — an unowned seam). The session-2 harness caught this case only by
+    // interpreting `label_hash`, a test convention deliberately not promoted to a format.
+    let mut oparts = other.parts();
+    oparts.push(ofourth.parts());
+    assert!(independent_verify(&EvidencePackage::of(&oev, oparts), &misbound).is_ok());
+    // A foreign-domain Subject cannot supply recognition under DOMAIN at all.
+    let stranger = GenASubject::incept(FOREIGN_DOMAIN, 0x08);
+    assert!(matches!(
+        independent_verify(
+            &EvidencePackage::of(&oev, vec![stranger.parts()]),
+            &misbound
+        ),
+        Err(IndependentRefusal::Institutional(
+            InstitutionalRefusal::InvalidRecognition { index: 0, .. }
+        ))
+    ));
+    // Without recognition items the electorate is refused instead.
+    assert!(matches!(
+        independent_verify(&EvidencePackage::of(&oev, vec![]), &misbound),
+        Err(IndependentRefusal::Institutional(
+            InstitutionalRefusal::UnrecognizedStanding { .. }
+        ))
+    ));
 
     // The target's pool lives in `inst.ctx`; the other context's evidence names `other.ctx`.
     let dir = tempfile::tempdir().unwrap();
@@ -829,7 +866,9 @@ fn stale_checkpoint_is_refused_by_verifier_and_target() {
             &EvidencePackage::of(&stale, inst.parts()),
             &inst.trust(2, None)
         ),
-        Err(IndependentRefusal::Log(refusal.clone()))
+        Err(IndependentRefusal::Institutional(
+            InstitutionalRefusal::Log(refusal.clone())
+        ))
     );
     let dir = tempfile::tempdir().unwrap();
     let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
@@ -870,8 +909,8 @@ fn conflicting_histories_yield_a_fork_proof_and_the_pin_decides() {
             &EvidencePackage::of(&on_b, inst.parts()),
             &inst.trust(1, Some(pin_a))
         ),
-        Err(IndependentRefusal::Log(
-            LogRefusal::PinnedCheckpointMismatch { seq: 2 }
+        Err(IndependentRefusal::Institutional(
+            InstitutionalRefusal::Log(LogRefusal::PinnedCheckpointMismatch { seq: 2 })
         ))
     );
     let dir = tempfile::tempdir().unwrap();
@@ -981,4 +1020,574 @@ fn storage_failure_is_uncertain_and_reconciles_once_after_restart() {
         Err(ReservationError::Authorization(AdmissionRefusal::Replayed))
     );
     assert_eq!(available(&target, inst.ctx), 6);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Institutional admission: the library gate in front of the real target
+// ---------------------------------------------------------------------------------------------
+
+fn geneses(subjects: &[&GenASubject]) -> Vec<SubjectContextGenesisV1> {
+    subjects.iter().map(|s| s.genesis.clone()).collect()
+}
+
+fn members_and(inst: &Institution, extra: &[&GenASubject]) -> Vec<SubjectContextGenesisV1> {
+    let mut all: Vec<&GenASubject> = inst.members.iter().collect();
+    all.extend_from_slice(extra);
+    geneses(&all)
+}
+
+type GateResult = Result<
+    (
+        icn_governance::institutional_admission::VerifiedInstitutionalAuthorization,
+        icn_authz_store::ReservationRecordV0,
+    ),
+    InstitutionalAdmissionError<ReservationError>,
+>;
+
+/// Admission through the institutional gate. `reached` records whether the target was invoked.
+fn reserve_via_gate(
+    target: &LocalResourceReservations<impl DurabilityBarrier>,
+    trust: &InstitutionalTrustAnchorV0,
+    evidence: &InstitutionalEvidenceV0,
+    request: &ReservationRequestV0,
+    reached: &std::cell::Cell<bool>,
+) -> GateResult {
+    admit_institutional(trust, evidence, |ev, frontier, rules| {
+        reached.set(true);
+        // The target receives the anchor's frontier, whatever the presenter would have preferred.
+        assert_eq!(*frontier, trust.frontier());
+        target.reserve_checkpointed(ev, frontier, rules, NOW, request)
+    })
+}
+
+fn fresh_target(inst: &Institution) -> (tempfile::TempDir, LocalResourceReservations) {
+    let dir = tempfile::tempdir().unwrap();
+    let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
+    target.initialize_pool(inst.pool(10)).unwrap();
+    (dir, target)
+}
+
+/// Nothing consumed, no reservation, capacity unchanged.
+fn untouched(target: &LocalResourceReservations, inst: &Institution, op: [u8; 32]) {
+    assert_eq!(target.inspect_consumed(inst.ctx, op).unwrap(), None);
+    assert!(matches!(
+        target.reconcile(inst.ctx, op).unwrap(),
+        ReservationReconciliation::Absent
+    ));
+    assert_eq!(available(target, inst.ctx), 10);
+}
+
+/// A recognised, authorized electorate admits exactly one reservation through the gate; the
+/// admission survives restart and its replay through the gate is refused by the target.
+#[test]
+fn institutional_admission_reserves_once_and_survives_restart() {
+    let inst = Institution::new(DOMAIN);
+    let (log, fourth) = honest_history(&inst);
+    let request = inst.request(OP, 4);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), &fourth], &request),
+        recognitions: members_and(&inst, &[&fourth]),
+    };
+    let trust = inst.trust(2, None);
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
+        target.initialize_pool(inst.pool(10)).unwrap();
+        let reached = std::cell::Cell::new(false);
+        let (verified, record) =
+            reserve_via_gate(&target, &trust, &evidence, &request, &reached).unwrap();
+        assert!(reached.get());
+        assert_eq!((record.available_before, record.available_after), (10, 6));
+        assert_eq!(verified.domain(), &GovernanceDomainId(DOMAIN.into()));
+        assert_eq!(verified.legitimacy(), Legitimacy::RehearsalOnly);
+        // Each counted voter carries the GEN-B recognition hash a relying party re-derives.
+        assert_eq!(verified.voters().len(), 3);
+        for (subject, hash) in verified.voters() {
+            let who = [inst.m(0), inst.m(1), &fourth]
+                .into_iter()
+                .find(|m| &m.subject == subject)
+                .unwrap();
+            let expected = SubjectRecognitionV1::recognize_bootstrap_rehearsal(
+                &GovernanceDomainId(DOMAIN.into()),
+                &who.genesis,
+            )
+            .unwrap();
+            assert_eq!(hash, expected.recognition_hash());
+        }
+    }
+    let target = LocalResourceReservations::open(dir.path(), inst.custodian).unwrap();
+    assert!(matches!(
+        target.reconcile(inst.ctx, OP).unwrap(),
+        ReservationReconciliation::Committed { .. }
+    ));
+    let reached = std::cell::Cell::new(false);
+    assert!(matches!(
+        reserve_via_gate(&target, &trust, &evidence, &request, &reached),
+        Err(InstitutionalAdmissionError::Target(
+            ReservationError::Authorization(AdmissionRefusal::Replayed)
+        ))
+    ));
+    assert_eq!(available(&target, inst.ctx), 6);
+}
+
+/// A foreign-domain Subject granted standing by an otherwise valid Subject decision is refused by
+/// the gate, before the target is invoked. Nothing is consumed or reserved.
+#[test]
+fn foreign_domain_standing_is_refused_before_any_effect() {
+    let inst = Institution::new(DOMAIN);
+    let foreign = GenASubject::incept(FOREIGN_DOMAIN, 0x05);
+    let mut log = vec![inst.genesis_entry()];
+    log.push(inst.decided(
+        &log,
+        TransitionV0::GrantStanding {
+            subject: foreign.subject,
+            role: ROLE.into(),
+        },
+        &[inst.m(0), inst.m(1)],
+    ));
+    let request = inst.request(OP, 1);
+    let authorization =
+        inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), inst.m(2)], &request);
+    let (_dir, target) = fresh_target(&inst);
+    let trust = inst.trust(2, None);
+
+    for (recognitions, expect_invalid) in [
+        (members_and(&inst, &[]), false),
+        (members_and(&inst, &[&foreign]), true),
+    ] {
+        let evidence = InstitutionalEvidenceV0 {
+            authorization: authorization.clone(),
+            recognitions,
+        };
+        let reached = std::cell::Cell::new(false);
+        let result = reserve_via_gate(&target, &trust, &evidence, &request, &reached);
+        if expect_invalid {
+            assert!(matches!(
+                result,
+                Err(InstitutionalAdmissionError::Refused(
+                    InstitutionalRefusal::InvalidRecognition { index: 3, .. }
+                ))
+            ));
+        } else {
+            assert_eq!(
+                result.unwrap_err(),
+                InstitutionalAdmissionError::Refused(InstitutionalRefusal::UnrecognizedStanding {
+                    at: 2,
+                    subject: foreign.subject
+                })
+            );
+        }
+        assert!(!reached.get(), "target must not be invoked on refusal");
+        untouched(&target, &inst, OP);
+    }
+}
+
+/// A Subject with valid GEN-B recognition by the domain but no decided standing grant cannot vote:
+/// recognition is not membership.
+#[test]
+fn recognized_subject_without_standing_grant_is_refused() {
+    let inst = Institution::new(DOMAIN);
+    let (log, fourth) = honest_history(&inst);
+    let outsider = GenASubject::incept(DOMAIN, 0x07);
+    let request = inst.request(OP, 4);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(
+            &log,
+            &[inst.m(0), inst.m(1), &outsider],
+            &request,
+        ),
+        recognitions: members_and(&inst, &[&fourth, &outsider]),
+    };
+    let (_dir, target) = fresh_target(&inst);
+    let reached = std::cell::Cell::new(false);
+    assert_eq!(
+        reserve_via_gate(&target, &inst.trust(2, None), &evidence, &request, &reached).unwrap_err(),
+        InstitutionalAdmissionError::Refused(InstitutionalRefusal::Log(
+            LogRefusal::IneligibleVoter {
+                at: 2,
+                subject: outsider.subject
+            }
+        ))
+    );
+    assert!(!reached.get());
+    untouched(&target, &inst, OP);
+}
+
+/// A writer-manufactured standing grant (no Subject acts) is refused by the gate's log replay even
+/// when the beneficiary presents valid recognition.
+#[test]
+fn writer_manufactured_standing_is_refused_by_the_gate() {
+    let inst = Institution::new(DOMAIN);
+    let intruder = GenASubject::incept(DOMAIN, 0x06);
+    let log = vec![inst.genesis_entry()];
+    let mut forged = log.clone();
+    forged.push(inst.decided(
+        &log,
+        TransitionV0::GrantStanding {
+            subject: intruder.subject,
+            role: ROLE.into(),
+        },
+        &[],
+    ));
+    let request = inst.request(OP, 1);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: inst.authorize(
+            &forged,
+            inst.tip(&log),
+            &[inst.m(0), inst.m(1), &intruder],
+            request.effect(inst.custodian).unwrap(),
+            OP,
+        ),
+        recognitions: members_and(&inst, &[&intruder]),
+    };
+    let (_dir, target) = fresh_target(&inst);
+    let reached = std::cell::Cell::new(false);
+    // The zero-act grant at seq 2 fails the transition rule: refused at that entry, not by some
+    // later check.
+    assert_eq!(
+        reserve_via_gate(&target, &inst.trust(1, None), &evidence, &request, &reached).unwrap_err(),
+        InstitutionalAdmissionError::Refused(InstitutionalRefusal::Log(
+            LogRefusal::TransitionNotAuthorized { seq: 2 }
+        ))
+    );
+    assert!(!reached.get());
+    untouched(&target, &inst, OP);
+}
+
+/// Missing recognition, stale checkpoints, a conflicting pinned history and an empty log all fail
+/// closed before the target is invoked.
+#[test]
+fn missing_or_stale_authority_evidence_fails_closed() {
+    let inst = Institution::new(DOMAIN);
+    let (log, fourth) = honest_history(&inst);
+    let request = inst.request(OP, 4);
+    let voters = [inst.m(0), inst.m(1), &fourth];
+    let good = inst.reservation_evidence(&log, &voters, &request);
+    let (_dir, target) = fresh_target(&inst);
+
+    let stale = inst.authorize(
+        &log,
+        inst.tip(&log[..1]),
+        &[inst.m(0), inst.m(1)],
+        request.effect(inst.custodian).unwrap(),
+        OP,
+    );
+    let mut b = vec![inst.genesis_entry()];
+    b.push(inst.decided(
+        &b,
+        TransitionV0::RevokeStanding {
+            subject: inst.m(2).subject,
+            role: ROLE.into(),
+        },
+        &[inst.m(0), inst.m(1)],
+    ));
+    let on_b = inst.reservation_evidence(&b, &[inst.m(0), inst.m(1)], &request);
+    let mut empty_log = good.clone();
+    empty_log.log.clear();
+
+    let all = members_and(&inst, &[&fourth]);
+    let cases: Vec<(&str, InstitutionalEvidenceV0, InstitutionalTrustAnchorV0)> = vec![
+        (
+            "no recognition at all",
+            InstitutionalEvidenceV0 {
+                authorization: good.clone(),
+                recognitions: vec![],
+            },
+            inst.trust(2, None),
+        ),
+        (
+            "recognition for the granted member missing",
+            InstitutionalEvidenceV0 {
+                authorization: good.clone(),
+                recognitions: members_and(&inst, &[]),
+            },
+            inst.trust(2, None),
+        ),
+        (
+            "checkpoint below the anchor frontier",
+            InstitutionalEvidenceV0 {
+                authorization: stale,
+                recognitions: all.clone(),
+            },
+            inst.trust(2, None),
+        ),
+        (
+            "history conflicting with the anchor pin",
+            InstitutionalEvidenceV0 {
+                authorization: on_b,
+                recognitions: all.clone(),
+            },
+            inst.trust(1, Some(inst.tip(&log))),
+        ),
+        (
+            "empty log",
+            InstitutionalEvidenceV0 {
+                authorization: empty_log,
+                recognitions: all.clone(),
+            },
+            inst.trust(2, None),
+        ),
+    ];
+    for (name, evidence, trust) in cases {
+        let reached = std::cell::Cell::new(false);
+        let result = reserve_via_gate(&target, &trust, &evidence, &request, &reached);
+        let refusal = match result {
+            Err(InstitutionalAdmissionError::Refused(r)) => r,
+            other => panic!("{name}: expected a gate refusal, got {other:?}"),
+        };
+        match name {
+            // The first decision in the log (the grant at seq 2, evaluated over the seq-1
+            // electorate) is already gated: every decision is, not only the effect.
+            "no recognition at all" => assert!(
+                matches!(
+                    refusal,
+                    InstitutionalRefusal::UnrecognizedStanding { at: 1, .. }
+                ),
+                "{name}: {refusal:?}"
+            ),
+            "recognition for the granted member missing" => assert_eq!(
+                refusal,
+                InstitutionalRefusal::UnrecognizedStanding {
+                    at: 2,
+                    subject: fourth.subject
+                },
+                "{name}"
+            ),
+            "checkpoint below the anchor frontier" => assert_eq!(
+                refusal,
+                InstitutionalRefusal::Log(LogRefusal::CheckpointBelowFrontier {
+                    checkpoint: 1,
+                    frontier: 2
+                }),
+                "{name}"
+            ),
+            "history conflicting with the anchor pin" => assert_eq!(
+                refusal,
+                InstitutionalRefusal::Log(LogRefusal::PinnedCheckpointMismatch { seq: 2 }),
+                "{name}"
+            ),
+            "empty log" => assert_eq!(refusal, InstitutionalRefusal::Log(LogRefusal::Empty)),
+            _ => unreachable!(),
+        }
+        assert!(!reached.get(), "{name}: target invoked");
+        untouched(&target, &inst, OP);
+    }
+}
+
+/// Rehearsal recognition is never production legitimacy: an anchor requiring production-grade
+/// recognition refuses every v1 presentation.
+#[test]
+fn production_requirement_refuses_rehearsal_recognition() {
+    let inst = Institution::new(DOMAIN);
+    let (log, fourth) = honest_history(&inst);
+    let request = inst.request(OP, 4);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), &fourth], &request),
+        recognitions: members_and(&inst, &[&fourth]),
+    };
+    let production = anchor(
+        DOMAIN,
+        inst.ctx,
+        2,
+        None,
+        RecognitionRequirement::ProductionGrade,
+    );
+    let (_dir, target) = fresh_target(&inst);
+    let reached = std::cell::Cell::new(false);
+    assert_eq!(
+        reserve_via_gate(&target, &production, &evidence, &request, &reached).unwrap_err(),
+        InstitutionalAdmissionError::Refused(InstitutionalRefusal::RehearsalNotProduction {
+            index: 0
+        })
+    );
+    assert!(!reached.get());
+    untouched(&target, &inst, OP);
+}
+
+/// The requester supplies evidence only. A self-consistent authorization from another context is
+/// refused, and the anchor cannot be built without the relying party's own trust inputs.
+#[test]
+fn requester_cannot_substitute_context_domain_or_frontier() {
+    let inst = Institution::new(DOMAIN);
+    // Another context whose members are recognised by DOMAIN and whose evidence is internally
+    // valid: the presenter would like it to count for `inst`.
+    let other = Institution::new(FOREIGN_DOMAIN);
+    let (olog, ofourth) = honest_history(&other);
+    let request = inst.request(OP, 4);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: other.reservation_evidence(
+            &olog,
+            &[other.m(0), other.m(1), &ofourth],
+            &request,
+        ),
+        recognitions: members_and(&other, &[&ofourth]),
+    };
+    // Valid under its own anchor...
+    assert!(verify_institutional_authorization(&other.trust(2, None), &evidence).is_ok());
+    // ...refused under the relying party's.
+    let (_dir, target) = fresh_target(&inst);
+    let reached = std::cell::Cell::new(false);
+    assert_eq!(
+        reserve_via_gate(&target, &inst.trust(2, None), &evidence, &request, &reached).unwrap_err(),
+        InstitutionalAdmissionError::Refused(InstitutionalRefusal::UntrustedContext)
+    );
+    assert!(!reached.get());
+    untouched(&target, &inst, OP);
+
+    // An anchor is never implicit: the relying party must name a domain and a governing rule.
+    use icn_governance::institutional_admission::TrustAnchorError;
+    let build = |domain: &str, rules: Vec<ThresholdRuleV0>, pinned| {
+        InstitutionalTrustAnchorV0::new(
+            GovernanceDomainId(domain.into()),
+            inst.ctx,
+            2,
+            pinned,
+            rules,
+            RecognitionRequirement::RehearsalPermitted,
+        )
+    };
+    assert_eq!(
+        build("", vec![strict()], None),
+        Err(TrustAnchorError::EmptyDomain)
+    );
+    assert_eq!(build(DOMAIN, vec![], None), Err(TrustAnchorError::NoRules));
+    assert_eq!(
+        build(DOMAIN, vec![strict(), strict()], None),
+        Err(TrustAnchorError::DuplicateRule)
+    );
+    let mut malformed = strict();
+    malformed.approval = Ratio { num: 0, den: 3 };
+    assert!(matches!(
+        build(DOMAIN, vec![malformed], None),
+        Err(TrustAnchorError::MalformedRule(_))
+    ));
+    assert_eq!(
+        build(
+            DOMAIN,
+            vec![strict()],
+            Some(LogCheckpointV0 {
+                seq: 0,
+                head: [0; 32]
+            })
+        ),
+        Err(TrustAnchorError::PinnedAtZero)
+    );
+}
+
+/// KNOWN LIMIT (pinned so it cannot be forgotten): the target does not know which resolver its
+/// pool requires. A custodian that calls `reserve_checkpointed` directly with a domain-blind
+/// resolver admits the foreign-standing authorization the gate refuses. Closing this needs the
+/// target to bind a pool to a required admission policy (an `icn-authz-store` change).
+#[test]
+fn institutional_gate_is_bypassed_by_a_direct_ungated_call() {
+    let inst = Institution::new(DOMAIN);
+    let foreign = GenASubject::incept(FOREIGN_DOMAIN, 0x05);
+    let mut log = vec![inst.genesis_entry()];
+    log.push(inst.decided(
+        &log,
+        TransitionV0::GrantStanding {
+            subject: foreign.subject,
+            role: ROLE.into(),
+        },
+        &[inst.m(0), inst.m(1)],
+    ));
+    let request = inst.request(OP, 1);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(
+            &log,
+            &[inst.m(0), inst.m(1), inst.m(2)],
+            &request,
+        ),
+        recognitions: members_and(&inst, &[]),
+    };
+    let (_dir, target) = fresh_target(&inst);
+    let reached = std::cell::Cell::new(false);
+    assert!(
+        reserve_via_gate(&target, &inst.trust(2, None), &evidence, &request, &reached).is_err()
+    );
+    untouched(&target, &inst, OP);
+    // Direct, ungated: admitted.
+    assert!(target
+        .reserve_checkpointed(
+            &evidence.authorization,
+            &inst.frontier(2, None),
+            &rules(),
+            NOW,
+            &request
+        )
+        .is_ok());
+    assert_eq!(available(&target, inst.ctx), 9);
+}
+
+/// The resolver the gate hands the target is itself gated: inside a successful admission, the
+/// target-side preflight with that resolver refuses a foreign-standing authorization for the same
+/// context. Guards against the gate ever passing the target a domain-blind resolver.
+#[test]
+fn the_resolver_handed_to_the_target_enforces_recognition() {
+    let inst = Institution::new(DOMAIN);
+    let (log, fourth) = honest_history(&inst);
+    let request = inst.request(OP, 4);
+    let good = InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), &fourth], &request),
+        recognitions: members_and(&inst, &[&fourth]),
+    };
+    // Same context, an electorate including a foreign-domain Subject.
+    let foreign = GenASubject::incept(FOREIGN_DOMAIN, 0x05);
+    let mut flog = vec![inst.genesis_entry()];
+    flog.push(inst.decided(
+        &flog,
+        TransitionV0::GrantStanding {
+            subject: foreign.subject,
+            role: ROLE.into(),
+        },
+        &[inst.m(0), inst.m(1)],
+    ));
+    let other_op = [0x0b; 32];
+    let freq = inst.request(other_op, 1);
+    let fev = inst.reservation_evidence(&flog, &[inst.m(0), inst.m(1), inst.m(2)], &freq);
+    // Domain-blind preflight admits it (control).
+    assert!(icn_authz::effect_v0::preflight_checkpointed(
+        &fev,
+        &inst.frontier(2, None),
+        &rules(),
+        inst.custodian,
+        NOW
+    )
+    .is_ok());
+    let (_dir, target) = fresh_target(&inst);
+    let (_, record) = admit_institutional(&inst.trust(2, None), &good, |ev, frontier, gated| {
+        assert!(matches!(
+            icn_authz::effect_v0::preflight_checkpointed(
+                &fev,
+                frontier,
+                gated,
+                inst.custodian,
+                NOW
+            ),
+            Err(AdmissionRefusal::Log(LogRefusal::RuleRefused {
+                at: 2,
+                error: icn_authz::effect_v0::RuleError::IneligibleSubject(s)
+            })) if s == foreign.subject
+        ));
+        target.reserve_checkpointed(ev, frontier, gated, NOW, &request)
+    })
+    .unwrap();
+    assert_eq!(record.available_after, 6);
+    assert_eq!(target.inspect_consumed(inst.ctx, other_op).unwrap(), None);
+}
+
+/// Two recognition items for one Subject are refused: the presenter must not choose which counts.
+#[test]
+fn duplicate_recognition_for_one_subject_is_refused() {
+    let inst = Institution::new(DOMAIN);
+    let (log, fourth) = honest_history(&inst);
+    let request = inst.request(OP, 4);
+    let evidence = InstitutionalEvidenceV0 {
+        authorization: inst.reservation_evidence(&log, &[inst.m(0), inst.m(1), &fourth], &request),
+        recognitions: members_and(&inst, &[&fourth, &fourth]),
+    };
+    assert_eq!(
+        verify_institutional_authorization(&inst.trust(2, None), &evidence),
+        Err(InstitutionalRefusal::DuplicateRecognition { index: 4 })
+    );
 }
