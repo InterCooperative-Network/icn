@@ -14,9 +14,9 @@ use icn_authz::effect_v0::{
     admit, designation_equivocators, issue_outcome_receipt, roster_hash, target_id,
     verify_authorization, verify_authorization_bytes, verify_outcome_receipt, AdmissionRefusal,
     AdoptedRule, AuthorizationEvidenceV0, AuthorizationV0, AuthzCodecError, AuthzRefusal,
-    CanonicalV0, ContextInceptionV0, ContextRef, EffectV0, InMemoryConsumedSet, InputActV0,
-    OutcomeReceiptV0, ReceiptRefusal, RuleAdoptionV0, RuleError, Signed, SignedDesignation,
-    StandingV0, StatementKind, Verdict, WriterDesignationV0,
+    CanonicalV0, ConflictClass, ConsumedAuthorization, ContextInceptionV0, ContextRef, EffectV0,
+    InMemoryConsumedSet, InputActV0, OutcomeReceiptV0, ReceiptRefusal, RuleAdoptionV0, RuleError,
+    Signed, SignedDesignation, StandingV0, StatementKind, Verdict, WriterDesignationV0,
 };
 use icn_governance::authz_threshold::{GovernanceActV0, Ratio, ThresholdRuleV0};
 use icn_governance::vote::VoteChoice;
@@ -995,13 +995,23 @@ fn a13_equivocation_yields_a_proof() {
     };
     assert!(proof.is_valid());
     assert_eq!(
-        proof.first.authorization.body.operation_id,
-        proof.second.authorization.body.operation_id
+        proof.first.authorization.operation_id(),
+        proof.second.authorization.operation_id()
+    );
+    // One writer signed both: attributable equivocation.
+    assert_eq!(
+        proof.classify(),
+        Some(ConflictClass::Equivocation {
+            signer: PrincipalKey::try_from_verifying_key(w.writer.verifying_key()).unwrap()
+        })
     );
     // A forged proof (bodies swapped under the wrong signature) is not valid.
     let mut forged = (*proof).clone();
-    forged.second.authorization.body.not_after = AUTH_UNTIL;
+    if let ConsumedAuthorization::Legacy(s) = &mut forged.second.authorization {
+        s.body.not_after = AUTH_UNTIL;
+    }
     assert!(!forged.is_valid());
+    assert_eq!(forged.classify(), None);
     // Neither is admissible again here.
     assert_eq!(
         w.admit(&first, NOW, 1, &mut consumed),

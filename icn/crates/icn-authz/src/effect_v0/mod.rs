@@ -18,7 +18,10 @@
 //! - [`OutcomeReceiptV0`] — the custodian's signed outcome boundary (no real effect runs);
 //! - [`log`] — the Context Authority Log: standing, rules and writer derived from authorized,
 //!   sequenced transitions instead of writer assertions, with relying-party frontiers and fork
-//!   proofs ([`verify_checkpointed_authorization`]).
+//!   proofs ([`verify_checkpointed_authorization`]);
+//! - [`admit_checkpointed`] — target-side admission of a checkpointed authorization against the
+//!   target's own frontier, identity and clock, consuming its operation id in the
+//!   `(context, operation_id)` space shared with [`admit`] ([`ConsumedAuthorization`]).
 //!
 //! ## Status
 //!
@@ -33,12 +36,13 @@ mod verify;
 
 pub use codec::AuthzCodecError;
 pub use log::{
-    apply_entry, find_log_fork, replay_context_log, sign_checkpointed_authorization,
-    transition_subject_matter, verify_checkpointed_authorization, CheckpointedAuthorizationV0,
-    CheckpointedEvidenceV0, ContextStateV0, DecisionAuthorityV0, EntryAuthorityV0, LogCheckpointV0,
-    LogEntryV0, LogForkProofV0, LogRefusal, RelyingFrontierV0, RuleResolver, RuleSlot,
-    SignedLogEntryV0, TransitionV0, VerifiedCheckpointedAuthorization, VerifiedContextLog,
-    CHECKPOINTED_AUTHORIZATION_DOMAIN, LOG_ENTRY_DOMAIN, LOG_TRANSITION_DOMAIN,
+    admit_checkpointed, apply_entry, find_log_fork, replay_context_log,
+    sign_checkpointed_authorization, transition_subject_matter, verify_checkpointed_authorization,
+    CheckpointedAdmission, CheckpointedAuthorizationV0, CheckpointedEvidenceV0, ContextStateV0,
+    DecisionAuthorityV0, EntryAuthorityV0, LogCheckpointV0, LogEntryV0, LogForkProofV0, LogRefusal,
+    RelyingFrontierV0, RuleResolver, RuleSlot, SignedLogEntryV0, TransitionV0,
+    VerifiedCheckpointedAuthorization, VerifiedContextLog, CHECKPOINTED_AUTHORIZATION_DOMAIN,
+    LOG_ENTRY_DOMAIN, LOG_TRANSITION_DOMAIN,
 };
 pub use statements::{
     roster_hash, target_id, AuthorizationEvidenceV0, AuthorizationV0, CanonicalV0,
@@ -52,7 +56,7 @@ pub use statements::{
 pub use verify::{
     admit, designation_equivocators, issue_outcome_receipt, verify_authorization,
     verify_authorization_bytes, verify_outcome_receipt, Admission, AdmissionRefusal, AdoptedRule,
-    AuthzRefusal, ConsumedEntry, ConsumedSet, ConsumedSetError, EquivocationProof,
-    InMemoryConsumedSet, ReceiptRefusal, RuleBinding, RuleError, StatementKind,
-    VerifiedAuthorization,
+    AuthzRefusal, ConflictClass, ConsumedAuthorization, ConsumedEntry, ConsumedSet,
+    ConsumedSetError, EquivocationProof, InMemoryConsumedSet, ReceiptRefusal, RuleBinding,
+    RuleError, StatementKind, VerifiedAuthorization,
 };
