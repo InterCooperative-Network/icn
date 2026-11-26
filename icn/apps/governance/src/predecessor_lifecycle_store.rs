@@ -84,8 +84,11 @@ impl ElectorateCommitment {
 /// Why a lifecycle operation was refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LifecycleStoreError {
-    /// The predecessor domain record is missing; a cutover cannot begin.
+    /// The predecessor domain record is missing; a cutover cannot begin or seal.
     DomainMissing,
+    /// L's stored domain record is not the one pinned at Begin (layout v3 pin); the Seal is
+    /// refused and nothing is written. Resolving it is not this store's authority.
+    DomainChanged,
     /// The loaded lifecycle is stale: another write landed first.
     Stale,
     /// Another lifecycle write for this domain is in flight.
@@ -107,7 +110,12 @@ pub enum LifecycleStoreError {
 impl std::fmt::Display for LifecycleStoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Self::DomainMissing => "predecessor domain record is missing; a cutover cannot begin",
+            Self::DomainMissing => {
+                "predecessor domain record is missing; a cutover cannot begin or seal"
+            }
+            Self::DomainChanged => {
+                "the predecessor domain record differs from the one pinned at Begin"
+            }
             Self::Stale => "the loaded lifecycle is stale: another write landed first",
             Self::Busy => "another lifecycle write for this domain is in flight",
             Self::MissingElectorate => "a Begin needs an electorate commitment",
@@ -453,6 +461,11 @@ impl<'a> LifecycleStore<'a> {
                 if self.store.get(&lifecycle_key(l)?)? != loaded.record_bytes {
                     return Err(LifecycleStoreError::Stale.into());
                 }
+                // A Seal replay is never acknowledged over a domain record that drifted from the
+                // pin (S28 review FOLLOW_UP: `seal()` checked this, `transition` did not).
+                if matches!(transition, CutoverTransition::Seal { .. }) {
+                    self.check_domain_pin(loaded)?;
+                }
                 if let (
                     Some(e),
                     Some(LifecycleRecordV1 {
@@ -496,6 +509,9 @@ impl<'a> LifecycleStore<'a> {
                 StoredLifecycle::Pending {
                     attempt: *attempt,
                     commitment: commitment.clone(),
+                    // The basis inputs are retained so the Seal can re-verify the pin (layout v3).
+                    begin_revision: loaded.revision,
+                    domain_pin: pin,
                     basis,
                     electorate: electorate.0,
                 }
@@ -505,19 +521,29 @@ impl<'a> LifecycleStore<'a> {
                 commitment,
                 final_set,
             } => {
-                let (basis, electorate) = match &loaded.stored {
+                let (begin_revision, domain_pin, basis, electorate) = match &loaded.stored {
                     Some(LifecycleRecordV1 {
                         state:
                             StoredLifecycle::Pending {
-                                basis, electorate, ..
+                                begin_revision,
+                                domain_pin,
+                                basis,
+                                electorate,
+                                ..
                             },
                         ..
-                    }) => (*basis, *electorate),
+                    }) => (*begin_revision, *domain_pin, *basis, *electorate),
                     _ => return Err(LifecycleStoreError::Inconsistent.into()),
                 };
+                // Contract §4.2 step 2: L's stored domain record must still be exactly the bytes
+                // pinned at Begin, and must still be so at the Seal's linearization point.
+                let domain_bytes = self.check_domain_pin(loaded)?;
+                guards.push((domain_key(l), Some(domain_bytes)));
                 StoredLifecycle::Sealed {
                     attempt: *attempt,
                     commitment: commitment.clone(),
+                    begin_revision,
+                    domain_pin,
                     basis,
                     electorate,
                     final_set: *final_set,
@@ -830,11 +856,13 @@ impl<'a> LifecycleStore<'a> {
     /// the revision and are not caught by step 1. Cross-database evidence is trusted as
     /// reported by `evidence` (no cross-database atomicity).
     ///
-    /// **Required before activation** (S27 review FOLLOW_UPs): (a) contract step 2, re-verify
-    /// the domain record against the Begin pin and expect `gov:domain:L` in the commit, which
-    /// needs Pending to retain the pin (today it keeps only the opaque basis); (b) bind
-    /// `SealEvidence` to the receipt backend and the compiled-in P5c predicate when the store
-    /// is constructed, instead of accepting it per call.
+    /// Contract step 2 (S28, layout v3): the Seal re-verifies L's stored domain record against
+    /// the pin retained since Begin and expects those exact bytes in the commit
+    /// ([`LifecycleStoreError::DomainChanged`] otherwise).
+    ///
+    /// **Required before activation** (S27 review FOLLOW_UP (b)): bind `SealEvidence` to the
+    /// receipt backend and the compiled-in P5c predicate when the store is constructed, instead
+    /// of accepting it per call.
     pub fn seal(
         &self,
         loaded: &LoadedLifecycle,
@@ -866,6 +894,9 @@ impl<'a> LifecycleStore<'a> {
                     && commitment.commitment()? == commitment_hash
                     && self.store.get(&lifecycle_key(l)?)? == loaded.record_bytes
                 {
+                    // A replay never acknowledges over a domain record that drifted from the pin
+                    // (only a raw writer can change it once sealed).
+                    self.check_domain_pin(loaded)?;
                     return Ok(Committed::Replayed);
                 }
                 return Err(SealRefusal::SealedIsFinal.into());
@@ -925,6 +956,24 @@ impl<'a> LifecycleStore<'a> {
             },
             txid,
         )
+    }
+
+    /// L's current stored domain record must hash to the pin `loaded` retains (Pending or
+    /// Sealed). Returns the exact bytes checked, for use as a commit guard.
+    fn check_domain_pin(&self, loaded: &LoadedLifecycle) -> anyhow::Result<Vec<u8>> {
+        let pin = loaded
+            .stored
+            .as_ref()
+            .and_then(|r| r.state.domain_pin())
+            .ok_or(LifecycleStoreError::Inconsistent)?;
+        let bytes = self
+            .store
+            .get(&domain_key(&loaded.predecessor))?
+            .ok_or(LifecycleStoreError::DomainMissing)?;
+        if domain_record_pin(&bytes) != *pin {
+            return Err(LifecycleStoreError::DomainChanged.into());
+        }
+        Ok(bytes)
     }
 
     /// The one fenced commit: `target` moves from exactly `stored` to `next` (`None`
@@ -3133,5 +3182,250 @@ mod tests {
         assert!(!rk.starts_with(LIFECYCLE_JOURNAL_PREFIX));
         assert!(!wk.starts_with(LIFECYCLE_JOURNAL_PREFIX));
         assert!(!domain_key(&l()).starts_with(LIFECYCLE_JOURNAL_PREFIX));
+    }
+
+    // ---- S28: the Begin-time domain pin (record layout v3) ----
+
+    fn stored_record(s: &SledStore) -> LifecycleRecordV1 {
+        let bytes = s.get(&lifecycle_key(&l()).unwrap()).unwrap().unwrap();
+        LifecycleRecordV1::decode_for(&l(), &bytes).unwrap()
+    }
+
+    fn store_err(e: anyhow::Error) -> LifecycleStoreError {
+        match e.downcast_ref::<LifecycleStoreError>() {
+            Some(x) => x.clone(),
+            None => panic!("expected a LifecycleStoreError, got {e:#}"),
+        }
+    }
+
+    /// `drained`, but via an aborted first attempt, and with one allowed fenced write (a Draft
+    /// cancelled) after the second Begin, so the Seal runs several revisions past `r_begin`.
+    fn drained_after_retry(s: &SledStore) -> (LifecycleStore<'_>, LoadedLifecycle) {
+        let ls = live(s);
+        // One proposal value throughout: `prop` mints a fresh proposer each call, and a
+        // proposal's proposer is fixed at creation (#2962 field immutability).
+        let a0 = prop("a");
+        ls.write_proposal(&ls.load(&l()).unwrap(), &a0, [1; 16])
+            .unwrap();
+        let p1 = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
+                .unwrap(),
+        );
+        let abort = LifecycleRequest::Abort {
+            attempt: 1,
+            commitment_hash: k(0x4D),
+        };
+        let aborted = written(ls.transition(&p1, abort, [3; 16]).unwrap());
+        written(ls.transition(&aborted, begin(2, 0x4E), [4; 16]).unwrap());
+        let mut a = a0.clone();
+        a.cancel().unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &a, [5; 16])
+            .unwrap();
+        let pending = ls.load(&l()).unwrap();
+        (ls, pending)
+    }
+
+    #[test]
+    fn begin_retains_the_exact_domain_pin_and_its_revision_through_retries_and_fenced_writes() {
+        let s = store();
+        let (ls, pending) = drained_after_retry(&s);
+        let pin = domain_record_pin(DOMAIN);
+        // The second Begin was fenced on the Legacy record at revision 2; a fenced write since.
+        assert_eq!(pending.revision, 4);
+        let rec = stored_record(&s);
+        match &rec.state {
+            StoredLifecycle::Pending {
+                begin_revision,
+                domain_pin,
+                basis,
+                electorate,
+                ..
+            } => {
+                assert_eq!((*begin_revision, *domain_pin), (2, pin));
+                assert_eq!(*electorate, [0xE1; 32]);
+                assert_eq!(*basis, lifecycle_basis(&l(), 2, &[0xE1; 32], &pin).unwrap());
+            }
+            other => panic!("expected Pending, got {other:?}"),
+        }
+        // K_first is the aborted first attempt's K; the witness still corresponds.
+        assert_eq!(rec.first_commitment_hash, k(0x4D));
+        let sealed = written(
+            ls.seal(&pending, 2, k(0x4E), &Evidence::default(), [6; 16])
+                .unwrap(),
+        );
+        assert_eq!(sealed.revision, 5);
+        let after = stored_record(&s);
+        match &after.state {
+            StoredLifecycle::Sealed {
+                begin_revision,
+                domain_pin,
+                basis,
+                ..
+            } => assert_eq!(
+                (*begin_revision, *domain_pin, *basis),
+                (2, pin, {
+                    lifecycle_basis(&l(), 2, &[0xE1; 32], &pin).unwrap()
+                })
+            ),
+            other => panic!("expected Sealed, got {other:?}"),
+        }
+        assert_eq!(after.first_commitment_hash, k(0x4D));
+        // The matching Seal replays; the pinned domain is unchanged.
+        assert_eq!(
+            ls.seal(&sealed, 2, k(0x4E), &Evidence::default(), [7; 16])
+                .unwrap(),
+            Committed::Replayed
+        );
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_raw_domain_edit_after_begin_refuses_the_seal_and_writes_nothing() {
+        let s = store();
+        let (ls, pending) = drained(&s);
+        let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        // Restricted harness: a raw writer (W25) bypasses the fence and edits L's record.
+        s.put(&domain_key(&l()), br#"{"id":"legacy.coop.example","x":1}"#)
+            .unwrap();
+        let e = ls
+            .seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            .unwrap_err();
+        assert_eq!(store_err(e), LifecycleStoreError::DomainChanged);
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
+        admitted(&s);
+        // A corrupt (undecodable) record is a changed record too.
+        s.put(&domain_key(&l()), &[0xFF, 0x00, 0x13]).unwrap();
+        let e = ls
+            .seal(&pending, 1, k(0x4D), &Evidence::default(), [6; 16])
+            .unwrap_err();
+        assert_eq!(store_err(e), LifecycleStoreError::DomainChanged);
+        // A missing record.
+        s.delete(&domain_key(&l())).unwrap();
+        let e = ls
+            .seal(&pending, 1, k(0x4D), &Evidence::default(), [7; 16])
+            .unwrap_err();
+        assert_eq!(store_err(e), LifecycleStoreError::DomainMissing);
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
+        // The refusal is specific to the contradiction: the exact pinned bytes seal again.
+        s.put(&domain_key(&l()), DOMAIN).unwrap();
+        assert!(ls
+            .seal(&pending, 1, k(0x4D), &Evidence::default(), [8; 16])
+            .is_ok());
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_domain_edit_racing_the_seal_commit_makes_it_stale_and_writes_nothing() {
+        let s = store();
+        let (ls, pending) = drained(&s);
+        let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        // After the Seal's checks and its durable intent, before apply: a raw domain write.
+        *ls.before_apply.lock().unwrap() = Some(Box::new(|st: &SledStore| {
+            st.put(
+                &domain_key(&l()),
+                br#"{"id":"legacy.coop.example","raced":1}"#,
+            )
+            .unwrap();
+        }));
+        let e = ls
+            .seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            .unwrap_err();
+        assert_eq!(store_err(e), LifecycleStoreError::Stale);
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
+        admitted(&s);
+        // The drift persists, so a fresh Seal is refused for it rather than racing again.
+        let e = ls
+            .seal(
+                &ls.load(&l()).unwrap(),
+                1,
+                k(0x4D),
+                &Evidence::default(),
+                [6; 16],
+            )
+            .unwrap_err();
+        assert_eq!(store_err(e), LifecycleStoreError::DomainChanged);
+    }
+
+    #[test]
+    fn a_seal_replay_through_transition_is_not_acknowledged_over_a_drifted_domain() {
+        // S28 review FOLLOW_UP: the public `transition(Seal)` replay path, not only `seal()`.
+        let s = store();
+        let (ls, pending) = drained(&s);
+        let sealed = written(
+            ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+                .unwrap(),
+        );
+        let replay = |txid| {
+            ls.transition(
+                &sealed,
+                LifecycleRequest::Seal {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                    final_ids: &["b", "c"],
+                },
+                txid,
+            )
+        };
+        assert_eq!(replay([6; 16]).unwrap(), Committed::Replayed);
+        s.put(
+            &domain_key(&l()),
+            br#"{"id":"legacy.coop.example","late":2}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            store_err(replay([7; 16]).unwrap_err()),
+            LifecycleStoreError::DomainChanged
+        );
+    }
+
+    #[test]
+    fn a_seal_replay_is_not_acknowledged_over_a_drifted_domain() {
+        let s = store();
+        let (ls, pending) = drained(&s);
+        let sealed = written(
+            ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+                .unwrap(),
+        );
+        s.put(
+            &domain_key(&l()),
+            br#"{"id":"legacy.coop.example","late":1}"#,
+        )
+        .unwrap();
+        let e = ls
+            .seal(&sealed, 1, k(0x4D), &Evidence::default(), [6; 16])
+            .unwrap_err();
+        assert_eq!(store_err(e), LifecycleStoreError::DomainChanged);
+    }
+
+    #[test]
+    fn a_crash_inside_the_seal_commit_recovers_and_the_pin_still_verifies() {
+        let s = store();
+        let pending_bytes;
+        {
+            let (ls, pending) = drained(&s);
+            pending_bytes = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+            *ls.before_apply.lock().unwrap() =
+                Some(Box::new(|_: &SledStore| panic!("crash inside the seal")));
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            }));
+            assert!(r.is_err(), "the simulated crash interrupts the Seal");
+        }
+        // Restart: recovery abandons the unapplied Seal; the Pending record is intact.
+        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let (recovery, _) = recovery.into_live().err().expect("closed after the crash");
+        let report = recovery.resolve_safe().unwrap();
+        assert_eq!((report.completed, report.abandoned), (0, 1));
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), pending_bytes);
+        let ls = recovery.into_live().map_err(|(_, e)| e).unwrap();
+        let reloaded = ls.load(&l()).unwrap();
+        assert_eq!(
+            stored_record(&s).state.domain_pin(),
+            Some(&domain_record_pin(DOMAIN))
+        );
+        assert!(ls
+            .seal(&reloaded, 1, k(0x4D), &Evidence::default(), [6; 16])
+            .is_ok());
+        admitted(&s);
     }
 }

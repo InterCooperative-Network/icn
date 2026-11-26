@@ -9,11 +9,12 @@
 //! ```text
 //! lp(x) := u32be(len x) ‖ x
 //!
-//! record := lp("icn.governance.predecessor-lifecycle.v1") ‖ u16be(2) ‖ lp(L) ‖ u64be(revision)
-//!           ‖ K_first[32] ‖ u8(state) ‖ body          (record layout version 2, S26)
+//! record := lp("icn.governance.predecessor-lifecycle.v1") ‖ u16be(3) ‖ lp(L) ‖ u64be(revision)
+//!           ‖ K_first[32] ‖ u8(state) ‖ body          (record layout version 3, S28)
 //!   0x01 Legacy   : u64be(last_attempt) ‖ u8(aborted_flag) ‖ [aborted_K[32] iff flag = 1]
-//!   0x02 Pending  : u64be(attempt) ‖ lp(C) ‖ K[32] ‖ basis[32] ‖ E[32]
-//!   0x03 Sealed   : u64be(attempt) ‖ lp(C) ‖ K[32] ‖ basis[32] ‖ E[32] ‖ F[32]
+//!   0x02 Pending  : u64be(attempt) ‖ lp(C) ‖ K[32] ‖ u64be(r_begin) ‖ pin[32] ‖ basis[32] ‖ E[32]
+//!   0x03 Sealed   : u64be(attempt) ‖ lp(C) ‖ K[32] ‖ u64be(r_begin) ‖ pin[32] ‖ basis[32] ‖ E[32]
+//!                   ‖ F[32]
 //!
 //! witness := lp("icn.governance.predecessor-lifecycle-witness.v1") ‖ u16be(1) ‖ lp(L)
 //!            ‖ u64be(first_attempt) ‖ K_first[32]
@@ -35,6 +36,12 @@
 //! * `pin` binds the exact stored domain-record bytes. It is a **store-local consistency pin**,
 //!   not portable legitimacy evidence: it detects a raw edit of L's record between Begin and Seal
 //!   and nothing more.
+//! * Since record layout v3 (S28) Pending and Sealed **retain the basis inputs** `r_begin` and
+//!   `pin` beside the basis, and the decoder recomputes `basis` from `(L, r_begin, E, pin)` and
+//!   refuses a mismatch (as it does for `K`). The Seal can then re-verify L's current stored domain
+//!   bytes against the exact Begin-time pin; `r_begin` is needed because later fenced writes move
+//!   the revision, so the basis could not otherwise be re-derived. The retained pin is local
+//!   integrity evidence, not a new source of institutional legitimacy.
 //! * The witness is written once, with L's first Pending record, and never rewritten. A record and
 //!   a witness that do not correspond are refused ([`check_witness`]). Simultaneous deletion or
 //!   rollback of **both** cannot be detected without independent durable evidence.
@@ -54,11 +61,13 @@ pub const LIFECYCLE_BASIS_TAG: &[u8] = b"icn.governance.predecessor-lifecycle.ba
 pub const DOMAIN_RECORD_PIN_TAG: &[u8] = b"icn.governance.predecessor-domain-record-pin.v1";
 /// Version of every layout in this module.
 pub const LIFECYCLE_VERSION: u16 = 1;
-/// Version of the lifecycle **record** layout. Version 2 (S26) adds `K_first`, the first cutover
+/// Version of the lifecycle **record** layout. Version 2 (S26) added `K_first`, the first cutover
 /// commitment, carried by every stored state so the witness can be cross-checked across every
-/// attempt. Version 1 records were never written outside tests (no writer exists) and are
-/// refused as unsupported. The witness and the basis stay at [`LIFECYCLE_VERSION`].
-pub const LIFECYCLE_RECORD_VERSION: u16 = 2;
+/// attempt. Version 3 (S28) retains the basis inputs `r_begin` and the domain-record pin in
+/// Pending and Sealed so the Seal can re-verify the Begin-time domain pin. Versions 1 and 2 were
+/// never written outside tests (no production writer exists) and are refused as unsupported,
+/// never reinterpreted. The witness and the basis stay at [`LIFECYCLE_VERSION`].
+pub const LIFECYCLE_RECORD_VERSION: u16 = 3;
 /// Key prefix of lifecycle records.
 pub const LIFECYCLE_KEY_PREFIX: &[u8] = b"gov:predecessor-lifecycle:v1:";
 /// Key prefix of witnesses (not under the record prefix: `-` follows `lifecycle`, not `:`).
@@ -122,6 +131,10 @@ pub enum LifecycleCodecError {
     AttemptOverflow,
     #[error("the first attempt's commitment does not equal the recorded first commitment")]
     FirstCommitmentMismatch,
+    #[error("the basis is not the commitment of its retained inputs (L, r_begin, E, pin)")]
+    BasisMismatch,
+    #[error("the Begin revision is not before the record's revision")]
+    BeginRevisionNotBefore,
 }
 
 /// The revision after `revision`: refuses overflow rather than wrapping. A record at
@@ -153,17 +166,23 @@ pub enum StoredLifecycle {
         last_attempt: u64,
         aborted: Option<[u8; 32]>,
     },
-    /// Attempt `attempt` is draining under `commitment`.
+    /// Attempt `attempt` is draining under `commitment`. `begin_revision` (`r_begin`) and
+    /// `domain_pin` are the basis inputs retained since layout v3; `basis` must equal
+    /// [`lifecycle_basis`]`(L, begin_revision, electorate, domain_pin)`.
     Pending {
         attempt: u64,
         commitment: CutoverCommitmentV1,
+        begin_revision: u64,
+        domain_pin: [u8; 32],
         basis: [u8; 32],
         electorate: [u8; 32],
     },
-    /// Attempt `attempt` completed. Terminal.
+    /// Attempt `attempt` completed. Terminal. Carries the Pending basis and its inputs unchanged.
     Sealed {
         attempt: u64,
         commitment: CutoverCommitmentV1,
+        begin_revision: u64,
+        domain_pin: [u8; 32],
         basis: [u8; 32],
         electorate: [u8; 32],
         final_set: [u8; 32],
@@ -178,6 +197,15 @@ impl StoredLifecycle {
             StoredLifecycle::Pending { attempt, .. } | StoredLifecycle::Sealed { attempt, .. } => {
                 *attempt
             }
+        }
+    }
+
+    /// The Begin-time domain-record pin this state retains (Pending and Sealed only).
+    pub fn domain_pin(&self) -> Option<&[u8; 32]> {
+        match self {
+            StoredLifecycle::Legacy { .. } => None,
+            StoredLifecycle::Pending { domain_pin, .. }
+            | StoredLifecycle::Sealed { domain_pin, .. } => Some(domain_pin),
         }
     }
 
@@ -303,15 +331,32 @@ impl LifecycleRecordV1 {
             StoredLifecycle::Pending {
                 attempt,
                 commitment,
-                ..
+                begin_revision,
+                domain_pin,
+                basis,
+                electorate,
             }
             | StoredLifecycle::Sealed {
                 attempt,
                 commitment,
+                begin_revision,
+                domain_pin,
+                basis,
+                electorate,
                 ..
             } => {
                 if *attempt == 0 {
                     return Err(LifecycleCodecError::ZeroAttempt);
+                }
+                // The Begin wrote the record at r_begin + 1 and revisions only grow.
+                if *begin_revision >= self.revision {
+                    return Err(LifecycleCodecError::BeginRevisionNotBefore);
+                }
+                // The basis is the commitment of exactly its retained inputs.
+                if lifecycle_basis(&self.predecessor, *begin_revision, electorate, domain_pin)?
+                    != *basis
+                {
+                    return Err(LifecycleCodecError::BasisMismatch);
                 }
                 let c = commitment
                     .encode()
@@ -362,21 +407,41 @@ impl LifecycleRecordV1 {
             StoredLifecycle::Pending {
                 attempt,
                 commitment,
+                begin_revision,
+                domain_pin,
                 basis,
                 electorate,
             } => {
                 out.push(STATE_PENDING);
-                encode_attempt_body(&mut out, *attempt, commitment, basis, electorate)?;
+                encode_attempt_body(
+                    &mut out,
+                    *attempt,
+                    commitment,
+                    *begin_revision,
+                    domain_pin,
+                    basis,
+                    electorate,
+                )?;
             }
             StoredLifecycle::Sealed {
                 attempt,
                 commitment,
+                begin_revision,
+                domain_pin,
                 basis,
                 electorate,
                 final_set,
             } => {
                 out.push(STATE_SEALED);
-                encode_attempt_body(&mut out, *attempt, commitment, basis, electorate)?;
+                encode_attempt_body(
+                    &mut out,
+                    *attempt,
+                    commitment,
+                    *begin_revision,
+                    domain_pin,
+                    basis,
+                    electorate,
+                )?;
                 out.extend_from_slice(final_set);
             }
         }
@@ -414,21 +479,25 @@ impl LifecycleRecordV1 {
                 }
             }
             STATE_PENDING => {
-                let (attempt, commitment, basis, electorate) = r.attempt_body()?;
+                let b = r.attempt_body()?;
                 StoredLifecycle::Pending {
-                    attempt,
-                    commitment,
-                    basis,
-                    electorate,
+                    attempt: b.attempt,
+                    commitment: b.commitment,
+                    begin_revision: b.begin_revision,
+                    domain_pin: b.domain_pin,
+                    basis: b.basis,
+                    electorate: b.electorate,
                 }
             }
             STATE_SEALED => {
-                let (attempt, commitment, basis, electorate) = r.attempt_body()?;
+                let b = r.attempt_body()?;
                 StoredLifecycle::Sealed {
-                    attempt,
-                    commitment,
-                    basis,
-                    electorate,
+                    attempt: b.attempt,
+                    commitment: b.commitment,
+                    begin_revision: b.begin_revision,
+                    domain_pin: b.domain_pin,
+                    basis: b.basis,
+                    electorate: b.electorate,
                     final_set: r.array()?,
                 }
             }
@@ -452,6 +521,8 @@ fn encode_attempt_body(
     out: &mut Vec<u8>,
     attempt: u64,
     commitment: &CutoverCommitmentV1,
+    begin_revision: u64,
+    domain_pin: &[u8; 32],
     basis: &[u8; 32],
     electorate: &[u8; 32],
 ) -> Result<()> {
@@ -464,6 +535,8 @@ fn encode_attempt_body(
     out.extend_from_slice(&attempt.to_be_bytes());
     lp(out, &c);
     out.extend_from_slice(&k);
+    out.extend_from_slice(&begin_revision.to_be_bytes());
+    out.extend_from_slice(domain_pin);
     out.extend_from_slice(basis);
     out.extend_from_slice(electorate);
     Ok(())
@@ -587,6 +660,16 @@ pub fn check_witness(
     }
 }
 
+/// The decoded Pending/Sealed body shared by both states.
+struct AttemptBody {
+    attempt: u64,
+    commitment: CutoverCommitmentV1,
+    begin_revision: u64,
+    domain_pin: [u8; 32],
+    basis: [u8; 32],
+    electorate: [u8; 32],
+}
+
 struct Reader<'a> {
     bytes: &'a [u8],
     pos: usize,
@@ -630,7 +713,7 @@ impl<'a> Reader<'a> {
         let s = std::str::from_utf8(raw).map_err(|_| LifecycleCodecError::InvalidDomain)?;
         Ok(GovernanceDomainId(s.to_string()))
     }
-    fn attempt_body(&mut self) -> Result<(u64, CutoverCommitmentV1, [u8; 32], [u8; 32])> {
+    fn attempt_body(&mut self) -> Result<AttemptBody> {
         let attempt = self.u64()?;
         let n = u32::from_be_bytes(self.array()?) as usize;
         if n > MAX_COMMITMENT_LEN {
@@ -647,6 +730,13 @@ impl<'a> Reader<'a> {
         if Sha256::digest(c).as_slice() != k {
             return Err(LifecycleCodecError::CommitmentHashMismatch);
         }
-        Ok((attempt, commitment, self.array()?, self.array()?))
+        Ok(AttemptBody {
+            attempt,
+            commitment,
+            begin_revision: self.u64()?,
+            domain_pin: self.array()?,
+            basis: self.array()?,
+            electorate: self.array()?,
+        })
     }
 }
