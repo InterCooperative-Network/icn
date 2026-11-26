@@ -46,8 +46,40 @@ pub trait GovernanceStateStore: Send + Sync {
     /// Load a proposal by ID.
     fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>>;
 
-    /// Persist a proposal (insert or overwrite).
+    /// Persist a proposal's next state.
+    ///
+    /// This is the update path. It refuses, against the exact bytes it would
+    /// replace, two rewrites that no ordinary governance transition makes:
+    ///
+    /// - changing the stored proposal's `domain_id` (a proposal never moves
+    ///   between governance domains), and
+    /// - changing a proposal that is already closed (a closed proposal's
+    ///   state is final; rewriting it with an equal value, as a close-journal
+    ///   replay does, is accepted as idempotent).
+    ///
+    /// An absent row is written as given. New proposals are created through
+    /// [`GovernanceStateStore::create_proposal`], which refuses an id that is
+    /// already in use.
     fn save_proposal(&self, proposal: &Proposal) -> Result<()>;
+
+    /// Persist a NEW proposal: an atomic create-if-absent.
+    ///
+    /// Refuses with [`ProposalWriteRefused::AlreadyExists`] when any row is
+    /// already stored under the proposal's id, and leaves that row unchanged.
+    /// The absence check and the write are one atomic step, so two concurrent
+    /// creates of one id have exactly one winner.
+    ///
+    /// **Default impl FAILS CLOSED** (returns `Err`): a store that cannot make
+    /// the check and the write atomic must not fall back to a read followed by
+    /// an unconditional write, because that window is the overwrite this
+    /// method exists to prevent.
+    fn create_proposal(&self, proposal: &Proposal) -> Result<()> {
+        anyhow::bail!(
+            "Proposal '{}': this governance state store cannot create a proposal \
+             atomically; refusing (fail closed)",
+            proposal.id.0
+        )
+    }
 
     /// Return all proposals in the store.
     fn list_proposals(&self) -> Result<Vec<Proposal>>;
@@ -196,7 +228,7 @@ pub trait GovernanceStateStore: Send + Sync {
 
 // ---- Key helpers ----
 
-fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
+pub(crate) fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
     format!("gov:domain:{}", id.0).into_bytes()
 }
 
@@ -333,6 +365,91 @@ impl SledGovernanceStateStore {
 /// against a pathological writer. Exhaustion fails closed.
 pub(crate) const SAVE_DOMAIN_MAX_ATTEMPTS: usize = 16;
 
+/// Bound on `save_proposal` retries under concurrent writers; matches
+/// [`SAVE_DOMAIN_MAX_ATTEMPTS`].
+pub(crate) const SAVE_PROPOSAL_MAX_ATTEMPTS: usize = SAVE_DOMAIN_MAX_ATTEMPTS;
+
+/// Why a proposal write was refused. Nothing is written when one is returned.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProposalWriteRefused {
+    /// `create_proposal` found a row already stored under this id.
+    AlreadyExists { proposal: String },
+    /// The write would move the proposal to another governance domain.
+    DomainChange {
+        proposal: String,
+        stored: String,
+        requested: String,
+    },
+    /// The stored proposal is closed and the write would change it.
+    ClosedIsFinal { proposal: String },
+    /// The stored row cannot be decoded, so it cannot be shown to permit the
+    /// write; it is refused, never overwritten.
+    Unreadable { proposal: String, reason: String },
+    /// Concurrent writers kept changing the row; the caller may retry.
+    Contended { proposal: String },
+}
+
+impl std::fmt::Display for ProposalWriteRefused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlreadyExists { proposal } => write!(
+                f,
+                "Proposal '{proposal}' already exists; a proposal id cannot be reused"
+            ),
+            Self::DomainChange {
+                proposal,
+                stored,
+                requested,
+            } => write!(
+                f,
+                "Proposal '{proposal}' belongs to domain '{stored}'; refusing to move it to \
+                 '{requested}'"
+            ),
+            Self::ClosedIsFinal { proposal } => write!(
+                f,
+                "Proposal '{proposal}' is closed and its state is final; refusing to rewrite it"
+            ),
+            Self::Unreadable { proposal, reason } => write!(
+                f,
+                "Proposal '{proposal}': stored record cannot be read ({reason}); refusing to \
+                 overwrite it"
+            ),
+            Self::Contended { proposal } => write!(
+                f,
+                "Proposal '{proposal}': gave up saving after {SAVE_PROPOSAL_MAX_ATTEMPTS} \
+                 attempts because concurrent writers kept changing the record"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ProposalWriteRefused {}
+
+/// Decide whether `next` may replace the stored proposal bytes `stored`.
+fn check_proposal_overwrite(stored: &[u8], next: &Proposal) -> Result<()> {
+    let existing: Proposal =
+        serde_json::from_slice(stored).map_err(|e| ProposalWriteRefused::Unreadable {
+            proposal: next.id.0.clone(),
+            reason: e.to_string(),
+        })?;
+    if existing.domain_id != next.domain_id {
+        return Err(ProposalWriteRefused::DomainChange {
+            proposal: next.id.0.clone(),
+            stored: existing.domain_id.0,
+            requested: next.domain_id.0.clone(),
+        }
+        .into());
+    }
+    if existing.state.is_closed() && serde_json::to_value(&existing)? != serde_json::to_value(next)?
+    {
+        return Err(ProposalWriteRefused::ClosedIsFinal {
+            proposal: next.id.0.clone(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
 impl GovernanceStateStore for SledGovernanceStateStore {
     // --- Domains ---
 
@@ -451,8 +568,40 @@ impl GovernanceStateStore for SledGovernanceStateStore {
     }
 
     fn save_proposal(&self, proposal: &Proposal) -> Result<()> {
-        self.store
-            .put(&proposal_key(&proposal.id), &serde_json::to_vec(proposal)?)
+        let key = proposal_key(&proposal.id);
+        let new_bytes = serde_json::to_vec(proposal)?;
+        // The checks are made against the exact bytes the write replaces, by
+        // compare-and-put: a writer landing between the read and the write
+        // turns into a conflict that is re-read and re-checked.
+        for _ in 0..SAVE_PROPOSAL_MAX_ATTEMPTS {
+            let current = self.store.get(&key)?;
+            if let Some(stored) = current.as_deref() {
+                check_proposal_overwrite(stored, proposal)?;
+            }
+            match self
+                .store
+                .compare_and_put(&key, current.as_deref(), &new_bytes)?
+            {
+                CompareAndPut::Applied => return Ok(()),
+                CompareAndPut::Conflict { .. } => continue,
+            }
+        }
+        Err(ProposalWriteRefused::Contended {
+            proposal: proposal.id.0.clone(),
+        }
+        .into())
+    }
+
+    fn create_proposal(&self, proposal: &Proposal) -> Result<()> {
+        let key = proposal_key(&proposal.id);
+        let bytes = serde_json::to_vec(proposal)?;
+        match self.store.compare_and_put(&key, None, &bytes)? {
+            CompareAndPut::Applied => Ok(()),
+            CompareAndPut::Conflict { .. } => Err(ProposalWriteRefused::AlreadyExists {
+                proposal: proposal.id.0.clone(),
+            }
+            .into()),
+        }
     }
 
     fn list_proposals(&self) -> Result<Vec<Proposal>> {
@@ -748,6 +897,24 @@ mod tests {
             store.save_domain_policy_body(&id, b"anything").is_err(),
             "default save must fail closed, not silently succeed"
         );
+    }
+
+    #[test]
+    fn create_proposal_default_impl_fails_closed() {
+        // Every other method of this store panics if reached, so a default that
+        // fell back to `get_proposal` + `save_proposal` would fail this test.
+        let store = NoInstitutionalDomainStore;
+        let p = Proposal::new(
+            GovernanceDomainId::new("d"),
+            icn_identity::IdentityBundle::generate()
+                .unwrap()
+                .did()
+                .clone(),
+            "t".into(),
+            "d".into(),
+            icn_governance::ProposalPayload::Text { body: "b".into() },
+        );
+        assert!(store.create_proposal(&p).is_err());
     }
 }
 
@@ -1091,5 +1258,383 @@ mod monotonic_domain_tests {
             stored_model(&store, "d"),
             HumanActorModel::LegacyPrincipalV0
         );
+    }
+}
+
+/// Proposal identity: a proposal id is created once, never reused to overwrite
+/// a row; a stored proposal never changes domain; a closed proposal is final.
+#[cfg(test)]
+mod proposal_identity_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::test_support::HookStore;
+    use super::*;
+    use icn_governance::{ProposalOutcome, ProposalPayload};
+    use icn_identity::IdentityBundle;
+    use icn_store::SledStore;
+
+    fn proposal(domain: &str, id: &str, title: &str) -> Proposal {
+        let mut p = Proposal::new(
+            GovernanceDomainId::new(domain),
+            IdentityBundle::generate().unwrap().did().clone(),
+            title.to_string(),
+            "d".to_string(),
+            ProposalPayload::Text { body: "b".into() },
+        );
+        p.id = ProposalId(id.to_string());
+        p
+    }
+
+    fn raw(store: &dyn Store, id: &str) -> Option<Vec<u8>> {
+        store
+            .get(&proposal_key(&ProposalId(id.to_string())))
+            .unwrap()
+    }
+
+    fn refusal(e: anyhow::Error) -> ProposalWriteRefused {
+        e.downcast::<ProposalWriteRefused>()
+            .expect("a typed ProposalWriteRefused")
+    }
+
+    fn sled() -> (Arc<SledStore>, SledGovernanceStateStore) {
+        let inner = Arc::new(SledStore::temporary().unwrap());
+        let state = SledGovernanceStateStore::new(inner.clone());
+        (inner, state)
+    }
+
+    #[test]
+    fn create_writes_a_new_proposal() {
+        let (_, state) = sled();
+        let p = proposal("d1", "p1", "first");
+        state.create_proposal(&p).unwrap();
+        let got = state.get_proposal(&p.id).unwrap().unwrap();
+        assert_eq!(got.title, "first");
+        assert_eq!(got.domain_id, GovernanceDomainId::new("d1"));
+    }
+
+    #[test]
+    fn create_refuses_a_reused_id_and_leaves_the_row_byte_identical() {
+        let (inner, state) = sled();
+        state
+            .create_proposal(&proposal("d1", "p1", "first"))
+            .unwrap();
+        let before = raw(inner.as_ref(), "p1").unwrap();
+
+        let err = state
+            .create_proposal(&proposal("d1", "p1", "second"))
+            .unwrap_err();
+        assert_eq!(
+            refusal(err),
+            ProposalWriteRefused::AlreadyExists {
+                proposal: "p1".into()
+            }
+        );
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+    }
+
+    #[test]
+    fn create_refuses_a_reused_id_from_another_domain() {
+        let (inner, state) = sled();
+        state
+            .create_proposal(&proposal("d1", "p1", "first"))
+            .unwrap();
+        let before = raw(inner.as_ref(), "p1").unwrap();
+
+        let err = state
+            .create_proposal(&proposal("d2", "p1", "hijack"))
+            .unwrap_err();
+        assert!(matches!(
+            refusal(err),
+            ProposalWriteRefused::AlreadyExists { .. }
+        ));
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+        assert_eq!(
+            state
+                .get_proposal(&ProposalId("p1".into()))
+                .unwrap()
+                .unwrap()
+                .domain_id,
+            GovernanceDomainId::new("d1")
+        );
+    }
+
+    #[test]
+    fn create_refuses_to_replace_a_closed_proposal_with_a_fresh_draft() {
+        let (inner, state) = sled();
+        let mut p = proposal("d1", "p1", "decided");
+        p.veto("stop".into()).unwrap();
+        state.save_proposal(&p).unwrap();
+        let before = raw(inner.as_ref(), "p1").unwrap();
+
+        let err = state
+            .create_proposal(&proposal("d1", "p1", "fresh draft"))
+            .unwrap_err();
+        assert!(matches!(
+            refusal(err),
+            ProposalWriteRefused::AlreadyExists { .. }
+        ));
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+    }
+
+    #[test]
+    fn concurrent_creates_of_one_id_have_exactly_one_winner() {
+        let (inner, state) = sled();
+        let state = Arc::new(state);
+        let threads: Vec<_> = (0..8)
+            .map(|i| {
+                let state = state.clone();
+                std::thread::spawn(move || {
+                    let p = proposal(&format!("d{i}"), "p1", &format!("t{i}"));
+                    state.create_proposal(&p).map(|()| i)
+                })
+            })
+            .collect();
+        let results: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        let winners: Vec<usize> = results
+            .iter()
+            .filter_map(|r| r.as_ref().ok().copied())
+            .collect();
+        assert_eq!(winners.len(), 1, "exactly one create may win: {results:?}");
+        for r in results {
+            if let Err(e) = r {
+                assert!(matches!(
+                    refusal(e),
+                    ProposalWriteRefused::AlreadyExists { .. }
+                ));
+            }
+        }
+        let stored = state
+            .get_proposal(&ProposalId("p1".into()))
+            .unwrap()
+            .unwrap();
+        let w = winners[0];
+        assert_eq!(stored.title, format!("t{w}"));
+        assert_eq!(stored.domain_id, GovernanceDomainId::new(format!("d{w}")));
+        assert!(raw(inner.as_ref(), "p1").is_some());
+    }
+
+    #[test]
+    fn a_refused_create_survives_restart_unchanged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let before;
+        {
+            let inner = Arc::new(SledStore::open(tmp.path()).unwrap());
+            let state = SledGovernanceStateStore::new(inner.clone());
+            state
+                .create_proposal(&proposal("d1", "p1", "first"))
+                .unwrap();
+            assert!(state.create_proposal(&proposal("d2", "p1", "x")).is_err());
+            inner.flush().unwrap();
+            before = raw(inner.as_ref(), "p1").unwrap();
+        }
+        let inner = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let state = SledGovernanceStateStore::new(inner.clone());
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+        assert!(matches!(
+            refusal(
+                state
+                    .create_proposal(&proposal("d1", "p1", "again"))
+                    .unwrap_err()
+            ),
+            ProposalWriteRefused::AlreadyExists { .. }
+        ));
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+    }
+
+    #[test]
+    fn create_on_a_store_without_atomic_compare_fails_closed_and_writes_nothing() {
+        let inner = Arc::new(HookStore::new(false));
+        let state = SledGovernanceStateStore::new(inner.clone());
+        assert!(state.create_proposal(&proposal("d1", "p1", "t")).is_err());
+        assert!(raw(&inner.inner, "p1").is_none());
+    }
+
+    #[test]
+    fn save_refuses_a_domain_change_and_leaves_the_row_unchanged() {
+        let (inner, state) = sled();
+        state.create_proposal(&proposal("d1", "p1", "t")).unwrap();
+        let before = raw(inner.as_ref(), "p1").unwrap();
+
+        let mut moved = state
+            .get_proposal(&ProposalId("p1".into()))
+            .unwrap()
+            .unwrap();
+        moved.domain_id = GovernanceDomainId::new("d2");
+        assert_eq!(
+            refusal(state.save_proposal(&moved).unwrap_err()),
+            ProposalWriteRefused::DomainChange {
+                proposal: "p1".into(),
+                stored: "d1".into(),
+                requested: "d2".into(),
+            }
+        );
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+    }
+
+    #[test]
+    fn save_keeps_ordinary_transitions() {
+        let (_, state) = sled();
+        let mut p = proposal("d1", "p1", "t");
+        state.create_proposal(&p).unwrap();
+        p.open(3600).unwrap();
+        state.save_proposal(&p).unwrap();
+        p.force_close(ProposalOutcome::Accepted, "r".into())
+            .unwrap();
+        state.save_proposal(&p).unwrap();
+        assert!(state
+            .get_proposal(&p.id)
+            .unwrap()
+            .unwrap()
+            .state
+            .is_closed());
+    }
+
+    #[test]
+    fn save_of_an_absent_row_still_writes_it() {
+        let (_, state) = sled();
+        let p = proposal("d1", "p1", "t");
+        state.save_proposal(&p).unwrap();
+        assert!(state.get_proposal(&p.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn a_closed_proposal_is_final_but_an_identical_replay_is_accepted() {
+        let (inner, state) = sled();
+        let mut p = proposal("d1", "p1", "t");
+        p.open(3600).unwrap();
+        p.force_close(ProposalOutcome::Accepted, "r".into())
+            .unwrap();
+        state.save_proposal(&p).unwrap();
+        let before = raw(inner.as_ref(), "p1").unwrap();
+
+        // Idempotent replay of the same terminal value (close-journal recovery).
+        state.save_proposal(&p).unwrap();
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+
+        // A different terminal outcome over a closed row is refused.
+        let mut other = p.clone();
+        other.state = icn_governance::ProposalState::Vetoed {
+            vetoed_at: 1,
+            reason: "late".into(),
+        };
+        assert!(matches!(
+            refusal(state.save_proposal(&other).unwrap_err()),
+            ProposalWriteRefused::ClosedIsFinal { .. }
+        ));
+        // So is reopening it.
+        let mut reopened = p.clone();
+        reopened.state = icn_governance::ProposalState::Draft;
+        assert!(matches!(
+            refusal(state.save_proposal(&reopened).unwrap_err()),
+            ProposalWriteRefused::ClosedIsFinal { .. }
+        ));
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+    }
+
+    #[test]
+    fn a_closed_proposal_keeps_its_metadata_too_not_only_its_state() {
+        // The whole closed value is final, not just `state`: a rewrite that keeps
+        // the terminal state but changes any other field is refused.
+        let (inner, state) = sled();
+        let mut p = proposal("d1", "p1", "decided");
+        p.veto("stop".into()).unwrap();
+        state.save_proposal(&p).unwrap();
+        let before = raw(inner.as_ref(), "p1").unwrap();
+
+        let mut retitled = p.clone();
+        retitled.title = "rewritten after the decision".into();
+        assert!(matches!(
+            refusal(state.save_proposal(&retitled).unwrap_err()),
+            ProposalWriteRefused::ClosedIsFinal { .. }
+        ));
+        let mut repayloaded = p.clone();
+        repayloaded.payload = ProposalPayload::Text {
+            body: "other".into(),
+        };
+        assert!(matches!(
+            refusal(state.save_proposal(&repayloaded).unwrap_err()),
+            ProposalWriteRefused::ClosedIsFinal { .. }
+        ));
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+    }
+
+    #[test]
+    fn save_rechecks_against_a_row_that_changed_after_its_read() {
+        // Another writer closes the proposal between save's read and its
+        // compare-and-put. The stale write must not land; the re-read sees the
+        // closed row and refuses.
+        let store = Arc::new(HookStore::new(true));
+        let state = SledGovernanceStateStore::new(store.clone());
+        let mut p = proposal("d1", "p1", "t");
+        state.create_proposal(&p).unwrap();
+
+        let mut vetoed = p.clone();
+        vetoed.veto("raced".into()).unwrap();
+        let vetoed_bytes = serde_json::to_vec(&vetoed).unwrap();
+        store.arm(
+            proposal_key(&p.id),
+            Box::new(move |inner, n| {
+                if n == 1 {
+                    inner
+                        .put(&proposal_key(&ProposalId("p1".into())), &vetoed_bytes)
+                        .unwrap();
+                }
+            }),
+        );
+
+        p.open(3600).unwrap();
+        assert!(matches!(
+            refusal(state.save_proposal(&p).unwrap_err()),
+            ProposalWriteRefused::ClosedIsFinal { .. }
+        ));
+        assert_eq!(
+            store.reads_of_armed_key(),
+            2,
+            "the conflict must force a re-read"
+        );
+        assert!(matches!(
+            state.get_proposal(&p.id).unwrap().unwrap().state,
+            icn_governance::ProposalState::Vetoed { .. }
+        ));
+    }
+
+    #[test]
+    fn save_refuses_to_overwrite_an_unreadable_row() {
+        let (inner, state) = sled();
+        inner
+            .put(&proposal_key(&ProposalId("p1".into())), b"not json")
+            .unwrap();
+        assert!(matches!(
+            refusal(state.save_proposal(&proposal("d1", "p1", "t")).unwrap_err()),
+            ProposalWriteRefused::Unreadable { .. }
+        ));
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), b"not json".to_vec());
+    }
+
+    #[test]
+    fn save_gives_up_with_contended_when_the_row_never_settles() {
+        let store = Arc::new(HookStore::new(true));
+        let state = SledGovernanceStateStore::new(store.clone());
+        let mut p = proposal("d1", "p1", "t");
+        state.create_proposal(&p).unwrap();
+        store.arm(
+            proposal_key(&p.id),
+            Box::new(move |inner, n| {
+                let mut q = proposal("d1", "p1", &format!("churn{n}"));
+                q.created_at = n as u64;
+                inner
+                    .put(
+                        &proposal_key(&ProposalId("p1".into())),
+                        &serde_json::to_vec(&q).unwrap(),
+                    )
+                    .unwrap();
+            }),
+        );
+        p.open(3600).unwrap();
+        assert!(matches!(
+            refusal(state.save_proposal(&p).unwrap_err()),
+            ProposalWriteRefused::Contended { .. }
+        ));
+        assert_eq!(store.reads_of_armed_key(), SAVE_PROPOSAL_MAX_ATTEMPTS);
     }
 }

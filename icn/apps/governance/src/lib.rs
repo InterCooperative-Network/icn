@@ -42,6 +42,7 @@ pub mod institutional_authority_store;
 pub mod institutional_effect;
 pub mod manager;
 pub mod mandate_gate;
+pub mod predecessor_lifecycle_store;
 pub mod receipt_backend;
 pub mod registry;
 pub mod rehearsal_workspace;
