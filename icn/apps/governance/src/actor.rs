@@ -2034,8 +2034,11 @@ impl GovernanceActor {
                 // Use the provided proposal ID instead of the generated one
                 proposal.id = proposal_id.clone();
 
-                // Persist locally
-                self.store.save_proposal(&proposal)?;
+                // Persist locally as a NEW row: an id already in use is refused
+                // atomically and the stored row is left unchanged, before
+                // anything is broadcast. (`submit` is public, so the id is
+                // caller-chosen and must not be able to replace a proposal.)
+                self.store.create_proposal(&proposal)?;
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::proposal_created(proposal.clone()))
