@@ -278,7 +278,7 @@ fn proof_key(proposal_id: &ProposalId) -> Vec<u8> {
     format!("governance:proof:{}", proposal_id.0).into_bytes()
 }
 
-fn close_intent_key(id: &ProposalId) -> Vec<u8> {
+pub(crate) fn close_intent_key(id: &ProposalId) -> Vec<u8> {
     format!("gov:close-intent:{}", id.0).into_bytes()
 }
 

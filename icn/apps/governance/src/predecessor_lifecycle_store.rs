@@ -51,9 +51,10 @@ use icn_store::recovery::{Entry, Outcome, RecoveryError, RecoveryIntent, Recover
 use icn_store::{CompareAndWrite, FaultDomain, SledStore, Store};
 use std::sync::{Arc, Mutex, Weak};
 
-use icn_governance::{Proposal, ProposalState};
+use icn_governance::{Proposal, ProposalId, ProposalState};
 
-use crate::state_store::{check_proposal_overwrite, domain_key, proposal_key};
+use crate::close_journal::CloseJournalEntry;
+use crate::state_store::{check_proposal_overwrite, close_intent_key, domain_key, proposal_key};
 
 /// The journal prefix for lifecycle writes. It sits outside every `gov:` prefix the governance
 /// store scans: `lifecycle-journal` differs from `lifecycle:` and `lifecycle-witness:`.
@@ -644,14 +645,100 @@ impl<'a> LifecycleStore<'a> {
             check_proposal_overwrite(bytes, next)?;
         }
         proposal_fence(&loaded.state, previous.as_ref(), next)?;
+        self.fenced_commit(loaded, pkey, stored, Some(next_bytes), txid)
+    }
+
+    /// Fenced write of L's own domain record (W13–W15: create/replace, config, membership).
+    /// The domain is a seal input (I2) and Pending's basis pins its bytes, so while L is
+    /// Pending or Sealed only an identical rewrite (no write) is accepted.
+    pub fn write_domain(
+        &self,
+        loaded: &LoadedLifecycle,
+        next_bytes: Vec<u8>,
+        txid: [u8; 16],
+    ) -> anyhow::Result<FencedWrite> {
+        let key = domain_key(&loaded.predecessor);
+        let stored = self.store.get(&key)?;
+        if stored.as_deref() == Some(next_bytes.as_slice()) {
+            return Ok(FencedWrite::Unchanged);
+        }
+        match loaded.state {
+            PredecessorLifecycle::Legacy { .. } => {}
+            PredecessorLifecycle::CutoverPending { .. } => {
+                return Err(FenceRefusal::DomainChangeWhilePending.into())
+            }
+            PredecessorLifecycle::Sealed { .. } => return Err(FenceRefusal::Sealed.into()),
+        }
+        self.fenced_commit(loaded, key, stored, Some(next_bytes), txid)
+    }
+
+    /// Fenced write-ahead close intent for a proposal of L (W6). Closing completes an
+    /// existing obligation, so it is permitted while Pending (refusing it would deadlock the
+    /// seal); a Sealed L has no open proposal to close.
+    pub fn write_close_intent(
+        &self,
+        loaded: &LoadedLifecycle,
+        entry: &CloseJournalEntry,
+        txid: [u8; 16],
+    ) -> anyhow::Result<FencedWrite> {
+        if entry.proposal.domain_id != loaded.predecessor {
+            return Err(FenceRefusal::OtherDomain.into());
+        }
+        if matches!(loaded.state, PredecessorLifecycle::Sealed { .. }) {
+            return Err(FenceRefusal::Sealed.into());
+        }
+        let key = close_intent_key(&entry.proposal.id);
+        let next_bytes = serde_json::to_vec(entry)?;
+        let stored = self.store.get(&key)?;
+        if stored.as_deref() == Some(next_bytes.as_slice()) {
+            return Ok(FencedWrite::Unchanged);
+        }
+        self.fenced_commit(loaded, key, stored, Some(next_bytes), txid)
+    }
+
+    /// Fenced removal of a proposal's close intent (W8). Never refused by lifecycle state:
+    /// recovery must always be able to finish a decided close. Removing an absent intent
+    /// writes nothing.
+    pub fn delete_close_intent(
+        &self,
+        loaded: &LoadedLifecycle,
+        proposal: &ProposalId,
+        txid: [u8; 16],
+    ) -> anyhow::Result<FencedWrite> {
+        let key = close_intent_key(proposal);
+        let stored = self.store.get(&key)?;
+        let Some(bytes) = stored.as_deref() else {
+            return Ok(FencedWrite::Unchanged);
+        };
+        let entry: CloseJournalEntry =
+            serde_json::from_slice(bytes).map_err(|_| FenceRefusal::UnreadableProposal)?;
+        if entry.proposal.domain_id != loaded.predecessor {
+            return Err(FenceRefusal::OtherDomain.into());
+        }
+        self.fenced_commit(loaded, key, stored, None, txid)
+    }
+
+    /// The one fenced commit: `target` moves from exactly `stored` to `next` (`None`
+    /// deletes) in the same journaled write that expects L's exact lifecycle record and
+    /// witness bytes and, when L has a record, stores it back with `revision + 1` and
+    /// everything else unchanged. Policy decisions are the caller's; this only commits.
+    fn fenced_commit(
+        &self,
+        loaded: &LoadedLifecycle,
+        target: Vec<u8>,
+        stored: Option<Vec<u8>>,
+        next: Option<Vec<u8>>,
+        txid: [u8; 16],
+    ) -> anyhow::Result<FencedWrite> {
+        let l = &loaded.predecessor;
         let rkey = lifecycle_key(l)?;
         let wkey = witness_key(l)?;
         let expected = vec![
-            (pkey.clone(), stored),
+            (target.clone(), stored),
             (rkey.clone(), loaded.record_bytes.clone()),
             (wkey, loaded.witness_bytes.clone()),
         ];
-        let mut intended = vec![(pkey, Some(next_bytes))];
+        let mut intended = vec![(target, next)];
         let revision = match &loaded.stored {
             Some(record) => {
                 let bumped = LifecycleRecordV1 {
@@ -695,6 +782,8 @@ pub enum FenceRefusal {
     ActivationWhilePending,
     /// L is Sealed: its proposal set is final.
     Sealed,
+    /// L is CutoverPending: its domain record is pinned by the basis and may not change.
+    DomainChangeWhilePending,
 }
 
 impl std::fmt::Display for FenceRefusal {
@@ -707,6 +796,9 @@ impl std::fmt::Display for FenceRefusal {
                 "a draft may not be activated while a cutover is pending"
             }
             Self::Sealed => "the domain is sealed; its proposals are final",
+            Self::DomainChangeWhilePending => {
+                "the domain record may not change while a cutover is pending"
+            }
         })
     }
 }
@@ -1497,6 +1589,164 @@ mod tests {
             Some(&LifecycleStoreError::Stale)
         );
         assert_eq!(row(&s, &p), before);
+    }
+
+    fn intent_for(p: &Proposal) -> CloseJournalEntry {
+        let mut closed = p.clone();
+        closed.state = ProposalState::Accepted { closed_at: 7 };
+        CloseJournalEntry {
+            proposal: closed,
+            proof_bytes: None,
+            receipts: Default::default(),
+            decided_at: 7,
+            governance_decision_hash: None,
+        }
+    }
+
+    #[test]
+    fn domain_writes_bump_in_legacy_and_are_refused_while_pending_or_sealed() {
+        let s = store();
+        let ls = live(&s);
+        // Never begun: expect-only, no record created.
+        assert_eq!(
+            ls.write_domain(&ls.load(&l()).unwrap(), b"v2".to_vec(), [1; 16])
+                .unwrap(),
+            FencedWrite::Written { revision: 0 }
+        );
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
+                .unwrap(),
+        );
+        // Identical rewrite: nothing written.
+        assert_eq!(
+            ls.write_domain(&pending, b"v2".to_vec(), [3; 16]).unwrap(),
+            FencedWrite::Unchanged
+        );
+        assert_eq!(
+            fence(ls.write_domain(&pending, b"v3".to_vec(), [4; 16]).unwrap_err()),
+            FenceRefusal::DomainChangeWhilePending
+        );
+        assert_eq!(s.get(&domain_key(&l())).unwrap(), Some(b"v2".to_vec()));
+        // After abort (Legacy with a record) a domain change is allowed and bumps.
+        let aborted = written(
+            ls.transition(
+                &pending,
+                LifecycleRequest::Abort {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                },
+                [5; 16],
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            ls.write_domain(&aborted, b"v4".to_vec(), [6; 16]).unwrap(),
+            FencedWrite::Written {
+                revision: aborted.revision() + 1
+            }
+        );
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_domain_write_makes_a_begin_prepared_earlier_stale() {
+        let s = store();
+        let ls = live(&s);
+        let legacy = ls.load(&l()).unwrap();
+        // Concurrent: the domain changes after Begin's view was read. Begin pins the domain
+        // bytes it reads at write time; the race this guards is a domain write that read the
+        // never-begun view while Begin landed first.
+        written(ls.transition(&legacy, begin(1, 0x4D), [1; 16]).unwrap());
+        let e = ls
+            .write_domain(&legacy, b"late".to_vec(), [2; 16])
+            .unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::Stale)
+        );
+        assert_eq!(s.get(&domain_key(&l())).unwrap(), Some(DOMAIN.to_vec()));
+        admitted(&s);
+    }
+
+    #[test]
+    fn close_intents_are_fenced_permitted_while_pending_and_removable_when_sealed() {
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.open(60).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
+                .unwrap(),
+        );
+        let entry = intent_for(&p);
+        // Writing the intent completes an existing obligation: allowed, and it bumps.
+        assert_eq!(
+            ls.write_close_intent(&pending, &entry, [3; 16]).unwrap(),
+            FencedWrite::Written {
+                revision: pending.revision() + 1
+            }
+        );
+        let now = ls.load(&l()).unwrap();
+        assert_eq!(
+            ls.write_close_intent(&now, &entry, [4; 16]).unwrap(),
+            FencedWrite::Unchanged
+        );
+        // The terminal row, then the intent removal (each fenced, each a bump).
+        ls.write_proposal(&now, &entry.proposal, [5; 16]).unwrap();
+        let now = ls.load(&l()).unwrap();
+        assert_eq!(
+            ls.delete_close_intent(&now, &p.id, [6; 16]).unwrap(),
+            FencedWrite::Written {
+                revision: now.revision() + 1
+            }
+        );
+        assert!(s.get(&close_intent_key(&p.id)).unwrap().is_none());
+        // Removing an absent intent writes nothing.
+        let now = ls.load(&l()).unwrap();
+        assert_eq!(
+            ls.delete_close_intent(&now, &p.id, [7; 16]).unwrap(),
+            FencedWrite::Unchanged
+        );
+        // Sealed: a new intent is refused.
+        let ids = ["p"];
+        let sealed = written(
+            ls.transition(
+                &now,
+                LifecycleRequest::Seal {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                    final_ids: &ids,
+                },
+                [8; 16],
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            fence(
+                ls.write_close_intent(&sealed, &intent_for(&prop("q")), [9; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::Sealed
+        );
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_close_intent_for_another_domain_is_refused() {
+        let s = store();
+        let ls = live(&s);
+        let mut other = prop("x");
+        other.domain_id = GovernanceDomainId("other.coop".into());
+        assert_eq!(
+            fence(
+                ls.write_close_intent(&ls.load(&l()).unwrap(), &intent_for(&other), [1; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::OtherDomain
+        );
+        assert!(s.get(&close_intent_key(&other.id)).unwrap().is_none());
     }
 
     #[test]
