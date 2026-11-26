@@ -237,7 +237,21 @@ async fn trust_threshold_eligibility_is_resolver_decided() {
         .await
         .expect_err("an electorate the resolver cannot name admits no vote");
     assert!(err.to_string().contains("TrustThreshold"), "{err}");
-    assert_eq!(n.votes(&id).await, 0, "no vote row was written");
+    // Count stored rows directly: the read tally of an Open proposal resolves the same
+    // electorate, so under this resolver it refuses too.
+    assert!(
+        n.handle.get_voter_dids(&id).await.unwrap().is_empty(),
+        "no vote row was written"
+    );
+    let tally_err = n
+        .handle
+        .get_vote_tally(&id)
+        .await
+        .expect_err("the read tally cannot name the electorate either");
+    assert!(
+        tally_err.to_string().contains("TrustThreshold"),
+        "{tally_err}"
+    );
 }
 
 #[tokio::test]
