@@ -1387,7 +1387,12 @@ mod tests {
         // Draft -> Cancelled is permitted while Pending, so only the overflow can refuse it.
         p.cancel().unwrap();
         let e = ls.write_proposal(&at_max, &p, [3; 16]).unwrap_err();
-        assert!(e.downcast_ref::<FenceRefusal>().is_none(), "{e:#}");
+        // The checked increment itself refuses (not the fence, not a stale conflict).
+        assert_eq!(
+            e.downcast_ref::<LifecycleCodecError>(),
+            Some(&LifecycleCodecError::RevisionOverflow),
+            "{e:#}"
+        );
         assert_eq!(row(&s, &p), before);
         assert_eq!(ls.load(&l()).unwrap().revision(), u64::MAX);
         admitted(&s);
