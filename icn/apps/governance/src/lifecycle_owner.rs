@@ -982,6 +982,19 @@ mod tests {
         store.save_revoked_delegation(&in_l, t2 + 5).unwrap();
         assert_eq!(deleg_row(&store, &in_l), revoked(&in_l, t2));
         assert_eq!(record(), before, "a no-op retry does not bump L's revision");
+        // A re-pointed delegation naming an already-revoked row is still refused: idempotency
+        // never turns a mismatched revocation into success (S30 delta-review FOLLOW_UP).
+        let mut repointed_revoked = in_l.clone();
+        repointed_revoked.delegate = did();
+        assert_eq!(
+            fence(
+                store
+                    .save_revoked_delegation(&repointed_revoked, t2)
+                    .unwrap_err()
+            ),
+            FenceRefusal::RevocationMismatch
+        );
+        assert_eq!(deleg_row(&store, &in_l), revoked(&in_l, t2));
         // Not backdated before the delegation existed; names the stored delegation exactly;
         // only stored delegations are revoked.
         let fresh = deleg(DelegationScope::Blanket);
