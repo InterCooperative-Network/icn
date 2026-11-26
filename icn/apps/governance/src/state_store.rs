@@ -426,7 +426,7 @@ impl std::fmt::Display for ProposalWriteRefused {
 impl std::error::Error for ProposalWriteRefused {}
 
 /// Decide whether `next` may replace the stored proposal bytes `stored`.
-fn check_proposal_overwrite(stored: &[u8], next: &Proposal) -> Result<()> {
+pub(crate) fn check_proposal_overwrite(stored: &[u8], next: &Proposal) -> Result<()> {
     let existing: Proposal =
         serde_json::from_slice(stored).map_err(|e| ProposalWriteRefused::Unreadable {
             proposal: next.id.0.clone(),

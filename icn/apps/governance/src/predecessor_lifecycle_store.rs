@@ -53,7 +53,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use icn_governance::{Proposal, ProposalState};
 
-use crate::state_store::{domain_key, proposal_key};
+use crate::state_store::{check_proposal_overwrite, domain_key, proposal_key};
 
 /// The journal prefix for lifecycle writes. It sits outside every `gov:` prefix the governance
 /// store scans: `lifecycle-journal` differs from `lifecycle:` and `lifecycle-witness:`.
@@ -637,6 +637,12 @@ impl<'a> LifecycleStore<'a> {
         if stored.as_deref() == Some(next_bytes.as_slice()) {
             return Ok(FencedWrite::Unchanged);
         }
+        // The state store's own update rules (one funnel; never restated here): a closed
+        // proposal is final, a proposal keeps its domain, and, where present, the field and
+        // transition rules. The lifecycle fence only adds lifecycle-dependent refusals.
+        if let Some(bytes) = stored.as_deref() {
+            check_proposal_overwrite(bytes, next)?;
+        }
         proposal_fence(&loaded.state, previous.as_ref(), next)?;
         let rkey = lifecycle_key(l)?;
         let wkey = witness_key(l)?;
@@ -715,9 +721,11 @@ impl std::error::Error for FenceRefusal {}
 /// | CutoverPending | refuse | refuse | allow | allow (incl. Draft → closed) | allow |
 /// | Sealed | refuse | refuse | refuse | refuse | refuse |
 ///
-/// Identical rewrites never reach the policy (they write nothing). Backward moves and
-/// closed-row rewrites are refused by the state store's own update rules; the fence adds only
-/// the lifecycle-dependent refusals. Cutover-control proposals (P5c) are not yet exempted.
+/// Identical rewrites never reach the policy (they write nothing). Before the policy,
+/// [`LifecycleStore::write_proposal`] applies the state store's update rules
+/// (`check_proposal_overwrite`: closed is final, domain fixed, and the field and transition
+/// rules where present); this function adds only the lifecycle-dependent refusals.
+/// Cutover-control proposals (P5c) are not yet exempted.
 pub fn proposal_fence(
     lifecycle: &PredecessorLifecycle,
     previous: Option<&Proposal>,
@@ -1150,11 +1158,17 @@ mod tests {
             ls.write_proposal(&sealed, &p, [4; 16]).unwrap(),
             FencedWrite::Unchanged
         );
+        // Every row of a sealed L is closed, so changing one is refused by the state store's
+        // closed-is-final rule (applied first); creating a new one by the Sealed fence.
         let mut changed = p.clone();
         changed.updated_at += 1;
-        assert_eq!(
-            fence(ls.write_proposal(&sealed, &changed, [5; 16]).unwrap_err()),
-            FenceRefusal::Sealed
+        let e = ls.write_proposal(&sealed, &changed, [5; 16]).unwrap_err();
+        assert!(
+            matches!(
+                e.downcast_ref::<crate::state_store::ProposalWriteRefused>(),
+                Some(crate::state_store::ProposalWriteRefused::ClosedIsFinal { .. })
+            ),
+            "{e:#}"
         );
         assert_eq!(
             fence(
@@ -1419,6 +1433,70 @@ mod tests {
                 reader.join().unwrap();
             });
         }
+    }
+
+    #[test]
+    fn a_closed_proposal_is_never_reopened_or_flipped_through_the_fence() {
+        // Review BLOCKER (S27): the fenced writer must apply the state store's update rules.
+        use crate::state_store::ProposalWriteRefused;
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.open(60).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let open = p.clone();
+        p.close(ProposalState::Accepted { closed_at: 5 }).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [2; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [3; 16])
+                .unwrap(),
+        );
+        let before = row(&s, &p);
+        let mut flipped = p.clone();
+        flipped.state = ProposalState::Rejected { closed_at: 5 };
+        for (i, next) in [open, flipped].iter().enumerate() {
+            let e = ls
+                .write_proposal(&pending, next, [4 + i as u8; 16])
+                .unwrap_err();
+            assert!(
+                matches!(
+                    e.downcast_ref::<ProposalWriteRefused>(),
+                    Some(ProposalWriteRefused::ClosedIsFinal { .. })
+                ),
+                "{e:#}"
+            );
+            assert_eq!(row(&s, &p), before);
+        }
+        assert_eq!(ls.load(&l()).unwrap().revision(), pending.revision());
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_witness_replaced_between_load_and_write_makes_the_write_stale() {
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [9; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
+                .unwrap(),
+        );
+        let before = row(&s, &p);
+        // Draft -> Cancelled is permitted while Pending; only the witness check can refuse it.
+        p.cancel().unwrap();
+        // A raw tamper of the witness lands after the view was loaded.
+        *ls.before_apply.lock().unwrap() = Some(Box::new(|st: &SledStore| {
+            st.put(&witness_key(&l()).unwrap(), b"tampered").unwrap();
+        }));
+        let e = ls.write_proposal(&pending, &p, [2; 16]).unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::Stale)
+        );
+        assert_eq!(row(&s, &p), before);
     }
 
     #[test]
