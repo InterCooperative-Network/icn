@@ -282,7 +282,8 @@ pub struct CloseJournalEntry {
     /// idempotent (`AlreadyEmitted` / `AlreadyMinted`), so replay never adds a
     /// second mandate.
     ///
-    /// Set by the force-accept path. Entries written before this field existed
+    /// Set by the ordinary close and the force-accept path for an accepted,
+    /// execution-required proposal. Entries written before this field existed
     /// deserialize as `false`, which matches what they did: their close wrote
     /// those artifacts itself, before the intent.
     #[serde(default)]
@@ -305,6 +306,42 @@ pub(crate) fn is_accepted(state: &icn_governance::ProposalState) -> bool {
 /// Envelope key for an entry that carries an execution closure. See the
 /// module docs ("Stored format and downgrade").
 const EXECUTION_CLOSURE_ENVELOPE: &str = "execution_closure_intent_v1";
+
+/// Fail unless an institutional effect that the emission seam reported as
+/// already stored is bound to exactly `decision_hash`.
+///
+/// `emit_accepted_effect` deduplicates by `(proposal_id, effect_kind)` only.
+/// A record that already exists for the proposal but names another decision
+/// (or none) is not this decision's effect; adopting it would let the
+/// proposal's terminal record and its effect disagree about which decision
+/// produced it. A fresh emission (`Emitted`) or `NoEffect` passes.
+pub(crate) fn require_effect_bound_to_decision(
+    backend: &dyn GovernanceReceiptBackend,
+    proposal_id: &str,
+    outcome: &crate::institutional_effect::AcceptanceEmissionOutcome,
+    decision_hash: Option<icn_kernel_api::Hash>,
+) -> Result<(), String> {
+    let crate::institutional_effect::AcceptanceEmissionOutcome::AlreadyEmitted { record_id } =
+        outcome
+    else {
+        return Ok(());
+    };
+    let prior = backend
+        .list_institutional_effects_by_proposal(proposal_id)
+        .map_err(|e| format!("could not read the existing institutional effect: {e}"))?
+        .into_iter()
+        .find(|r| &r.record_id == record_id);
+    match prior {
+        Some(r) if r.decision_hash == decision_hash => Ok(()),
+        Some(_) => Err(
+            "an institutional effect for this proposal is already bound to a different decision"
+                .to_string(),
+        ),
+        None => Err(format!(
+            "the existing institutional effect '{record_id}' could not be read back"
+        )),
+    }
+}
 
 impl CloseJournalEntry {
     /// Serialize for the state store. An entry with an execution closure is
@@ -420,6 +457,24 @@ impl CloseJournalEntry {
                     "close journal for proposal '{proposal_id}' carries an execution closure without a valid decision hash"
                 )
             })?;
+        // The journal alone does not authorize: the decision it carries must be
+        // an accepted one and internally consistent. A v1 governance receipt in
+        // the same entry must name this proposal, record acceptance and carry
+        // exactly the decision hash the closure is bound to.
+        if let Some(receipt) = &self.receipts.governance_receipt {
+            if receipt.proposal_id != *proposal_id
+                || receipt.decision_hash != decision_hash
+                || !matches!(
+                    receipt.outcome,
+                    icn_governance::proof::ProofOutcome::Accepted
+                )
+            {
+                anyhow::bail!(
+                    "close journal for proposal '{proposal_id}' carries an execution closure whose \
+                     decision does not match its governance receipt"
+                );
+            }
+        }
         let effect = crate::institutional_effect::emit_accepted_effect(
             backend,
             proposal_id,
@@ -436,27 +491,10 @@ impl CloseJournalEntry {
         // An effect record that already exists must belong to THIS decision.
         // One bound to another decision hash (or to none) is refused, never
         // adopted: the intent stays for an authorized reconciliation.
-        if let crate::institutional_effect::AcceptanceEmissionOutcome::AlreadyEmitted {
-            record_id,
-        } = &effect
-        {
-            let prior = backend
-                .list_institutional_effects_by_proposal(proposal_id)
-                .map_err(|e| anyhow::anyhow!("execution closure for proposal '{proposal_id}' failed: could not read the existing institutional effect: {e}"))?
-                .into_iter()
-                .find(|r| &r.record_id == record_id);
-            match prior {
-                Some(r) if r.decision_hash == Some(decision_hash) => {}
-                Some(_) => anyhow::bail!(
-                    "execution closure for proposal '{proposal_id}' failed: an institutional \
-                     effect for this proposal is already bound to a different decision"
-                ),
-                None => anyhow::bail!(
-                    "execution closure for proposal '{proposal_id}' failed: the existing \
-                     institutional effect '{record_id}' could not be read back"
-                ),
-            }
-        }
+        require_effect_bound_to_decision(backend, proposal_id, &effect, Some(decision_hash))
+            .map_err(|e| {
+                anyhow::anyhow!("execution closure for proposal '{proposal_id}' failed: {e}")
+            })?;
         match crate::grant_minting::mint_and_persist_for_accepted(
             backend,
             proposal_id,

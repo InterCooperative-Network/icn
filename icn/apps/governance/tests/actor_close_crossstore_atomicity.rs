@@ -159,6 +159,7 @@ struct RecordingReceiptBackend {
     flushes: AtomicUsize,
     fail_flush: AtomicBool,
     put_institutional_effect_calls: AtomicUsize,
+    effects: Mutex<Vec<InstitutionalEffectRecord>>,
 }
 
 impl RecordingReceiptBackend {
@@ -232,10 +233,24 @@ impl GovernanceReceiptBackend for RecordingReceiptBackend {
     ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
         Ok(self.allocations.lock().unwrap().clone())
     }
-    fn put_institutional_effect(&self, _record: &InstitutionalEffectRecord) -> Result<(), String> {
+    fn put_institutional_effect(&self, record: &InstitutionalEffectRecord) -> Result<(), String> {
         self.put_institutional_effect_calls
             .fetch_add(1, Ordering::SeqCst);
+        self.effects.lock().unwrap().push(record.clone());
         Ok(())
+    }
+    fn list_institutional_effects_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+        Ok(self
+            .effects
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r.proposal_id == proposal_id)
+            .cloned()
+            .collect())
     }
     fn put_mandate(&self, mandate: &icn_governance::Mandate) -> Result<(), String> {
         self.mandates.lock().unwrap().push(mandate.clone());
@@ -1299,6 +1314,10 @@ async fn close_retry_completes_existing_intent_without_overwrite() {
         1,
         "attempt 1 ran the execution-closure preflight exactly once"
     );
+    let first_intent = state
+        .list_close_intents()
+        .expect("list_close_intents")
+        .remove(0);
 
     // Attempt 2 (retried before restart): the handler must COMPLETE the existing
     // journal entry, not run a fresh close. A fresh close would re-run the
@@ -1323,6 +1342,11 @@ async fn close_retry_completes_existing_intent_without_overwrite() {
         matches!(persisted.state, ProposalState::Accepted { .. }),
         "the retry completes the existing close; got {:?}",
         persisted.state
+    );
+    assert_eq!(
+        serde_json::to_value(&persisted).unwrap(),
+        serde_json::to_value(&first_intent.proposal).unwrap(),
+        "the retry committed the first attempt's journaled decision"
     );
     assert_eq!(
         state
