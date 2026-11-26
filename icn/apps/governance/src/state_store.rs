@@ -1638,3 +1638,14 @@ mod proposal_identity_tests {
         assert_eq!(store.reads_of_armed_key(), SAVE_PROPOSAL_MAX_ATTEMPTS);
     }
 }
+
+/// Test-only: write a proposal row raw (no checks), to model a stored state that typed
+/// writers cannot produce (historical contradictions).
+#[cfg(test)]
+pub(crate) fn state_store_test_put(store: &icn_store::SledStore, p: &Proposal) {
+    use icn_store::Store;
+    #[allow(clippy::unwrap_used)]
+    store
+        .put(&proposal_key(&p.id), &serde_json::to_vec(p).unwrap())
+        .unwrap();
+}

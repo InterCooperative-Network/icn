@@ -96,6 +96,8 @@ pub enum LifecycleStoreError {
     AlreadyClaimed,
     /// The process-wide claim registry is poisoned (a panic while it was held).
     ClaimPoisoned,
+    /// A commit panicked while serialized; this owner must return to recovery.
+    CommitPoisoned,
 }
 
 impl std::fmt::Display for LifecycleStoreError {
@@ -110,6 +112,9 @@ impl std::fmt::Display for LifecycleStoreError {
             }
             Self::AlreadyClaimed => "another lifecycle owner already holds this database",
             Self::ClaimPoisoned => "the lifecycle claim registry is poisoned",
+            Self::CommitPoisoned => {
+                "a lifecycle commit was interrupted; recovery is required before further writes"
+            }
             Self::ReplayMismatch => {
                 "a Begin replay names a different electorate commitment than the one recorded"
             }
@@ -281,6 +286,7 @@ impl<'a> LifecycleRecovery<'a> {
             journal: self.journal,
             _admission: admission,
             _claim: self.claim,
+            commit_lock: Mutex::new(()),
             #[cfg(test)]
             before_apply: Mutex::new(None),
         })
@@ -295,6 +301,12 @@ pub struct LifecycleStore<'a> {
     _admission: icn_store::recovery::Admission<'a>,
     /// The database claim, moved here from recovery; released when the live store drops.
     _claim: Claim,
+    /// Serializes journaled commits within this (exclusive) owner. Only this owner writes the
+    /// journal prefix, so while the lock is held any record `admit` sees is genuinely
+    /// unresolved evidence, never a sibling commit in flight (S27 review FOLLOW_UP). Poisoned
+    /// by a panic mid-commit: every later commit is then refused until the database goes
+    /// through recovery again.
+    commit_lock: Mutex<()>,
     /// Test-only: runs once between journaling an intent and applying it, to model a concurrent
     /// writer landing in that window.
     #[cfg(test)]
@@ -565,6 +577,10 @@ impl<'a> LifecycleStore<'a> {
     /// One journaled multi-key write: admit, begin, apply, complete. A conflict is definitive
     /// (nothing was written) and surfaces as [`LifecycleStoreError::Stale`].
     fn commit(&self, intent: RecoveryIntent) -> anyhow::Result<()> {
+        let _serial = self
+            .commit_lock
+            .lock()
+            .map_err(|_| LifecycleStoreError::CommitPoisoned)?;
         let txid = intent.txid;
         // Any unresolved journal record (on any domain) closes the store until recovery.
         self.journal.admit()?;
@@ -675,6 +691,11 @@ impl<'a> LifecycleStore<'a> {
     /// Fenced write-ahead close intent for a proposal of L (W6). Closing completes an
     /// existing obligation, so it is permitted while Pending (refusing it would deadlock the
     /// seal); a Sealed L has no open proposal to close.
+    ///
+    /// The intent must name a proposal that is stored in L, and its terminal row must be a
+    /// write the state store would accept over the stored row (`check_proposal_overwrite`:
+    /// closed is final, fields fixed, legal transition). An intent is immutable once written:
+    /// a different intent for the same proposal is refused, never replaced.
     pub fn write_close_intent(
         &self,
         loaded: &LoadedLifecycle,
@@ -687,18 +708,47 @@ impl<'a> LifecycleStore<'a> {
         if matches!(loaded.state, PredecessorLifecycle::Sealed { .. }) {
             return Err(FenceRefusal::Sealed.into());
         }
+        if !entry.proposal.state.is_closed() {
+            return Err(FenceRefusal::IntentNotTerminal.into());
+        }
+        let row = self
+            .store
+            .get(&proposal_key(&entry.proposal.id))?
+            .ok_or(FenceRefusal::IntentWithoutProposal)?;
+        let stored_proposal: Proposal =
+            serde_json::from_slice(&row).map_err(|_| FenceRefusal::UnreadableProposal)?;
+        if stored_proposal.domain_id != loaded.predecessor {
+            return Err(FenceRefusal::OtherDomain.into());
+        }
+        if row != serde_json::to_vec(&entry.proposal)? {
+            check_proposal_overwrite(&row, &entry.proposal)?;
+        }
         let key = close_intent_key(&entry.proposal.id);
         let next_bytes = serde_json::to_vec(entry)?;
         let stored = self.store.get(&key)?;
-        if stored.as_deref() == Some(next_bytes.as_slice()) {
-            return Ok(FencedWrite::Unchanged);
+        match stored.as_deref() {
+            Some(existing) if existing == next_bytes.as_slice() => {
+                return Ok(FencedWrite::Unchanged)
+            }
+            Some(_) => return Err(FenceRefusal::ConflictingIntent.into()),
+            None => {}
         }
         self.fenced_commit(loaded, key, stored, Some(next_bytes), txid)
     }
 
-    /// Fenced removal of a proposal's close intent (W8). Never refused by lifecycle state:
-    /// recovery must always be able to finish a decided close. Removing an absent intent
-    /// writes nothing.
+    /// Fenced retirement of a **completed** close intent (W8). This is the narrow housekeeping
+    /// step after a decided close has landed, not a deletion capability:
+    /// - the intent must decode and belong to L;
+    /// - the stored proposal row must be **byte-identical** to the intent's terminal row, so
+    ///   the decision is durably complete and its outcome is the one the intent recorded. An
+    ///   intent whose close has not landed, or that contradicts the stored terminal row (a
+    ///   `CloseConflict`), is refused and preserved as evidence;
+    /// - it is allowed while Legacy or Pending (retiring finishes an existing obligation and
+    ///   bumps the revision, since intents are a seal input), and refused while Sealed: a
+    ///   valid Seal requires that no intent of L remains, so a Sealed L has none to retire,
+    ///   and anything present after a seal is evidence, not housekeeping.
+    ///
+    /// Removing an absent intent writes nothing.
     pub fn delete_close_intent(
         &self,
         loaded: &LoadedLifecycle,
@@ -712,8 +762,15 @@ impl<'a> LifecycleStore<'a> {
         };
         let entry: CloseJournalEntry =
             serde_json::from_slice(bytes).map_err(|_| FenceRefusal::UnreadableProposal)?;
-        if entry.proposal.domain_id != loaded.predecessor {
+        if entry.proposal.domain_id != loaded.predecessor || entry.proposal.id != *proposal {
             return Err(FenceRefusal::OtherDomain.into());
+        }
+        if matches!(loaded.state, PredecessorLifecycle::Sealed { .. }) {
+            return Err(FenceRefusal::Sealed.into());
+        }
+        let row = self.store.get(&proposal_key(proposal))?;
+        if row.as_deref() != Some(serde_json::to_vec(&entry.proposal)?.as_slice()) {
+            return Err(FenceRefusal::CloseNotCompleted.into());
         }
         self.fenced_commit(loaded, key, stored, None, txid)
     }
@@ -784,6 +841,15 @@ pub enum FenceRefusal {
     Sealed,
     /// L is CutoverPending: its domain record is pinned by the basis and may not change.
     DomainChangeWhilePending,
+    /// A close intent must carry a terminal proposal state.
+    IntentNotTerminal,
+    /// A close intent names a proposal that is not stored.
+    IntentWithoutProposal,
+    /// A different close intent is already recorded for this proposal; it is never replaced.
+    ConflictingIntent,
+    /// The stored proposal does not equal the intent's terminal row: the close has not landed,
+    /// or the records contradict each other. The intent is kept as evidence.
+    CloseNotCompleted,
 }
 
 impl std::fmt::Display for FenceRefusal {
@@ -798,6 +864,12 @@ impl std::fmt::Display for FenceRefusal {
             Self::Sealed => "the domain is sealed; its proposals are final",
             Self::DomainChangeWhilePending => {
                 "the domain record may not change while a cutover is pending"
+            }
+            Self::IntentNotTerminal => "a close intent must carry a terminal proposal state",
+            Self::IntentWithoutProposal => "the close intent names no stored proposal",
+            Self::ConflictingIntent => "a different close intent is already recorded",
+            Self::CloseNotCompleted => {
+                "the close has not landed or contradicts the stored proposal; intent kept"
             }
         })
     }
@@ -1747,6 +1819,185 @@ mod tests {
             FenceRefusal::OtherDomain
         );
         assert!(s.get(&close_intent_key(&other.id)).unwrap().is_none());
+    }
+
+    #[test]
+    fn close_intents_are_tied_to_a_stored_proposal_and_never_replaced() {
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.open(60).unwrap();
+        // No stored proposal: refused.
+        assert_eq!(
+            fence(
+                ls.write_close_intent(&ls.load(&l()).unwrap(), &intent_for(&p), [1; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::IntentWithoutProposal
+        );
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [2; 16])
+            .unwrap();
+        // A non-terminal "intent" is refused.
+        let mut open_entry = intent_for(&p);
+        open_entry.proposal = p.clone();
+        assert_eq!(
+            fence(
+                ls.write_close_intent(&ls.load(&l()).unwrap(), &open_entry, [3; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::IntentNotTerminal
+        );
+        // The first intent is recorded; a different one is refused and the first kept.
+        let first = intent_for(&p);
+        ls.write_close_intent(&ls.load(&l()).unwrap(), &first, [4; 16])
+            .unwrap();
+        let kept = s.get(&close_intent_key(&p.id)).unwrap();
+        let mut other = first.clone();
+        other.proposal.state = ProposalState::Rejected { closed_at: 7 };
+        assert_eq!(
+            fence(
+                ls.write_close_intent(&ls.load(&l()).unwrap(), &other, [5; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::ConflictingIntent
+        );
+        assert_eq!(s.get(&close_intent_key(&p.id)).unwrap(), kept);
+        admitted(&s);
+    }
+
+    #[test]
+    fn retirement_requires_the_close_to_have_landed_exactly_as_recorded() {
+        use crate::state_store::state_store_test_put;
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.open(60).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let entry = intent_for(&p);
+        ls.write_close_intent(&ls.load(&l()).unwrap(), &entry, [2; 16])
+            .unwrap();
+        // Premature: the close has not landed yet.
+        assert_eq!(
+            fence(
+                ls.delete_close_intent(&ls.load(&l()).unwrap(), &p.id, [3; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::CloseNotCompleted
+        );
+        // Contradiction: the stored row closed differently (raw, modelling the historical
+        // contradiction a veto race once produced). The intent is kept as evidence.
+        let mut contradicting = entry.proposal.clone();
+        contradicting.state = ProposalState::Vetoed {
+            vetoed_at: 7,
+            reason: "r".into(),
+        };
+        state_store_test_put(&s, &contradicting);
+        assert_eq!(
+            fence(
+                ls.delete_close_intent(&ls.load(&l()).unwrap(), &p.id, [4; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::CloseNotCompleted
+        );
+        assert!(s.get(&close_intent_key(&p.id)).unwrap().is_some());
+        admitted(&s);
+    }
+
+    #[test]
+    fn nothing_is_retired_after_a_seal() {
+        use crate::state_store::state_store_test_put;
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.cancel().unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
+                .unwrap(),
+        );
+        let ids = ["p"];
+        let sealed = written(
+            ls.transition(
+                &pending,
+                LifecycleRequest::Seal {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                    final_ids: &ids,
+                },
+                [3; 16],
+            )
+            .unwrap(),
+        );
+        // An intent present after the seal (raw) is evidence, not housekeeping.
+        let mut entry = intent_for(&p);
+        entry.proposal = p.clone();
+        state_store_test_put(&s, &entry.proposal);
+        s.put(&close_intent_key(&p.id), &serde_json::to_vec(&entry).unwrap())
+            .unwrap();
+        assert_eq!(
+            fence(ls.delete_close_intent(&sealed, &p.id, [4; 16]).unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        assert!(s.get(&close_intent_key(&p.id)).unwrap().is_some());
+    }
+
+    #[test]
+    fn unrelated_concurrent_writes_never_require_recovery() {
+        // Review FOLLOW_UP: admit() counts every journal record, so a sibling commit in
+        // flight used to read as unresolved evidence. Commits are now serialized in the owner.
+        let s = store();
+        let ls = live(&s);
+        let props: Vec<Proposal> = (0..8).map(|i| prop(&format!("u{i}"))).collect();
+        let results: Vec<anyhow::Result<FencedWrite>> = std::thread::scope(|scope| {
+            let hs: Vec<_> = props
+                .iter()
+                .enumerate()
+                .map(|(i, p)| {
+                    let ls = &ls;
+                    scope.spawn(move || {
+                        ls.write_proposal(&ls.load(&l()).unwrap(), p, [i as u8 + 1; 16])
+                    })
+                })
+                .collect();
+            hs.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        for r in &results {
+            assert!(r.is_ok(), "{:#}", r.as_ref().unwrap_err());
+        }
+        admitted(&s);
+    }
+
+    #[test]
+    fn competing_closes_of_one_proposal_have_exactly_one_winner() {
+        // write_proposal reads the stored row at write time (as save_proposal does), so two
+        // individually legitimate transitions may both apply in sequence. Two different
+        // decisions cannot: the loser meets a closed row (or a moved one) and is refused.
+        let s = store();
+        let ls = live(&s);
+        let mut open = prop("p");
+        open.open(60).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &open, [1; 16])
+            .unwrap();
+        let loaded = ls.load(&l()).unwrap();
+        let mut accepted = open.clone();
+        accepted.close(ProposalState::Accepted { closed_at: 9 }).unwrap();
+        let mut rejected = open.clone();
+        rejected.close(ProposalState::Rejected { closed_at: 9 }).unwrap();
+        let (a, b) = std::thread::scope(|scope| {
+            let a = scope.spawn(|| ls.write_proposal(&loaded, &accepted, [2; 16]));
+            let b = scope.spawn(|| ls.write_proposal(&loaded, &rejected, [3; 16]));
+            (a.join().unwrap(), b.join().unwrap())
+        });
+        assert_eq!(
+            [a.is_ok(), b.is_ok()].iter().filter(|x| **x).count(),
+            1,
+            "exactly one decision stands"
+        );
+        let winner = if a.is_ok() { &accepted } else { &rejected };
+        assert_eq!(row(&s, &open), Some(serde_json::to_vec(winner).unwrap()));
+        admitted(&s);
     }
 
     #[test]
