@@ -207,11 +207,15 @@ async fn a_vote_during_deliberation_is_refused() {
     assert_eq!(n.votes(&id).await, 0, "no vote row was written");
 }
 
-/// TrustThreshold keeps its existing meaning: the actor does not check eligibility for it.
-/// This pins that the fix did not silently change that policy (a known gap, documented on the
-/// handler) — it is not an endorsement.
+/// TrustThreshold eligibility is decided by the membership resolver, like every other source:
+/// the actor admits a vote only from a principal the resolver names (the same electorate the
+/// close-time quorum is drawn from). This node is wired with `StaticMembershipResolver`, which
+/// cannot name a TrustThreshold electorate, so the vote is refused fail-closed and no row is
+/// written; a proposal in such a domain could not be closed under this resolver either. The
+/// admitted TrustThreshold path (a TrustService-backed resolver, as the daemon wires it) is
+/// covered by `signed_governance_emission::a_trust_threshold_domain_emits_the_legacy_payload`.
 #[tokio::test]
-async fn trust_threshold_eligibility_is_unchanged() {
+async fn trust_threshold_eligibility_is_resolver_decided() {
     let n = node().await;
     let domain = GovernanceDomainId("tt".to_string());
     n.manager
@@ -227,10 +231,13 @@ async fn trust_threshold_eligibility_is_unchanged() {
     let id = n.propose(&domain).await.unwrap();
     n.manager.open_proposal(id.clone(), 3600).await.unwrap();
     let anyone = IdentityBundle::generate().unwrap().did().clone();
-    n.manager
+    let err = n
+        .manager
         .cast_vote(id.clone(), anyone, VoteChoice::For, None)
         .await
-        .expect("TrustThreshold voting is not gated here, as before");
+        .expect_err("an electorate the resolver cannot name admits no vote");
+    assert!(err.to_string().contains("TrustThreshold"), "{err}");
+    assert_eq!(n.votes(&id).await, 0, "no vote row was written");
 }
 
 #[tokio::test]
