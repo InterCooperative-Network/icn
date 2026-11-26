@@ -663,7 +663,7 @@ impl<'a> LifecycleStore<'a> {
             check_proposal_overwrite(bytes, next)?;
         }
         proposal_fence(&loaded.state, previous.as_ref(), next)?;
-        self.fenced_commit(loaded, pkey, stored, Some(next_bytes), txid)
+        self.fenced_commit(loaded, pkey, stored, Some(next_bytes), Vec::new(), txid)
     }
 
     /// Fenced write of L's own domain record (W13–W15: create/replace, config, membership).
@@ -700,7 +700,7 @@ impl<'a> LifecycleStore<'a> {
         if let Some(bytes) = stored.as_deref() {
             check_domain_overwrite(bytes, domain)?;
         }
-        self.fenced_commit(loaded, key, stored, Some(next_bytes), txid)
+        self.fenced_commit(loaded, key, stored, Some(next_bytes), Vec::new(), txid)
     }
 
     /// Fenced write-ahead close intent for a proposal of L (W6). Closing completes an
@@ -709,7 +709,8 @@ impl<'a> LifecycleStore<'a> {
     ///
     /// The intent must name a proposal that is stored in L, and its terminal row must be a
     /// write the state store would accept over the stored row (`check_proposal_overwrite`:
-    /// closed is final, fields fixed, legal transition). An intent is immutable once written:
+    /// closed is final and the domain is fixed; field and transition rules where present,
+    /// i.e. once #2962 is in the tree). The stored row is also expected unchanged by the write. An intent is immutable once written:
     /// a different intent for the same proposal is refused, never replaced.
     pub fn write_close_intent(
         &self,
@@ -726,9 +727,10 @@ impl<'a> LifecycleStore<'a> {
         if !entry.proposal.state.is_closed() {
             return Err(FenceRefusal::IntentNotTerminal.into());
         }
+        let pkey = proposal_key(&entry.proposal.id);
         let row = self
             .store
-            .get(&proposal_key(&entry.proposal.id))?
+            .get(&pkey)?
             .ok_or(FenceRefusal::IntentWithoutProposal)?;
         let stored_proposal: Proposal =
             serde_json::from_slice(&row).map_err(|_| FenceRefusal::UnreadableProposal)?;
@@ -748,7 +750,16 @@ impl<'a> LifecycleStore<'a> {
             Some(_) => return Err(FenceRefusal::ConflictingIntent.into()),
             None => {}
         }
-        self.fenced_commit(loaded, key, stored, Some(next_bytes), txid)
+        // The row the checks above relied on must still be there at the write's linearization
+        // point; in a never-begun L no revision bump would otherwise fence it (S27 review).
+        self.fenced_commit(
+            loaded,
+            key,
+            stored,
+            Some(next_bytes),
+            vec![(pkey, Some(row))],
+            txid,
+        )
     }
 
     /// Fenced retirement of a **completed** close intent (W8). This is the narrow housekeeping
@@ -762,6 +773,14 @@ impl<'a> LifecycleStore<'a> {
     ///   bumps the revision, since intents are a seal input), and refused while Sealed: a
     ///   valid Seal requires that no intent of L remains, so a Sealed L has none to retire,
     ///   and anything present after a seal is evidence, not housekeeping.
+    ///
+    /// **Deviation from contract W8** ("never refused"), recorded deliberately: the two
+    /// refusals keep evidence. `CloseNotCompleted` matches the actor's real path, which
+    /// retires only after the terminal row has been saved. The Sealed refusal relies on the Seal
+    /// leaving no intent of L behind (contract §4.2 step 4). **Dependency:** `transition(Seal)`
+    /// does not yet scan `gov:close-intent:` itself (it takes caller-enumerated ids); that
+    /// scan belongs to the seal-driver increment and must land before any production routing,
+    /// or a sealed L with a leftover intent could never retire it.
     ///
     /// Removing an absent intent writes nothing.
     pub fn delete_close_intent(
@@ -783,15 +802,17 @@ impl<'a> LifecycleStore<'a> {
         if matches!(loaded.state, PredecessorLifecycle::Sealed { .. }) {
             return Err(FenceRefusal::Sealed.into());
         }
-        let row = self.store.get(&proposal_key(proposal))?;
+        let pkey = proposal_key(proposal);
+        let row = self.store.get(&pkey)?;
         if row.as_deref() != Some(serde_json::to_vec(&entry.proposal)?.as_slice()) {
             return Err(FenceRefusal::CloseNotCompleted.into());
         }
-        self.fenced_commit(loaded, key, stored, None, txid)
+        self.fenced_commit(loaded, key, stored, None, vec![(pkey, row)], txid)
     }
 
     /// The one fenced commit: `target` moves from exactly `stored` to `next` (`None`
-    /// deletes) in the same journaled write that expects L's exact lifecycle record and
+    /// deletes), with every `guards` key expected at the value the caller checked, in the same
+    /// journaled write that expects L's exact lifecycle record and
     /// witness bytes and, when L has a record, stores it back with `revision + 1` and
     /// everything else unchanged. Policy decisions are the caller's; this only commits.
     fn fenced_commit(
@@ -800,16 +821,19 @@ impl<'a> LifecycleStore<'a> {
         target: Vec<u8>,
         stored: Option<Vec<u8>>,
         next: Option<Vec<u8>>,
+        guards: Vec<Entry>,
         txid: [u8; 16],
     ) -> anyhow::Result<FencedWrite> {
         let l = &loaded.predecessor;
         let rkey = lifecycle_key(l)?;
         let wkey = witness_key(l)?;
-        let expected = vec![
+        let mut expected = vec![
             (target.clone(), stored),
             (rkey.clone(), loaded.record_bytes.clone()),
             (wkey, loaded.witness_bytes.clone()),
         ];
+        // Further keys the caller's checks relied on; expected unchanged, never written.
+        expected.extend(guards);
         let mut intended = vec![(target, next)];
         let revision = match &loaded.stored {
             Some(record) => {
@@ -1789,7 +1813,7 @@ mod tests {
     }
 
     #[test]
-    fn close_intents_are_fenced_permitted_while_pending_and_removable_when_sealed() {
+    fn close_intents_are_fenced_permitted_while_pending_and_refused_when_sealed() {
         let s = store();
         let ls = live(&s);
         let mut p = prop("p");
@@ -2052,6 +2076,87 @@ mod tests {
         );
         let winner = if a.is_ok() { &accepted } else { &rejected };
         assert_eq!(row(&s, &open), Some(serde_json::to_vec(winner).unwrap()));
+        admitted(&s);
+    }
+
+    #[test]
+    fn the_fenced_domain_writer_applies_save_domains_actor_model_rule() {
+        // Kills S27 mutant D04: the shared check_domain_overwrite must be applied.
+        let s = store();
+        let subject = icn_governance::GovernanceDomain::with_id(l(), "s".into(), {
+            let mut c = icn_governance::GovernanceConfig::cooperative_default();
+            c.membership = icn_governance::MembershipConfig::static_list(vec![]);
+            c
+        })
+        .with_human_actor_model(icn_governance::HumanActorModel::ContextSubjectV1)
+        .unwrap();
+        s.put(&domain_key(&l()), &serde_json::to_vec(&subject).unwrap())
+            .unwrap();
+        let ls = live(&s);
+        let before = s.get(&domain_key(&l())).unwrap();
+        // A Subject-mode domain is never replaced by a legacy-mode one.
+        let e = ls
+            .write_domain(&ls.load(&l()).unwrap(), &gdom("legacy"), [1; 16])
+            .unwrap_err();
+        assert!(e.downcast_ref::<FenceRefusal>().is_none(), "{e:#}");
+        assert_eq!(s.get(&domain_key(&l())).unwrap(), before);
+    }
+
+    #[test]
+    fn an_intent_contradicting_an_already_closed_row_is_refused() {
+        // Kills S27 mutant C05: the intent's terminal row must pass the state store's rules
+        // over the stored row (here: closed is final).
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.open(60).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let mut rejected = p.clone();
+        rejected
+            .close(ProposalState::Rejected { closed_at: 3 })
+            .unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &rejected, [2; 16])
+            .unwrap();
+        let e = ls
+            .write_close_intent(&ls.load(&l()).unwrap(), &intent_for(&p), [3; 16])
+            .unwrap_err();
+        assert!(
+            matches!(
+                e.downcast_ref::<crate::state_store::ProposalWriteRefused>(),
+                Some(crate::state_store::ProposalWriteRefused::ClosedIsFinal { .. })
+            ),
+            "{e:#}"
+        );
+        assert!(s.get(&close_intent_key(&p.id)).unwrap().is_none());
+    }
+
+    #[test]
+    fn a_proposal_row_changed_after_the_intent_checks_makes_the_intent_stale() {
+        // Review FOLLOW_UP: in a never-begun L no revision bump fences the proposal row, so the
+        // intent write must expect it unchanged.
+        use crate::state_store::state_store_test_put;
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.open(60).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let mut rejected = p.clone();
+        rejected
+            .close(ProposalState::Rejected { closed_at: 3 })
+            .unwrap();
+        *ls.before_apply.lock().unwrap() = Some(Box::new(move |st: &SledStore| {
+            state_store_test_put(st, &rejected);
+        }));
+        let e = ls
+            .write_close_intent(&ls.load(&l()).unwrap(), &intent_for(&p), [2; 16])
+            .unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::Stale)
+        );
+        assert!(s.get(&close_intent_key(&p.id)).unwrap().is_none());
         admitted(&s);
     }
 
