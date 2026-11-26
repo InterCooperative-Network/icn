@@ -3029,7 +3029,9 @@ mod tests {
     fn a_database_has_one_lifecycle_owner_at_a_time() {
         let s = store();
         let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
-        let e = LifecycleRecovery::claim(&s, fixture_evidence()).err().unwrap();
+        let e = LifecycleRecovery::claim(&s, fixture_evidence())
+            .err()
+            .unwrap();
         assert_eq!(
             e.downcast_ref::<LifecycleStoreError>(),
             Some(&LifecycleStoreError::AlreadyClaimed)
@@ -3377,7 +3379,7 @@ mod tests {
         let s = store();
         let (ls, pending) = drained(&s);
         let sealed = written(
-            ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            ls.seal_with(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
                 .unwrap(),
         );
         let replay = |txid| {
@@ -3451,6 +3453,119 @@ mod tests {
         assert!(ls
             .seal_with(&reloaded, 1, k(0x4D), &Evidence::default(), [6; 16])
             .is_ok());
+        admitted(&s);
+    }
+
+    // ---- S28: Seal evidence bound at construction to the receipt backend ----
+
+    use crate::seal_evidence::tests::{budget, durable, Backend};
+
+    fn accepted(id: &str, payload: icn_governance::ProposalPayload) -> Proposal {
+        let mut p = prop(id);
+        p.payload = payload;
+        p.open(60).unwrap();
+        p.close(ProposalState::Accepted { closed_at: 3 }).unwrap();
+        p
+    }
+
+    /// A live owner bound to `backend`, with `rows` written in Legacy and attempt 1 begun.
+    fn bound_pending<'s>(
+        s: &'s SledStore,
+        backend: &std::sync::Arc<Backend>,
+        rows: &[Proposal],
+    ) -> (LifecycleStore<'s>, LoadedLifecycle) {
+        let ls = LifecycleRecovery::claim(s, BoundSealEvidence::receipts(backend.clone()))
+            .unwrap()
+            .into_live()
+            .map_err(|(_, e)| e)
+            .unwrap();
+        for (i, p) in rows.iter().enumerate() {
+            ls.write_proposal(&ls.load(&l()).unwrap(), p, [0x30 + i as u8; 16])
+                .unwrap();
+        }
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [0x2F; 16])
+                .unwrap(),
+        );
+        (ls, pending)
+    }
+
+    #[test]
+    fn the_production_seal_uses_the_bound_receipts_and_seals_on_complete_durable_intent() {
+        let s = store();
+        let backend = std::sync::Arc::new(Backend::default());
+        let m = accepted("m", budget());
+        let t = accepted(
+            "t",
+            icn_governance::ProposalPayload::Text { body: "b".into() },
+        );
+        durable(&backend, &m);
+        // The declarative row needs no receipt evidence at all.
+        let (ls, pending) = bound_pending(&s, &backend, &[m, t]);
+        let sealed = written(ls.seal(&pending, 1, k(0x4D), [0x40; 16]).unwrap());
+        let f = final_set_commitment(&l(), 1, &k(0x4D), &["m", "t"]).unwrap();
+        assert!(matches!(
+            sealed.state(),
+            PredecessorLifecycle::Sealed { final_set, .. } if *final_set == f
+        ));
+        admitted(&s);
+    }
+
+    #[test]
+    fn the_production_seal_refuses_missing_contradictory_or_basis_changing_evidence() {
+        // Missing durable intent: the accepted execution-required row is unresolved.
+        let s = store();
+        let backend = std::sync::Arc::new(Backend::default());
+        let (ls, pending) = bound_pending(&s, &backend, &[accepted("m", budget())]);
+        let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        assert_eq!(
+            seal_err(ls.seal(&pending, 1, k(0x4D), [0x41; 16]).unwrap_err()),
+            SealRefusal::UnresolvedEffects("m".into())
+        );
+        // Contradictory receipt evidence: a typed evidence error, nothing written.
+        let m = accepted("m", budget());
+        durable(&backend, &m);
+        backend.receipts.lock().unwrap()[0].outcome = icn_governance::ProofOutcome::Rejected;
+        let e = ls.seal(&pending, 1, k(0x4D), [0x42; 16]).unwrap_err();
+        assert!(
+            e.downcast_ref::<crate::seal_evidence::SealEvidenceError>()
+                .is_some(),
+            "{e:#}"
+        );
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
+        drop(ls);
+        // A basis-changing acceptance with complete evidence still blocks (P5c, conservative).
+        let s = store();
+        let backend = std::sync::Arc::new(Backend::default());
+        let c = accepted(
+            "c",
+            icn_governance::ProposalPayload::Charter {
+                charter_id: "x".into(),
+                charter_yaml: "schema_version: v0".into(),
+            },
+        );
+        durable(&backend, &c);
+        let (ls, pending) = bound_pending(&s, &backend, &[c]);
+        assert_eq!(
+            seal_err(ls.seal(&pending, 1, k(0x4D), [0x43; 16]).unwrap_err()),
+            SealRefusal::ChangesCutoverBasis("c".into())
+        );
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_failed_receipt_flush_refuses_the_seal_and_writes_nothing() {
+        let s = store();
+        let backend = std::sync::Arc::new(Backend {
+            flush_fails: true,
+            ..Backend::default()
+        });
+        let m = accepted("m", budget());
+        durable(&backend, &m);
+        let (ls, pending) = bound_pending(&s, &backend, &[m]);
+        let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        assert!(ls.seal(&pending, 1, k(0x4D), [0x44; 16]).is_err());
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
         admitted(&s);
     }
 }
