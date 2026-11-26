@@ -394,6 +394,67 @@ pub trait Store: Send + Sync {
         Err(CompareAndPutUnsupported.into())
     }
 
+    /// Apply every write in `writes` **only if** every expectation in `expect` still holds, as
+    /// one indivisible step across all the keys involved.
+    ///
+    /// This is the multi-key generalization of [`Store::compare_and_put`] and keeps its
+    /// semantics exactly:
+    ///
+    /// * **Exact bytes.** An [`Expectation`] with `value: Some(v)` holds only if the stored value
+    ///   is exactly `v`; `value: None` holds only if the key is absent. Absence is a value: `None`
+    ///   does not match an empty stored value and `Some(b"")` does not match an absent key.
+    /// * **All or nothing.** If every expectation holds, every [`Mutation`] is applied (`Some(v)`
+    ///   writes `v`, `None` deletes) and [`CompareAndWrite::Applied`] is returned. Otherwise
+    ///   nothing is written and [`CompareAndWrite::Conflict`] names the first failing expectation
+    ///   (in the caller's order) with the value actually found. A conflict is an expected outcome
+    ///   under concurrency, not an error.
+    /// * **An error leaves the outcome unknown.** Only a [`CompareAndWriteInvalid`] or
+    ///   [`CompareAndWriteUnsupported`] refusal guarantees that nothing was read or written. Any
+    ///   other `Err` means the backend could not answer, and the call may have applied none,
+    ///   some or all of `writes`: within the running process, *and after a restart*. On sled
+    ///   0.34.7 a storage error after the commit has begun can leave a prefix of the writes
+    ///   visible in memory, and when the error does not stop sled's log writer, the batch's
+    ///   atomic-recovery marker is cancelled (not sealed), so the writes already linked can also
+    ///   be recovered from disk. The error's kind (an abort reason or a storage error) is not a
+    ///   reliable classification of what happened. A caller that needs all-or-nothing across
+    ///   failures must detect and reconcile, for example by fencing on a key whose expected value
+    ///   commits to the whole write set and re-reading it after reopening, and must not act on
+    ///   any key in `writes` until it has done so.
+    /// * **Request validation.** `writes` must be non-empty; neither list may name a key twice;
+    ///   neither list may exceed [`MAX_COMPARE_AND_WRITE_ENTRIES`]. A malformed request is refused
+    ///   with [`CompareAndWriteInvalid`] before anything is read or written. A key may appear in
+    ///   both lists (the usual read-check-replace).
+    /// * **Durability** matches [`Store::put`]: not forced to disk until [`Store::flush`]. An
+    ///   `Ok(Applied)` is visible in the process at once but may be lost by a crash before a later
+    ///   `flush` returns `Ok`; a `flush` error leaves its durability unknown.
+    /// * **Interoperation.** On a backend that implements this, single-key writes to the same keys
+    ///   ([`Store::put`], [`Store::compare_and_put`], [`Store::delete`]) are serialized with it:
+    ///   none can land between the comparison and the write of a compare-and-write.
+    /// * **Cost.** A backend may hold a coarse lock for the whole call (sled holds a
+    ///   process-wide write lock that stalls every sled store in the process), so keep both lists
+    ///   small. Values are unbounded in size, as for [`Store::put`].
+    /// * **No snapshot reads elsewhere.** This makes the *write* atomic. Plain [`Store::get`] and
+    ///   [`Store::scan`] are not snapshot reads and may observe some keys before and some after a
+    ///   concurrent compare-and-write.
+    ///
+    /// The store gives the keys and values no meaning (Meaning Firewall).
+    ///
+    /// A wrapper `Store` that delegates to an inner store inherits the refusing default below; it
+    /// must forward this method deliberately if it wants the capability.
+    ///
+    /// # Unsupported backends fail closed
+    ///
+    /// The default implementation returns [`CompareAndWriteUnsupported`]. It never falls back to
+    /// sequential reads and writes, which would look atomic while not being so.
+    fn compare_and_write(
+        &self,
+        expect: &[Expectation<'_>],
+        writes: &[Mutation<'_>],
+    ) -> Result<CompareAndWrite> {
+        let _ = (expect, writes);
+        Err(CompareAndWriteUnsupported.into())
+    }
+
     /// Scan all key-value pairs with the given prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
@@ -746,6 +807,77 @@ pub enum CompareAndPut {
 #[error("this store backend does not support atomic compare-and-put")]
 pub struct CompareAndPutUnsupported;
 
+/// Upper bound on the entries in each list of one [`Store::compare_and_write`].
+pub const MAX_COMPARE_AND_WRITE_ENTRIES: usize = 256;
+
+/// One condition of a [`Store::compare_and_write`]: `key` holds exactly `value` (`None`: absent).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Expectation<'a> {
+    pub key: &'a [u8],
+    pub value: Option<&'a [u8]>,
+}
+
+/// One write of a [`Store::compare_and_write`]: set `key` to `value`, or delete it when `None`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Mutation<'a> {
+    pub key: &'a [u8],
+    pub value: Option<&'a [u8]>,
+}
+
+/// Result of [`Store::compare_and_write`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompareAndWrite {
+    /// Every expectation held and every mutation was applied.
+    Applied,
+    /// The expectation on `key` did not hold; `current` is what was found. Nothing was written.
+    Conflict {
+        key: Vec<u8>,
+        current: Option<Vec<u8>>,
+    },
+}
+
+/// The backend cannot apply a multi-key compare-and-write atomically (the trait default).
+/// Detect it with `err.downcast_ref::<CompareAndWriteUnsupported>()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("this store cannot apply a multi-key compare-and-write atomically")]
+pub struct CompareAndWriteUnsupported;
+
+/// A malformed [`Store::compare_and_write`] request, refused before any read or write.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum CompareAndWriteInvalid {
+    #[error("a compare-and-write must write at least one key")]
+    NoWrites,
+    #[error("too many entries in one compare-and-write")]
+    TooManyEntries,
+    #[error("an expectation names the same key twice")]
+    DuplicateExpectation,
+    #[error("a mutation names the same key twice")]
+    DuplicateMutation,
+}
+
+/// Validate a compare-and-write request (shared by every implementation).
+pub fn validate_compare_and_write(
+    expect: &[Expectation<'_>],
+    writes: &[Mutation<'_>],
+) -> std::result::Result<(), CompareAndWriteInvalid> {
+    if writes.is_empty() {
+        return Err(CompareAndWriteInvalid::NoWrites);
+    }
+    if expect.len() > MAX_COMPARE_AND_WRITE_ENTRIES || writes.len() > MAX_COMPARE_AND_WRITE_ENTRIES
+    {
+        return Err(CompareAndWriteInvalid::TooManyEntries);
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    if !expect.iter().all(|e| seen.insert(e.key)) {
+        return Err(CompareAndWriteInvalid::DuplicateExpectation);
+    }
+    seen.clear();
+    if !writes.iter().all(|m| seen.insert(m.key)) {
+        return Err(CompareAndWriteInvalid::DuplicateMutation);
+    }
+    Ok(())
+}
+
 /// Storage statistics for monitoring
 #[derive(Debug, Clone, Default)]
 pub struct StorageStats {
@@ -1064,6 +1196,42 @@ impl Store for SledStore {
                 current: mismatch.current.map(|v| v.to_vec()),
             }),
         }
+    }
+
+    /// One sled transaction: read every expected key, and either return the first mismatch with
+    /// nothing staged, or stage every mutation. Sled commits a transaction's writes as one sealed
+    /// log group (recovery replays it whole or not at all) and serializes it with single-key
+    /// operations on the same tree; the closure only reads and stages, so sled's conflict retry
+    /// is safe.
+    fn compare_and_write(
+        &self,
+        expect: &[Expectation<'_>],
+        writes: &[Mutation<'_>],
+    ) -> Result<CompareAndWrite> {
+        validate_compare_and_write(expect, writes)?;
+        // ORDERING INVARIANT: every expectation is read before anything is staged. Sled commits
+        // whatever was staged when the closure returns `Ok`, including on the `Conflict` path,
+        // so staging a write before the last comparison (or "on conflict") would commit a
+        // partial write while reporting `Conflict`. Reads therefore always see the database,
+        // never a write staged by this call, which is also why a key may be in both lists.
+        self.transaction(|tx| {
+            for e in expect {
+                let current = tx.get(e.key)?;
+                if current.as_deref() != e.value {
+                    return Ok(CompareAndWrite::Conflict {
+                        key: e.key.to_vec(),
+                        current,
+                    });
+                }
+            }
+            for m in writes {
+                match m.value {
+                    Some(value) => tx.set(m.key, value)?,
+                    None => tx.delete(m.key)?,
+                }
+            }
+            Ok(CompareAndWrite::Applied)
+        })
     }
 
     fn flush(&self) -> Result<()> {
