@@ -57,6 +57,9 @@ use crate::state_store::domain_key;
 /// store scans: `lifecycle-journal` differs from `lifecycle:` and `lifecycle-witness:`.
 pub const LIFECYCLE_JOURNAL_PREFIX: &[u8] = b"gov:predecessor-lifecycle-journal:v1:";
 
+/// Bound on re-reads in [`LifecycleStore::load`] while concurrent writes keep changing the record.
+const LOAD_MAX_ATTEMPTS: usize = 16;
+
 /// The electorate commitment `E` for a Begin. Opaque here, and with **no production
 /// constructor**: only the gated electorate constructor may assert that bytes commit to the
 /// institutionally authorized electorate.
@@ -317,9 +320,25 @@ impl<'a> LifecycleStore<'a> {
     }
 
     /// Load and cross-check L's record and witness.
+    ///
+    /// The two keys are read by separate `get`s, which is not a snapshot: a Begin committing
+    /// between them would show "record absent, witness present" and be refused as a mismatch.
+    /// So the record is read again after the witness, and the pair is used only when both
+    /// record reads agree. That pair is consistent: the witness is written once, in the same
+    /// commit as the record's first value, and every record write bumps the revision, so equal
+    /// record bytes mean no commit landed in between. Persistent churn refuses with `Busy`.
     pub fn load(&self, l: &GovernanceDomainId) -> anyhow::Result<LoadedLifecycle> {
-        let record_bytes = self.store.get(&lifecycle_key(l)?)?;
-        let witness_bytes = self.store.get(&witness_key(l)?)?;
+        let (rkey, wkey) = (lifecycle_key(l)?, witness_key(l)?);
+        let mut pair = None;
+        for _ in 0..LOAD_MAX_ATTEMPTS {
+            let record_bytes = self.store.get(&rkey)?;
+            let witness_bytes = self.store.get(&wkey)?;
+            if self.store.get(&rkey)? == record_bytes {
+                pair = Some((record_bytes, witness_bytes));
+                break;
+            }
+        }
+        let (record_bytes, witness_bytes) = pair.ok_or(LifecycleStoreError::Busy)?;
         let presence = check_witness(l, record_bytes.as_deref(), witness_bytes.as_deref())?;
         let (state, revision, stored) = match presence {
             LifecyclePresence::NeverBegun => (PredecessorLifecycle::initial(), 0, None),
@@ -781,6 +800,29 @@ mod tests {
         w.first_commitment_hash = k(0x4F);
         s.put(&wkey, &w.encode().unwrap()).unwrap();
         assert!(ls.load(&l()).is_err());
+    }
+
+    #[test]
+    fn load_never_reports_a_mismatch_while_a_first_begin_commits_concurrently() {
+        // Regression (S27 integration gate): load read record and witness with two gets, so a
+        // first Begin committing between them was refused as "record and witness do not
+        // correspond". Only the first Begin creates the witness, so race it repeatedly, each
+        // time on a fresh store, against a reader spinning on load.
+        for round in 0..64u8 {
+            let s = store();
+            let ls = live(&s);
+            std::thread::scope(|scope| {
+                let reader = scope.spawn(|| loop {
+                    let loaded = ls.load(&l()).expect("load must never see a torn pair");
+                    if loaded.revision() > 0 {
+                        break;
+                    }
+                });
+                let fresh = ls.load(&l()).unwrap();
+                ls.transition(&fresh, begin(1, 0x4D), [round; 16]).unwrap();
+                reader.join().unwrap();
+            });
+        }
     }
 
     #[test]
