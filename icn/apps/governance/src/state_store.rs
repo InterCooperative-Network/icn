@@ -250,7 +250,7 @@ fn domain_policy_body_key(id: &DomainPolicyId) -> Vec<u8> {
     format!("gov:domain-policy-body:{id}").into_bytes()
 }
 
-fn proposal_key(id: &ProposalId) -> Vec<u8> {
+pub(crate) fn proposal_key(id: &ProposalId) -> Vec<u8> {
     format!("gov:proposal:{}", id.0).into_bytes()
 }
 
