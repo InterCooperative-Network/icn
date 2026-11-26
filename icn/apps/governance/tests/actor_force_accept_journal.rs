@@ -829,3 +829,36 @@ async fn force_reject_writes_no_intent_and_no_authority() {
 
     fx.handle.shutdown().await;
 }
+
+/// A journaled execution closure is applied only for an entry that records an
+/// accepted outcome. A malformed intent (closure flag set, outcome not accepted)
+/// must fail closed: no mandate, grant or effect record, proposal untouched, the
+/// intent retained for an authorized reconciliation.
+#[tokio::test(flavor = "current_thread")]
+async fn execution_closure_for_a_non_accepted_intent_fails_closed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+
+    let mut proposal = fx.state().get_proposal(&fx.proposal_id).unwrap().unwrap();
+    proposal
+        .force_close(ProposalOutcome::Rejected, "malformed".to_string())
+        .unwrap();
+    let entry = icn_governance_actor::close_journal::CloseJournalEntry {
+        proposal,
+        proof_bytes: None,
+        receipts: Default::default(),
+        decided_at: 1,
+        governance_decision_hash: Some(forced_decision_hash(&fx)),
+        execution_closure: true,
+    };
+    fx.state().save_close_intent(&entry).unwrap();
+    fx.handle.recover_incomplete_closes().await;
+
+    assert_eq!(fx.backend.mandate_writes(), 0);
+    assert_eq!(fx.backend.grant_count(), 0);
+    assert_eq!(fx.backend.effect_writes(), 0);
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+    assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
+
+    fx.handle.shutdown().await;
+}
