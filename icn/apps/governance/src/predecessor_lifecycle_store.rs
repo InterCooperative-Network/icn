@@ -1693,27 +1693,31 @@ mod tests {
     #[test]
     fn domain_writes_bump_in_legacy_and_are_refused_while_pending_or_sealed() {
         let s = store();
+        s.put(&domain_key(&l()), &serde_json::to_vec(&gdom("v1")).unwrap())
+            .unwrap();
         let ls = live(&s);
         // Never begun: expect-only, no record created.
         assert_eq!(
-            ls.write_domain(&ls.load(&l()).unwrap(), b"v2".to_vec(), [1; 16])
+            ls.write_domain(&ls.load(&l()).unwrap(), &gdom("v2"), [1; 16])
                 .unwrap(),
             FencedWrite::Written { revision: 0 }
         );
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), None);
         let pending = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
                 .unwrap(),
         );
         // Identical rewrite: nothing written.
         assert_eq!(
-            ls.write_domain(&pending, b"v2".to_vec(), [3; 16]).unwrap(),
+            ls.write_domain(&pending, &gdom("v2"), [3; 16]).unwrap(),
             FencedWrite::Unchanged
         );
+        let pinned = s.get(&domain_key(&l())).unwrap();
         assert_eq!(
-            fence(ls.write_domain(&pending, b"v3".to_vec(), [4; 16]).unwrap_err()),
+            fence(ls.write_domain(&pending, &gdom("v3"), [4; 16]).unwrap_err()),
             FenceRefusal::DomainChangeWhilePending
         );
-        assert_eq!(s.get(&domain_key(&l())).unwrap(), Some(b"v2".to_vec()));
+        assert_eq!(s.get(&domain_key(&l())).unwrap(), pinned);
         // After abort (Legacy with a record) a domain change is allowed and bumps.
         let aborted = written(
             ls.transition(
@@ -1727,7 +1731,7 @@ mod tests {
             .unwrap(),
         );
         assert_eq!(
-            ls.write_domain(&aborted, b"v4".to_vec(), [6; 16]).unwrap(),
+            ls.write_domain(&aborted, &gdom("v4"), [6; 16]).unwrap(),
             FencedWrite::Written {
                 revision: aborted.revision() + 1
             }
@@ -1736,23 +1740,50 @@ mod tests {
     }
 
     #[test]
-    fn a_domain_write_makes_a_begin_prepared_earlier_stale() {
+    fn a_domain_record_with_another_id_is_refused() {
         let s = store();
         let ls = live(&s);
+        let foreign = icn_governance::GovernanceDomain::with_id(
+            GovernanceDomainId("other.coop".into()),
+            "x".into(),
+            icn_governance::GovernanceConfig::cooperative_default(),
+        );
+        assert_eq!(
+            fence(
+                ls.write_domain(&ls.load(&l()).unwrap(), &foreign, [1; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::OtherDomain
+        );
+        assert_eq!(s.get(&domain_key(&l())).unwrap(), Some(DOMAIN.to_vec()));
+    }
+
+    #[test]
+    fn a_domain_write_from_a_view_taken_before_begin_is_stale() {
+        let s = store();
+        s.put(&domain_key(&l()), &serde_json::to_vec(&gdom("v1")).unwrap())
+            .unwrap();
+        let ls = live(&s);
         let legacy = ls.load(&l()).unwrap();
-        // Concurrent: the domain changes after Begin's view was read. Begin pins the domain
-        // bytes it reads at write time; the race this guards is a domain write that read the
-        // never-begun view while Begin landed first.
         written(ls.transition(&legacy, begin(1, 0x4D), [1; 16]).unwrap());
-        let e = ls
-            .write_domain(&legacy, b"late".to_vec(), [2; 16])
-            .unwrap_err();
+        // The writer still holds the never-begun view, so the policy passes; the lifecycle
+        // expectation (record and witness absent) is what refuses it.
+        let pinned = s.get(&domain_key(&l())).unwrap();
+        let e = ls.write_domain(&legacy, &gdom("late"), [2; 16]).unwrap_err();
         assert_eq!(
             e.downcast_ref::<LifecycleStoreError>(),
             Some(&LifecycleStoreError::Stale)
         );
-        assert_eq!(s.get(&domain_key(&l())).unwrap(), Some(DOMAIN.to_vec()));
+        assert_eq!(s.get(&domain_key(&l())).unwrap(), pinned);
         admitted(&s);
+    }
+
+    fn gdom(name: &str) -> icn_governance::GovernanceDomain {
+        icn_governance::GovernanceDomain::with_id(
+            l(),
+            name.into(),
+            icn_governance::GovernanceConfig::cooperative_default(),
+        )
     }
 
     #[test]
