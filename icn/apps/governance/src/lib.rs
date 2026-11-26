@@ -40,6 +40,7 @@ pub mod init;
 pub mod institutional_anchor_derivation;
 pub mod institutional_authority_store;
 pub mod institutional_effect;
+pub mod lifecycle_owner;
 pub mod manager;
 pub mod mandate_gate;
 pub mod predecessor_lifecycle_store;

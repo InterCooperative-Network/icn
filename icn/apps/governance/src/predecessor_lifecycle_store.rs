@@ -57,7 +57,7 @@ use crate::close_journal::CloseJournalEntry;
 use crate::seal_evidence::{BoundSealEvidence, SealEvidence};
 use crate::state_store::{
     check_domain_overwrite, check_proposal_overwrite, close_intent_key, close_intent_key_prefix,
-    domain_key, proposal_key, proposal_key_prefix,
+    domain_key, proposal_key, proposal_key_prefix, ProposalWriteRefused,
 };
 use icn_governance::predecessor_seal::{classify, evaluate_drain, DrainStatus};
 
@@ -654,6 +654,33 @@ impl<'a> LifecycleStore<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Fenced creation of a NEW proposal (S28 routing; the #2953 create-if-absent rule under the
+    /// fence). Refuses `AlreadyExists` when any row is stored under the id, even an identical
+    /// one, and commits expecting the id's absence: a row that lands after the check makes the
+    /// write conflict (`Stale`) rather than overwrite it.
+    pub fn create_proposal(
+        &self,
+        loaded: &LoadedLifecycle,
+        next: &Proposal,
+        txid: [u8; 16],
+    ) -> anyhow::Result<FencedWrite> {
+        if next.domain_id != loaded.predecessor {
+            return Err(FenceRefusal::OtherDomain.into());
+        }
+        let pkey = proposal_key(&next.id);
+        if self.store.get(&pkey)?.is_some() {
+            return Err(ProposalWriteRefused::AlreadyExists {
+                proposal: next.id.0.clone(),
+            }
+            .into());
+        }
+        proposal_fence(&loaded.state, None, next)?;
+        // The commit expects the id's absence, so a row landing after the check above makes
+        // it conflict (Stale) instead of being overwritten.
+        let bytes = serde_json::to_vec(next)?;
+        self.fenced_commit(loaded, pkey, None, Some(bytes), Vec::new(), txid)
     }
 
     /// P5b slice 2, increment 1 (INACTIVE: no production caller). The fenced proposal writer.
@@ -3597,6 +3624,38 @@ pub(crate) mod tests {
         let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
         assert!(ls.seal(&pending, 1, k(0x4D), [0x44; 16]).is_err());
         assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_fenced_create_refuses_an_existing_id_and_never_overwrites_a_racing_row() {
+        // S28 routing review FOLLOW_UP: create-if-absent must be atomic under the fence.
+        use crate::state_store::state_store_test_put;
+        let s = store();
+        let ls = live(&s);
+        let p = prop("p");
+        ls.create_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let e = ls
+            .create_proposal(&ls.load(&l()).unwrap(), &p, [2; 16])
+            .unwrap_err();
+        assert!(matches!(
+            e.downcast_ref::<ProposalWriteRefused>(),
+            Some(ProposalWriteRefused::AlreadyExists { .. })
+        ));
+        // A row with the same id lands after the absence check, before the apply.
+        let mut raced = prop("q");
+        raced.title = "raced".into();
+        let planted = raced.clone();
+        *ls.before_apply.lock().unwrap() = Some(Box::new(move |st: &SledStore| {
+            state_store_test_put(st, &planted);
+        }));
+        let e = ls
+            .create_proposal(&ls.load(&l()).unwrap(), &prop("q"), [3; 16])
+            .unwrap_err();
+        assert_eq!(store_err(e), LifecycleStoreError::Stale);
+        let stored: Proposal = serde_json::from_slice(&row(&s, &raced).unwrap()).unwrap();
+        assert_eq!(stored.title, "raced", "the racing row is not overwritten");
         admitted(&s);
     }
 }
