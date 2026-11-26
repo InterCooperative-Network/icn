@@ -129,6 +129,7 @@ struct AuthorityBackend {
     mandate_writes: AtomicUsize,
     grants: Mutex<HashMap<icn_governance::AuthorityGrantId, icn_governance::AuthorityGrant>>,
     fail_flush: AtomicBool,
+    fail_mandate_write: AtomicBool,
 }
 
 impl AuthorityBackend {
@@ -205,6 +206,9 @@ impl GovernanceReceiptBackend for AuthorityBackend {
             .collect())
     }
     fn put_mandate(&self, mandate: &icn_governance::Mandate) -> Result<(), String> {
+        if self.fail_mandate_write.load(Ordering::SeqCst) {
+            return Err("injected mandate write failure".to_string());
+        }
         self.mandate_writes.fetch_add(1, Ordering::SeqCst);
         self.mandates.lock().unwrap().push(mandate.clone());
         Ok(())
@@ -226,6 +230,9 @@ impl GovernanceReceiptBackend for AuthorityBackend {
         mandate: &icn_governance::Mandate,
         grants: &[icn_governance::AuthorityGrant],
     ) -> Result<(), String> {
+        if self.fail_mandate_write.load(Ordering::SeqCst) {
+            return Err("injected mandate write failure".to_string());
+        }
         self.mandate_writes.fetch_add(1, Ordering::SeqCst);
         self.mandates.lock().unwrap().push(mandate.clone());
         for g in grants {
@@ -300,8 +307,26 @@ struct Restarted {
 
 impl Fixture {
     async fn open(db_path: &std::path::Path) -> Self {
-        let did = IdentityBundle::generate().unwrap().did().clone();
         let candidate = IdentityBundle::generate().unwrap().did().clone();
+        Self::open_with(db_path, move |did| ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate,
+                sponsors: vec![did.clone()],
+                region: "region-force".to_string(),
+                bond_amount: 1_000,
+                term_length: 3600 * 24 * 30,
+            },
+        })
+        .await
+    }
+
+    /// Like [`Self::open`], with the proposal payload built from the member DID.
+    async fn open_with(
+        db_path: &std::path::Path,
+        payload: impl FnOnce(&icn_identity::Did) -> ProposalPayload,
+    ) -> Self {
+        let did = IdentityBundle::generate().unwrap().did().clone();
+        let payload = payload(&did);
         let fail_store = Arc::new(PrefixFailStore::new(SledStore::open(db_path).unwrap()));
         let store: Arc<dyn Store> = fail_store.clone();
         let handle = GovernanceActor::spawn(
@@ -333,17 +358,9 @@ impl Fixture {
                 ProposalId("_ignored".to_string()),
                 domain_id.clone(),
                 did.clone(),
-                "Appoint steward (force-accept journal)".to_string(),
+                "Force-accept journal proposal".to_string(),
                 String::new(),
-                ProposalPayload::Sdis {
-                    proposal: SdisProposal::AppointSteward {
-                        candidate,
-                        sponsors: vec![did.clone()],
-                        region: "region-force".to_string(),
-                        bond_amount: 1_000,
-                        term_length: 3600 * 24 * 30,
-                    },
-                },
+                payload,
                 ProposalScope::Local,
             )
             .await
@@ -385,38 +402,27 @@ impl Fixture {
         db_path: &std::path::Path,
         events: Option<Arc<dyn EventEmitter>>,
     ) -> (Restarted, Arc<AuthorityBackend>) {
+        let backend = self.backend.clone();
+        self.release().await;
+        let restarted = start(db_path, backend.clone(), events).await;
+        (restarted, backend)
+    }
+
+    /// Shut the actor down and drop every handle on the state `Db`.
+    async fn release(self) {
         let Fixture {
-            backend,
-            fail_store,
-            handle,
-            ..
+            fail_store, handle, ..
         } = self;
         handle.shutdown().await;
         drop(handle);
         drop(fail_store);
-        let store: Arc<dyn Store> = Arc::new(
-            SledStore::open(db_path).expect("reopen sled: the first Db must have been released"),
-        );
-        let did = IdentityBundle::generate().unwrap().did().clone();
-        let handle = GovernanceActor::spawn(
-            did.clone(),
-            store.clone(),
-            gossip(did).await,
-            Arc::new(StaticMembershipResolver::new()),
-            events,
-            None,
-        )
-        .await
-        .unwrap();
-        handle.install_receipt_store(backend.clone()).await;
-        handle.recover_incomplete_closes().await;
-        (
-            Restarted {
-                handle,
-                state: Arc::new(SledGovernanceStateStore::new(store)),
-            },
-            backend,
-        )
+    }
+
+    /// The raw stored bytes of this proposal's close intent.
+    fn raw_intent(&self) -> Option<Vec<u8>> {
+        self.fail_store
+            .get(format!("gov:close-intent:{}", self.proposal_id.0).as_bytes())
+            .unwrap()
     }
 
     fn stored_state(&self) -> ProposalState {
@@ -425,6 +431,35 @@ impl Fixture {
             .unwrap()
             .unwrap()
             .state
+    }
+}
+
+/// Reopen the state `Db` at `db_path` (no fault injection), spawn an actor on
+/// it with `receipts` installed and run startup recovery.
+async fn start(
+    db_path: &std::path::Path,
+    receipts: Arc<dyn GovernanceReceiptBackend>,
+    events: Option<Arc<dyn EventEmitter>>,
+) -> Restarted {
+    let store: Arc<dyn Store> = Arc::new(
+        SledStore::open(db_path).expect("reopen sled: the first Db must have been released"),
+    );
+    let did = IdentityBundle::generate().unwrap().did().clone();
+    let handle = GovernanceActor::spawn(
+        did.clone(),
+        store.clone(),
+        gossip(did).await,
+        Arc::new(StaticMembershipResolver::new()),
+        events,
+        None,
+    )
+    .await
+    .unwrap();
+    handle.install_receipt_store(receipts).await;
+    handle.recover_incomplete_closes().await;
+    Restarted {
+        handle,
+        state: Arc::new(SledGovernanceStateStore::new(store)),
     }
 }
 
@@ -861,4 +896,547 @@ async fn execution_closure_for_a_non_accepted_intent_fails_closed() {
     assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
 
     fx.handle.shutdown().await;
+}
+
+// ---------------------------------------------------------------------------
+// Follow-ups: stored format, decision identity, wedged intents, lost receipt
+// writes, legacy replay, non-execution-required force-accept
+// ---------------------------------------------------------------------------
+
+/// The shape of a close-journal entry as a binary that predates
+/// `execution_closure` reads it: every field it requires, no others.
+#[derive(serde::Deserialize)]
+#[allow(dead_code)]
+struct PreClosureReaderEntry {
+    proposal: icn_governance::Proposal,
+    proof_bytes: Option<Vec<u8>>,
+    receipts: icn_governance_actor::close_journal::CloseReceipts,
+    decided_at: u64,
+    governance_decision_hash: Option<String>,
+}
+
+/// An intent that carries an execution closure is stored so that a reader
+/// which does not know the field refuses it (it would otherwise replay a
+/// force-accept as a rejection with no closure). An intent without one keeps
+/// the legacy shape that reader parses.
+#[tokio::test(flavor = "current_thread")]
+async fn execution_closure_intent_is_refused_by_a_pre_closure_reader() {
+    use icn_governance_actor::close_journal::CloseJournalEntry;
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+
+    fx.fail_store.arm(b"gov:proposal:");
+    fx.force(ForcedOutcome::Accept).await.unwrap_err();
+    let raw = fx.raw_intent().expect("the intent is durable");
+    let err = serde_json::from_slice::<PreClosureReaderEntry>(&raw)
+        .err()
+        .expect("a pre-closure reader must refuse an execution-closure intent");
+    assert!(
+        err.to_string().contains("missing field `proposal`"),
+        "{err}"
+    );
+
+    let entry = CloseJournalEntry::from_stored_bytes(&raw).unwrap();
+    assert!(entry.execution_closure);
+    assert!(is_force_accepted(&entry.proposal.state));
+
+    // The same decision without a closure is stored in the legacy shape.
+    let mut plain = entry.clone();
+    plain.execution_closure = false;
+    let plain_raw = plain.to_stored_bytes().unwrap();
+    serde_json::from_slice::<PreClosureReaderEntry>(&plain_raw)
+        .expect("a legacy entry stays readable by a pre-closure reader");
+    assert!(
+        !CloseJournalEntry::from_stored_bytes(&plain_raw)
+            .unwrap()
+            .execution_closure
+    );
+
+    // An envelope that does not carry a closure is malformed, not legacy.
+    let mut forged = serde_json::Map::new();
+    forged.insert(
+        "execution_closure_intent_v1".to_string(),
+        serde_json::to_value(&plain).unwrap(),
+    );
+    assert!(CloseJournalEntry::from_stored_bytes(&serde_json::to_vec(&forged).unwrap()).is_err());
+
+    fx.handle.shutdown().await;
+}
+
+/// A mandate already stored for the proposal under ANOTHER decision hash is
+/// not this force-accept's mandate. Before the fix `AlreadyMinted` matched on
+/// proposal id alone, so the force-accept "completed" with the terminal
+/// record and event bound to the forced hash and the mandate bound to the
+/// other one. Now the closure is refused, nothing new is minted, and the
+/// durable intent stays for an authorized reconciliation.
+#[tokio::test(flavor = "current_thread")]
+async fn force_accept_refuses_a_mandate_bound_to_another_decision() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    let payload = fx
+        .state()
+        .get_proposal(&fx.proposal_id)
+        .unwrap()
+        .unwrap()
+        .payload;
+    let other = [0x5au8; 32];
+    icn_governance_actor::grant_minting::mint_and_persist_for_accepted(
+        fx.backend.as_ref(),
+        &fx.proposal_id.0,
+        &fx.domain_id,
+        other,
+        &payload,
+        1,
+    )
+    .unwrap();
+    let seeded = fx.backend.mandates();
+
+    let err = fx
+        .force(ForcedOutcome::Accept)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains(icn_governance_actor::grant_minting::MANDATE_IDENTITY_CONFLICT),
+        "{err}"
+    );
+    assert_eq!(
+        fx.backend.mandates(),
+        seeded,
+        "no second mandate, none replaced"
+    );
+    assert_eq!(fx.backend.mandates()[0].decision.decision_hash, other);
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+    assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
+
+    fx.handle.shutdown().await;
+}
+
+/// The same for an institutional-effect record bound to another decision:
+/// refused before any mandate is minted.
+#[tokio::test(flavor = "current_thread")]
+async fn force_accept_refuses_an_effect_bound_to_another_decision() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    let payload = fx
+        .state()
+        .get_proposal(&fx.proposal_id)
+        .unwrap()
+        .unwrap()
+        .payload;
+    icn_governance_actor::institutional_effect::emit_accepted_effect(
+        fx.backend.as_ref(),
+        &fx.proposal_id.0,
+        &fx.domain_id.0,
+        Some([0x5au8; 32]),
+        &payload,
+        1,
+    )
+    .unwrap();
+
+    let err = fx
+        .force(ForcedOutcome::Accept)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("already bound to a different decision"),
+        "{err}"
+    );
+    assert_eq!(fx.backend.mandate_writes(), 0);
+    assert_eq!(fx.backend.grant_count(), 0);
+    assert_eq!(fx.backend.effects().len(), 1);
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+    assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
+
+    fx.handle.shutdown().await;
+}
+
+/// A force-accept intent whose closure keeps failing is NOT discarded: veto
+/// and force-reject are refused while it cannot complete, a restart keeps it
+/// (and does not report it as a conflict), and once the cause is fixed the
+/// next veto completes the accept first and is then refused.
+#[tokio::test(flavor = "current_thread")]
+async fn incomplete_force_accept_intent_blocks_veto_until_it_completes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    let proposal_id = fx.proposal_id.clone();
+    let veto = |id: &ProposalId| GovernanceCommand::VetoProposal {
+        proposal_id: id.clone(),
+        reason: "veto during a wedged force-accept".to_string(),
+    };
+
+    fx.backend.fail_mandate_write.store(true, Ordering::SeqCst);
+    let err = fx
+        .force(ForcedOutcome::Accept)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("injected mandate write failure"), "{err}");
+    assert_eq!(
+        fx.backend.effects().len(),
+        1,
+        "the effect precedes the mandate"
+    );
+    assert_eq!(fx.backend.mandates().len(), 0);
+
+    let err = fx
+        .handle
+        .submit(veto(&proposal_id))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("its already-decided close could not be completed first"),
+        "{err}"
+    );
+    let err = fx
+        .force(ForcedOutcome::Reject)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("its already-decided close could not be completed first"),
+        "{err}"
+    );
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+    assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
+
+    // Restart with the fault still present: recovery keeps the intent.
+    let (r, backend) = fx.restart(tmp.path(), None).await;
+    assert_eq!(
+        r.state.list_close_intents().unwrap().len(),
+        1,
+        "not discarded"
+    );
+    assert!(matches!(
+        r.state.get_proposal(&proposal_id).unwrap().unwrap().state,
+        ProposalState::Open { .. }
+    ));
+    assert!(r.handle.close_conflicts().await.unwrap().is_empty());
+
+    backend.fail_mandate_write.store(false, Ordering::SeqCst);
+    let err = r
+        .handle
+        .submit(veto(&proposal_id))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("was already decided; it has now been completed"),
+        "{err}"
+    );
+    assert!(is_force_accepted(
+        &r.state.get_proposal(&proposal_id).unwrap().unwrap().state
+    ));
+    assert_eq!(backend.mandates().len(), 1);
+    assert_eq!(backend.effects().len(), 1);
+    assert_eq!(r.state.list_close_intents().unwrap().len(), 0);
+
+    r.handle.shutdown().await;
+}
+
+/// Receipt store whose records live in a sled `Db` on disk, so what survives a
+/// restart is what that `Db` holds when it is reopened.
+struct SledAuthorityBackend {
+    store: SledStore,
+}
+
+impl SledAuthorityBackend {
+    fn open(path: &std::path::Path) -> Self {
+        Self {
+            store: SledStore::open(path).unwrap(),
+        }
+    }
+    fn rows<T: serde::de::DeserializeOwned>(&self, prefix: &str) -> Vec<T> {
+        self.store
+            .scan(prefix.as_bytes())
+            .unwrap()
+            .into_iter()
+            .map(|(_, v)| serde_json::from_slice(&v).unwrap())
+            .collect()
+    }
+    fn mandates(&self) -> Vec<icn_governance::Mandate> {
+        self.rows("mandate:")
+    }
+    fn effects(&self) -> Vec<InstitutionalEffectRecord> {
+        self.rows("effect:")
+    }
+    fn put_json<T: serde::Serialize>(&self, key: String, value: &T) -> Result<(), String> {
+        self.store
+            .put(key.as_bytes(), &serde_json::to_vec(value).unwrap())
+            .map_err(|e| e.to_string())
+    }
+}
+
+impl GovernanceReceiptBackend for SledAuthorityBackend {
+    fn put_governance(&self, _: &icn_governance::GovernanceDecisionReceipt) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_governance_by_proposal(
+        &self,
+        _: &str,
+    ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn put_allocation(
+        &self,
+        _: &icn_kernel_api::AllocationReceipt,
+    ) -> Result<icn_kernel_api::Hash, String> {
+        Ok([0u8; 32])
+    }
+    fn get_governance_by_decision(
+        &self,
+        _: &icn_kernel_api::Hash,
+    ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn list_allocations_by_decision(
+        &self,
+        _: &icn_kernel_api::Hash,
+    ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+        Ok(vec![])
+    }
+    fn flush(&self) -> Result<(), String> {
+        self.store.flush().map(|_| ()).map_err(|e| e.to_string())
+    }
+    fn put_institutional_effect(&self, record: &InstitutionalEffectRecord) -> Result<(), String> {
+        self.put_json(format!("effect:{}", record.record_id), record)
+    }
+    fn list_institutional_effects_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+        Ok(self
+            .effects()
+            .into_iter()
+            .filter(|r| r.proposal_id == proposal_id)
+            .collect())
+    }
+    fn put_mandate(&self, mandate: &icn_governance::Mandate) -> Result<(), String> {
+        self.put_json(format!("mandate:{}", mandate.id), mandate)
+    }
+    fn get_mandate_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Option<icn_governance::Mandate>, String> {
+        Ok(self
+            .mandates()
+            .into_iter()
+            .find(|m| m.decision.proposal_id == proposal_id))
+    }
+    fn put_mandate_with_grants(
+        &self,
+        mandate: &icn_governance::Mandate,
+        grants: &[icn_governance::AuthorityGrant],
+    ) -> Result<(), String> {
+        for g in grants {
+            self.put_authority_grant(g)?;
+        }
+        self.put_mandate(mandate)
+    }
+    fn put_authority_grant(&self, grant: &icn_governance::AuthorityGrant) -> Result<(), String> {
+        self.put_json(
+            format!("grant:{}", serde_json::to_string(&grant.id).unwrap()),
+            grant,
+        )
+    }
+    fn get_authority_grant(
+        &self,
+        grant_id: &icn_governance::AuthorityGrantId,
+    ) -> Result<Option<icn_governance::AuthorityGrant>, String> {
+        Ok(self
+            .rows::<icn_governance::AuthorityGrant>("grant:")
+            .into_iter()
+            .find(|g| &g.id == grant_id))
+    }
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_dir(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
+/// The receipt `Db` loses the effect record and mandate a failed force-accept
+/// wrote but never fsynced (the actor flushes the receipt store only after the
+/// terminal save, which failed). The crash is modelled by reopening the
+/// receipt `Db` from its last fsynced on-disk image. Replay re-mints exactly
+/// once, bound to the forced decision, and that mandate then survives a
+/// further restart because completion fsyncs the receipt store.
+#[tokio::test(flavor = "current_thread")]
+async fn lost_unflushed_receipt_writes_are_reminted_exactly_once_on_restart() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state_path = tmp.path().join("state");
+    let receipts_path = tmp.path().join("receipts");
+    let checkpoint_path = tmp.path().join("receipts-fsynced");
+    let fx = Fixture::open(&state_path).await;
+    let expected_hash = forced_decision_hash(&fx);
+    let proposal_id = fx.proposal_id.clone();
+
+    let receipts = Arc::new(SledAuthorityBackend::open(&receipts_path));
+    receipts.flush().unwrap();
+    copy_dir(&receipts_path, &checkpoint_path);
+    fx.handle.install_receipt_store(receipts.clone()).await;
+
+    fx.fail_store.arm(b"gov:proposal:");
+    fx.force(ForcedOutcome::Accept).await.unwrap_err();
+    let lost = receipts.mandates();
+    assert_eq!(lost.len(), 1, "the mandate was written, unflushed");
+    assert_eq!(receipts.effects().len(), 1);
+    assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
+
+    // Crash: the receipt Db keeps only its fsynced image.
+    fx.release().await;
+    drop(receipts);
+    std::fs::remove_dir_all(&receipts_path).unwrap();
+    copy_dir(&checkpoint_path, &receipts_path);
+    let receipts = Arc::new(SledAuthorityBackend::open(&receipts_path));
+    assert_eq!(
+        receipts.mandates().len(),
+        0,
+        "the unflushed mandate is gone"
+    );
+    assert_eq!(receipts.effects().len(), 0, "the unflushed effect is gone");
+
+    let r = start(&state_path, receipts.clone(), None).await;
+    assert!(is_force_accepted(
+        &r.state.get_proposal(&proposal_id).unwrap().unwrap().state
+    ));
+    assert_eq!(r.state.list_close_intents().unwrap().len(), 0);
+    let mandates = receipts.mandates();
+    assert_eq!(mandates.len(), 1, "exactly one mandate (ADR-0019)");
+    assert_ne!(
+        mandates[0].id, lost[0].id,
+        "a fresh mandate replaced the lost one"
+    );
+    assert_eq!(
+        hex::encode(mandates[0].decision.decision_hash),
+        expected_hash
+    );
+    assert_eq!(receipts.effects().len(), 1);
+
+    // Completion fsynced the receipt store: a further crash keeps the mandate.
+    r.handle.shutdown().await;
+    drop(r);
+    let kept = mandates[0].id.clone();
+    drop(receipts);
+    let receipts = Arc::new(SledAuthorityBackend::open(&receipts_path));
+    let r = start(&state_path, receipts.clone(), None).await;
+    assert_eq!(receipts.mandates().len(), 1);
+    assert_eq!(receipts.mandates()[0].id, kept);
+    r.handle.shutdown().await;
+}
+
+/// An ordinary-close intent written before `execution_closure` existed (no
+/// such field in the stored JSON) replays end to end through startup recovery
+/// exactly as before: the journaled terminal proposal is committed, the
+/// `ProposalAccepted` event carries the journaled hash, the intent is cleared,
+/// and replay writes no execution closure (that close wrote it itself).
+#[tokio::test(flavor = "current_thread")]
+async fn legacy_close_intent_without_the_field_replays_unchanged_on_restart() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    let proposal_id = fx.proposal_id.clone();
+
+    let mut proposal = fx.state().get_proposal(&proposal_id).unwrap().unwrap();
+    proposal
+        .close(ProposalState::Accepted { closed_at: 4_242 })
+        .unwrap();
+    let hash = hex::encode([0x7cu8; 32]);
+    let mut legacy = serde_json::to_value(icn_governance_actor::close_journal::CloseJournalEntry {
+        proposal: proposal.clone(),
+        proof_bytes: None,
+        receipts: Default::default(),
+        decided_at: 4_242,
+        governance_decision_hash: Some(hash.clone()),
+        execution_closure: false,
+    })
+    .unwrap();
+    assert!(legacy
+        .as_object_mut()
+        .unwrap()
+        .remove("execution_closure")
+        .is_some());
+    fx.fail_store
+        .put(
+            format!("gov:close-intent:{}", proposal_id.0).as_bytes(),
+            &serde_json::to_vec(&legacy).unwrap(),
+        )
+        .unwrap();
+
+    let events = Arc::new(AcceptedEvents::default());
+    let (r, backend) = fx.restart(tmp.path(), Some(events.clone())).await;
+
+    let stored = r.state.get_proposal(&proposal_id).unwrap().unwrap();
+    assert_eq!(
+        serde_json::to_value(&stored).unwrap(),
+        serde_json::to_value(&proposal).unwrap()
+    );
+    assert_eq!(r.state.list_close_intents().unwrap().len(), 0);
+    assert_eq!(
+        events.seen.lock().unwrap().clone(),
+        vec![(proposal_id.0.clone(), Some(hash))]
+    );
+    assert_eq!(backend.mandate_writes(), 0);
+    assert_eq!(backend.effect_writes(), 0);
+
+    r.handle.shutdown().await;
+}
+
+/// A NON-execution-required force-accept (Text payload) is journaled with no
+/// execution closure; its pending-grants mandate comes from the replayed
+/// downstream effects. Crash at the terminal save: nothing is minted, and the
+/// restart completes the forced decision with one mandate bound to the forced
+/// hash and the forced `ProposalAccepted` event.
+#[tokio::test(flavor = "current_thread")]
+async fn non_execution_required_force_accept_recovers_after_a_mid_journal_crash() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open_with(tmp.path(), |_| ProposalPayload::Text {
+        body: "forced text".to_string(),
+    })
+    .await;
+    let expected_hash = forced_decision_hash(&fx);
+    let proposal_id = fx.proposal_id.clone();
+
+    fx.fail_store.arm(b"gov:proposal:");
+    fx.force(ForcedOutcome::Accept).await.unwrap_err();
+    let intent = fx.state().list_close_intents().unwrap().remove(0);
+    assert!(!intent.execution_closure);
+    assert!(is_force_accepted(&intent.proposal.state));
+    assert_eq!(fx.backend.mandate_writes(), 0, "nothing before completion");
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+
+    let events = Arc::new(AcceptedEvents::default());
+    let (r, backend) = fx.restart(tmp.path(), Some(events.clone())).await;
+
+    assert!(is_force_accepted(
+        &r.state.get_proposal(&proposal_id).unwrap().unwrap().state
+    ));
+    assert_eq!(r.state.list_close_intents().unwrap().len(), 0);
+    let mandates = backend.mandates();
+    assert_eq!(mandates.len(), 1);
+    assert_eq!(
+        hex::encode(mandates[0].decision.decision_hash),
+        expected_hash
+    );
+    assert_eq!(
+        events.seen.lock().unwrap().clone(),
+        vec![(proposal_id.0.clone(), Some(expected_hash))]
+    );
+
+    // Replaying again does not mint a second one.
+    r.state.save_close_intent(&intent).unwrap();
+    r.handle.recover_incomplete_closes().await;
+    assert_eq!(backend.mandates().len(), 1);
+    assert_eq!(backend.mandate_writes(), 1);
+
+    r.handle.shutdown().await;
 }

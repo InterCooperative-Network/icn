@@ -1987,7 +1987,7 @@ impl GovernanceActor {
                     failures.push(format!("institutional effect: {e}"));
                 }
                 if let Some(decision_hash) = decision_hash {
-                    if let Err(e) = crate::grant_minting::mint_and_persist_for_accepted(
+                    match crate::grant_minting::mint_and_persist_for_accepted(
                         store.as_ref(),
                         &proposal.id.0,
                         &proposal.domain_id,
@@ -1995,12 +1995,23 @@ impl GovernanceActor {
                         &proposal.payload,
                         decided_at,
                     ) {
-                        error!(
-                            proposal_id = %proposal.id.0,
-                            error = %e,
-                            "Actor failed to persist ADR-0014 mandate"
-                        );
-                        failures.push(format!("mandate: {e}"));
+                        Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
+                        | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted { .. }) => {}
+                        Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
+                            error!(
+                                proposal_id = %proposal.id.0,
+                                "Failed to hash proposal payload for the ADR-0014 mandate — \
+                                 declining to mint"
+                            );
+                        }
+                        Err(e) => {
+                            error!(
+                                proposal_id = %proposal.id.0,
+                                error = %e,
+                                "Actor failed to persist ADR-0014 mandate"
+                            );
+                            failures.push(format!("mandate: {e}"));
+                        }
                     }
                 }
             }
