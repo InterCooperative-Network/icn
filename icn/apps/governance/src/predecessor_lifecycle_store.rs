@@ -54,7 +54,9 @@ use std::sync::{Arc, Mutex, Weak};
 use icn_governance::{Proposal, ProposalId, ProposalState};
 
 use crate::close_journal::CloseJournalEntry;
-use crate::state_store::{check_proposal_overwrite, close_intent_key, domain_key, proposal_key};
+use crate::state_store::{
+    check_domain_overwrite, check_proposal_overwrite, close_intent_key, domain_key, proposal_key,
+};
 
 /// The journal prefix for lifecycle writes. It sits outside every `gov:` prefix the governance
 /// store scans: `lifecycle-journal` differs from `lifecycle:` and `lifecycle-witness:`.
@@ -665,14 +667,24 @@ impl<'a> LifecycleStore<'a> {
     }
 
     /// Fenced write of L's own domain record (W13–W15: create/replace, config, membership).
-    /// The domain is a seal input (I2) and Pending's basis pins its bytes, so while L is
-    /// Pending or Sealed only an identical rewrite (no write) is accepted.
+    ///
+    /// The record must be L's (its own id, not a caller-chosen key), it is serialized exactly
+    /// as `save_domain` does, and `save_domain`'s update rules apply (`check_domain_overwrite`).
+    /// The domain is a seal input (I2), and Pending's basis pins a hash of the **whole**
+    /// stored record; there is no finer-grained pin, so any field change would invalidate the
+    /// authorized basis. While L is Pending or Sealed only an identical rewrite (no write) is
+    /// accepted. Legacy updates are fenced and bump the revision.
     pub fn write_domain(
         &self,
         loaded: &LoadedLifecycle,
-        next_bytes: Vec<u8>,
+        domain: &icn_governance::GovernanceDomain,
         txid: [u8; 16],
     ) -> anyhow::Result<FencedWrite> {
+        if domain.id != loaded.predecessor {
+            return Err(FenceRefusal::OtherDomain.into());
+        }
+        domain.check_actor_model_invariant()?;
+        let next_bytes = serde_json::to_vec(domain)?;
         let key = domain_key(&loaded.predecessor);
         let stored = self.store.get(&key)?;
         if stored.as_deref() == Some(next_bytes.as_slice()) {
@@ -684,6 +696,9 @@ impl<'a> LifecycleStore<'a> {
                 return Err(FenceRefusal::DomainChangeWhilePending.into())
             }
             PredecessorLifecycle::Sealed { .. } => return Err(FenceRefusal::Sealed.into()),
+        }
+        if let Some(bytes) = stored.as_deref() {
+            check_domain_overwrite(bytes, domain)?;
         }
         self.fenced_commit(loaded, key, stored, Some(next_bytes), txid)
     }

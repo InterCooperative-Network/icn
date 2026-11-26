@@ -450,6 +450,28 @@ pub(crate) fn check_proposal_overwrite(stored: &[u8], next: &Proposal) -> Result
     Ok(())
 }
 
+/// Decide whether `domain` may replace the stored domain bytes `stored` (the update rules of
+/// `save_domain`, shared with the lifecycle fence so they exist once).
+pub(crate) fn check_domain_overwrite(stored: &[u8], domain: &GovernanceDomain) -> Result<()> {
+    // An unreadable record cannot be proven not to be a Subject domain, so it is refused,
+    // never overwritten.
+    let existing: GovernanceDomain = serde_json::from_slice(stored).map_err(|e| {
+        anyhow::anyhow!(
+            "Domain '{}': stored record cannot be read ({e}); refusing to overwrite it",
+            domain.id.0
+        )
+    })?;
+    if existing.human_actor_model() == HumanActorModel::ContextSubjectV1
+        && domain.human_actor_model() != HumanActorModel::ContextSubjectV1
+    {
+        return Err(ActorModelError::ModeChangeRefused {
+            domain: domain.id.0.clone(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
 impl GovernanceStateStore for SledGovernanceStateStore {
     // --- Domains ---
 
@@ -473,22 +495,7 @@ impl GovernanceStateStore for SledGovernanceStateStore {
         for _ in 0..SAVE_DOMAIN_MAX_ATTEMPTS {
             let current = self.store.get(&key)?;
             if let Some(bytes) = current.as_deref() {
-                // An unreadable record cannot be proven not to be a Subject
-                // domain, so it is refused, never overwritten.
-                let existing: GovernanceDomain = serde_json::from_slice(bytes).map_err(|e| {
-                    anyhow::anyhow!(
-                        "Domain '{}': stored record cannot be read ({e}); refusing to overwrite it",
-                        id.0
-                    )
-                })?;
-                if existing.human_actor_model() == HumanActorModel::ContextSubjectV1
-                    && domain.human_actor_model() != HumanActorModel::ContextSubjectV1
-                {
-                    return Err(ActorModelError::ModeChangeRefused {
-                        domain: id.0.clone(),
-                    }
-                    .into());
-                }
+                check_domain_overwrite(bytes, domain)?;
             }
             match self
                 .store
