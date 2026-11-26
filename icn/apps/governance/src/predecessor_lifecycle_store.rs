@@ -1769,7 +1769,9 @@ mod tests {
         // The writer still holds the never-begun view, so the policy passes; the lifecycle
         // expectation (record and witness absent) is what refuses it.
         let pinned = s.get(&domain_key(&l())).unwrap();
-        let e = ls.write_domain(&legacy, &gdom("late"), [2; 16]).unwrap_err();
+        let e = ls
+            .write_domain(&legacy, &gdom("late"), [2; 16])
+            .unwrap_err();
         assert_eq!(
             e.downcast_ref::<LifecycleStoreError>(),
             Some(&LifecycleStoreError::Stale)
@@ -1980,8 +1982,11 @@ mod tests {
         let mut entry = intent_for(&p);
         entry.proposal = p.clone();
         state_store_test_put(&s, &entry.proposal);
-        s.put(&close_intent_key(&p.id), &serde_json::to_vec(&entry).unwrap())
-            .unwrap();
+        s.put(
+            &close_intent_key(&p.id),
+            &serde_json::to_vec(&entry).unwrap(),
+        )
+        .unwrap();
         assert_eq!(
             fence(ls.delete_close_intent(&sealed, &p.id, [4; 16]).unwrap_err()),
             FenceRefusal::Sealed
@@ -2028,9 +2033,13 @@ mod tests {
             .unwrap();
         let loaded = ls.load(&l()).unwrap();
         let mut accepted = open.clone();
-        accepted.close(ProposalState::Accepted { closed_at: 9 }).unwrap();
+        accepted
+            .close(ProposalState::Accepted { closed_at: 9 })
+            .unwrap();
         let mut rejected = open.clone();
-        rejected.close(ProposalState::Rejected { closed_at: 9 }).unwrap();
+        rejected
+            .close(ProposalState::Rejected { closed_at: 9 })
+            .unwrap();
         let (a, b) = std::thread::scope(|scope| {
             let a = scope.spawn(|| ls.write_proposal(&loaded, &accepted, [2; 16]));
             let b = scope.spawn(|| ls.write_proposal(&loaded, &rejected, [3; 16]));
