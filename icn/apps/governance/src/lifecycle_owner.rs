@@ -1442,6 +1442,36 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_close_racing_a_draining_vote_wins_and_the_retry_refuses_the_vote() {
+        // S29 mutant V14 (vote commit without its proposal guard) survived the first suite:
+        // a close landing between the owner's check and the commit must not be outrun.
+        use crate::state_store::state_store_test_put;
+        let s = sled();
+        let (owner, store) = started(&s);
+        let p = opened(&store, "p", L);
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        let mut closed = p.clone();
+        closed
+            .close(ProposalState::Rejected { closed_at: 7 })
+            .unwrap();
+        let racer = closed.clone();
+        owner
+            .arm_before_apply_for_tests(Box::new(move |st: &SledStore| {
+                state_store_test_put(st, &racer);
+            }))
+            .unwrap();
+        let voter = did();
+        let e = store.save_vote(&p.id, &ballot("p", &voter)).unwrap_err();
+        assert_eq!(fence(e), FenceRefusal::VoteNotDraining);
+        assert_eq!(
+            vote_row(&store, "p", &voter),
+            None,
+            "no vote on a closed proposal"
+        );
+        assert_eq!(bytes(&store, &p.id), js(&closed), "the close stands");
+    }
+
     // ---- S28 §8: isolated institutional lifecycle, end to end ----
     //
     // EXPERIMENTAL lifecycle integration, NOT production succession: Begin and Seal use the
