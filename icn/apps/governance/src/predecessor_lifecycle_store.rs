@@ -144,6 +144,10 @@ pub enum Committed {
 pub struct LifecycleStore<'a> {
     store: &'a SledStore,
     journal: RecoveryJournal<'a>,
+    /// Test-only: runs once between journaling an intent and applying it, to model a concurrent
+    /// writer landing in that window.
+    #[cfg(test)]
+    before_apply: std::cell::RefCell<Option<Box<dyn FnOnce(&SledStore) + 'a>>>,
 }
 
 /// What [`recover`] did.
@@ -186,7 +190,12 @@ impl<'a> LifecycleStore<'a> {
     pub(crate) fn open(store: &'a SledStore) -> anyhow::Result<Self> {
         let journal = RecoveryJournal::new(store, LIFECYCLE_JOURNAL_PREFIX)?;
         let _admission = journal.admit()?;
-        Ok(Self { store, journal })
+        Ok(Self {
+            store,
+            journal,
+            #[cfg(test)]
+            before_apply: std::cell::RefCell::new(None),
+        })
     }
 
     /// Load and cross-check L's record and witness.
@@ -380,6 +389,10 @@ impl<'a> LifecycleStore<'a> {
                 Some(RecoveryError::Overlap) => LifecycleStoreError::Busy.into(),
                 _ => e,
             });
+        }
+        #[cfg(test)]
+        if let Some(hook) = self.before_apply.borrow_mut().take() {
+            hook(self.store);
         }
         match self.journal.apply(&intent)? {
             CompareAndWrite::Applied => self.journal.complete(&txid)?,
@@ -656,6 +669,87 @@ mod tests {
             StoredLifecycle::Pending { basis, .. }
                 if basis == lifecycle_basis(&l(), 0, &[0xE1; 32], &domain_record_pin(b"edited")).unwrap()
         ));
+    }
+
+    #[test]
+    fn seal_carries_the_pending_basis_and_electorate_unchanged() {
+        let s = store();
+        let ls = LifecycleStore::open(&s).unwrap();
+        let p = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
+                .unwrap(),
+        );
+        let (pb, pe) = match &p.stored.as_ref().unwrap().state {
+            StoredLifecycle::Pending {
+                basis, electorate, ..
+            } => (*basis, *electorate),
+            other => panic!("{other:?}"),
+        };
+        let ids = ["p-a"];
+        let sealed = written(
+            ls.transition(
+                &p,
+                LifecycleRequest::Seal {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                    final_ids: &ids,
+                },
+                [2; 16],
+            )
+            .unwrap(),
+        );
+        assert!(matches!(
+            sealed.stored.unwrap().state,
+            StoredLifecycle::Sealed { basis, electorate, .. } if basis == pb && electorate == pe
+        ));
+    }
+
+    #[test]
+    fn a_domain_edit_after_begin_read_it_makes_the_begin_stale_and_leaves_nothing() {
+        let s = store();
+        let ls = LifecycleStore::open(&s).unwrap();
+        let fresh = ls.load(&l()).unwrap();
+        *ls.before_apply.borrow_mut() = Some(Box::new(|st: &SledStore| {
+            st.put(&domain_key(&l()), b"edited concurrently").unwrap();
+        }));
+        let e = ls.transition(&fresh, begin(1, 0x4D), [1; 16]).unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::Stale)
+        );
+        assert_eq!(
+            s.get(&lifecycle_key(&l()).unwrap()).unwrap(),
+            None,
+            "no record written"
+        );
+        assert_eq!(
+            s.get(&witness_key(&l()).unwrap()).unwrap(),
+            None,
+            "no witness written"
+        );
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_record_write_landing_after_journaling_is_stale_and_retired_through_the_store() {
+        let s = store();
+        let ls = LifecycleStore::open(&s).unwrap();
+        let fresh = ls.load(&l()).unwrap();
+        *ls.before_apply.borrow_mut() = Some(Box::new(|st: &SledStore| {
+            st.put(&lifecycle_key(&l()).unwrap(), b"another writer")
+                .unwrap();
+        }));
+        let e = ls.transition(&fresh, begin(1, 0x4D), [1; 16]).unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::Stale)
+        );
+        assert_eq!(
+            s.get(&lifecycle_key(&l()).unwrap()).unwrap(),
+            Some(b"another writer".to_vec()),
+            "the other write is left as it is"
+        );
+        admitted(&s);
     }
 
     #[test]
