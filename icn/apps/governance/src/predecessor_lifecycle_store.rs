@@ -2161,6 +2161,47 @@ mod tests {
     }
 
     #[test]
+    fn a_sealed_domain_record_is_final() {
+        // Kills S27 mutant D03.
+        let s = store();
+        s.put(&domain_key(&l()), &serde_json::to_vec(&gdom("v1")).unwrap())
+            .unwrap();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.cancel().unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [9; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
+                .unwrap(),
+        );
+        let ids = ["p"];
+        let sealed = written(
+            ls.transition(
+                &pending,
+                LifecycleRequest::Seal {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                    final_ids: &ids,
+                },
+                [2; 16],
+            )
+            .unwrap(),
+        );
+        let before = s.get(&domain_key(&l())).unwrap();
+        assert_eq!(
+            fence(ls.write_domain(&sealed, &gdom("v2"), [3; 16]).unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        assert_eq!(
+            ls.write_domain(&sealed, &gdom("v1"), [4; 16]).unwrap(),
+            FencedWrite::Unchanged
+        );
+        assert_eq!(s.get(&domain_key(&l())).unwrap(), before);
+        assert_eq!(ls.load(&l()).unwrap().revision(), sealed.revision());
+    }
+
+    #[test]
     fn seal_recomputes_f_and_is_terminal() {
         let s = store();
         let ls = live(&s);
