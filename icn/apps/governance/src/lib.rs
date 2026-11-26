@@ -48,6 +48,7 @@ pub mod registry;
 pub mod rehearsal_workspace;
 pub mod replication_emission;
 pub mod replication_sequence;
+pub mod seal_evidence;
 pub mod state_store;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};

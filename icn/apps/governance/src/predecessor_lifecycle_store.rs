@@ -54,6 +54,7 @@ use std::sync::{Arc, Mutex, Weak};
 use icn_governance::{Proposal, ProposalId, ProposalState};
 
 use crate::close_journal::CloseJournalEntry;
+use crate::seal_evidence::{BoundSealEvidence, SealEvidence};
 use crate::state_store::{
     check_domain_overwrite, check_proposal_overwrite, close_intent_key, close_intent_key_prefix,
     domain_key, proposal_key, proposal_key_prefix,
@@ -243,19 +244,23 @@ pub struct LifecycleRecovery<'a> {
     store: &'a SledStore,
     journal: RecoveryJournal<'a>,
     claim: Claim,
+    /// The Seal evidence bound at claim time and carried into the live owner (S28).
+    evidence: BoundSealEvidence,
 }
 
 impl<'a> LifecycleRecovery<'a> {
-    /// Claim the database for lifecycle recovery. Crate-private and without a production call
-    /// site (operationally inactive until P5b activation).
+    /// Claim the database for lifecycle recovery, binding the Seal evidence the live owner will
+    /// use (S28: evidence is fixed at construction, never supplied per Seal). Crate-private and
+    /// without a production call site (operationally inactive until P5b activation).
     #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn claim(store: &'a SledStore) -> anyhow::Result<Self> {
+    pub(crate) fn claim(store: &'a SledStore, evidence: BoundSealEvidence) -> anyhow::Result<Self> {
         let claim = Claim::acquire(store)?;
         let journal = RecoveryJournal::new(store, LIFECYCLE_JOURNAL_PREFIX)?;
         Ok(Self {
             store,
             journal,
             claim,
+            evidence,
         })
     }
 
@@ -298,6 +303,7 @@ impl<'a> LifecycleRecovery<'a> {
             journal: self.journal,
             _admission: admission,
             _claim: self.claim,
+            evidence: self.evidence,
             commit_lock: Mutex::new(()),
             #[cfg(test)]
             before_apply: Mutex::new(None),
@@ -313,6 +319,9 @@ pub struct LifecycleStore<'a> {
     _admission: icn_store::recovery::Admission<'a>,
     /// The database claim, moved here from recovery; released when the live store drops.
     _claim: Claim,
+    /// The Seal evidence bound when the database was claimed; [`LifecycleStore::seal`] uses only
+    /// this.
+    evidence: BoundSealEvidence,
     /// Serializes journaled commits within this (exclusive) owner. Only this owner writes the
     /// journal prefix, so while the lock is held any record `admit` sees is genuinely
     /// unresolved evidence, never a sibling commit in flight (S27 review FOLLOW_UP). Poisoned
@@ -343,6 +352,7 @@ impl<'a> LifecycleStore<'a> {
             store: self.store,
             journal: self.journal,
             claim: self._claim,
+            evidence: self.evidence,
         }
     }
 
@@ -860,10 +870,34 @@ impl<'a> LifecycleStore<'a> {
     /// the pin retained since Begin and expects those exact bytes in the commit
     /// ([`LifecycleStoreError::DomainChanged`] otherwise).
     ///
-    /// **Required before activation** (S27 review FOLLOW_UP (b)): bind `SealEvidence` to the
-    /// receipt backend and the compiled-in P5c predicate when the store is constructed, instead
-    /// of accepting it per call.
+    /// Evidence (S28, S27 review FOLLOW_UP (b)): the receipt-backed [`BoundSealEvidence`] fixed
+    /// when the database was claimed, with the compiled-in conservative P5c predicate
+    /// (`crate::seal_evidence`). No caller supplies it per Seal.
     pub fn seal(
+        &self,
+        loaded: &LoadedLifecycle,
+        attempt: u64,
+        commitment_hash: [u8; 32],
+        txid: [u8; 16],
+    ) -> anyhow::Result<Committed> {
+        self.seal_inner(loaded, attempt, commitment_hash, self.evidence.get(), txid)
+    }
+
+    /// Test-only: seal against a fixture instead of the bound evidence. Not compiled outside
+    /// tests, so no operational caller can substitute an oracle.
+    #[cfg(test)]
+    pub(crate) fn seal_with(
+        &self,
+        loaded: &LoadedLifecycle,
+        attempt: u64,
+        commitment_hash: [u8; 32],
+        evidence: &dyn SealEvidence,
+        txid: [u8; 16],
+    ) -> anyhow::Result<Committed> {
+        self.seal_inner(loaded, attempt, commitment_hash, evidence, txid)
+    }
+
+    fn seal_inner(
         &self,
         loaded: &LoadedLifecycle,
         attempt: u64,
@@ -926,12 +960,17 @@ impl<'a> LifecycleStore<'a> {
         rows.sort_by(|a, b| a.id.0.as_bytes().cmp(b.id.0.as_bytes()));
         let mut statuses: Vec<(&str, DrainStatus)> = Vec::with_capacity(rows.len());
         for p in &rows {
-            let status = classify(
-                &p.state,
-                &p.payload,
-                evidence.closure_durable(p)?,
-                evidence.changes_cutover_basis(p),
-            );
+            let basis = evidence.changes_cutover_basis(p);
+            // Consult the durability oracle only when the classification depends on it
+            // (accepted, execution-required rows). P5a `classify` stays the only statement of
+            // that rule; an accepted declarative row is never asked for receipt evidence (S28
+            // review BLOCKER: the actor mints a mandate for it but writes no decision receipt).
+            let durable = classify(&p.state, &p.payload, true, basis);
+            let status = if classify(&p.state, &p.payload, false, basis) == durable {
+                durable
+            } else {
+                classify(&p.state, &p.payload, evidence.closure_durable(p)?, basis)
+            };
             statuses.push((p.id.0.as_str(), status));
         }
         evidence.flush()?;
@@ -1020,18 +1059,6 @@ impl<'a> LifecycleStore<'a> {
         })?;
         Ok(FencedWrite::Written { revision })
     }
-}
-
-/// The facts the Seal needs that the governance store cannot establish itself. They live in
-/// other databases (the receipt store) or are P5c predicates. Implementations must be
-/// read-only views bound at construction, not per-call lists.
-pub trait SealEvidence {
-    /// Is `p`'s closure artifact durable (only consulted for execution-required acceptances)?
-    fn closure_durable(&self, p: &Proposal) -> anyhow::Result<bool>;
-    /// Does accepting `p` change a condition the cutover relies on (P5c predicate)?
-    fn changes_cutover_basis(&self, p: &Proposal) -> bool;
-    /// Make every fact reported so far durable before the Seal commits.
-    fn flush(&self) -> anyhow::Result<()>;
 }
 
 /// What [`LifecycleStore::write_proposal`] did.
@@ -1139,7 +1166,7 @@ pub fn proposal_fence(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
@@ -1155,14 +1182,14 @@ mod tests {
     }
 
     /// The golden commitment, with its recognition-map bytes set to `m` (a distinct valid K).
-    fn commitment(m: u8) -> CutoverCommitmentV1 {
+    pub(crate) fn commitment(m: u8) -> CutoverCommitmentV1 {
         let mut b = hex::decode(GOLDEN_C).unwrap();
         let n = b.len();
         b[n - 32..].copy_from_slice(&[m; 32]);
         CutoverCommitmentV1::decode(&b).unwrap()
     }
 
-    fn k(m: u8) -> [u8; 32] {
+    pub(crate) fn k(m: u8) -> [u8; 32] {
         commitment(m).commitment().unwrap()
     }
 
@@ -1195,7 +1222,7 @@ mod tests {
 
     /// Claim, then go live (the only path to a live store).
     fn live(s: &SledStore) -> LifecycleStore<'_> {
-        LifecycleRecovery::claim(s)
+        LifecycleRecovery::claim(s, fixture_evidence())
             .unwrap()
             .into_live()
             .map_err(|(_, e)| e)
@@ -1658,7 +1685,7 @@ mod tests {
         let before = row(&s, &p);
         crash_during_fenced_write(&s, &p, Box::new(|_: &SledStore| panic!("crash")));
         // Restart: no live access until recovery has resolved the record.
-        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
         let (recovery, _) = recovery.into_live().err().expect("closed after the crash");
         let report = recovery.resolve_safe().unwrap();
         assert_eq!((report.completed, report.abandoned), (0, 1));
@@ -1684,7 +1711,7 @@ mod tests {
                 panic!("crash mid-commit");
             }),
         );
-        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
         let report = recovery.resolve_safe().unwrap();
         assert_eq!(report.quarantined.len(), 1);
         assert!(matches!(report.quarantined[0], Outcome::Partial(_)));
@@ -1708,7 +1735,7 @@ mod tests {
                 panic!("crash before acknowledgement");
             }),
         );
-        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
         let report = recovery.resolve_safe().unwrap();
         assert_eq!((report.completed, report.abandoned), (1, 0));
         let ls = recovery.into_live().map_err(|(_, e)| e).unwrap();
@@ -2407,6 +2434,12 @@ mod tests {
         }
     }
 
+    /// The evidence every test owner is claimed with; individual Seal tests pass their own
+    /// fixture through the test-only `seal_with`.
+    fn fixture_evidence() -> BoundSealEvidence {
+        BoundSealEvidence::fixture(std::sync::Arc::new(Evidence::default()))
+    }
+
     fn seal_err(e: anyhow::Error) -> SealRefusal {
         e.downcast::<SealRefusal>().expect("a typed SealRefusal")
     }
@@ -2444,7 +2477,7 @@ mod tests {
         other.cancel().unwrap();
         crate::state_store::state_store_test_put(&s, &other);
         let ev = Evidence::default();
-        let sealed = written(ls.seal(&pending, 1, k(0x4D), &ev, [5; 16]).unwrap());
+        let sealed = written(ls.seal_with(&pending, 1, k(0x4D), &ev, [5; 16]).unwrap());
         let expected = final_set_commitment(&l(), 1, &k(0x4D), &["b", "c"]).unwrap();
         assert!(matches!(
             sealed.state(),
@@ -2466,7 +2499,7 @@ mod tests {
         crate::state_store::state_store_test_put(&s, &d);
         let now = ls.load(&l()).unwrap();
         assert!(matches!(
-            seal_err(ls.seal(&now, 1, k(0x4D), &Evidence::default(), [6; 16]).unwrap_err()),
+            seal_err(ls.seal_with(&now, 1, k(0x4D), &Evidence::default(), [6; 16]).unwrap_err()),
             SealRefusal::ActiveProposal(id) if id == "d"
         ));
         // Effects pending and basis-changing acceptances block.
@@ -2482,7 +2515,7 @@ mod tests {
             ..Default::default()
         };
         assert!(matches!(
-            seal_err(ls.seal(&pending, 1, k(0x4D), &ev, [7; 16]).unwrap_err()),
+            seal_err(ls.seal_with(&pending, 1, k(0x4D), &ev, [7; 16]).unwrap_err()),
             SealRefusal::ChangesCutoverBasis(id) if id == "e"
         ));
         // An outstanding close intent of L blocks.
@@ -2495,7 +2528,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             fence(
-                ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [8; 16])
+                ls.seal_with(&pending, 1, k(0x4D), &Evidence::default(), [8; 16])
                     .unwrap_err()
             ),
             FenceRefusal::IntentOutstanding
@@ -2513,7 +2546,7 @@ mod tests {
         s.put(&proposal_key(&prop("bad").id), b"not json").unwrap();
         assert_eq!(
             fence(
-                ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [9; 16])
+                ls.seal_with(&pending, 1, k(0x4D), &Evidence::default(), [9; 16])
                     .unwrap_err()
             ),
             FenceRefusal::UnreadableProposal
@@ -2540,7 +2573,7 @@ mod tests {
         p.cancel().unwrap();
         ls.write_proposal(&pending, &p, [4; 16]).unwrap();
         let e = ls
-            .seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            .seal_with(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
             .unwrap_err();
         assert_eq!(
             e.downcast_ref::<LifecycleStoreError>(),
@@ -2548,7 +2581,7 @@ mod tests {
         );
         // From the current view, every L row is now terminal and the Seal goes through.
         assert!(ls
-            .seal(
+            .seal_with(
                 &ls.load(&l()).unwrap(),
                 1,
                 k(0x4D),
@@ -2567,7 +2600,7 @@ mod tests {
         for (n, kk) in [(2, k(0x4D)), (1, k(0x4E))] {
             assert_eq!(
                 seal_err(
-                    ls.seal(&pending, n, kk, &Evidence::default(), [1; 16])
+                    ls.seal_with(&pending, n, kk, &Evidence::default(), [1; 16])
                         .unwrap_err()
                 ),
                 SealRefusal::MismatchedAttempt
@@ -2575,19 +2608,19 @@ mod tests {
         }
         assert_eq!(ls.load(&l()).unwrap().state(), pending.state());
         let sealed = written(
-            ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [2; 16])
+            ls.seal_with(&pending, 1, k(0x4D), &Evidence::default(), [2; 16])
                 .unwrap(),
         );
         // A retry with the same (n, K) is acknowledged as a replay, writing nothing.
         assert!(matches!(
-            ls.seal(&sealed, 1, k(0x4D), &Evidence::default(), [3; 16])
+            ls.seal_with(&sealed, 1, k(0x4D), &Evidence::default(), [3; 16])
                 .unwrap(),
             Committed::Replayed
         ));
         assert_eq!(ls.load(&l()).unwrap(), sealed);
         assert_eq!(
             seal_err(
-                ls.seal(&sealed, 1, k(0x4E), &Evidence::default(), [4; 16])
+                ls.seal_with(&sealed, 1, k(0x4E), &Evidence::default(), [4; 16])
                     .unwrap_err()
             ),
             SealRefusal::SealedIsFinal
@@ -2608,7 +2641,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             fence(
-                ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [1; 16])
+                ls.seal_with(&pending, 1, k(0x4D), &Evidence::default(), [1; 16])
                     .unwrap_err()
             ),
             FenceRefusal::UnreadableProposal
@@ -2621,7 +2654,7 @@ mod tests {
         let ls = live(&s);
         assert_eq!(
             seal_err(
-                ls.seal(
+                ls.seal_with(
                     &ls.load(&l()).unwrap(),
                     1,
                     k(0x4D),
@@ -3000,21 +3033,23 @@ mod tests {
     #[test]
     fn a_database_has_one_lifecycle_owner_at_a_time() {
         let s = store();
-        let recovery = LifecycleRecovery::claim(&s).unwrap();
-        let e = LifecycleRecovery::claim(&s).err().unwrap();
+        let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
+        let e = LifecycleRecovery::claim(&s, fixture_evidence())
+            .err()
+            .unwrap();
         assert_eq!(
             e.downcast_ref::<LifecycleStoreError>(),
             Some(&LifecycleStoreError::AlreadyClaimed)
         );
         // Going live keeps the claim: still no second owner.
         let ls = recovery.into_live().map_err(|(_, e)| e).unwrap();
-        assert!(LifecycleRecovery::claim(&s).is_err());
+        assert!(LifecycleRecovery::claim(&s, fixture_evidence()).is_err());
         // Another database (another fault domain) is independent.
         let other = store();
-        assert!(LifecycleRecovery::claim(&other).is_ok());
+        assert!(LifecycleRecovery::claim(&other, fixture_evidence()).is_ok());
         // Back to recovery and dropped: the claim is released.
         drop(ls.into_recovery());
-        assert!(LifecycleRecovery::claim(&s).is_ok());
+        assert!(LifecycleRecovery::claim(&s, fixture_evidence()).is_ok());
     }
 
     #[test]
@@ -3029,7 +3064,7 @@ mod tests {
                 intended: vec![(rkey, Some(b"r".to_vec()))],
             })
             .unwrap();
-        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
         let (recovery, _e) = recovery.into_live().err().expect("refused");
         assert_eq!(recovery.inspect().unwrap().len(), 1);
         let report = recovery.resolve_safe().unwrap();
@@ -3134,7 +3169,7 @@ mod tests {
             (applied, not)
         };
         let s = SledStore::open(dir.path()).unwrap();
-        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
         let (recovery, _) = recovery.into_live().err().expect("closed after restart");
         let report = recovery.resolve_safe().unwrap();
         assert_eq!((report.completed, report.abandoned), (1, 1));
@@ -3164,7 +3199,7 @@ mod tests {
         journal.begin(&intent).unwrap();
         // Simulated prefix of the commit: the record landed, the witness did not.
         s.put(&rkey, b"r").unwrap();
-        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
         let report = recovery.resolve_safe().unwrap();
         assert_eq!(report.quarantined.len(), 1);
         assert!(matches!(report.quarantined[0], Outcome::Partial(_)));
@@ -3250,7 +3285,7 @@ mod tests {
         // K_first is the aborted first attempt's K; the witness still corresponds.
         assert_eq!(rec.first_commitment_hash, k(0x4D));
         let sealed = written(
-            ls.seal(&pending, 2, k(0x4E), &Evidence::default(), [6; 16])
+            ls.seal_with(&pending, 2, k(0x4E), &Evidence::default(), [6; 16])
                 .unwrap(),
         );
         assert_eq!(sealed.revision, 5);
@@ -3272,7 +3307,7 @@ mod tests {
         assert_eq!(after.first_commitment_hash, k(0x4D));
         // The matching Seal replays; the pinned domain is unchanged.
         assert_eq!(
-            ls.seal(&sealed, 2, k(0x4E), &Evidence::default(), [7; 16])
+            ls.seal_with(&sealed, 2, k(0x4E), &Evidence::default(), [7; 16])
                 .unwrap(),
             Committed::Replayed
         );
@@ -3288,7 +3323,7 @@ mod tests {
         s.put(&domain_key(&l()), br#"{"id":"legacy.coop.example","x":1}"#)
             .unwrap();
         let e = ls
-            .seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            .seal_with(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
             .unwrap_err();
         assert_eq!(store_err(e), LifecycleStoreError::DomainChanged);
         assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
@@ -3296,20 +3331,20 @@ mod tests {
         // A corrupt (undecodable) record is a changed record too.
         s.put(&domain_key(&l()), &[0xFF, 0x00, 0x13]).unwrap();
         let e = ls
-            .seal(&pending, 1, k(0x4D), &Evidence::default(), [6; 16])
+            .seal_with(&pending, 1, k(0x4D), &Evidence::default(), [6; 16])
             .unwrap_err();
         assert_eq!(store_err(e), LifecycleStoreError::DomainChanged);
         // A missing record.
         s.delete(&domain_key(&l())).unwrap();
         let e = ls
-            .seal(&pending, 1, k(0x4D), &Evidence::default(), [7; 16])
+            .seal_with(&pending, 1, k(0x4D), &Evidence::default(), [7; 16])
             .unwrap_err();
         assert_eq!(store_err(e), LifecycleStoreError::DomainMissing);
         assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
         // The refusal is specific to the contradiction: the exact pinned bytes seal again.
         s.put(&domain_key(&l()), DOMAIN).unwrap();
         assert!(ls
-            .seal(&pending, 1, k(0x4D), &Evidence::default(), [8; 16])
+            .seal_with(&pending, 1, k(0x4D), &Evidence::default(), [8; 16])
             .is_ok());
         admitted(&s);
     }
@@ -3328,14 +3363,14 @@ mod tests {
             .unwrap();
         }));
         let e = ls
-            .seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            .seal_with(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
             .unwrap_err();
         assert_eq!(store_err(e), LifecycleStoreError::Stale);
         assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
         admitted(&s);
         // The drift persists, so a fresh Seal is refused for it rather than racing again.
         let e = ls
-            .seal(
+            .seal_with(
                 &ls.load(&l()).unwrap(),
                 1,
                 k(0x4D),
@@ -3352,7 +3387,7 @@ mod tests {
         let s = store();
         let (ls, pending) = drained(&s);
         let sealed = written(
-            ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            ls.seal_with(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
                 .unwrap(),
         );
         let replay = |txid| {
@@ -3383,7 +3418,7 @@ mod tests {
         let s = store();
         let (ls, pending) = drained(&s);
         let sealed = written(
-            ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            ls.seal_with(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
                 .unwrap(),
         );
         s.put(
@@ -3392,7 +3427,7 @@ mod tests {
         )
         .unwrap();
         let e = ls
-            .seal(&sealed, 1, k(0x4D), &Evidence::default(), [6; 16])
+            .seal_with(&sealed, 1, k(0x4D), &Evidence::default(), [6; 16])
             .unwrap_err();
         assert_eq!(store_err(e), LifecycleStoreError::DomainChanged);
     }
@@ -3407,12 +3442,12 @@ mod tests {
             *ls.before_apply.lock().unwrap() =
                 Some(Box::new(|_: &SledStore| panic!("crash inside the seal")));
             let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+                ls.seal_with(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
             }));
             assert!(r.is_err(), "the simulated crash interrupts the Seal");
         }
         // Restart: recovery abandons the unapplied Seal; the Pending record is intact.
-        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s, fixture_evidence()).unwrap();
         let (recovery, _) = recovery.into_live().err().expect("closed after the crash");
         let report = recovery.resolve_safe().unwrap();
         assert_eq!((report.completed, report.abandoned), (0, 1));
@@ -3424,8 +3459,144 @@ mod tests {
             Some(&domain_record_pin(DOMAIN))
         );
         assert!(ls
-            .seal(&reloaded, 1, k(0x4D), &Evidence::default(), [6; 16])
+            .seal_with(&reloaded, 1, k(0x4D), &Evidence::default(), [6; 16])
             .is_ok());
+        admitted(&s);
+    }
+
+    // ---- S28: Seal evidence bound at construction to the receipt backend ----
+
+    use crate::seal_evidence::tests::{budget, durable, Backend};
+
+    fn accepted(id: &str, payload: icn_governance::ProposalPayload) -> Proposal {
+        let mut p = prop(id);
+        p.payload = payload;
+        p.open(60).unwrap();
+        p.close(ProposalState::Accepted { closed_at: 3 }).unwrap();
+        p
+    }
+
+    /// A live owner bound to `backend`, with `rows` written in Legacy and attempt 1 begun.
+    fn bound_pending<'s>(
+        s: &'s SledStore,
+        backend: &std::sync::Arc<Backend>,
+        rows: &[Proposal],
+    ) -> (LifecycleStore<'s>, LoadedLifecycle) {
+        let ls = LifecycleRecovery::claim(s, BoundSealEvidence::receipts(backend.clone()))
+            .unwrap()
+            .into_live()
+            .map_err(|(_, e)| e)
+            .unwrap();
+        for (i, p) in rows.iter().enumerate() {
+            ls.write_proposal(&ls.load(&l()).unwrap(), p, [0x30 + i as u8; 16])
+                .unwrap();
+        }
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [0x2F; 16])
+                .unwrap(),
+        );
+        (ls, pending)
+    }
+
+    #[test]
+    fn the_production_seal_uses_the_bound_receipts_and_seals_on_complete_durable_intent() {
+        let s = store();
+        let backend = std::sync::Arc::new(Backend::default());
+        let m = accepted("m", budget());
+        let t = accepted(
+            "t",
+            icn_governance::ProposalPayload::Text { body: "b".into() },
+        );
+        durable(&backend, &m);
+        // The declarative row needs no receipt evidence at all.
+        let (ls, pending) = bound_pending(&s, &backend, &[m, t]);
+        let sealed = written(ls.seal(&pending, 1, k(0x4D), [0x40; 16]).unwrap());
+        let f = final_set_commitment(&l(), 1, &k(0x4D), &["m", "t"]).unwrap();
+        assert!(matches!(
+            sealed.state(),
+            PredecessorLifecycle::Sealed { final_set, .. } if *final_set == f
+        ));
+        admitted(&s);
+    }
+
+    #[test]
+    fn the_production_seal_refuses_missing_contradictory_or_basis_changing_evidence() {
+        // Missing durable intent: the accepted execution-required row is unresolved.
+        let s = store();
+        let backend = std::sync::Arc::new(Backend::default());
+        let m = accepted("m", budget());
+        let (ls, pending) = bound_pending(&s, &backend, std::slice::from_ref(&m));
+        let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        assert_eq!(
+            seal_err(ls.seal(&pending, 1, k(0x4D), [0x41; 16]).unwrap_err()),
+            SealRefusal::UnresolvedEffects("m".into())
+        );
+        // Contradictory receipt evidence: the stored row itself (so the payload hash matches
+        // and only the decision receipt is wrong); exactly DecisionMismatch, nothing written.
+        durable(&backend, &m);
+        backend.receipts.lock().unwrap()[0].outcome = icn_governance::ProofOutcome::Rejected;
+        let e = ls.seal(&pending, 1, k(0x4D), [0x42; 16]).unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<crate::seal_evidence::SealEvidenceError>(),
+            Some(&crate::seal_evidence::SealEvidenceError::DecisionMismatch(
+                "m".into()
+            ))
+        );
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
+        drop(ls);
+        // A basis-changing acceptance with complete evidence still blocks (P5c, conservative).
+        let s = store();
+        let backend = std::sync::Arc::new(Backend::default());
+        let c = accepted(
+            "c",
+            icn_governance::ProposalPayload::Charter {
+                charter_id: "x".into(),
+                charter_yaml: "schema_version: v0".into(),
+            },
+        );
+        durable(&backend, &c);
+        let (ls, pending) = bound_pending(&s, &backend, &[c]);
+        assert_eq!(
+            seal_err(ls.seal(&pending, 1, k(0x4D), [0x43; 16]).unwrap_err()),
+            SealRefusal::ChangesCutoverBasis("c".into())
+        );
+        admitted(&s);
+    }
+
+    #[test]
+    fn an_accepted_declarative_row_is_never_asked_for_receipt_evidence() {
+        // S28 review BLOCKER: the actor mints a mandate for an accepted declarative proposal
+        // but writes no decision receipt, which the oracle reads as a contradiction. The Seal
+        // must not consult the oracle for a row whose classification does not depend on it.
+        let s = store();
+        let backend = std::sync::Arc::new(Backend::default());
+        let t = accepted(
+            "t",
+            icn_governance::ProposalPayload::Text { body: "b".into() },
+        );
+        backend
+            .mandates
+            .lock()
+            .unwrap()
+            .push(crate::seal_evidence::tests::mandate(&t, [0x5A; 32]));
+        let (ls, pending) = bound_pending(&s, &backend, std::slice::from_ref(&t));
+        assert!(ls.seal(&pending, 1, k(0x4D), [0x45; 16]).is_ok());
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_failed_receipt_flush_refuses_the_seal_and_writes_nothing() {
+        let s = store();
+        let backend = std::sync::Arc::new(Backend {
+            flush_fails: true,
+            ..Backend::default()
+        });
+        let m = accepted("m", budget());
+        durable(&backend, &m);
+        let (ls, pending) = bound_pending(&s, &backend, &[m]);
+        let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        assert!(ls.seal(&pending, 1, k(0x4D), [0x44; 16]).is_err());
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
         admitted(&s);
     }
 }
