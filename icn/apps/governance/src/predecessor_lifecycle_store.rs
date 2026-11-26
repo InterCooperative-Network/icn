@@ -82,6 +82,8 @@ pub enum LifecycleStoreError {
     MissingElectorate,
     /// The stored record does not carry the Pending basis needed to seal.
     Inconsistent,
+    /// A Begin replay names a different electorate commitment than the one recorded.
+    ReplayMismatch,
 }
 
 impl std::fmt::Display for LifecycleStoreError {
@@ -94,6 +96,9 @@ impl std::fmt::Display for LifecycleStoreError {
             Self::Inconsistent => {
                 "the stored record does not carry the Pending basis needed to seal"
             }
+            Self::ReplayMismatch => {
+                "a Begin replay names a different electorate commitment than the one recorded"
+            }
         })
     }
 }
@@ -101,15 +106,33 @@ impl std::fmt::Display for LifecycleStoreError {
 impl std::error::Error for LifecycleStoreError {}
 
 /// L's lifecycle as loaded, with the exact bytes a transition must expect.
+///
+/// Every field is private and only [`LifecycleStore::load`] and [`LifecycleStore::transition`]
+/// construct one, so the state a transition validates against always corresponds to the bytes
+/// it expects. A caller cannot edit the state to pass validation over genuine bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedLifecycle {
-    pub predecessor: GovernanceDomainId,
-    pub state: PredecessorLifecycle,
-    /// 0 when L never began a cutover.
-    pub revision: u64,
+    predecessor: GovernanceDomainId,
+    state: PredecessorLifecycle,
+    revision: u64,
     record_bytes: Option<Vec<u8>>,
     witness_bytes: Option<Vec<u8>>,
     stored: Option<LifecycleRecordV1>,
+}
+
+impl LoadedLifecycle {
+    /// The predecessor domain.
+    pub fn predecessor(&self) -> &GovernanceDomainId {
+        &self.predecessor
+    }
+    /// The lifecycle state.
+    pub fn state(&self) -> &PredecessorLifecycle {
+        &self.state
+    }
+    /// The storage revision (0 when L never began a cutover).
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
 }
 
 /// One requested transition.
@@ -140,14 +163,20 @@ pub enum Committed {
     Written(Box<LoadedLifecycle>),
 }
 
+/// Test-only hook type (see `LifecycleStore::before_apply`).
+#[cfg(test)]
+type BeforeApplyHook<'a> = Box<dyn FnOnce(&SledStore) + 'a>;
+
 /// The admitted, owning-store-only lifecycle persistence.
 pub struct LifecycleStore<'a> {
     store: &'a SledStore,
     journal: RecoveryJournal<'a>,
+    /// Held for the store's lifetime; admission is also re-checked before every transition.
+    _admission: icn_store::recovery::Admission<'a>,
     /// Test-only: runs once between journaling an intent and applying it, to model a concurrent
     /// writer landing in that window.
     #[cfg(test)]
-    before_apply: std::cell::RefCell<Option<Box<dyn FnOnce(&SledStore) + 'a>>>,
+    before_apply: std::cell::RefCell<Option<BeforeApplyHook<'a>>>,
 }
 
 /// What [`recover`] did.
@@ -189,10 +218,11 @@ impl<'a> LifecycleStore<'a> {
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn open(store: &'a SledStore) -> anyhow::Result<Self> {
         let journal = RecoveryJournal::new(store, LIFECYCLE_JOURNAL_PREFIX)?;
-        let _admission = journal.admit()?;
+        let admission = journal.admit()?;
         Ok(Self {
             store,
             journal,
+            _admission: admission,
             #[cfg(test)]
             before_apply: std::cell::RefCell::new(None),
         })
@@ -291,7 +321,26 @@ impl<'a> LifecycleStore<'a> {
             ),
         };
         let next = match validate_transition(l, &loaded.state, &transition)? {
-            TransitionOutcome::Replayed => return Ok(Committed::Replayed),
+            TransitionOutcome::Replayed => {
+                // Acknowledge a replay only against the CURRENT stored bytes, and only if a Begin
+                // replay names the electorate commitment that was recorded.
+                if self.store.get(&lifecycle_key(l)?)? != loaded.record_bytes {
+                    return Err(LifecycleStoreError::Stale.into());
+                }
+                if let (
+                    Some(e),
+                    Some(LifecycleRecordV1 {
+                        state: StoredLifecycle::Pending { electorate, .. },
+                        ..
+                    }),
+                ) = (electorate.as_ref(), loaded.stored.as_ref())
+                {
+                    if e.0 != *electorate {
+                        return Err(LifecycleStoreError::ReplayMismatch.into());
+                    }
+                }
+                return Ok(Committed::Replayed);
+            }
             TransitionOutcome::Validated(next) => next,
         };
         let revision = next_revision(loaded.revision)?;
@@ -384,6 +433,8 @@ impl<'a> LifecycleStore<'a> {
             expected,
             intended,
         };
+        // Any unresolved journal record (on any domain) closes the store until recovery.
+        self.journal.admit()?;
         if let Err(e) = self.journal.begin(&intent) {
             return Err(match e.downcast_ref::<RecoveryError>() {
                 Some(RecoveryError::Overlap) => LifecycleStoreError::Busy.into(),
@@ -401,8 +452,11 @@ impl<'a> LifecycleStore<'a> {
                 // priors the intent is NotApplied (abandon); if another writer moved them it
                 // classifies as Foreign, and since we know our write did not land, the record is
                 // retired as reconciled. Any storage error propagates (the store faults).
-                if self.journal.abandon(&txid).is_err() {
-                    self.journal.retire_reconciled(&txid)?;
+                if let Err(e) = self.journal.abandon(&txid) {
+                    match e.downcast_ref::<RecoveryError>() {
+                        Some(RecoveryError::WrongState) => self.journal.retire_reconciled(&txid)?,
+                        _ => return Err(e),
+                    }
                 }
                 return Err(LifecycleStoreError::Stale.into());
             }
@@ -661,7 +715,8 @@ mod tests {
             journal.apply(&intent).unwrap(),
             CompareAndWrite::Conflict { .. }
         ));
-        journal.retire_reconciled(&[9; 16]).unwrap();
+        // Only the guard moved; every written key is at its prior: NotApplied, abandoned.
+        journal.abandon(&[9; 16]).unwrap();
         // And a real Begin over an edited domain pins the edited bytes, not the old ones.
         let p = written(ls.transition(&fresh, begin(1, 0x4D), [1; 16]).unwrap());
         assert!(matches!(
@@ -753,6 +808,154 @@ mod tests {
     }
 
     #[test]
+    fn a_begin_replay_with_a_different_electorate_is_refused() {
+        let s = store();
+        let ls = LifecycleStore::open(&s).unwrap();
+        let p = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
+                .unwrap(),
+        );
+        let other_e = LifecycleRequest::Begin {
+            attempt: 1,
+            commitment: commitment(0x4D),
+            electorate: ElectorateCommitment::unverified_for_tests([0xE2; 32]),
+        };
+        let e = ls.transition(&p, other_e, [2; 16]).unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::ReplayMismatch)
+        );
+    }
+
+    #[test]
+    fn a_replay_against_a_stale_snapshot_is_refused() {
+        let s = store();
+        let ls = LifecycleStore::open(&s).unwrap();
+        let p = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
+                .unwrap(),
+        );
+        // Someone else aborts attempt 1 after our snapshot.
+        written(
+            ls.transition(
+                &p,
+                LifecycleRequest::Abort {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                },
+                [2; 16],
+            )
+            .unwrap(),
+        );
+        let e = ls.transition(&p, begin(1, 0x4D), [3; 16]).unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::Stale)
+        );
+    }
+
+    #[test]
+    fn invalid_transitions_are_refused_and_write_nothing() {
+        let s = store();
+        let ls = LifecycleStore::open(&s).unwrap();
+        let fresh = ls.load(&l()).unwrap();
+        let ids = ["p"];
+        // Seal from the untouched legacy state; Begin with an attempt gap.
+        assert!(ls
+            .transition(
+                &fresh,
+                LifecycleRequest::Seal {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                    final_ids: &ids
+                },
+                [1; 16],
+            )
+            .is_err());
+        assert!(ls.transition(&fresh, begin(2, 0x4D), [2; 16]).is_err());
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), None);
+        let p = written(ls.transition(&fresh, begin(1, 0x4D), [3; 16]).unwrap());
+        let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        // Abort with the wrong K; Seal at the wrong attempt or with the wrong K.
+        for bad in [
+            LifecycleRequest::Abort {
+                attempt: 1,
+                commitment_hash: k(0x4E),
+            },
+            LifecycleRequest::Seal {
+                attempt: 2,
+                commitment_hash: k(0x4D),
+                final_ids: &ids,
+            },
+            LifecycleRequest::Seal {
+                attempt: 1,
+                commitment_hash: k(0x4E),
+                final_ids: &ids,
+            },
+        ] {
+            assert!(ls.transition(&p, bad, [4; 16]).is_err());
+        }
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_witness_tampered_after_abort_and_retry_is_refused() {
+        let s = store();
+        let ls = LifecycleStore::open(&s).unwrap();
+        let p1 = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
+                .unwrap(),
+        );
+        let a = written(
+            ls.transition(
+                &p1,
+                LifecycleRequest::Abort {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                },
+                [2; 16],
+            )
+            .unwrap(),
+        );
+        written(ls.transition(&a, begin(2, 0x4E), [3; 16]).unwrap());
+        // A witness claiming a later first attempt than the record's attempt is refused.
+        let mut w = LifecycleWitnessV1::decode_for(
+            &l(),
+            &s.get(&witness_key(&l()).unwrap()).unwrap().unwrap(),
+        )
+        .unwrap();
+        w.first_attempt = 3;
+        s.put(&witness_key(&l()).unwrap(), &w.encode().unwrap())
+            .unwrap();
+        assert_eq!(
+            ls.load(&l())
+                .unwrap_err()
+                .downcast_ref::<LifecycleCodecError>(),
+            Some(&LifecycleCodecError::WitnessMismatch)
+        );
+    }
+
+    #[test]
+    fn an_unresolved_record_on_any_domain_closes_transitions() {
+        let s = store();
+        let ls = LifecycleStore::open(&s).unwrap();
+        let fresh = ls.load(&l()).unwrap();
+        // Another domain's write left an unresolved intent after this store opened.
+        let other = lifecycle_key(&GovernanceDomainId("other.coop".into())).unwrap();
+        let journal = RecoveryJournal::new(&s, LIFECYCLE_JOURNAL_PREFIX).unwrap();
+        journal
+            .begin(&RecoveryIntent {
+                txid: [8; 16],
+                expected: vec![(other.clone(), None)],
+                intended: vec![(other, Some(b"o".to_vec()))],
+            })
+            .unwrap();
+        assert!(ls.transition(&fresh, begin(1, 0x4D), [1; 16]).is_err());
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), None);
+    }
+
+    #[test]
     fn concurrent_begins_have_one_winner() {
         let s = std::sync::Arc::new(store());
         let results: Vec<_> = (0..6u8)
@@ -768,6 +971,7 @@ mod tests {
             .map(|h| h.join().unwrap())
             .collect();
         assert_eq!(results.iter().filter(|ok| **ok).count(), 1, "{results:?}");
+        admitted(&s);
     }
 
     #[test]
