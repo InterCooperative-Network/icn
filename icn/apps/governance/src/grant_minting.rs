@@ -90,6 +90,22 @@ pub enum MandateMintOutcome {
 /// one is written.
 pub const MANDATE_IDENTITY_CONFLICT: &str = "mandate_identity_conflict";
 
+/// Prefix of the error a [`GovernanceReceiptBackend`] returns from
+/// `put_mandate` / `put_mandate_with_grants` when the proposal's mandate
+/// identity is already held by ANOTHER mandate id (ADR-0019: exactly one
+/// mandate per accepted proposal). A backend that enforces the identity
+/// atomically (the production receipt store does) reports a lost race this
+/// way and writes nothing; [`mint_and_persist_for_accepted`] then re-reads
+/// the stored mandate and reports `AlreadyMinted` if it is bound to the same
+/// decision and payload, or [`MANDATE_IDENTITY_CONFLICT`] otherwise.
+pub const MANDATE_IDENTITY_TAKEN: &str = "mandate identity already recorded for this proposal";
+
+/// Prefix of the error a backend returns when a proposal has more than one
+/// stored mandate and no identity entry selects one (records written before
+/// the identity entry existed). Nothing is chosen automatically and nothing
+/// is written; resolving it is an authorized reconciliation.
+pub const MANDATE_IDENTITY_AMBIGUOUS: &str = "mandate_identity_ambiguous";
+
 /// Mint and persist the constitutional-memory artifacts for an accepted
 /// decision — zero or more [`AuthorityGrant`]s plus one [`Mandate`].
 ///
@@ -110,6 +126,45 @@ pub const MANDATE_IDENTITY_CONFLICT: &str = "mandate_identity_conflict";
 /// as `Accepted` and after the governance decision receipt has been
 /// stored (so `decision_hash` binds into the INV-5 chain).
 pub fn mint_and_persist_for_accepted(
+    backend: &dyn GovernanceReceiptBackend,
+    proposal_id: &str,
+    domain_id: &GovernanceDomainId,
+    decision_hash: icn_kernel_api::Hash,
+    payload: &ProposalPayload,
+    now: Timestamp,
+) -> Result<MandateMintOutcome, String> {
+    match mint_once(backend, proposal_id, domain_id, decision_hash, payload, now) {
+        // Another writer recorded this proposal's mandate between our read and
+        // our write (or a single pre-identity mandate was adopted). Nothing of
+        // ours was written; report the stored mandate only if it is this
+        // decision's.
+        Err(e) if e.starts_with(MANDATE_IDENTITY_TAKEN) => {
+            let Some(prior) = backend.get_mandate_by_proposal(proposal_id)? else {
+                return Err(format!(
+                    "{e}; but no stored mandate for proposal '{proposal_id}' could be read back"
+                ));
+            };
+            let payload_hash = match hash_proposal_payload(payload) {
+                Ok(h) => h,
+                Err(_) => return Ok(MandateMintOutcome::HashFailed),
+            };
+            if prior.decision.decision_hash == decision_hash && prior.payload_hash == payload_hash {
+                Ok(MandateMintOutcome::AlreadyMinted {
+                    mandate_id: prior.id,
+                })
+            } else {
+                Err(format!(
+                    "{MANDATE_IDENTITY_CONFLICT}: proposal '{proposal_id}' already has mandate {} \
+                     bound to another decision or payload ({e})",
+                    prior.id
+                ))
+            }
+        }
+        other => other,
+    }
+}
+
+fn mint_once(
     backend: &dyn GovernanceReceiptBackend,
     proposal_id: &str,
     domain_id: &GovernanceDomainId,
