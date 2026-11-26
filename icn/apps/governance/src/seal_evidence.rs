@@ -296,6 +296,8 @@ pub(crate) mod tests {
         pub(crate) receipts: Mutex<Vec<GovernanceDecisionReceipt>>,
         pub(crate) effects: Mutex<Vec<InstitutionalEffectRecord>>,
         pub(crate) no_enumerate: bool,
+        /// When set, the by-proposal lookup returns this copy (an index/primary disagreement).
+        pub(crate) by_proposal_copy: Mutex<Option<Mandate>>,
         pub(crate) flush_fails: bool,
     }
 
@@ -340,6 +342,9 @@ pub(crate) mod tests {
         // Keyed by the index (the queried id), like the store's by_proposal index, so a
         // corrupt index entry can surface a mandate whose body names another proposal.
         fn get_mandate_by_proposal(&self, id: &str) -> Result<Option<Mandate>, String> {
+            if let Some(copy) = self.by_proposal_copy.lock().unwrap().clone() {
+                return Ok(Some(copy));
+            }
             let m = self.mandates.lock().unwrap();
             Ok(m.iter()
                 .find(|x| {
@@ -577,6 +582,22 @@ pub(crate) mod tests {
         let h = durable(&b, &m);
         b.mandates.lock().unwrap()[0].payload_hash = [1; 32];
         let _ = h;
+        assert_eq!(
+            err(closure_durable_from(&b, &m)),
+            SealEvidenceError::MandatePayloadMismatch("m".into())
+        );
+    }
+
+    #[test]
+    fn a_by_proposal_copy_that_disagrees_with_the_decision_listing_is_refused() {
+        // Kills E02: the primary mandate's own payload binding is checked, not only the copy
+        // the decision listing returns.
+        let b = Backend::default();
+        let m = proposal("m", budget());
+        durable(&b, &m);
+        let mut copy = b.mandates.lock().unwrap()[0].clone();
+        copy.payload_hash = [7; 32];
+        *b.by_proposal_copy.lock().unwrap() = Some(copy);
         assert_eq!(
             err(closure_durable_from(&b, &m)),
             SealEvidenceError::MandatePayloadMismatch("m".into())
