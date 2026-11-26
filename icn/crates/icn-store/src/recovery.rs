@@ -25,10 +25,10 @@
 //!
 //! | Outcome | Meaning | Resolution |
 //! |---|---|---|
-//! | [`Outcome::NotApplied`] | every key at its prior value | `apply` or `abandon` |
-//! | [`Outcome::Applied`] | every written key at its intended value, guards unchanged | `complete` |
-//! | [`Outcome::Partial`] | every key at its prior or intended value, but mixed | caller reconciles, then `retire_reconciled` |
-//! | [`Outcome::Foreign`] | some key matches neither | caller reconciles, then `retire_reconciled` |
+//! | [`Outcome::NotApplied`] | every written key at its prior value | `apply` or `abandon` |
+//! | [`Outcome::Applied`] | every written key at its intended value (guard-only keys are not consulted: `apply` already enforced them) | `complete` |
+//! | [`Outcome::Partial`] | every written key at its prior or intended value, but mixed | caller reconciles, then `retire_reconciled` |
+//! | [`Outcome::Foreign`] | some written key matches neither | caller reconciles, then `retire_reconciled` |
 //! | [`Outcome::Torn`] | a decodable intent missing some of its locks (an interrupted `begin` or retirement) | caller inspects, then `retire_torn` |
 //! | [`Outcome::Corrupt`] | an intent that fails its digest, does not decode, or is misfiled | none in-store: needs out-of-band repair |
 //! | [`Outcome::OrphanLock`] | a lock with no intent | `clear_orphan_locks`, refused while any intent is Corrupt |
@@ -360,20 +360,23 @@ impl<'a> RecoveryJournal<'a> {
         }
         let mut observed = Vec::with_capacity(intent.expected.len());
         let (mut any_before_only, mut any_after_only, mut any_neither) = (false, false, false);
-        for (k, before) in &intent.expected {
+        // Only WRITTEN keys say whether the write happened. Guard-only keys decided whether it
+        // MAY happen, and `apply` enforced that atomically. They may legitimately change
+        // afterwards, so they never make an applied write look foreign.
+        for (k, after) in &intent.intended {
             let current = self.store.get(k)?;
-            let after = intent
-                .intended
+            let before = intent
+                .expected
                 .iter()
-                .find(|(ik, _)| ik == k)
+                .find(|(ek, _)| ek == k)
                 .map(|(_, v)| v);
-            let is_before = current.as_ref() == before.as_ref();
-            let is_after = after.is_some_and(|a| current.as_ref() == a.as_ref());
+            let is_before = before.is_some_and(|b| current.as_ref() == b.as_ref());
+            let is_after = current.as_ref() == after.as_ref();
             match (is_before, is_after) {
                 (false, false) => any_neither = true,
-                (true, false) if after.is_some() => any_before_only = true,
+                (true, false) => any_before_only = true,
                 (false, true) => any_after_only = true,
-                _ => {} // guard unchanged, or a key whose prior equals its intended value
+                (true, true) => {} // prior equals intended for this key
             }
             observed.push((k.clone(), current));
         }
@@ -723,11 +726,38 @@ mod tests {
         );
         s.put(b"b", b"someone else").unwrap();
         assert_eq!(one(&j), Outcome::Foreign(intent(1)));
+        // A guard-only key moving does not make a write foreign; only written keys count.
         s.put(b"b", b"b1").unwrap();
         s.put(b"guard", b"moved").unwrap();
+        assert_eq!(one(&j), Outcome::Applied(intent(1)));
+        s.put(b"b", b"someone else").unwrap();
         assert_eq!(one(&j), Outcome::Foreign(intent(1)));
         assert_eq!(s.get(b"a").unwrap(), Some(b"a1".to_vec()));
         j.retire_reconciled(&[1; 16]).unwrap();
+        j.admit().unwrap();
+    }
+
+    #[test]
+    fn a_guard_moving_after_apply_does_not_block_completion_and_before_apply_blocks_the_write() {
+        let s = SledStore::temporary().unwrap();
+        seed(&s);
+        let j = j(&s);
+        // Before apply: the guard is enforced atomically, nothing is written, intent NotApplied.
+        j.begin(&intent(1)).unwrap();
+        s.put(b"guard", b"moved").unwrap();
+        assert!(matches!(
+            j.apply(&intent(1)).unwrap(),
+            CompareAndWrite::Conflict { .. }
+        ));
+        assert_eq!(one(&j), Outcome::NotApplied(intent(1)));
+        j.abandon(&[1; 16]).unwrap();
+        // After apply: a guard edit (ordinary activity on that key) does not strand the write.
+        s.put(b"guard", b"g").unwrap();
+        j.begin(&intent(2)).unwrap();
+        j.apply(&intent(2)).unwrap();
+        s.put(b"guard", b"edited later").unwrap();
+        assert_eq!(one(&j), Outcome::Applied(intent(2)));
+        j.complete(&[2; 16]).unwrap();
         j.admit().unwrap();
     }
 
