@@ -1164,9 +1164,11 @@ impl<'a> LifecycleStore<'a> {
     ///
     /// `delegation` must equal the stored row apart from `revoked_at`: the revocation names the
     /// delegation it withdraws, not a re-pointed one. `revoked_at` may not precede the
-    /// delegation's creation, and a recorded revocation is final: an identical revocation is a
-    /// replay, and a different time is refused rather than moved. `loaded` is the lifecycle of
-    /// the scope's domain (journaled under L's record), or `None` for a scope with no lifecycle.
+    /// delegation's creation. A recorded revocation is final and **idempotent**: revoking an
+    /// already-revoked delegation succeeds as [`FencedWrite::Unchanged`] and keeps the original
+    /// effective time (a retry's time never overwrites it), with no write and no lifecycle
+    /// revision increment. `loaded` is the lifecycle of the scope's domain (journaled under L's
+    /// record), or `None` for a scope with no lifecycle.
     pub fn write_revocation(
         &self,
         loaded: Option<&LoadedLifecycle>,
@@ -1188,10 +1190,9 @@ impl<'a> LifecycleStore<'a> {
         if serde_json::to_vec(&named)? != serde_json::to_vec(&current)? {
             return Err(FenceRefusal::RevocationMismatch.into());
         }
-        match current.revoked_at {
-            Some(t) if t == revoked_at => return Ok(FencedWrite::Unchanged),
-            Some(_) => return Err(FenceRefusal::RevocationFinal.into()),
-            None => {}
+        if current.revoked_at.is_some() {
+            // Already revoked: success, original effective time preserved, nothing written.
+            return Ok(FencedWrite::Unchanged);
         }
         if revoked_at < current.created_at {
             return Err(FenceRefusal::RevocationBeforeCreation.into());
@@ -1333,8 +1334,6 @@ pub enum FenceRefusal {
     RevocationWithoutDelegation,
     /// The revocation names a delegation that differs from the stored one.
     RevocationMismatch,
-    /// The delegation is already revoked at a different time; a revocation is final.
-    RevocationFinal,
     /// The revocation time precedes the delegation's creation.
     RevocationBeforeCreation,
     /// A stored delegation cannot be decoded.
@@ -1373,7 +1372,6 @@ impl std::fmt::Display for FenceRefusal {
             }
             Self::RevocationWithoutDelegation => "the delegation to revoke is not stored",
             Self::RevocationMismatch => "the revocation names a different delegation",
-            Self::RevocationFinal => "the delegation is already revoked; a revocation is final",
             Self::RevocationBeforeCreation => "the revocation precedes the delegation's creation",
             Self::UnreadableDelegation => "the stored delegation cannot be decoded",
         })

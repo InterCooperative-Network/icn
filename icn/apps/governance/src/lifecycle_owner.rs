@@ -973,13 +973,15 @@ mod tests {
             .unwrap();
         assert_eq!(deleg_row(&store, &stray), revoked(&stray, stray.created_at));
 
-        // Final: an identical revocation replays; a different time is refused, not moved.
+        // Final and idempotent: an authenticated retry (identical, or carrying a later retry
+        // time) succeeds, keeps the original effective time, and writes nothing: no lifecycle
+        // revision increment.
+        let record = || s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        let before = record();
         store.save_revoked_delegation(&in_l, t2).unwrap();
-        assert_eq!(
-            fence(store.save_revoked_delegation(&in_l, t2 + 5).unwrap_err()),
-            FenceRefusal::RevocationFinal
-        );
+        store.save_revoked_delegation(&in_l, t2 + 5).unwrap();
         assert_eq!(deleg_row(&store, &in_l), revoked(&in_l, t2));
+        assert_eq!(record(), before, "a no-op retry does not bump L's revision");
         // Not backdated before the delegation existed; names the stored delegation exactly;
         // only stored delegations are revoked.
         let fresh = deleg(DelegationScope::Blanket);
@@ -1531,6 +1533,59 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_close_intent_racing_a_draining_vote_is_caught_by_the_commit_guard() {
+        // S29 delta-review FOLLOW_UP 1: the intent lands AFTER the pre-check passed; only the
+        // `(close_intent_key(P), None)` commit guard can stop the vote.
+        let s = sled();
+        let (owner, store) = started(&s);
+        let p = opened(&store, "p", L);
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        let entry = intent_for(&p, ProposalState::Rejected { closed_at: 5 });
+        let racer = serde_json::to_vec(&entry).unwrap();
+        let ikey = crate::state_store::close_intent_key(&p.id);
+        owner
+            .arm_before_apply_for_tests(Box::new(move |st: &SledStore| {
+                st.put(&ikey, &racer).unwrap();
+            }))
+            .unwrap();
+        let voter = did();
+        assert_eq!(
+            fence(store.save_vote(&p.id, &ballot("p", &voter)).unwrap_err()),
+            FenceRefusal::VoteWhileClosing
+        );
+        assert_eq!(vote_row(&store, "p", &voter), None);
+    }
+
+    #[test]
+    fn an_unreadable_proposal_never_traps_a_revocation_and_still_refuses_creation() {
+        // S29 delta-review FOLLOW_UP 2.
+        let s = sled();
+        let (_owner, store) = started(&s);
+        let pid = ProposalId("garbled".into());
+        s.put(&crate::state_store::proposal_key(&pid), b"not json")
+            .unwrap();
+        let d = deleg(DelegationScope::Proposal(pid.clone()));
+        SledGovernanceStateStore::new(Arc::new(s.share()))
+            .save_delegation(&d)
+            .unwrap();
+        // Revocation: not trapped by the unreadable context.
+        store.save_revoked_delegation(&d, d.created_at).unwrap();
+        assert_eq!(
+            store.get_delegation(&d.id).unwrap().unwrap().revoked_at,
+            Some(d.created_at)
+        );
+        // Creation on the same unreadable context: refused (the decode error), nothing stored.
+        let fresh = deleg(DelegationScope::Proposal(pid));
+        let e = store.save_delegation(&fresh).unwrap_err();
+        assert!(
+            e.chain()
+                .any(|c| c.downcast_ref::<serde_json::Error>().is_some()),
+            "{e:#}"
+        );
+        assert_eq!(deleg_row(&store, &fresh), None);
+    }
+
     // ---- S28 §8: isolated institutional lifecycle, end to end ----
     //
     // EXPERIMENTAL lifecycle integration, NOT production succession: Begin and Seal use the
@@ -1709,14 +1764,13 @@ mod tests {
             state.get_delegation(&d.id).unwrap().unwrap().revoked_at,
             Some(t)
         );
-        let e = h
-            .submit(GovernanceCommand::RevokeDelegation {
-                id: d.id.clone(),
-                revoked_at: t + 100,
-            })
-            .await
-            .unwrap_err();
-        assert_eq!(fence(e), FenceRefusal::RevocationFinal);
+        // An authenticated retry after restart succeeds and keeps the original time.
+        h.submit(GovernanceCommand::RevokeDelegation {
+            id: d.id.clone(),
+            revoked_at: t + 100,
+        })
+        .await
+        .unwrap();
         assert_eq!(
             state.get_delegation(&d.id).unwrap().unwrap().revoked_at,
             Some(t)
