@@ -55,8 +55,10 @@ use icn_governance::{Proposal, ProposalId, ProposalState};
 
 use crate::close_journal::CloseJournalEntry;
 use crate::state_store::{
-    check_domain_overwrite, check_proposal_overwrite, close_intent_key, domain_key, proposal_key,
+    check_domain_overwrite, check_proposal_overwrite, close_intent_key, close_intent_key_prefix,
+    domain_key, proposal_key, proposal_key_prefix,
 };
+use icn_governance::predecessor_seal::{classify, evaluate_drain, DrainStatus};
 
 /// The journal prefix for lifecycle writes. It sits outside every `gov:` prefix the governance
 /// store scans: `lifecycle-journal` differs from `lifecycle:` and `lifecycle-witness:`.
@@ -810,6 +812,121 @@ impl<'a> LifecycleStore<'a> {
         self.fenced_commit(loaded, key, stored, None, vec![(pkey, row)], txid)
     }
 
+    /// P5b Seal driver (INACTIVE: no production caller). Seals L from what is actually
+    /// stored, never from caller-supplied ids or `F` (contract §4.2):
+    /// 1. L must be Pending (`loaded`), and the commit expects `loaded`'s exact record, so any
+    ///    fenced write after `loaded` was read (before, during or after the scans below) makes
+    ///    the Seal `Stale`. Prefix scans are not snapshots; the revision is what binds them.
+    /// 2. Every `gov:proposal:` row is decoded strictly (an unreadable row refuses); L's rows
+    ///    are classified with P5a `classify`, using `evidence` for the two facts this store
+    ///    cannot see (durable closure artifacts and basis-changing acceptances).
+    /// 3. Every `gov:close-intent:` row is decoded; any intent of L refuses (a decided close
+    ///    must be completed and retired first).
+    /// 4. `evidence.flush()` makes every closure fact relied on durable before the Seal.
+    /// 5. P5a `evaluate_drain` derives `F` over the terminal ids, which are committed through
+    ///    the same journaled transition as every other lifecycle change.
+    ///
+    /// LIMIT: writers that bypass the fence (not yet routed, increment 3; raw W25) do not bump
+    /// the revision and are not caught by step 1. Cross-database evidence is trusted as
+    /// reported by `evidence` (no cross-database atomicity).
+    ///
+    /// **Required before activation** (S27 review FOLLOW_UPs): (a) contract step 2, re-verify
+    /// the domain record against the Begin pin and expect `gov:domain:L` in the commit, which
+    /// needs Pending to retain the pin (today it keeps only the opaque basis); (b) bind
+    /// `SealEvidence` to the receipt backend and the compiled-in P5c predicate when the store
+    /// is constructed, instead of accepting it per call.
+    pub fn seal(
+        &self,
+        loaded: &LoadedLifecycle,
+        attempt: u64,
+        commitment_hash: [u8; 32],
+        evidence: &dyn SealEvidence,
+        txid: [u8; 16],
+    ) -> anyhow::Result<Committed> {
+        use icn_governance::predecessor_seal::{CutoverTransition, SealRefusal};
+        let l = &loaded.predecessor;
+        match &loaded.state {
+            PredecessorLifecycle::CutoverPending {
+                attempt: n,
+                commitment,
+            } => {
+                // The caller's authorized attempt, not whichever attempt happens to be pending.
+                if *n != attempt || commitment.commitment()? != commitment_hash {
+                    return Err(SealRefusal::MismatchedAttempt.into());
+                }
+            }
+            PredecessorLifecycle::Sealed {
+                attempt: n,
+                commitment,
+                ..
+            } => {
+                // Replay (contract 4.2): the same (n, K) against the current bytes is
+                // acknowledged with the stored F; anything else is a typed refusal.
+                if *n == attempt
+                    && commitment.commitment()? == commitment_hash
+                    && self.store.get(&lifecycle_key(l)?)? == loaded.record_bytes
+                {
+                    return Ok(Committed::Replayed);
+                }
+                return Err(SealRefusal::SealedIsFinal.into());
+            }
+            PredecessorLifecycle::Legacy { .. } => return Err(SealRefusal::NotPending.into()),
+        }
+        let mut rows: Vec<Proposal> = Vec::new();
+        for (key, bytes) in self.store.scan(proposal_key_prefix())? {
+            let p: Proposal =
+                serde_json::from_slice(&bytes).map_err(|_| FenceRefusal::UnreadableProposal)?;
+            // A row must sit under its own id; a raw row whose body names another id is refused.
+            if key != proposal_key(&p.id) {
+                return Err(FenceRefusal::UnreadableProposal.into());
+            }
+            if p.domain_id == *l {
+                rows.push(p);
+            }
+        }
+        for (_, bytes) in self.store.scan(close_intent_key_prefix())? {
+            // Conforms to contract 4.2 step 4: an unreadable intent anywhere refuses the Seal.
+            let entry: CloseJournalEntry =
+                serde_json::from_slice(&bytes).map_err(|_| FenceRefusal::UnreadableIntent)?;
+            if entry.proposal.domain_id == *l {
+                return Err(FenceRefusal::IntentOutstanding.into());
+            }
+        }
+        rows.sort_by(|a, b| a.id.0.as_bytes().cmp(b.id.0.as_bytes()));
+        let mut statuses: Vec<(&str, DrainStatus)> = Vec::with_capacity(rows.len());
+        for p in &rows {
+            let status = classify(
+                &p.state,
+                &p.payload,
+                evidence.closure_durable(p)?,
+                evidence.changes_cutover_basis(p),
+            );
+            statuses.push((p.id.0.as_str(), status));
+        }
+        evidence.flush()?;
+        let derived = evaluate_drain(l, &loaded.state, &statuses)?;
+        let terminal: Vec<&str> = statuses
+            .iter()
+            .filter(|(_, st)| *st == DrainStatus::Terminal)
+            .map(|(id, _)| *id)
+            .collect();
+        // Before anything is written: the F the store will commit must equal P5a's derivation.
+        let store_f = final_set_commitment(l, attempt, &commitment_hash, &terminal)?;
+        match derived {
+            CutoverTransition::Seal { final_set, .. } if final_set == store_f => {}
+            _ => return Err(LifecycleStoreError::Inconsistent.into()),
+        }
+        self.transition(
+            loaded,
+            LifecycleRequest::Seal {
+                attempt,
+                commitment_hash,
+                final_ids: &terminal,
+            },
+            txid,
+        )
+    }
+
     /// The one fenced commit: `target` moves from exactly `stored` to `next` (`None`
     /// deletes), with every `guards` key expected at the value the caller checked, in the same
     /// journaled write that expects L's exact lifecycle record and
@@ -856,6 +973,18 @@ impl<'a> LifecycleStore<'a> {
     }
 }
 
+/// The facts the Seal needs that the governance store cannot establish itself. They live in
+/// other databases (the receipt store) or are P5c predicates. Implementations must be
+/// read-only views bound at construction, not per-call lists.
+pub trait SealEvidence {
+    /// Is `p`'s closure artifact durable (only consulted for execution-required acceptances)?
+    fn closure_durable(&self, p: &Proposal) -> anyhow::Result<bool>;
+    /// Does accepting `p` change a condition the cutover relies on (P5c predicate)?
+    fn changes_cutover_basis(&self, p: &Proposal) -> bool;
+    /// Make every fact reported so far durable before the Seal commits.
+    fn flush(&self) -> anyhow::Result<()>;
+}
+
 /// What [`LifecycleStore::write_proposal`] did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FencedWrite {
@@ -889,6 +1018,10 @@ pub enum FenceRefusal {
     /// The stored proposal does not equal the intent's terminal row: the close has not landed,
     /// or the records contradict each other. The intent is kept as evidence.
     CloseNotCompleted,
+    /// A close intent of L is outstanding; it must be completed and retired before the Seal.
+    IntentOutstanding,
+    /// A stored close intent cannot be decoded.
+    UnreadableIntent,
 }
 
 impl std::fmt::Display for FenceRefusal {
@@ -907,6 +1040,8 @@ impl std::fmt::Display for FenceRefusal {
             Self::IntentNotTerminal => "a close intent must carry a terminal proposal state",
             Self::IntentWithoutProposal => "the close intent names no stored proposal",
             Self::ConflictingIntent => "a different close intent is already recorded",
+            Self::IntentOutstanding => "a close intent of the domain is outstanding",
+            Self::UnreadableIntent => "a stored close intent cannot be decoded",
             Self::CloseNotCompleted => {
                 "the close has not landed or contradicts the stored proposal; intent kept"
             }
@@ -2199,6 +2334,255 @@ mod tests {
         );
         assert_eq!(s.get(&domain_key(&l())).unwrap(), before);
         assert_eq!(ls.load(&l()).unwrap().revision(), sealed.revision());
+    }
+
+    /// Test evidence: every closure durable unless listed; nothing changes the basis unless
+    /// listed. Counts flushes.
+    #[derive(Default)]
+    struct Evidence {
+        not_durable: Vec<&'static str>,
+        changes_basis: Vec<&'static str>,
+        flushes: std::sync::atomic::AtomicUsize,
+    }
+    impl SealEvidence for Evidence {
+        fn closure_durable(&self, p: &Proposal) -> anyhow::Result<bool> {
+            Ok(!self.not_durable.contains(&p.id.0.as_str()))
+        }
+        fn changes_cutover_basis(&self, p: &Proposal) -> bool {
+            self.changes_basis.contains(&p.id.0.as_str())
+        }
+        fn flush(&self) -> anyhow::Result<()> {
+            self.flushes
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
+    fn seal_err(e: anyhow::Error) -> SealRefusal {
+        e.downcast::<SealRefusal>().expect("a typed SealRefusal")
+    }
+
+    /// L with: an inactive Draft "a", a cancelled "b", a rejected "c" (closed before Begin);
+    /// Pending at attempt 1.
+    fn drained(s: &SledStore) -> (LifecycleStore<'_>, LoadedLifecycle) {
+        let ls = live(s);
+        ls.write_proposal(&ls.load(&l()).unwrap(), &prop("a"), [1; 16])
+            .unwrap();
+        let mut b = prop("b");
+        b.cancel().unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &b, [2; 16])
+            .unwrap();
+        let mut c = prop("c");
+        c.open(60).unwrap();
+        c.close(ProposalState::Rejected { closed_at: 3 }).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &c, [3; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [4; 16])
+                .unwrap(),
+        );
+        (ls, pending)
+    }
+
+    #[test]
+    fn the_seal_driver_derives_f_from_the_stored_rows_alone() {
+        let s = store();
+        let (ls, pending) = drained(&s);
+        // A row of another domain is ignored.
+        // A terminal row of another domain is ignored (it would change F if counted).
+        let mut other = prop("z");
+        other.domain_id = GovernanceDomainId("other.coop".into());
+        other.cancel().unwrap();
+        crate::state_store::state_store_test_put(&s, &other);
+        let ev = Evidence::default();
+        let sealed = written(ls.seal(&pending, 1, k(0x4D), &ev, [5; 16]).unwrap());
+        let expected = final_set_commitment(&l(), 1, &k(0x4D), &["b", "c"]).unwrap();
+        assert!(matches!(
+            sealed.state(),
+            PredecessorLifecycle::Sealed { final_set, .. } if *final_set == expected
+        ));
+        assert_eq!(ev.flushes.load(std::sync::atomic::Ordering::SeqCst), 1);
+        admitted(&s);
+    }
+
+    #[test]
+    fn the_seal_driver_refuses_active_pending_effects_basis_changes_and_intents() {
+        // An active proposal blocks.
+        let s = store();
+        let (ls, _) = drained(&s);
+        let mut d = prop("d");
+        d.open(60).unwrap();
+        // Written before Begin would have been the legitimate path; here it is raw, so a fresh
+        // load is used (the row exists in L either way).
+        crate::state_store::state_store_test_put(&s, &d);
+        let now = ls.load(&l()).unwrap();
+        assert!(matches!(
+            seal_err(ls.seal(&now, 1, k(0x4D), &Evidence::default(), [6; 16]).unwrap_err()),
+            SealRefusal::ActiveProposal(id) if id == "d"
+        ));
+        // Effects pending and basis-changing acceptances block.
+        let s = store();
+        let (ls, pending) = drained(&s);
+        let mut e = prop("e");
+        e.payload = icn_governance::ProposalPayload::Text { body: "x".into() };
+        e.open(60).unwrap();
+        e.close(ProposalState::Accepted { closed_at: 4 }).unwrap();
+        crate::state_store::state_store_test_put(&s, &e);
+        let ev = Evidence {
+            changes_basis: vec!["e"],
+            ..Default::default()
+        };
+        assert!(matches!(
+            seal_err(ls.seal(&pending, 1, k(0x4D), &ev, [7; 16]).unwrap_err()),
+            SealRefusal::ChangesCutoverBasis(id) if id == "e"
+        ));
+        // An outstanding close intent of L blocks.
+        let s = store();
+        let (ls, pending) = drained(&s);
+        s.put(
+            &close_intent_key(&prop("b").id),
+            &serde_json::to_vec(&intent_for(&prop("b"))).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            fence(
+                ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [8; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::IntentOutstanding
+        );
+        assert!(matches!(
+            ls.load(&l()).unwrap().state(),
+            PredecessorLifecycle::CutoverPending { .. }
+        ));
+    }
+
+    #[test]
+    fn an_unreadable_proposal_row_refuses_the_seal() {
+        let s = store();
+        let (ls, pending) = drained(&s);
+        s.put(&proposal_key(&prop("bad").id), b"not json").unwrap();
+        assert_eq!(
+            fence(
+                ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [9; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::UnreadableProposal
+        );
+    }
+
+    #[test]
+    fn a_fenced_write_after_the_seals_view_makes_it_stale() {
+        // Concurrent completion between the Seal's load and its commit: the revision moved.
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        p.start_deliberation(60).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let mut q = prop("q");
+        q.cancel().unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &q, [2; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [3; 16])
+                .unwrap(),
+        );
+        p.cancel().unwrap();
+        ls.write_proposal(&pending, &p, [4; 16]).unwrap();
+        let e = ls
+            .seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+            .unwrap_err();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::Stale)
+        );
+        // From the current view, every L row is now terminal and the Seal goes through.
+        assert!(ls
+            .seal(
+                &ls.load(&l()).unwrap(),
+                1,
+                k(0x4D),
+                &Evidence::default(),
+                [6; 16]
+            )
+            .is_ok());
+        admitted(&s);
+    }
+
+    #[test]
+    fn the_seal_is_bound_to_the_callers_attempt_and_replays_exactly() {
+        let s = store();
+        let (ls, pending) = drained(&s);
+        // Another attempt or commitment than the one pending is refused; nothing is written.
+        for (n, kk) in [(2, k(0x4D)), (1, k(0x4E))] {
+            assert_eq!(
+                seal_err(
+                    ls.seal(&pending, n, kk, &Evidence::default(), [1; 16])
+                        .unwrap_err()
+                ),
+                SealRefusal::MismatchedAttempt
+            );
+        }
+        assert_eq!(ls.load(&l()).unwrap().state(), pending.state());
+        let sealed = written(
+            ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [2; 16])
+                .unwrap(),
+        );
+        // A retry with the same (n, K) is acknowledged as a replay, writing nothing.
+        assert!(matches!(
+            ls.seal(&sealed, 1, k(0x4D), &Evidence::default(), [3; 16])
+                .unwrap(),
+            Committed::Replayed
+        ));
+        assert_eq!(ls.load(&l()).unwrap(), sealed);
+        assert_eq!(
+            seal_err(
+                ls.seal(&sealed, 1, k(0x4E), &Evidence::default(), [4; 16])
+                    .unwrap_err()
+            ),
+            SealRefusal::SealedIsFinal
+        );
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_row_stored_under_another_id_refuses_the_seal() {
+        let s = store();
+        let (ls, pending) = drained(&s);
+        let mut b = prop("b");
+        b.cancel().unwrap();
+        s.put(
+            &proposal_key(&prop("x").id),
+            &serde_json::to_vec(&b).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            fence(
+                ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [1; 16])
+                    .unwrap_err()
+            ),
+            FenceRefusal::UnreadableProposal
+        );
+    }
+
+    #[test]
+    fn the_seal_driver_refuses_outside_pending() {
+        let s = store();
+        let ls = live(&s);
+        assert_eq!(
+            seal_err(
+                ls.seal(
+                    &ls.load(&l()).unwrap(),
+                    1,
+                    k(0x4D),
+                    &Evidence::default(),
+                    [1; 16]
+                )
+                .unwrap_err()
+            ),
+            SealRefusal::NotPending
+        );
     }
 
     #[test]

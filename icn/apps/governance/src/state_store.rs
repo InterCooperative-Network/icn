@@ -254,7 +254,7 @@ pub(crate) fn proposal_key(id: &ProposalId) -> Vec<u8> {
     format!("gov:proposal:{}", id.0).into_bytes()
 }
 
-fn proposal_key_prefix() -> &'static [u8] {
+pub(crate) fn proposal_key_prefix() -> &'static [u8] {
     b"gov:proposal:"
 }
 
@@ -282,7 +282,7 @@ pub(crate) fn close_intent_key(id: &ProposalId) -> Vec<u8> {
     format!("gov:close-intent:{}", id.0).into_bytes()
 }
 
-fn close_intent_key_prefix() -> &'static [u8] {
+pub(crate) fn close_intent_key_prefix() -> &'static [u8] {
     b"gov:close-intent:"
 }
 
