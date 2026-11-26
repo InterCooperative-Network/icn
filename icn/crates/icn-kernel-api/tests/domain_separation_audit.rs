@@ -495,6 +495,7 @@ const REGISTRY: &[Domain] = &[
     d(b"icn.n4.enrollment-request", SignatureMessage, U32BeLen, Production, &["icn/crates/icn-identity/src/device_enrollment.rs"]),
     // `bundle_id` hashes the container; nothing signs it (N4-B).
     d(b"icn.n4.evidence-bundle", Sha256, U32BeLen, Production, &["icn/crates/icn-identity/src/evidence_bundle.rs", "icn/crates/icn-identity/tests/reference/evidence_bundle_reference.py"]),
+    d(b"icn.store.recovery-intent.v1", Sha256, U32BeLen, Production, &["icn/crates/icn-store/src/recovery.rs"]),
     d(b"icn:anti-entropy-probe:v1", Blake3, Raw, Production, &["icn/crates/icn-kernel-api/src/proofs.rs"]),
     d(b"icn:artifact-receipt:v1", Blake3, Raw, Production, &["icn/crates/icn-kernel-api/src/proofs.rs", "icn/crates/icn-kernel-api/src/canonical.rs"]),
     d(b"icn:baseline:agreement_ctx:fixture", Blake3, Whole, TestOnly, &["icn/crates/icn-baseline-lock/src/projector.rs"]),
