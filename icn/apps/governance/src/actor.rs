@@ -107,6 +107,26 @@ pub struct GovernanceConfigLite {
     pub membership: MembershipConfig,
 }
 
+/// Why [`GovernanceCommand::RepublishProposal`] was refused. Nothing was written or emitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RepublishRefused {
+    /// No stored proposal has this id.
+    NotFound,
+    /// The stored proposal was authored by another principal.
+    NotAuthor,
+}
+
+impl std::fmt::Display for RepublishRefused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::NotFound => "no stored proposal has this id",
+            Self::NotAuthor => "only the proposal's author may republish it",
+        })
+    }
+}
+
+impl std::error::Error for RepublishRefused {}
+
 /// Commands that can be submitted to the governance actor
 #[derive(Debug)]
 pub enum GovernanceCommand {
@@ -135,6 +155,22 @@ pub enum GovernanceCommand {
         scope: ProposalScope,
         /// Action items to create on acceptance (decision-to-action bridge)
         action_items_on_accept: Vec<icn_governance::ActionItemSpec>,
+    },
+    /// Re-emit a stored proposal this node authored, without touching it.
+    ///
+    /// The recovery path for "persisted, then publication failed": `CreateProposal`
+    /// stores the row before it broadcasts, so a publish error after a successful
+    /// store leaves a proposal nobody has heard of, and re-submitting the create is
+    /// refused (the id is taken). This command reads the **stored** row (refused if
+    /// absent) and publishes it through the single emission seam, which allocates a
+    /// fresh replication sequence for a signed frame. It never writes the row, so
+    /// repeating it leaves institutional state unchanged.
+    ///
+    /// Authorized only for a proposal whose proposer is this node: the node re-emits
+    /// its own authorship and never relays another principal's proposal as its own.
+    RepublishProposal {
+        /// The stored proposal to re-emit
+        proposal_id: ProposalId,
     },
     /// Start deliberation period for a proposal
     ///
@@ -2052,6 +2088,20 @@ impl GovernanceActor {
                 .await;
 
                 info!("✓ Proposal created: {} (ID: {})", title, proposal_id.0);
+            }
+
+            GovernanceCommand::RepublishProposal { proposal_id } => {
+                // Source of truth is the persisted row; nothing here writes to the store.
+                let proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or(RepublishRefused::NotFound)?;
+                if proposal.proposer != self.did {
+                    return Err(RepublishRefused::NotAuthor.into());
+                }
+                let msg = GovernanceMessage::proposal_created(proposal.clone());
+                self.publish(msg.clone()).await?;
+                self.publish_federation_if_scoped(&proposal, msg).await;
+                info!("✓ Proposal republished: {}", proposal_id.0);
             }
 
             GovernanceCommand::StartDeliberation {
