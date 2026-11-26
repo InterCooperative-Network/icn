@@ -1182,6 +1182,161 @@ mod tests {
         admitted(&s);
     }
 
+    /// L at Pending with one deliberating proposal `p`; returns the store-side pieces a
+    /// fenced Deliberation→Open write of `p` would produce.
+    fn pending_with_deliberating(s: &SledStore) -> (Proposal, Vec<u8>, Vec<u8>) {
+        let ls = live(s);
+        let mut p = prop("p");
+        p.start_deliberation(60).unwrap();
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16]).unwrap();
+        let pending =
+            written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16]).unwrap());
+        p.force_end_deliberation(60).unwrap();
+        let bumped = LifecycleRecordV1 {
+            revision: pending.revision() + 1,
+            ..pending.stored.clone().unwrap()
+        }
+        .encode()
+        .unwrap();
+        (p.clone(), serde_json::to_vec(&p).unwrap(), bumped)
+    }
+
+    /// Run a fenced write whose process "dies" in the hook (after the intent is durable,
+    /// before `apply`), then drop the owner as a restart would.
+    fn crash_during_fenced_write(s: &SledStore, p: &Proposal, hook: BeforeApplyHook<'static>) {
+        let ls = live(s);
+        let loaded = ls.load(&l()).unwrap();
+        *ls.before_apply.lock().unwrap() = Some(hook);
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            ls.write_proposal(&loaded, p, [0xC0; 16])
+        }));
+        assert!(r.is_err(), "the simulated crash interrupts the write");
+    }
+
+    #[test]
+    fn a_crash_after_journaling_closes_access_until_recovery_abandons_it() {
+        let s = store();
+        let (p, _, _) = pending_with_deliberating(&s);
+        let before = row(&s, &p);
+        crash_during_fenced_write(&s, &p, Box::new(|_: &SledStore| panic!("crash")));
+        // Restart: no live access until recovery has resolved the record.
+        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let (recovery, _) = recovery.into_live().err().expect("closed after the crash");
+        let report = recovery.resolve_safe().unwrap();
+        assert_eq!((report.completed, report.abandoned), (0, 1));
+        assert_eq!(row(&s, &p), before, "nothing was applied");
+        let ls = recovery.into_live().map_err(|(_, e)| e).unwrap();
+        // The write can now be made, against the recovered state.
+        assert!(ls.write_proposal(&ls.load(&l()).unwrap(), &p, [0xC1; 16]).is_ok());
+    }
+
+    #[test]
+    fn a_torn_fenced_write_stays_quarantined_and_access_stays_closed() {
+        let s = store();
+        let (p, p_bytes, _) = pending_with_deliberating(&s);
+        let pkey = proposal_key(&p.id);
+        // A prefix of the multi-key write landed: the proposal row, not the lifecycle bump.
+        crash_during_fenced_write(
+            &s,
+            &p,
+            Box::new(move |st: &SledStore| {
+                st.put(&pkey, &p_bytes).unwrap();
+                panic!("crash mid-commit");
+            }),
+        );
+        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let report = recovery.resolve_safe().unwrap();
+        assert_eq!(report.quarantined.len(), 1);
+        assert!(matches!(report.quarantined[0], Outcome::Partial(_)));
+        assert!(recovery.into_live().is_err(), "no authoritative access over a torn write");
+    }
+
+    #[test]
+    fn a_fully_applied_but_unacknowledged_fenced_write_is_completed_by_recovery() {
+        let s = store();
+        let (p, p_bytes, bumped) = pending_with_deliberating(&s);
+        let (pkey, rkey) = (proposal_key(&p.id), lifecycle_key(&l()).unwrap());
+        crash_during_fenced_write(
+            &s,
+            &p,
+            Box::new(move |st: &SledStore| {
+                st.put(&pkey, &p_bytes).unwrap();
+                st.put(&rkey, &bumped).unwrap();
+                panic!("crash before acknowledgement");
+            }),
+        );
+        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let report = recovery.resolve_safe().unwrap();
+        assert_eq!((report.completed, report.abandoned), (1, 0));
+        let ls = recovery.into_live().map_err(|(_, e)| e).unwrap();
+        let now = ls.load(&l()).unwrap();
+        assert!(matches!(now.state(), PredecessorLifecycle::CutoverPending { .. }));
+        assert_eq!(row(&s, &p), Some(serde_json::to_vec(&p).unwrap()));
+    }
+
+    #[test]
+    fn after_an_abort_fenced_writes_bump_the_revision_and_keep_k_first_and_the_witness() {
+        let s = store();
+        let ls = live(&s);
+        let pending =
+            written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16]).unwrap());
+        let aborted = written(
+            ls.transition(
+                &pending,
+                LifecycleRequest::Abort {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                },
+                [2; 16],
+            )
+            .unwrap(),
+        );
+        let witness = s.get(&witness_key(&l()).unwrap()).unwrap();
+        // Legacy again, but with history: creation is allowed and is fenced.
+        let w = ls.write_proposal(&aborted, &prop("after"), [3; 16]).unwrap();
+        assert_eq!(
+            w,
+            FencedWrite::Written {
+                revision: aborted.revision() + 1
+            }
+        );
+        let now = ls.load(&l()).unwrap();
+        assert_eq!(now.state(), aborted.state(), "still Legacy, attempt history intact");
+        assert_eq!(
+            now.stored.as_ref().unwrap().first_commitment_hash,
+            k(0x4D),
+            "K_first preserved"
+        );
+        assert_eq!(s.get(&witness_key(&l()).unwrap()).unwrap(), witness);
+        admitted(&s);
+    }
+
+    #[test]
+    fn a_fenced_write_at_the_maximum_revision_is_refused_and_writes_nothing() {
+        let s = store();
+        let ls = live(&s);
+        let mut p = prop("p");
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16]).unwrap();
+        let pending =
+            written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16]).unwrap());
+        let maxed = LifecycleRecordV1 {
+            revision: u64::MAX,
+            ..pending.stored.clone().unwrap()
+        };
+        s.put(&lifecycle_key(&l()).unwrap(), &maxed.encode().unwrap())
+            .unwrap();
+        let at_max = ls.load(&l()).unwrap();
+        assert_eq!(at_max.revision(), u64::MAX);
+        let before = row(&s, &p);
+        // Draft -> Cancelled is permitted while Pending, so only the overflow can refuse it.
+        p.cancel().unwrap();
+        let e = ls.write_proposal(&at_max, &p, [3; 16]).unwrap_err();
+        assert!(e.downcast_ref::<FenceRefusal>().is_none(), "{e:#}");
+        assert_eq!(row(&s, &p), before);
+        assert_eq!(ls.load(&l()).unwrap().revision(), u64::MAX);
+        admitted(&s);
+    }
+
     #[test]
     fn load_never_reports_a_mismatch_while_a_first_begin_commits_concurrently() {
         // Regression (S27 integration gate): load read record and witness with two gets, so a
