@@ -9,6 +9,7 @@
 /// Hybrid blob store: sled metadata + filesystem blobs
 pub mod blob_store;
 pub mod did_collision_scan;
+pub mod fault;
 /// Storage maintenance tasks
 pub mod maintenance;
 /// N2-A startup gate: refuse to open stores a key-equality binary cannot open
@@ -25,6 +26,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 // Re-export peer cache types
+pub use fault::{FaultDomain, StoreFaulted, StoreOutcomeUnknown};
 pub use peer_cache::{CachedPeer, PeerCache, PeerSource, DEFAULT_PEER_TTL};
 
 // Re-export proof-of-storage types
@@ -394,6 +396,69 @@ pub trait Store: Send + Sync {
         Err(CompareAndPutUnsupported.into())
     }
 
+    /// Apply every write in `writes` **only if** every expectation in `expect` still holds, as
+    /// one indivisible step across all the keys involved.
+    ///
+    /// This is the multi-key generalization of [`Store::compare_and_put`] and keeps its
+    /// semantics exactly:
+    ///
+    /// * **Exact bytes.** An [`Expectation`] with `value: Some(v)` holds only if the stored value
+    ///   is exactly `v`; `value: None` holds only if the key is absent. Absence is a value: `None`
+    ///   does not match an empty stored value and `Some(b"")` does not match an absent key.
+    /// * **All or nothing.** If every expectation holds, every [`Mutation`] is applied (`Some(v)`
+    ///   writes `v`, `None` deletes) and [`CompareAndWrite::Applied`] is returned. Otherwise
+    ///   nothing is written and [`CompareAndWrite::Conflict`] names the first failing expectation
+    ///   (in the caller's order) with the value actually found. A conflict is an expected outcome
+    ///   under concurrency, not an error.
+    /// * **An error leaves the outcome unknown.** Only a [`CompareAndWriteInvalid`] or
+    ///   [`CompareAndWriteUnsupported`] refusal guarantees that nothing was read or written. Any
+    ///   other `Err` means the backend could not answer, and the call may have applied none,
+    ///   some or all of `writes`: within the running process, *and after a restart*. On sled
+    ///   0.34.7 a storage error after the commit has begun can leave a prefix of the writes
+    ///   visible in memory, and when the error does not stop sled's log writer, the batch's
+    ///   atomic-recovery marker is cancelled (not sealed), so the writes already linked can also
+    ///   be recovered from disk. The error's kind (an abort reason or a storage error) is not a
+    ///   reliable classification of what happened. A caller that needs all-or-nothing across
+    ///   failures must detect and reconcile, for example by fencing on a key whose expected value
+    ///   commits to the whole write set and re-reading it after reopening, and must not act on
+    ///   any key in `writes` until it has done so. A backend with a [`FaultDomain`] (sled does)
+    ///   reports such an error as [`StoreOutcomeUnknown`] and faults the store: every later
+    ///   operation on the domain's handles is refused with [`StoreFaulted`] until reopen.
+    /// * **Request validation.** `writes` must be non-empty; neither list may name a key twice;
+    ///   neither list may exceed [`MAX_COMPARE_AND_WRITE_ENTRIES`]. A malformed request is refused
+    ///   with [`CompareAndWriteInvalid`] before anything is read or written. A key may appear in
+    ///   both lists (the usual read-check-replace).
+    /// * **Durability** matches [`Store::put`]: not forced to disk until [`Store::flush`]. An
+    ///   `Ok(Applied)` is visible in the process at once but may be lost by a crash before a later
+    ///   `flush` returns `Ok`; a `flush` error leaves its durability unknown.
+    /// * **Interoperation.** On a backend that implements this, single-key writes to the same keys
+    ///   ([`Store::put`], [`Store::compare_and_put`], [`Store::delete`]) are serialized with it:
+    ///   none can land between the comparison and the write of a compare-and-write.
+    /// * **Cost.** A backend may hold a coarse lock for the whole call (sled holds a
+    ///   process-wide write lock that stalls every sled store in the process), so keep both lists
+    ///   small. Values are unbounded in size, as for [`Store::put`].
+    /// * **No snapshot reads elsewhere.** This makes the *write* atomic. Plain [`Store::get`] and
+    ///   [`Store::scan`] are not snapshot reads and may observe some keys before and some after a
+    ///   concurrent compare-and-write.
+    ///
+    /// The store gives the keys and values no meaning (Meaning Firewall).
+    ///
+    /// A wrapper `Store` that delegates to an inner store inherits the refusing default below; it
+    /// must forward this method deliberately if it wants the capability.
+    ///
+    /// # Unsupported backends fail closed
+    ///
+    /// The default implementation returns [`CompareAndWriteUnsupported`]. It never falls back to
+    /// sequential reads and writes, which would look atomic while not being so.
+    fn compare_and_write(
+        &self,
+        expect: &[Expectation<'_>],
+        writes: &[Mutation<'_>],
+    ) -> Result<CompareAndWrite> {
+        let _ = (expect, writes);
+        Err(CompareAndWriteUnsupported.into())
+    }
+
     /// Scan all key-value pairs with the given prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
@@ -746,6 +811,77 @@ pub enum CompareAndPut {
 #[error("this store backend does not support atomic compare-and-put")]
 pub struct CompareAndPutUnsupported;
 
+/// Upper bound on the entries in each list of one [`Store::compare_and_write`].
+pub const MAX_COMPARE_AND_WRITE_ENTRIES: usize = 256;
+
+/// One condition of a [`Store::compare_and_write`]: `key` holds exactly `value` (`None`: absent).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Expectation<'a> {
+    pub key: &'a [u8],
+    pub value: Option<&'a [u8]>,
+}
+
+/// One write of a [`Store::compare_and_write`]: set `key` to `value`, or delete it when `None`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Mutation<'a> {
+    pub key: &'a [u8],
+    pub value: Option<&'a [u8]>,
+}
+
+/// Result of [`Store::compare_and_write`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompareAndWrite {
+    /// Every expectation held and every mutation was applied.
+    Applied,
+    /// The expectation on `key` did not hold; `current` is what was found. Nothing was written.
+    Conflict {
+        key: Vec<u8>,
+        current: Option<Vec<u8>>,
+    },
+}
+
+/// The backend cannot apply a multi-key compare-and-write atomically (the trait default).
+/// Detect it with `err.downcast_ref::<CompareAndWriteUnsupported>()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("this store cannot apply a multi-key compare-and-write atomically")]
+pub struct CompareAndWriteUnsupported;
+
+/// A malformed [`Store::compare_and_write`] request, refused before any read or write.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum CompareAndWriteInvalid {
+    #[error("a compare-and-write must write at least one key")]
+    NoWrites,
+    #[error("too many entries in one compare-and-write")]
+    TooManyEntries,
+    #[error("an expectation names the same key twice")]
+    DuplicateExpectation,
+    #[error("a mutation names the same key twice")]
+    DuplicateMutation,
+}
+
+/// Validate a compare-and-write request (shared by every implementation).
+pub fn validate_compare_and_write(
+    expect: &[Expectation<'_>],
+    writes: &[Mutation<'_>],
+) -> std::result::Result<(), CompareAndWriteInvalid> {
+    if writes.is_empty() {
+        return Err(CompareAndWriteInvalid::NoWrites);
+    }
+    if expect.len() > MAX_COMPARE_AND_WRITE_ENTRIES || writes.len() > MAX_COMPARE_AND_WRITE_ENTRIES
+    {
+        return Err(CompareAndWriteInvalid::TooManyEntries);
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    if !expect.iter().all(|e| seen.insert(e.key)) {
+        return Err(CompareAndWriteInvalid::DuplicateExpectation);
+    }
+    seen.clear();
+    if !writes.iter().all(|m| seen.insert(m.key)) {
+        return Err(CompareAndWriteInvalid::DuplicateMutation);
+    }
+    Ok(())
+}
+
 /// Storage statistics for monitoring
 #[derive(Debug, Clone, Default)]
 pub struct StorageStats {
@@ -799,13 +935,16 @@ where
 
 pub struct SledStore {
     db: sled::Db,
+    /// Shared by every handle of this database that came from the same owner (see
+    /// [`fault`]). Never cleared.
+    fault: std::sync::Arc<FaultDomain>,
 }
 
 impl SledStore {
     /// Open a Sled database at the given path
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let db = sled::open(path)?;
-        Ok(SledStore { db })
+        Ok(SledStore::from_db(db))
     }
 
     /// Enumerate every tree in the database with its row count, read-only.
@@ -888,7 +1027,7 @@ impl SledStore {
             .with_context(|| format!("Failed to create temporary sled directory: {:?}", path))?;
 
         let db = sled::Config::new().path(&path).temporary(true).open()?;
-        Ok(SledStore { db })
+        Ok(SledStore::from_db(db))
     }
 
     /// Wrap an already-opened Sled database.
@@ -896,8 +1035,36 @@ impl SledStore {
     /// Use this when a caller already holds a `sled::Db` (often via `Arc<sled::Db>`)
     /// and needs `Store`-trait access without opening a second handle. `sled::Db`
     /// is internally reference-counted, so cloning into the wrapper is cheap.
+    ///
+    /// The wrapper starts a **new** [`FaultDomain`]: a fault recorded through another wrapper of
+    /// the same `sled::Db` is not seen here. A second handle of a database that already has an
+    /// owner should come from [`SledStore::share`] or [`SledStore::from_db_in`].
     pub fn from_db(db: sled::Db) -> Self {
-        SledStore { db }
+        Self::from_db_in(db, std::sync::Arc::new(FaultDomain::new()))
+    }
+
+    /// Wrap an already-opened Sled database inside an existing fault domain, so this handle and
+    /// the domain's other handles see each other's faults.
+    pub fn from_db_in(db: sled::Db, fault: std::sync::Arc<FaultDomain>) -> Self {
+        SledStore { db, fault }
+    }
+
+    /// Another handle to the same database, in the same fault domain.
+    pub fn share(&self) -> SledStore {
+        SledStore {
+            db: self.db.clone(),
+            fault: self.fault.clone(),
+        }
+    }
+
+    /// This handle's fault domain.
+    pub fn fault_domain(&self) -> std::sync::Arc<FaultDomain> {
+        self.fault.clone()
+    }
+
+    /// The fault this handle's domain has recorded, if any.
+    pub fn fault(&self) -> Option<StoreFaulted> {
+        self.fault.fault()
     }
 
     /// Get direct access to underlying Sled database
@@ -912,9 +1079,12 @@ impl SledStore {
     ///
     /// This ensures data durability by syncing all buffered writes.
     /// Returns the number of bytes flushed.
+    ///
+    /// `Ok` is the durability acknowledgement for every write that returned before this call. An
+    /// error leaves durability unknown and faults the store (see [`fault`]).
     pub fn flush(&self) -> Result<usize> {
         let start = std::time::Instant::now();
-        let flushed = self.db.flush()?;
+        let flushed = self.fault.write_single("flush", || Ok(self.db.flush()?))?;
         icn_obs::metrics::storage::flush_total_inc();
         icn_obs::metrics::storage::flush_bytes_add(flushed as u64);
         icn_obs::metrics::storage::flush_duration_record(start.elapsed().as_secs_f64());
@@ -927,7 +1097,12 @@ impl SledStore {
     /// while waiting for the I/O operation to complete.
     pub async fn flush_async(&self) -> Result<usize> {
         let start = std::time::Instant::now();
-        let flushed = self.db.flush_async().await?;
+        self.fault.check()?;
+        let flushed = self
+            .db
+            .flush_async()
+            .await
+            .map_err(|e| self.fault.fail_async("flush", e.into()))?;
         icn_obs::metrics::storage::flush_total_inc();
         icn_obs::metrics::storage::flush_bytes_add(flushed as u64);
         icn_obs::metrics::storage::flush_duration_record(start.elapsed().as_secs_f64());
@@ -1014,24 +1189,31 @@ impl SledStore {
 
 impl Store for SledStore {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.db.get(key)?.map(|v| v.to_vec()))
+        self.fault
+            .read("get", || Ok(self.db.get(key)?.map(|v| v.to_vec())))
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
-        self.db.insert(key, value)?;
-        Ok(())
+        self.fault.write_single("put", || {
+            self.db.insert(key, value)?;
+            Ok(())
+        })
     }
 
     fn delete(&self, key: &[u8]) -> Result<()> {
-        self.db.remove(key)?;
-        Ok(())
+        self.fault.write_single("delete", || {
+            self.db.remove(key)?;
+            Ok(())
+        })
     }
 
     /// Delegates to this store's own transaction rather than reimplementing
     /// atomicity: sled stages a transaction's writes and applies them under a
     /// pinned log reservation that is sealed only once every one of them has
     /// been written, and recovery replays such a group only when it finds that
-    /// seal. An interrupted commit is therefore discarded whole.
+    /// seal, so a crash during the commit recovers none of it. A storage *error* during the
+    /// commit is different: the outcome is unknown (some removals may be applied, in memory and
+    /// after restart), and the store is faulted (see [`fault`]).
     ///
     /// Removing a key that is not there is not an error and repeating a
     /// removal changes nothing, so the closure is safe under the retry
@@ -1058,12 +1240,50 @@ impl Store for SledStore {
         expected: Option<&[u8]>,
         new: &[u8],
     ) -> Result<CompareAndPut> {
-        match self.db.compare_and_swap(key, expected, Some(new))? {
-            Ok(()) => Ok(CompareAndPut::Applied),
-            Err(mismatch) => Ok(CompareAndPut::Conflict {
-                current: mismatch.current.map(|v| v.to_vec()),
-            }),
-        }
+        self.fault.write_single("compare_and_put", || {
+            match self.db.compare_and_swap(key, expected, Some(new))? {
+                Ok(()) => Ok(CompareAndPut::Applied),
+                Err(mismatch) => Ok(CompareAndPut::Conflict {
+                    current: mismatch.current.map(|v| v.to_vec()),
+                }),
+            }
+        })
+    }
+
+    /// One sled transaction: read every expected key, and either return the first mismatch with
+    /// nothing staged, or stage every mutation. Sled commits a transaction's writes as one sealed
+    /// log group (recovery replays it whole or not at all) and serializes it with single-key
+    /// operations on the same tree; the closure only reads and stages, so sled's conflict retry
+    /// is safe.
+    fn compare_and_write(
+        &self,
+        expect: &[Expectation<'_>],
+        writes: &[Mutation<'_>],
+    ) -> Result<CompareAndWrite> {
+        validate_compare_and_write(expect, writes)?;
+        // ORDERING INVARIANT: every expectation is read before anything is staged. Sled commits
+        // whatever was staged when the closure returns `Ok`, including on the `Conflict` path,
+        // so staging a write before the last comparison (or "on conflict") would commit a
+        // partial write while reporting `Conflict`. Reads therefore always see the database,
+        // never a write staged by this call, which is also why a key may be in both lists.
+        self.transaction(|tx| {
+            for e in expect {
+                let current = tx.get(e.key)?;
+                if current.as_deref() != e.value {
+                    return Ok(CompareAndWrite::Conflict {
+                        key: e.key.to_vec(),
+                        current,
+                    });
+                }
+            }
+            for m in writes {
+                match m.value {
+                    Some(value) => tx.set(m.key, value)?,
+                    None => tx.delete(m.key)?,
+                }
+            }
+            Ok(CompareAndWrite::Applied)
+        })
     }
 
     fn flush(&self) -> Result<()> {
@@ -1073,39 +1293,47 @@ impl Store for SledStore {
     }
 
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        let mut results = Vec::new();
+        self.fault.read("scan", || {
+            let mut results = Vec::new();
 
-        for item in self.db.scan_prefix(prefix) {
-            let (k, v) = item?;
-            results.push((k.to_vec(), v.to_vec()));
-        }
+            for item in self.db.scan_prefix(prefix) {
+                let (k, v) = item?;
+                results.push((k.to_vec(), v.to_vec()));
+            }
 
-        Ok(results)
+            Ok(results)
+        })
     }
 
     fn scan_keys(&self, prefix: &[u8]) -> Result<Vec<Vec<u8>>> {
-        let mut keys = Vec::new();
-        for item in self.db.scan_prefix(prefix).keys() {
-            keys.push(item?.to_vec());
-        }
-        Ok(keys)
+        self.fault.read("scan_keys", || {
+            let mut keys = Vec::new();
+            for item in self.db.scan_prefix(prefix).keys() {
+                keys.push(item?.to_vec());
+            }
+            Ok(keys)
+        })
     }
 
     fn scan_key_sizes(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, usize)>> {
-        let mut out = Vec::new();
-        for item in self.db.scan_prefix(prefix) {
-            // `v` is dropped at the end of each iteration, so peak memory holds
-            // one value rather than every value in the keyspace.
-            let (k, v) = item?;
-            out.push((k.to_vec(), v.len()));
-        }
-        Ok(out)
+        self.fault.read("scan_key_sizes", || {
+            let mut out = Vec::new();
+            for item in self.db.scan_prefix(prefix) {
+                // `v` is dropped at the end of each iteration, so peak memory holds
+                // one value rather than every value in the keyspace.
+                let (k, v) = item?;
+                out.push((k.to_vec(), v.len()));
+            }
+            Ok(out)
+        })
     }
 
     fn scan_count(&self, prefix: &[u8]) -> Result<usize> {
-        // Efficient count using iterator - doesn't materialize values
-        let count = self.db.scan_prefix(prefix).count();
-        Ok(count)
+        self.fault.read("scan_count", || {
+            // Efficient count using iterator - doesn't materialize values
+            let count = self.db.scan_prefix(prefix).count();
+            Ok(count)
+        })
     }
 
     fn scan_paginated(
@@ -1114,17 +1342,19 @@ impl Store for SledStore {
         offset: usize,
         limit: usize,
     ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, usize)> {
-        // First get total count efficiently
-        let total = self.db.scan_prefix(prefix).count();
+        self.fault.read("scan_paginated", || {
+            // First get total count efficiently
+            let total = self.db.scan_prefix(prefix).count();
 
-        // Then get paginated results
-        let mut results = Vec::with_capacity(limit.min(total.saturating_sub(offset)));
-        for item in self.db.scan_prefix(prefix).skip(offset).take(limit) {
-            let (k, v) = item?;
-            results.push((k.to_vec(), v.to_vec()));
-        }
+            // Then get paginated results
+            let mut results = Vec::with_capacity(limit.min(total.saturating_sub(offset)));
+            for item in self.db.scan_prefix(prefix).skip(offset).take(limit) {
+                let (k, v) = item?;
+                results.push((k.to_vec(), v.to_vec()));
+            }
 
-        Ok((results, total))
+            Ok((results, total))
+        })
     }
 
     fn scan_reverse_paginated(
@@ -1133,18 +1363,20 @@ impl Store for SledStore {
         offset: usize,
         limit: usize,
     ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, usize)> {
-        // First get total count efficiently (without loading values)
-        let total = self.db.scan_prefix(prefix).count();
+        self.fault.read("scan_reverse_paginated", || {
+            // First get total count efficiently (without loading values)
+            let total = self.db.scan_prefix(prefix).count();
 
-        // Then get paginated results in reverse order
-        // Sled's scan_prefix().rev() efficiently iterates in reverse
-        let mut results = Vec::with_capacity(limit.min(total.saturating_sub(offset)));
-        for item in self.db.scan_prefix(prefix).rev().skip(offset).take(limit) {
-            let (k, v) = item?;
-            results.push((k.to_vec(), v.to_vec()));
-        }
+            // Then get paginated results in reverse order
+            // Sled's scan_prefix().rev() efficiently iterates in reverse
+            let mut results = Vec::with_capacity(limit.min(total.saturating_sub(offset)));
+            for item in self.db.scan_prefix(prefix).rev().skip(offset).take(limit) {
+                let (k, v) = item?;
+                results.push((k.to_vec(), v.to_vec()));
+            }
 
-        Ok((results, total))
+            Ok((results, total))
+        })
     }
 
     fn scan_after(
@@ -1153,66 +1385,75 @@ impl Store for SledStore {
         after: Option<&[u8]>,
         limit: usize,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        use std::ops::Bound;
+        self.fault.read("scan_after", || {
+            use std::ops::Bound;
 
-        // Seek directly to the cursor: strictly after the last key on resume,
-        // or at the prefix on the first page. Sled keys are ordered, so this
-        // visits each entry at most once across the whole paged traversal.
-        let lower = match after {
-            Some(a) => Bound::Excluded(a.to_vec()),
-            None => Bound::Included(prefix.to_vec()),
-        };
+            // Seek directly to the cursor: strictly after the last key on resume,
+            // or at the prefix on the first page. Sled keys are ordered, so this
+            // visits each entry at most once across the whole paged traversal.
+            let lower = match after {
+                Some(a) => Bound::Excluded(a.to_vec()),
+                None => Bound::Included(prefix.to_vec()),
+            };
 
-        let mut results = Vec::with_capacity(limit);
-        for item in self.db.range((lower, Bound::<Vec<u8>>::Unbounded)) {
-            let (k, v) = item?;
-            // range() is unbounded above; stop as soon as we leave the prefix.
-            if !k.starts_with(prefix) {
-                break;
+            let mut results = Vec::with_capacity(limit);
+            for item in self.db.range((lower, Bound::<Vec<u8>>::Unbounded)) {
+                let (k, v) = item?;
+                // range() is unbounded above; stop as soon as we leave the prefix.
+                if !k.starts_with(prefix) {
+                    break;
+                }
+                results.push((k.to_vec(), v.to_vec()));
+                if results.len() >= limit {
+                    break;
+                }
             }
-            results.push((k.to_vec(), v.to_vec()));
-            if results.len() >= limit {
-                break;
-            }
-        }
 
-        Ok(results)
+            Ok(results)
+        })
     }
 
     // Replica tracking implementation
     fn get_replica_metadata(&self, content_hash: &ContentHash) -> Result<Option<ReplicaMetadata>> {
-        let key = Self::replica_key(content_hash);
-        if let Some(value) = self.db.get(&key)? {
-            let metadata: ReplicaMetadata =
-                serde_json::from_slice(&value).context("Failed to deserialize replica metadata")?;
-            Ok(Some(metadata))
-        } else {
-            Ok(None)
-        }
+        self.fault.read("get_replica_metadata", || {
+            let key = Self::replica_key(content_hash);
+            if let Some(value) = self.db.get(&key)? {
+                let metadata: ReplicaMetadata = serde_json::from_slice(&value)
+                    .context("Failed to deserialize replica metadata")?;
+                Ok(Some(metadata))
+            } else {
+                Ok(None)
+            }
+        })
     }
 
     fn put_replica_metadata(&self, metadata: &ReplicaMetadata) -> Result<()> {
-        let key = Self::replica_key(&metadata.content_hash);
-        let value = serde_json::to_vec(metadata).context("Failed to serialize replica metadata")?;
-        self.db.insert(&key, value)?;
-        Ok(())
+        self.fault.write_single("put_replica_metadata", || {
+            let key = Self::replica_key(&metadata.content_hash);
+            let value =
+                serde_json::to_vec(metadata).context("Failed to serialize replica metadata")?;
+            self.db.insert(&key, value)?;
+            Ok(())
+        })
     }
 
     fn list_replica_hashes(&self) -> Result<Vec<ContentHash>> {
-        let prefix = b"replica:";
-        let mut hashes = Vec::new();
+        self.fault.read("list_replica_hashes", || {
+            let prefix = b"replica:";
+            let mut hashes = Vec::new();
 
-        for item in self.db.scan_prefix(prefix) {
-            let (key, _) = item?;
-            // Key format: "replica:" + 32-byte hash
-            if key.len() == prefix.len() + 32 {
-                let mut hash = [0u8; 32];
-                hash.copy_from_slice(&key[prefix.len()..]);
-                hashes.push(hash);
+            for item in self.db.scan_prefix(prefix) {
+                let (key, _) = item?;
+                // Key format: "replica:" + 32-byte hash
+                if key.len() == prefix.len() + 32 {
+                    let mut hash = [0u8; 32];
+                    hash.copy_from_slice(&key[prefix.len()..]);
+                    hashes.push(hash);
+                }
             }
-        }
 
-        Ok(hashes)
+            Ok(hashes)
+        })
     }
 
     fn supports_transactions(&self) -> bool {
@@ -1250,6 +1491,33 @@ impl StoreTransaction for SledTransaction<'_> {
 
 impl TransactionalStore for SledStore {
     fn transaction<F, T>(&self, f: F) -> Result<T>
+    where
+        F: Fn(&dyn StoreTransaction) -> Result<T>,
+    {
+        // Held exclusively for the whole transaction and until any fault is published (see
+        // `fault`): no other operation in this domain can see the commit part-way. Only a
+        // commit-time storage error is ambiguous; when the closure fails, sled discards the
+        // staged writes, so an abort is not a fault.
+        self.fault.write_exclusive(
+            "transaction",
+            || self.transaction_unfenced(&f),
+            transaction_outcome_is_unknown,
+        )
+    }
+}
+
+/// Whether a transaction error leaves the outcome unknown: only a commit-time storage error
+/// does. A closure abort (including a read error inside the closure) makes sled discard the
+/// staged writes before anything is committed.
+pub(crate) fn transaction_outcome_is_unknown(e: &anyhow::Error) -> bool {
+    matches!(
+        e.downcast_ref::<StoreTransactionError>(),
+        Some(StoreTransactionError::StorageError { .. })
+    )
+}
+
+impl SledStore {
+    fn transaction_unfenced<F, T>(&self, f: &F) -> Result<T>
     where
         F: Fn(&dyn StoreTransaction) -> Result<T>,
     {
