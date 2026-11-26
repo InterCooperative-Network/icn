@@ -107,6 +107,26 @@ pub struct GovernanceConfigLite {
     pub membership: MembershipConfig,
 }
 
+/// Why [`GovernanceCommand::RepublishProposal`] was refused. Nothing was written or emitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RepublishRefused {
+    /// No stored proposal has this id.
+    NotFound,
+    /// The stored proposal was authored by another principal.
+    NotAuthor,
+}
+
+impl std::fmt::Display for RepublishRefused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::NotFound => "no stored proposal has this id",
+            Self::NotAuthor => "only the proposal's author may republish it",
+        })
+    }
+}
+
+impl std::error::Error for RepublishRefused {}
+
 /// Commands that can be submitted to the governance actor
 #[derive(Debug)]
 pub enum GovernanceCommand {
@@ -135,6 +155,22 @@ pub enum GovernanceCommand {
         scope: ProposalScope,
         /// Action items to create on acceptance (decision-to-action bridge)
         action_items_on_accept: Vec<icn_governance::ActionItemSpec>,
+    },
+    /// Re-emit a stored proposal this node authored, without touching it.
+    ///
+    /// The recovery path for "persisted, then publication failed": `CreateProposal`
+    /// stores the row before it broadcasts, so a publish error after a successful
+    /// store leaves a proposal nobody has heard of, and re-submitting the create is
+    /// refused (the id is taken). This command reads the **stored** row (refused if
+    /// absent) and publishes it through the single emission seam, which allocates a
+    /// fresh replication sequence for a signed frame. It never writes the row, so
+    /// repeating it leaves institutional state unchanged.
+    ///
+    /// Authorized only for a proposal whose proposer is this node: the node re-emits
+    /// its own authorship and never relays another principal's proposal as its own.
+    RepublishProposal {
+        /// The stored proposal to re-emit
+        proposal_id: ProposalId,
     },
     /// Start deliberation period for a proposal
     ///
@@ -595,6 +631,13 @@ impl GovernanceHandle {
     /// A no-op when there is nothing to recover.
     pub async fn recover_incomplete_closes(&self) {
         self.inner.read().await.recover_incomplete_closes().await;
+    }
+
+    /// Durable close intents that contradict their proposal's stored terminal
+    /// state (see [`crate::close_journal::CloseConflict`]). Read-only: nothing is
+    /// resolved or cleared; an empty list means no contradiction exists.
+    pub async fn close_conflicts(&self) -> Result<Vec<crate::close_journal::CloseConflict>> {
+        self.inner.read().await.close_conflicts()
     }
 
     /// List all protocol parameters
@@ -1601,6 +1644,50 @@ impl GovernanceActor {
         Some(icn_governance::ProposalThresholds::new(quorum, approval))
     }
 
+    /// Durable close intents that contradict their proposal's stored terminal
+    /// state. Read-only; see [`crate::close_journal::CloseConflict`].
+    fn close_conflicts(&self) -> Result<Vec<crate::close_journal::CloseConflict>> {
+        let mut out = Vec::new();
+        for entry in self.store.list_close_intents()? {
+            let stored = self.store.get_proposal(&entry.proposal.id)?;
+            if let Some(c) = crate::close_journal::detect_conflict(&entry, stored.as_ref())? {
+                out.push(c);
+            }
+        }
+        Ok(out)
+    }
+
+    /// A terminal operation other than close (veto, force-close) must not act on
+    /// a proposal whose close is already durably decided. Complete that close
+    /// first (exactly what the fault-free path would have done); the operation
+    /// then meets the proposal in its closed state and is refused by the
+    /// existing rule that a closed proposal cannot be vetoed or force-closed.
+    /// If completion fails, the operation is refused and nothing is written.
+    async fn complete_pending_close_first(&self, proposal_id: &ProposalId, op: &str) -> Result<()> {
+        if let Some(existing) = self.store.get_close_intent(proposal_id)? {
+            info!(
+                proposal_id = %proposal_id.0,
+                operation = op,
+                "A durable close of this proposal is pending; completing it before the {op}"
+            );
+            self.complete_journaled_close(existing).await.map_err(|e| {
+                anyhow::anyhow!(
+                    "Cannot {op} proposal '{}': its already-decided close could not be \
+                     completed first: {e}",
+                    proposal_id.0
+                )
+            })?;
+            // The decided close now stands, so the proposal is closed and the
+            // existing rule refuses this operation. Say so explicitly.
+            anyhow::bail!(
+                "Cannot {op} proposal '{}': a close of this proposal was already decided; it \
+                 has now been completed, and a closed proposal cannot be vetoed or force-closed",
+                proposal_id.0
+            );
+        }
+        Ok(())
+    }
+
     /// Replay any lingering write-ahead close-journal entries to completion.
     ///
     /// Called once a receipt backend is installed — the point at which both the
@@ -1674,6 +1761,28 @@ impl GovernanceActor {
                 "Refusing to complete a journaled close for a ContextSubjectV1 domain"
             );
             return Err(e.to_string());
+        }
+        // 0. Never replace a decision with a different one. If the stored
+        //    proposal is already closed with a different value, both records are
+        //    retained, nothing is written, and the contradiction is surfaced: it
+        //    needs an authorized reconciliation, not a recovery-time choice.
+        let stored = self
+            .store
+            .get_proposal(&proposal_id)
+            .map_err(|e| format!("could not read the stored proposal: {e}"))?;
+        match crate::close_journal::detect_conflict(&entry, stored.as_ref()) {
+            Ok(None) => {}
+            Ok(Some(conflict)) => {
+                error!(
+                    proposal_id = %proposal_id.0,
+                    journaled = %conflict.journaled_state,
+                    stored = %conflict.stored_state,
+                    "Close-journal entry contradicts the stored terminal proposal; \
+                     retaining both and refusing to complete it"
+                );
+                return Err(conflict.to_string());
+            }
+            Err(e) => return Err(format!("could not compare close records: {e}")),
         }
         // 1. Re-commit the durable state (receipts + proof + proposal),
         //    idempotently. On failure, leave the entry for replay.
@@ -1971,8 +2080,11 @@ impl GovernanceActor {
                 // Use the provided proposal ID instead of the generated one
                 proposal.id = proposal_id.clone();
 
-                // Persist locally
-                self.store.save_proposal(&proposal)?;
+                // Persist locally as a NEW row: an id already in use is refused
+                // atomically and the stored row is left unchanged, before
+                // anything is broadcast. (`submit` is public, so the id is
+                // caller-chosen and must not be able to replace a proposal.)
+                self.store.create_proposal(&proposal)?;
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::proposal_created(proposal.clone()))
@@ -1986,6 +2098,20 @@ impl GovernanceActor {
                 .await;
 
                 info!("✓ Proposal created: {} (ID: {})", title, proposal_id.0);
+            }
+
+            GovernanceCommand::RepublishProposal { proposal_id } => {
+                // Source of truth is the persisted row; nothing here writes to the store.
+                let proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or(RepublishRefused::NotFound)?;
+                if proposal.proposer != self.did {
+                    return Err(RepublishRefused::NotAuthor.into());
+                }
+                let msg = GovernanceMessage::proposal_created(proposal.clone());
+                self.publish(msg.clone()).await?;
+                self.publish_federation_if_scoped(&proposal, msg).await;
+                info!("✓ Proposal republished: {}", proposal_id.0);
             }
 
             GovernanceCommand::StartDeliberation {
@@ -2909,6 +3035,10 @@ impl GovernanceActor {
                 // Notify scheduler to cancel any pending events (if scheduled)
                 let _ = self.cancel_tx.send(proposal_id.clone());
 
+                // A durable close intent records an already-made decision.
+                self.complete_pending_close_first(&proposal_id, "veto")
+                    .await?;
+
                 // Load proposal
                 let mut proposal = self
                     .load_proposal(&proposal_id)?
@@ -2959,6 +3089,10 @@ impl GovernanceActor {
 
                 // Notify scheduler to cancel any pending events (if scheduled)
                 let _ = self.cancel_tx.send(proposal_id.clone());
+
+                // A durable close intent records an already-made decision.
+                self.complete_pending_close_first(&proposal_id, "force-close")
+                    .await?;
 
                 // Load proposal
                 let mut proposal = self
