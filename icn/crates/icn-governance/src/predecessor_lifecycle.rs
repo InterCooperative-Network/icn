@@ -9,8 +9,8 @@
 //! ```text
 //! lp(x) := u32be(len x) ‖ x
 //!
-//! record := lp("icn.governance.predecessor-lifecycle.v1") ‖ u16be(1) ‖ lp(L) ‖ u64be(revision)
-//!           ‖ u8(state) ‖ body
+//! record := lp("icn.governance.predecessor-lifecycle.v1") ‖ u16be(2) ‖ lp(L) ‖ u64be(revision)
+//!           ‖ K_first[32] ‖ u8(state) ‖ body          (record layout version 2, S26)
 //!   0x01 Legacy   : u64be(last_attempt) ‖ u8(aborted_flag) ‖ [aborted_K[32] iff flag = 1]
 //!   0x02 Pending  : u64be(attempt) ‖ lp(C) ‖ K[32] ‖ basis[32] ‖ E[32]
 //!   0x03 Sealed   : u64be(attempt) ‖ lp(C) ‖ K[32] ‖ basis[32] ‖ E[32] ‖ F[32]
@@ -54,6 +54,11 @@ pub const LIFECYCLE_BASIS_TAG: &[u8] = b"icn.governance.predecessor-lifecycle.ba
 pub const DOMAIN_RECORD_PIN_TAG: &[u8] = b"icn.governance.predecessor-domain-record-pin.v1";
 /// Version of every layout in this module.
 pub const LIFECYCLE_VERSION: u16 = 1;
+/// Version of the lifecycle **record** layout. Version 2 (S26) adds `K_first`, the first cutover
+/// commitment, carried by every stored state so the witness can be cross-checked across every
+/// attempt. Version 1 records were never written outside tests (no writer exists) and are
+/// refused as unsupported. The witness and the basis stay at [`LIFECYCLE_VERSION`].
+pub const LIFECYCLE_RECORD_VERSION: u16 = 2;
 /// Key prefix of lifecycle records.
 pub const LIFECYCLE_KEY_PREFIX: &[u8] = b"gov:predecessor-lifecycle:v1:";
 /// Key prefix of witnesses (not under the record prefix: `-` follows `lifecycle`, not `:`).
@@ -115,6 +120,8 @@ pub enum LifecycleCodecError {
     RevisionOverflow,
     #[error("the succession attempt would overflow")]
     AttemptOverflow,
+    #[error("the first attempt's commitment does not equal the recorded first commitment")]
+    FirstCommitmentMismatch,
 }
 
 /// The revision after `revision`: refuses overflow rather than wrapping. A record at
@@ -194,6 +201,9 @@ pub struct LifecycleRecordV1 {
     pub predecessor: GovernanceDomainId,
     /// Storage concurrency revision (≥ 1), independent of the succession attempt.
     pub revision: u64,
+    /// `K_first`: the commitment hash of L's first cutover attempt. Set by the first Begin and
+    /// never changed by any later transition; it must equal the witness's on every load.
+    pub first_commitment_hash: [u8; 32],
     /// The lifecycle state.
     pub state: StoredLifecycle,
 }
@@ -314,6 +324,14 @@ impl LifecycleRecordV1 {
                 }
             }
         }
+        // Attempts start at 1 (P5a), so while the record is at attempt 1 its current K is K_first.
+        if self.state.attempt() == 1 {
+            if let Some(k) = self.state.latest_k()? {
+                if k != self.first_commitment_hash {
+                    return Err(LifecycleCodecError::FirstCommitmentMismatch);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -322,9 +340,10 @@ impl LifecycleRecordV1 {
         self.validate()?;
         let mut out = Vec::new();
         lp(&mut out, LIFECYCLE_RECORD_TAG);
-        out.extend_from_slice(&LIFECYCLE_VERSION.to_be_bytes());
+        out.extend_from_slice(&LIFECYCLE_RECORD_VERSION.to_be_bytes());
         lp(&mut out, self.predecessor.0.as_bytes());
         out.extend_from_slice(&self.revision.to_be_bytes());
+        out.extend_from_slice(&self.first_commitment_hash);
         match &self.state {
             StoredLifecycle::Legacy {
                 last_attempt,
@@ -372,7 +391,7 @@ impl LifecycleRecordV1 {
         if r.lp()? != LIFECYCLE_RECORD_TAG {
             return Err(LifecycleCodecError::WrongTag);
         }
-        if r.u16()? != LIFECYCLE_VERSION {
+        if r.u16()? != LIFECYCLE_RECORD_VERSION {
             return Err(LifecycleCodecError::UnsupportedVersion);
         }
         let predecessor = r.domain()?;
@@ -380,6 +399,7 @@ impl LifecycleRecordV1 {
             return Err(LifecycleCodecError::WrongDomain);
         }
         let revision = r.u64()?;
+        let first_commitment_hash: [u8; 32] = r.array()?;
         let state = match r.u8()? {
             STATE_LEGACY => {
                 let last_attempt = r.u64()?;
@@ -420,6 +440,7 @@ impl LifecycleRecordV1 {
         let record = LifecycleRecordV1 {
             predecessor,
             revision,
+            first_commitment_hash,
             state,
         };
         record.validate()?;
@@ -502,13 +523,19 @@ impl LifecycleWitnessV1 {
                 attempt,
                 commitment,
                 ..
-            } => Ok(LifecycleWitnessV1 {
-                predecessor: record.predecessor.clone(),
-                first_attempt: *attempt,
-                first_commitment_hash: commitment
+            } => {
+                let k = commitment
                     .commitment()
-                    .map_err(|_| LifecycleCodecError::InvalidCommitment)?,
-            }),
+                    .map_err(|_| LifecycleCodecError::InvalidCommitment)?;
+                if k != record.first_commitment_hash {
+                    return Err(LifecycleCodecError::FirstCommitmentMismatch);
+                }
+                Ok(LifecycleWitnessV1 {
+                    predecessor: record.predecessor.clone(),
+                    first_attempt: *attempt,
+                    first_commitment_hash: k,
+                })
+            }
             _ => Err(LifecycleCodecError::WitnessMismatch),
         }
     }
@@ -539,6 +566,11 @@ pub fn check_witness(
         (Some(rb), Some(wb)) => {
             let record = LifecycleRecordV1::decode_for(l, rb)?;
             let witness = LifecycleWitnessV1::decode_for(l, wb)?;
+            // The record retains K_first across every attempt, so the witness is checked on every
+            // load, not only during the first attempt.
+            if record.first_commitment_hash != witness.first_commitment_hash {
+                return Err(LifecycleCodecError::WitnessMismatch);
+            }
             let attempt = record.state.attempt();
             if attempt < witness.first_attempt {
                 return Err(LifecycleCodecError::WitnessMismatch);
