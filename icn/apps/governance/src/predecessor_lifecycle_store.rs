@@ -461,6 +461,11 @@ impl<'a> LifecycleStore<'a> {
                 if self.store.get(&lifecycle_key(l)?)? != loaded.record_bytes {
                     return Err(LifecycleStoreError::Stale.into());
                 }
+                // A Seal replay is never acknowledged over a domain record that drifted from the
+                // pin (S28 review FOLLOW_UP: `seal()` checked this, `transition` did not).
+                if matches!(transition, CutoverTransition::Seal { .. }) {
+                    self.check_domain_pin(loaded)?;
+                }
                 if let (
                     Some(e),
                     Some(LifecycleRecordV1 {
@@ -3336,6 +3341,38 @@ mod tests {
             )
             .unwrap_err();
         assert_eq!(store_err(e), LifecycleStoreError::DomainChanged);
+    }
+
+    #[test]
+    fn a_seal_replay_through_transition_is_not_acknowledged_over_a_drifted_domain() {
+        // S28 review FOLLOW_UP: the public `transition(Seal)` replay path, not only `seal()`.
+        let s = store();
+        let (ls, pending) = drained(&s);
+        let sealed = written(
+            ls.seal(&pending, 1, k(0x4D), &Evidence::default(), [5; 16])
+                .unwrap(),
+        );
+        let replay = |txid| {
+            ls.transition(
+                &sealed,
+                LifecycleRequest::Seal {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                    final_ids: &["b", "c"],
+                },
+                txid,
+            )
+        };
+        assert_eq!(replay([6; 16]).unwrap(), Committed::Replayed);
+        s.put(
+            &domain_key(&l()),
+            br#"{"id":"legacy.coop.example","late":2}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            store_err(replay([7; 16]).unwrap_err()),
+            LifecycleStoreError::DomainChanged
+        );
     }
 
     #[test]

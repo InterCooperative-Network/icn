@@ -633,17 +633,35 @@ fn the_basis_inputs_are_retained_and_the_basis_is_recomputed_on_decode() {
     let e_at = basis_at + 32;
     assert_eq!(e_at + 32, v.len(), "Pending body layout");
     assert_eq!(&v[pin_at..pin_at + 32], &pin());
-    for at in [r_begin_at + 7, pin_at, basis_at + 31, e_at] {
+    // r_begin is 0 at revision 1: raising it to 1 reaches the revision (order checked first).
+    let mut b = v.clone();
+    b[r_begin_at + 7] ^= 1;
+    assert_eq!(
+        LifecycleRecordV1::decode_for(&l, &b),
+        Err(E::BeginRevisionNotBefore)
+    );
+    for at in [
+        pin_at,
+        pin_at + 31,
+        basis_at,
+        basis_at + 31,
+        e_at,
+        e_at + 31,
+    ] {
         let mut b = v.clone();
         b[at] ^= 1;
-        let got = LifecycleRecordV1::decode_for(&l, &b);
-        assert!(
-            got == Err(E::BasisMismatch) || got == Err(E::BeginRevisionNotBefore),
-            "byte {at}: {got:?}"
+        assert_eq!(
+            LifecycleRecordV1::decode_for(&l, &b),
+            Err(E::BasisMismatch),
+            "byte {at}"
         );
     }
-    // A v2-shaped body (no r_begin, no pin) under the v3 version is refused, never reinterpreted.
+    // A v2-shaped body (no r_begin, no pin) under the v3 version is refused, never reinterpreted:
+    // it is 40 bytes short, so the reader runs out.
     let mut v2_body = v.clone();
     v2_body.drain(r_begin_at..pin_at + 32);
-    assert!(LifecycleRecordV1::decode_for(&l, &v2_body).is_err());
+    assert_eq!(
+        LifecycleRecordV1::decode_for(&l, &v2_body),
+        Err(E::Truncated)
+    );
 }
