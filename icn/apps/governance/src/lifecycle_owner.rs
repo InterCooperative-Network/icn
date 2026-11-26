@@ -819,4 +819,66 @@ mod tests {
         let held = handle.receipt_store_for_tests().await.unwrap();
         assert!(Arc::ptr_eq(&held, &bound), "the bound backend is kept");
     }
+
+    fn intent_for(p: &Proposal, closed: ProposalState) -> CloseJournalEntry {
+        let mut proposal = p.clone();
+        proposal.state = closed;
+        CloseJournalEntry {
+            proposal,
+            proof_bytes: None,
+            receipts: Default::default(),
+            decided_at: 7,
+            governance_decision_hash: None,
+        }
+    }
+
+    #[test]
+    fn pending_drains_a_close_through_the_routed_intent_writes_and_then_seals() {
+        let s = sled();
+        let (owner, store) = started(&s);
+        let mut p = prop("p");
+        store.create_proposal(&p).unwrap();
+        p.open(60).unwrap();
+        store.save_proposal(&p).unwrap();
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        // The journaled close of an existing obligation: intent, terminal row, retirement.
+        let entry = intent_for(&p, ProposalState::Rejected { closed_at: 7 });
+        store.save_close_intent(&entry).unwrap();
+        assert!(store.get_close_intent(&p.id).unwrap().is_some());
+        // While the intent is outstanding the Seal refuses (a decided close must complete).
+        assert!(owner.seal_for_tests(&l(), 1, k(0x4D)).is_err());
+        store.save_proposal(&entry.proposal).unwrap();
+        store.delete_close_intent(&p.id).unwrap();
+        assert!(store.get_close_intent(&p.id).unwrap().is_none());
+        owner.seal_for_tests(&l(), 1, k(0x4D)).unwrap();
+    }
+
+    #[test]
+    fn sealed_refuses_routed_intent_writes_and_keeps_a_stray_intent_as_evidence() {
+        use crate::state_store::close_intent_key;
+        let s = sled();
+        let (owner, store) = started(&s);
+        let mut c = prop("c");
+        store.create_proposal(&c).unwrap();
+        c.cancel().unwrap();
+        store.save_proposal(&c).unwrap();
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        owner.seal_for_tests(&l(), 1, k(0x4D)).unwrap();
+        // A new intent for a predecessor proposal: refused, nothing written.
+        let entry = intent_for(&c, ProposalState::Accepted { closed_at: 7 });
+        assert_eq!(
+            fence(store.save_close_intent(&entry).unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        assert!(s.get(&close_intent_key(&c.id)).unwrap().is_none());
+        // An intent that appears after the seal (raw writer) is evidence: retirement through the
+        // owner is refused and the record stays.
+        let raw = serde_json::to_vec(&entry).unwrap();
+        s.put(&close_intent_key(&c.id), &raw).unwrap();
+        assert_eq!(
+            fence(store.delete_close_intent(&c.id).unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        assert_eq!(s.get(&close_intent_key(&c.id)).unwrap(), Some(raw));
+    }
 }
