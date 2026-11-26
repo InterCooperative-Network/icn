@@ -525,3 +525,80 @@ async fn member_delegation_to_a_non_member_delegate_row_still_carries_weight() {
     let s = state_of(&f.handle, &id).await;
     assert!(matches!(s, ProposalState::Accepted { .. }), "{s:?}");
 }
+
+// ---------------------------------------------------------------------------
+// Proposal creation: the domain must exist on this node
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn proposal_in_an_unknown_domain_is_refused_and_not_persisted() {
+    let alice = new_did();
+    let f = fx(std::slice::from_ref(&alice)).await;
+
+    let err = GovernanceOps::create_proposal(
+        &f.handle,
+        GovernanceDomainId("no-such-domain".to_string()),
+        "t".to_string(),
+        "d".to_string(),
+        ProposalPayload::Text { body: "b".into() },
+        ProposalScope::Local,
+    )
+    .await
+    .expect_err("a proposal in an unknown domain must be refused");
+    match err.downcast::<GovernanceError>() {
+        Ok(GovernanceError::DomainNotFound(d)) => assert_eq!(d, "no-such-domain"),
+        other => panic!("expected DomainNotFound, got {other:?}"),
+    }
+    assert!(
+        f.handle.list_proposals().await.unwrap().is_empty(),
+        "a refused proposal must not be persisted"
+    );
+
+    // Control: the same call against the existing domain succeeds.
+    draft(&f.handle, "ok").await;
+    assert_eq!(f.handle.list_proposals().await.unwrap().len(), 1);
+}
+
+// ---------------------------------------------------------------------------
+// Read-only tally agrees with what a close would count
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn read_tally_of_an_open_proposal_counts_only_the_electorate() {
+    let alice = new_did();
+    let bob = new_did();
+    let f = fx(&[alice.clone(), bob.clone()]).await;
+    let id = opened(&f.handle, "p").await;
+    vote(&f.handle, &id, &alice, VoteChoice::For).await.unwrap();
+    vote(&f.handle, &id, &bob, VoteChoice::Abstain)
+        .await
+        .unwrap();
+    plant_non_member_rows(&f.state, &id, 3);
+
+    let t = f.handle.get_vote_tally(&id).await.unwrap();
+    assert_eq!(
+        (t.for_votes, t.against_votes, t.abstain_votes),
+        (1, 0, 1),
+        "outsider rows must not appear in the tally a close would not count"
+    );
+    // Rows are untouched by the read.
+    assert_eq!(f.state.list_votes(&id).unwrap().len(), 5);
+}
+
+/// A terminal proposal's decision is fixed in its receipt; the read path does
+/// not re-derive eligibility for it (the electorate at decision time is not
+/// recoverable here). Its read tally stays the stored rows, as before.
+#[tokio::test]
+async fn read_tally_of_a_closed_proposal_is_not_re_derived() {
+    let alice = new_did();
+    let f = fx(std::slice::from_ref(&alice)).await;
+    let id = opened(&f.handle, "p").await;
+    vote(&f.handle, &id, &alice, VoteChoice::For).await.unwrap();
+    GovernanceOps::close_proposal(&f.handle, id.clone())
+        .await
+        .unwrap();
+    plant_non_member_rows(&f.state, &id, 2);
+
+    let t = f.handle.get_vote_tally(&id).await.unwrap();
+    assert_eq!((t.for_votes, t.against_votes, t.abstain_votes), (1, 2, 0));
+}

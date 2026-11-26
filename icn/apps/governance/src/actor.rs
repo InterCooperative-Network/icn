@@ -2057,14 +2057,15 @@ impl GovernanceActor {
             } => {
                 info!("Creating proposal: {} (scope: {:?})", title, scope);
 
-                // A proposal belongs to a governance domain this node holds; refuse one for a
-                // domain that does not exist here before anything is persisted or broadcast
-                // (parity with `GovernanceManager::create_proposal`).
+                // A proposal belongs to a governance domain this node holds.
+                // Refuse one for an unknown domain before anything is persisted
+                // or broadcast: such a proposal could never be voted on or
+                // closed (admission and close both resolve its domain).
                 if self.load_domain(&domain_id)?.is_none() {
-                    anyhow::bail!(
-                        "Domain '{}' not found. Cannot create a proposal in it.",
-                        domain_id.0
-                    );
+                    return Err(icn_governance::GovernanceError::DomainNotFound(
+                        domain_id.0.clone(),
+                    )
+                    .into());
                 }
 
                 let mut proposal = Proposal::new(
@@ -2503,13 +2504,10 @@ impl GovernanceActor {
                 // resolver does not name -- out of the decision. Such rows are
                 // not deleted or rewritten: they stay in the store and simply do
                 // not count. The standing filter above can only narrow this set.
-                let electorate = electorate_principals(&eligible_members)?;
-                let mut votes: Vec<Vote> = Vec::with_capacity(standing_votes.len());
-                for v in &standing_votes {
-                    if electorate.contains(&VotingPrincipal::of(&v.voter)?) {
-                        votes.push(v.clone());
-                    }
-                }
+                let votes = counted_by_electorate(
+                    &standing_votes,
+                    &electorate_principals(&eligible_members)?,
+                )?;
                 // The tally that decides the outcome, so it must give one
                 // cryptographic principal one effective vote and fail closed on
                 // conflicting historical rows, exactly like the read-only
@@ -3797,9 +3795,26 @@ impl GovernanceActor {
     /// Get vote tally for a proposal
     fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         let votes = self.load_votes(proposal_id)?;
+        // While a proposal is Open, show the direct votes a close would count:
+        // rows whose principal the domain's resolver names (close-time
+        // delegation expansion is not applied here). Conflicts are checked
+        // across every stored row first, as the close does. A terminal
+        // proposal is not re-derived: its decision is fixed in its receipt,
+        // and the electorate it was decided against is not recoverable here.
+        let counted = match self.load_proposal(proposal_id)? {
+            Some(p) if p.state.is_open() => {
+                icn_governance::effective_votes(&votes)?;
+                let domain = self.load_domain(&p.domain_id)?.ok_or_else(|| {
+                    icn_governance::GovernanceError::DomainNotFound(p.domain_id.0.clone())
+                })?;
+                let electorate = electorate_principals(&self.resolver.resolve_members(&domain)?)?;
+                counted_by_electorate(&votes, &electorate)?
+            }
+            _ => votes,
+        };
         // One effective vote per cryptographic principal; conflicting
         // historical rows fail closed rather than double-counting (#2641).
-        Ok(VoteTally::try_from_votes(&votes)?)
+        Ok(VoteTally::try_from_votes(&counted)?)
     }
 
     /// Get list of voter DIDs for a proposal
@@ -4402,6 +4417,23 @@ fn electorate_principals(members: &[Did]) -> Result<std::collections::HashSet<Vo
         .iter()
         .map(|m| VotingPrincipal::of(m).map_err(anyhow::Error::from))
         .collect()
+}
+
+/// The rows whose voter principal is in `electorate`, in stored order.
+///
+/// The counted set for a decision: a row from a principal the resolver does not
+/// name is kept in the store but never counted.
+fn counted_by_electorate(
+    rows: &[Vote],
+    electorate: &std::collections::HashSet<VotingPrincipal>,
+) -> Result<Vec<Vote>> {
+    let mut counted = Vec::with_capacity(rows.len());
+    for v in rows {
+        if electorate.contains(&VotingPrincipal::of(&v.voter)?) {
+            counted.push(v.clone());
+        }
+    }
+    Ok(counted)
 }
 
 fn now_seconds() -> u64 {
