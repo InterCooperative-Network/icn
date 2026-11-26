@@ -31,8 +31,9 @@
 //!   receipt facts being monotone (append-only, no delete: contract §4.3.4), so a fact read here
 //!   cannot later become false; a concurrent receipt write can only turn a refusal into a later
 //!   success. [`SealEvidence::flush`] makes every fact relied on durable before the Seal commits.
-//!   IER uniqueness per (proposal, kind) is enforced by the receipt store since #2955; this
-//!   module refuses duplicates independently rather than assuming it.
+//!   IER uniqueness per (proposal, kind) is enforced by the gateway receipt store from #2955
+//!   (on main; this stack does not yet include it); this module refuses duplicates
+//!   independently rather than assuming it.
 //! * **An unwired backend refuses.** The trait's default lookups return empty, which reads as
 //!   "not durable": the Seal is refused, never granted.
 //! * The P5c predicate is a **conservative compiled-in list** (D-P5c-1 open): S19's closed list
@@ -50,8 +51,9 @@ use crate::receipt_backend::GovernanceReceiptBackend;
 /// The facts the Seal needs that the governance store cannot establish itself. Crate-private:
 /// implementations are this module's receipt-backed source and `#[cfg(test)]` fixtures only.
 pub(crate) trait SealEvidence: Send + Sync {
-    /// Is `p`'s durable intent present (only consulted for accepted execution-required
-    /// proposals)? `Err` on any contradiction or backend failure.
+    /// Is `p`'s durable intent present? The Seal consults it only for rows whose
+    /// classification depends on it (accepted, execution-required). `Err` on any contradiction
+    /// or backend failure.
     fn closure_durable(&self, p: &Proposal) -> anyhow::Result<bool>;
     /// Does accepting `p` change a condition the cutover relies on (P5c predicate)?
     fn changes_cutover_basis(&self, p: &Proposal) -> bool;
@@ -64,7 +66,7 @@ pub(crate) trait SealEvidence: Send + Sync {
 ///
 /// Code outside this crate cannot supply its own oracle: the evidence trait is crate-private.
 ///
-/// ```compile_fail
+/// ```compile_fail,E0603
 /// // Complete apart from the trait's visibility, so privacy is the only reason this fails.
 /// use icn_governance::Proposal;
 /// struct AlwaysDurable;
@@ -421,7 +423,7 @@ pub(crate) mod tests {
         )
     }
 
-    fn mandate(p: &Proposal, decision_hash: icn_kernel_api::Hash) -> Mandate {
+    pub(crate) fn mandate(p: &Proposal, decision_hash: icn_kernel_api::Hash) -> Mandate {
         Mandate::new_pending_grants(
             DecisionProvenance {
                 proposal_id: p.id.0.clone(),

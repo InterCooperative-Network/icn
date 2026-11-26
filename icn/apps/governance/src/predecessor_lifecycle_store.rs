@@ -960,12 +960,17 @@ impl<'a> LifecycleStore<'a> {
         rows.sort_by(|a, b| a.id.0.as_bytes().cmp(b.id.0.as_bytes()));
         let mut statuses: Vec<(&str, DrainStatus)> = Vec::with_capacity(rows.len());
         for p in &rows {
-            let status = classify(
-                &p.state,
-                &p.payload,
-                evidence.closure_durable(p)?,
-                evidence.changes_cutover_basis(p),
-            );
+            let basis = evidence.changes_cutover_basis(p);
+            // Consult the durability oracle only when the classification depends on it
+            // (accepted, execution-required rows). P5a `classify` stays the only statement of
+            // that rule; an accepted declarative row is never asked for receipt evidence (S28
+            // review BLOCKER: the actor mints a mandate for it but writes no decision receipt).
+            let durable = classify(&p.state, &p.payload, true, basis);
+            let status = if classify(&p.state, &p.payload, false, basis) == durable {
+                durable
+            } else {
+                classify(&p.state, &p.payload, evidence.closure_durable(p)?, basis)
+            };
             statuses.push((p.id.0.as_str(), status));
         }
         evidence.flush()?;
@@ -1161,7 +1166,7 @@ pub fn proposal_fence(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
@@ -1177,14 +1182,14 @@ mod tests {
     }
 
     /// The golden commitment, with its recognition-map bytes set to `m` (a distinct valid K).
-    fn commitment(m: u8) -> CutoverCommitmentV1 {
+    pub(crate) fn commitment(m: u8) -> CutoverCommitmentV1 {
         let mut b = hex::decode(GOLDEN_C).unwrap();
         let n = b.len();
         b[n - 32..].copy_from_slice(&[m; 32]);
         CutoverCommitmentV1::decode(&b).unwrap()
     }
 
-    fn k(m: u8) -> [u8; 32] {
+    pub(crate) fn k(m: u8) -> [u8; 32] {
         commitment(m).commitment().unwrap()
     }
 
@@ -3516,21 +3521,23 @@ mod tests {
         // Missing durable intent: the accepted execution-required row is unresolved.
         let s = store();
         let backend = std::sync::Arc::new(Backend::default());
-        let (ls, pending) = bound_pending(&s, &backend, &[accepted("m", budget())]);
+        let m = accepted("m", budget());
+        let (ls, pending) = bound_pending(&s, &backend, std::slice::from_ref(&m));
         let before = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
         assert_eq!(
             seal_err(ls.seal(&pending, 1, k(0x4D), [0x41; 16]).unwrap_err()),
             SealRefusal::UnresolvedEffects("m".into())
         );
-        // Contradictory receipt evidence: a typed evidence error, nothing written.
-        let m = accepted("m", budget());
+        // Contradictory receipt evidence: the stored row itself (so the payload hash matches
+        // and only the decision receipt is wrong); exactly DecisionMismatch, nothing written.
         durable(&backend, &m);
         backend.receipts.lock().unwrap()[0].outcome = icn_governance::ProofOutcome::Rejected;
         let e = ls.seal(&pending, 1, k(0x4D), [0x42; 16]).unwrap_err();
-        assert!(
-            e.downcast_ref::<crate::seal_evidence::SealEvidenceError>()
-                .is_some(),
-            "{e:#}"
+        assert_eq!(
+            e.downcast_ref::<crate::seal_evidence::SealEvidenceError>(),
+            Some(&crate::seal_evidence::SealEvidenceError::DecisionMismatch(
+                "m".into()
+            ))
         );
         assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), before);
         drop(ls);
@@ -3550,6 +3557,27 @@ mod tests {
             seal_err(ls.seal(&pending, 1, k(0x4D), [0x43; 16]).unwrap_err()),
             SealRefusal::ChangesCutoverBasis("c".into())
         );
+        admitted(&s);
+    }
+
+    #[test]
+    fn an_accepted_declarative_row_is_never_asked_for_receipt_evidence() {
+        // S28 review BLOCKER: the actor mints a mandate for an accepted declarative proposal
+        // but writes no decision receipt, which the oracle reads as a contradiction. The Seal
+        // must not consult the oracle for a row whose classification does not depend on it.
+        let s = store();
+        let backend = std::sync::Arc::new(Backend::default());
+        let t = accepted(
+            "t",
+            icn_governance::ProposalPayload::Text { body: "b".into() },
+        );
+        backend
+            .mandates
+            .lock()
+            .unwrap()
+            .push(crate::seal_evidence::tests::mandate(&t, [0x5A; 32]));
+        let (ls, pending) = bound_pending(&s, &backend, std::slice::from_ref(&t));
+        assert!(ls.seal(&pending, 1, k(0x4D), [0x45; 16]).is_ok());
         admitted(&s);
     }
 
