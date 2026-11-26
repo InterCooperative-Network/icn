@@ -24,8 +24,12 @@
 //!   lifecycle and applies the fenced, journaled write. Every actor path that writes through
 //!   its state store (direct commands, scheduler callbacks, startup close recovery) is therefore
 //!   routed by construction, with one funnel and no lifecycle rule restated outside the store.
-//! * Writes the lifecycle does not govern (votes, delegations, proof bytes, institutional
-//!   domains, policy bodies) pass through unchanged (writer inventory W5, W16, W7-proof, W22).
+//! * S29: votes (`save_vote`), delegation creation (`save_delegation`) and revocation
+//!   (`save_revoked_delegation`) are routed too: a vote is fenced by its stored proposal's
+//!   domain; a delegation by the domain its scope resolves into (Blanket resolves into none and
+//!   is never refused by a lifecycle); revocation is allowed in every state and write-once.
+//! * Writes the lifecycle does not govern (proof bytes, institutional domains, policy bodies)
+//!   pass through unchanged (writer inventory W7-proof, W16, W22).
 //!
 //! # What remains outside this funnel (recorded, not claimed)
 //! Raw writers that construct their own `SledGovernanceStateStore` or `Store` handle over the
@@ -40,16 +44,18 @@ use std::sync::Arc;
 use std::thread;
 
 use anyhow::{anyhow, Result};
+use icn_governance::predecessor_lifecycle::lifecycle_key;
 use icn_governance::{
-    Delegation, DelegationId, DomainPolicyId, GovernanceDomain, GovernanceDomainId,
-    InstitutionalDomain, Proposal, ProposalId, Timestamp, Vote,
+    Delegation, DelegationId, DelegationScope, DomainPolicyId, GovernanceDomain,
+    GovernanceDomainId, InstitutionalDomain, Proposal, ProposalId, Timestamp, Vote,
 };
 use icn_identity::Did;
 use icn_store::SledStore;
 
 use crate::close_journal::CloseJournalEntry;
 use crate::predecessor_lifecycle_store::{
-    LifecycleRecovery, LifecycleStore, LifecycleStoreError, RecoveryReport,
+    FenceRefusal, LifecycleRecovery, LifecycleStore, LifecycleStoreError, LoadedLifecycle,
+    RecoveryReport,
 };
 use crate::seal_evidence::BoundSealEvidence;
 use crate::state_store::{GovernanceStateStore, SledGovernanceStateStore};
@@ -65,6 +71,15 @@ enum Write {
     SaveDomain(Box<GovernanceDomain>),
     SaveCloseIntent(Box<CloseJournalEntry>),
     DeleteCloseIntent(ProposalId),
+    SaveVote {
+        proposal_id: ProposalId,
+        vote: Box<Vote>,
+    },
+    CreateDelegation(Box<Delegation>),
+    RevokeDelegation {
+        delegation: Box<Delegation>,
+        revoked_at: Timestamp,
+    },
     /// Test-only lifecycle transitions (the operational Begin/Abort/Seal are institutional
     /// actions, W18, and are not exposed by the owner).
     #[cfg(test)]
@@ -285,6 +300,25 @@ fn apply_once(live: &LifecycleStore<'_>, store: &SledStore, write: &Write) -> Re
             };
             live.delete_close_intent(&live.load(&entry.proposal.domain_id)?, id, txid())?;
         }
+        Write::SaveVote { proposal_id, vote } => {
+            // The vote's institutional context is its stored proposal's domain. No stored
+            // proposal, no context: refused (the store re-checks under the commit guard).
+            let Some(proposal) = reader(store).get_proposal(proposal_id)? else {
+                return Err(FenceRefusal::VoteWithoutProposal.into());
+            };
+            live.write_vote(&live.load(&proposal.domain_id)?, proposal_id, vote, txid())?;
+        }
+        Write::CreateDelegation(d) => {
+            let loaded = scope_lifecycle(live, store, &d.scope, ScopeUse::Create)?;
+            live.write_delegation(loaded.as_ref(), d, txid())?;
+        }
+        Write::RevokeDelegation {
+            delegation,
+            revoked_at,
+        } => {
+            let loaded = scope_lifecycle(live, store, &delegation.scope, ScopeUse::Revoke)?;
+            live.write_revocation(loaded.as_ref(), delegation, *revoked_at, txid())?;
+        }
         #[cfg(test)]
         Write::TestBegin {
             domain,
@@ -313,6 +347,49 @@ fn apply_once(live: &LifecycleStore<'_>, store: &SledStore, write: &Write) -> Re
         }
     }
     Ok(())
+}
+
+fn reader(store: &SledStore) -> SledGovernanceStateStore {
+    SledGovernanceStateStore::new(Arc::new(store.share()))
+}
+
+/// Why a delegation scope is being resolved: creation must resolve to a context, and
+/// revocation must never be trapped by one.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ScopeUse {
+    Create,
+    Revoke,
+}
+
+/// The lifecycle of the domain a delegation scope resolves into, or `None` for a scope that
+/// resolves into no fenced domain.
+///
+/// * Blanket names no domain.
+/// * `Domain(D)` resolves to D. A domain id that cannot key a lifecycle record can never have
+///   been begun, so revoking such a delegation is unfenced rather than trapped; creating one
+///   fails like every other routed write for that id (writer inventory, DP-7).
+/// * `Proposal(P)` resolves to P's stored domain. Creating one requires a stored P. Revoking
+///   one whose P is not stored (rows the pre-fence path accepted) is unfenced, never trapped.
+fn scope_lifecycle(
+    live: &LifecycleStore<'_>,
+    store: &SledStore,
+    scope: &DelegationScope,
+    usage: ScopeUse,
+) -> Result<Option<LoadedLifecycle>> {
+    match scope {
+        DelegationScope::Blanket => Ok(None),
+        DelegationScope::Domain(d) => {
+            if usage == ScopeUse::Revoke && lifecycle_key(d).is_err() {
+                return Ok(None);
+            }
+            Ok(Some(live.load(d)?))
+        }
+        DelegationScope::Proposal(p) => match reader(store).get_proposal(p)? {
+            Some(proposal) => Ok(Some(live.load(&proposal.domain_id)?)),
+            None if usage == ScopeUse::Revoke => Ok(None),
+            None => Err(FenceRefusal::DelegationWithoutProposal.into()),
+        },
+    }
 }
 
 /// The lifecycle-aware [`GovernanceStateStore`] (INACTIVE: no production construction). See the
@@ -371,7 +448,10 @@ impl GovernanceStateStore for FencedGovernanceStateStore {
         self.inner.get_vote(proposal_id, voter)
     }
     fn save_vote(&self, proposal_id: &ProposalId, vote: &Vote) -> Result<()> {
-        self.inner.save_vote(proposal_id, vote)
+        self.owner.call(Write::SaveVote {
+            proposal_id: proposal_id.clone(),
+            vote: Box::new(vote.clone()),
+        })
     }
     fn list_votes(&self, proposal_id: &ProposalId) -> Result<Vec<Vote>> {
         self.inner.list_votes(proposal_id)
@@ -380,7 +460,8 @@ impl GovernanceStateStore for FencedGovernanceStateStore {
         self.inner.get_delegation(id)
     }
     fn save_delegation(&self, delegation: &Delegation) -> Result<()> {
-        self.inner.save_delegation(delegation)
+        self.owner
+            .call(Write::CreateDelegation(Box::new(delegation.clone())))
     }
     fn list_all_delegations(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         self.inner.list_all_delegations()
@@ -390,7 +471,10 @@ impl GovernanceStateStore for FencedGovernanceStateStore {
         delegation: &Delegation,
         revoked_at: Timestamp,
     ) -> Result<()> {
-        self.inner.save_revoked_delegation(delegation, revoked_at)
+        self.owner.call(Write::RevokeDelegation {
+            delegation: Box::new(delegation.clone()),
+            revoked_at,
+        })
     }
     fn get_proof_bytes(&self, proposal_id: &ProposalId) -> Result<Option<Vec<u8>>> {
         self.inner.get_proof_bytes(proposal_id)
@@ -604,6 +688,320 @@ mod tests {
         assert_eq!(bytes(&store, &draft.id), js(&draft), "history kept");
     }
 
+    // ---- S29: votes and delegations through the owner ----
+
+    const M: &str = "other.coop.example";
+
+    fn did() -> Did {
+        icn_identity::IdentityBundle::generate()
+            .unwrap()
+            .did()
+            .clone()
+    }
+
+    fn prop_in(id: &str, dom: &str) -> Proposal {
+        let mut p = prop(id);
+        p.domain_id = GovernanceDomainId::new(dom);
+        p
+    }
+
+    fn opened(store: &Arc<dyn GovernanceStateStore>, id: &str, dom: &str) -> Proposal {
+        let mut p = prop_in(id, dom);
+        store.create_proposal(&p).unwrap();
+        p.open(600).unwrap();
+        store.save_proposal(&p).unwrap();
+        p
+    }
+
+    fn ballot(p: &str, voter: &Did) -> Vote {
+        Vote::new(
+            ProposalId(p.into()),
+            voter.clone(),
+            icn_governance::VoteChoice::For,
+        )
+    }
+
+    fn vote_row(store: &Arc<dyn GovernanceStateStore>, p: &str, voter: &Did) -> Option<Vec<u8>> {
+        store
+            .get_vote(&ProposalId(p.into()), voter)
+            .unwrap()
+            .map(|v| serde_json::to_vec(&v).unwrap())
+    }
+
+    fn deleg(scope: DelegationScope) -> Delegation {
+        Delegation::new(did(), did(), scope)
+    }
+
+    fn deleg_row(store: &Arc<dyn GovernanceStateStore>, d: &Delegation) -> Option<Vec<u8>> {
+        store
+            .get_delegation(&d.id)
+            .unwrap()
+            .map(|d| serde_json::to_vec(&d).unwrap())
+    }
+
+    /// Close every open proposal of L and seal it (attempt 1).
+    fn drain_and_seal(
+        owner: &LifecycleOwner,
+        store: &Arc<dyn GovernanceStateStore>,
+        open: &[Proposal],
+    ) {
+        for p in open {
+            let mut p = p.clone();
+            p.close(ProposalState::Rejected { closed_at: 9 }).unwrap();
+            store.save_proposal(&p).unwrap();
+        }
+        owner.seal_for_tests(&l(), 1, k(0x4D)).unwrap();
+    }
+
+    #[test]
+    fn votes_follow_the_lifecycle_of_their_proposals_domain() {
+        let s = sled();
+        let (owner, store) = started(&s);
+        let lp = opened(&store, "lp", L);
+        let draft = prop("draft");
+        store.create_proposal(&draft).unwrap();
+        let mp = opened(&store, "mp", M);
+        let (a, b, c) = (did(), did(), did());
+
+        // Legacy: an ordinary vote is written; context and identity are checked.
+        let va = ballot("lp", &a);
+        store.save_vote(&lp.id, &va).unwrap();
+        assert_eq!(
+            vote_row(&store, "lp", &a),
+            Some(serde_json::to_vec(&va).unwrap())
+        );
+        assert_eq!(
+            fence(
+                store
+                    .save_vote(&ProposalId("nope".into()), &ballot("nope", &a))
+                    .unwrap_err()
+            ),
+            FenceRefusal::VoteWithoutProposal
+        );
+        assert_eq!(
+            fence(store.save_vote(&lp.id, &ballot("mp", &a)).unwrap_err()),
+            FenceRefusal::VoteProposalMismatch
+        );
+        assert_eq!(vote_row(&store, "mp", &a), None);
+
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        // Pending: an open proposal of L drains (votes accepted); a draft of L does not.
+        let vb = ballot("lp", &b);
+        store.save_vote(&lp.id, &vb).unwrap();
+        assert_eq!(
+            vote_row(&store, "lp", &b),
+            Some(serde_json::to_vec(&vb).unwrap())
+        );
+        assert_eq!(
+            fence(
+                store
+                    .save_vote(&draft.id, &ballot("draft", &b))
+                    .unwrap_err()
+            ),
+            FenceRefusal::VoteNotDraining
+        );
+        assert_eq!(vote_row(&store, "draft", &b), None);
+        // An unrelated domain is unaffected.
+        store.save_vote(&mp.id, &ballot("mp", &b)).unwrap();
+
+        drain_and_seal(&owner, &store, std::slice::from_ref(&lp));
+        // Sealed: no new vote on L; the stored votes are kept; a byte-identical replay of an
+        // already stored vote writes nothing and is accepted.
+        assert_eq!(
+            fence(store.save_vote(&lp.id, &ballot("lp", &c)).unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        assert_eq!(vote_row(&store, "lp", &c), None);
+        store.save_vote(&lp.id, &va).unwrap();
+        assert_eq!(
+            vote_row(&store, "lp", &a),
+            Some(serde_json::to_vec(&va).unwrap())
+        );
+        assert_eq!(
+            vote_row(&store, "lp", &b),
+            Some(serde_json::to_vec(&vb).unwrap())
+        );
+        // A changed vote by an existing voter is a new act, refused like any other.
+        let mut changed = va.clone();
+        changed.choice = icn_governance::VoteChoice::Against;
+        assert_eq!(
+            fence(store.save_vote(&lp.id, &changed).unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        // M still votes after L is sealed.
+        store.save_vote(&mp.id, &ballot("mp", &c)).unwrap();
+        assert!(vote_row(&store, "mp", &c).is_some());
+    }
+
+    #[test]
+    fn delegations_are_contained_to_the_domain_their_scope_resolves_into() {
+        let s = sled();
+        let (owner, store) = started(&s);
+        let lp = opened(&store, "lp", L);
+        opened(&store, "mp", M);
+
+        // Legacy: scoped and blanket delegations are created; a proposal scope must name a
+        // stored proposal; an id is never re-pointed; an identical replay is accepted.
+        let dl = deleg(DelegationScope::Domain(l()));
+        store.save_delegation(&dl).unwrap();
+        store.save_delegation(&dl).unwrap();
+        let mut repointed = dl.clone();
+        repointed.delegate = did();
+        assert_eq!(
+            fence(store.save_delegation(&repointed).unwrap_err()),
+            FenceRefusal::DelegationExists
+        );
+        assert_eq!(
+            deleg_row(&store, &dl),
+            Some(serde_json::to_vec(&dl).unwrap())
+        );
+        let ghost = deleg(DelegationScope::Proposal(ProposalId("nope".into())));
+        assert_eq!(
+            fence(store.save_delegation(&ghost).unwrap_err()),
+            FenceRefusal::DelegationWithoutProposal
+        );
+        assert_eq!(deleg_row(&store, &ghost), None);
+        let mut blanket_repointed = deleg(DelegationScope::Blanket);
+        store.save_delegation(&blanket_repointed).unwrap();
+        blanket_repointed.delegate = did();
+        assert_eq!(
+            fence(store.save_delegation(&blanket_repointed).unwrap_err()),
+            FenceRefusal::DelegationExists
+        );
+
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        // Pending: nothing new resolves into L (scoped interim) ...
+        for scope in [
+            DelegationScope::Domain(l()),
+            DelegationScope::Proposal(lp.id.clone()),
+        ] {
+            let d = deleg(scope);
+            assert_eq!(
+                fence(store.save_delegation(&d).unwrap_err()),
+                FenceRefusal::DelegationWhilePending
+            );
+            assert_eq!(deleg_row(&store, &d), None);
+        }
+        // ... but L's transition disables nothing elsewhere: M and Blanket still work.
+        for scope in [
+            DelegationScope::Domain(GovernanceDomainId::new(M)),
+            DelegationScope::Proposal(ProposalId("mp".into())),
+            DelegationScope::Blanket,
+        ] {
+            let d = deleg(scope);
+            store.save_delegation(&d).unwrap();
+            assert_eq!(deleg_row(&store, &d), Some(serde_json::to_vec(&d).unwrap()));
+        }
+
+        drain_and_seal(&owner, &store, std::slice::from_ref(&lp));
+        // Sealed: no new authority enters L; others are unaffected.
+        for scope in [
+            DelegationScope::Domain(l()),
+            DelegationScope::Proposal(lp.id.clone()),
+        ] {
+            let d = deleg(scope);
+            assert_eq!(
+                fence(store.save_delegation(&d).unwrap_err()),
+                FenceRefusal::Sealed
+            );
+            assert_eq!(deleg_row(&store, &d), None);
+        }
+        let d = deleg(DelegationScope::Blanket);
+        store.save_delegation(&d).unwrap();
+        let d = deleg(DelegationScope::Domain(GovernanceDomainId::new(M)));
+        store.save_delegation(&d).unwrap();
+    }
+
+    #[test]
+    fn revocation_is_never_trapped_prospective_and_final() {
+        let s = sled();
+        let (owner, store) = started(&s);
+        let lp = opened(&store, "lp", L);
+        let in_l = deleg(DelegationScope::Domain(l()));
+        let on_lp = deleg(DelegationScope::Proposal(lp.id.clone()));
+        let blanket = deleg(DelegationScope::Blanket);
+        for d in [&in_l, &on_lp, &blanket] {
+            store.save_delegation(d).unwrap();
+        }
+        // A proposal-scoped row the pre-fence path accepted for a proposal that was never
+        // stored: written raw, as legacy data.
+        let stray = deleg(DelegationScope::Proposal(ProposalId("never".into())));
+        SledGovernanceStateStore::new(Arc::new(s.share()))
+            .save_delegation(&stray)
+            .unwrap();
+        let revoked = |d: &Delegation, t| {
+            let mut d = d.clone();
+            d.revoked_at = Some(t);
+            Some(serde_json::to_vec(&d).unwrap())
+        };
+
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        // Pending: the delegator may withdraw a delegation into L.
+        let t1 = on_lp.created_at + 1;
+        store.save_revoked_delegation(&on_lp, t1).unwrap();
+        assert_eq!(deleg_row(&store, &on_lp), revoked(&on_lp, t1));
+
+        drain_and_seal(&owner, &store, std::slice::from_ref(&lp));
+        // Sealed: still revocable (no one is trapped), and for every scope.
+        let t2 = in_l.created_at + 2;
+        store.save_revoked_delegation(&in_l, t2).unwrap();
+        assert_eq!(deleg_row(&store, &in_l), revoked(&in_l, t2));
+        store
+            .save_revoked_delegation(&blanket, blanket.created_at)
+            .unwrap();
+        assert_eq!(
+            deleg_row(&store, &blanket),
+            revoked(&blanket, blanket.created_at)
+        );
+        store
+            .save_revoked_delegation(&stray, stray.created_at)
+            .unwrap();
+        assert_eq!(deleg_row(&store, &stray), revoked(&stray, stray.created_at));
+
+        // Final: an identical revocation replays; a different time is refused, not moved.
+        store.save_revoked_delegation(&in_l, t2).unwrap();
+        assert_eq!(
+            fence(store.save_revoked_delegation(&in_l, t2 + 5).unwrap_err()),
+            FenceRefusal::RevocationFinal
+        );
+        assert_eq!(deleg_row(&store, &in_l), revoked(&in_l, t2));
+        // Not backdated before the delegation existed; names the stored delegation exactly;
+        // only stored delegations are revoked.
+        let fresh = deleg(DelegationScope::Blanket);
+        store.save_delegation(&fresh).unwrap();
+        assert_eq!(
+            fence(
+                store
+                    .save_revoked_delegation(&fresh, fresh.created_at - 1)
+                    .unwrap_err()
+            ),
+            FenceRefusal::RevocationBeforeCreation
+        );
+        let mut other = fresh.clone();
+        other.delegate = did();
+        assert_eq!(
+            fence(
+                store
+                    .save_revoked_delegation(&other, fresh.created_at)
+                    .unwrap_err()
+            ),
+            FenceRefusal::RevocationMismatch
+        );
+        assert_eq!(
+            deleg_row(&store, &fresh),
+            Some(serde_json::to_vec(&fresh).unwrap())
+        );
+        let unknown = deleg(DelegationScope::Blanket);
+        assert_eq!(
+            fence(
+                store
+                    .save_revoked_delegation(&unknown, unknown.created_at)
+                    .unwrap_err()
+            ),
+            FenceRefusal::RevocationWithoutDelegation
+        );
+    }
+
     #[test]
     fn the_owner_is_exclusive_and_releases_its_claim_when_dropped() {
         let s = sled();
@@ -739,6 +1137,105 @@ mod tests {
             .await
             .unwrap();
         assert!(state.get_proposal(&id("q1")).unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn the_actor_vote_and_delegation_commands_are_fenced_through_the_owner() {
+        let s = SledStore::temporary().unwrap();
+        let node = icn_identity::IdentityBundle::generate()
+            .unwrap()
+            .did()
+            .clone();
+        let other = "other.coop.example";
+        for id in [L, other] {
+            s.put(
+                &domain_key(&GovernanceDomainId::new(id)),
+                &serde_json::to_vec(&member_domain(id, &node)).unwrap(),
+            )
+            .unwrap();
+        }
+        let owner = LifecycleOwner::start(
+            &s,
+            BoundSealEvidence::receipts(Arc::new(Backend::default())),
+        )
+        .unwrap();
+        let handle = actor_on(&s, owner.clone(), &node).await;
+        let state = SledGovernanceStateStore::new(Arc::new(s.share()));
+        let id = |x: &str| ProposalId(x.to_string());
+        let gen = || {
+            icn_identity::IdentityBundle::generate()
+                .unwrap()
+                .did()
+                .clone()
+        };
+        // A fresh delegator each time, so the actor's one-active-delegation-per-scope rule never
+        // answers before the fence does.
+        let delegate = |scope| GovernanceCommand::CreateDelegation {
+            delegation: Delegation::new(gen(), gen(), scope),
+        };
+
+        for (p, dom) in [("p1", L), ("q1", other)] {
+            handle.submit(create(p, dom)).await.unwrap();
+            handle.submit(open(p)).await.unwrap();
+        }
+        // Legacy: a delegation into L, made by the node, through the command path.
+        let in_l = Delegation::new(node.clone(), gen(), DelegationScope::Domain(l()));
+        handle
+            .submit(GovernanceCommand::CreateDelegation {
+                delegation: in_l.clone(),
+            })
+            .await
+            .unwrap();
+
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        // Pending: L's open proposal drains through a real CastVote; no new delegation enters L.
+        handle.submit(vote("p1", &node)).await.unwrap();
+        assert!(state.get_vote(&id("p1"), &node).unwrap().is_some());
+        let e = handle
+            .submit(delegate(DelegationScope::Domain(l())))
+            .await
+            .unwrap_err();
+        assert_eq!(fence(e), FenceRefusal::DelegationWhilePending);
+        handle
+            .submit(delegate(DelegationScope::Blanket))
+            .await
+            .unwrap();
+
+        handle.submit(close("p1")).await.unwrap();
+        owner.seal_for_tests(&l(), 1, k(0x4D)).unwrap();
+        // Sealed: a new vote and a new delegation into L are refused through the actor ...
+        let voter_rows = state.list_votes(&id("p1")).unwrap().len();
+        let e = handle
+            .submit(GovernanceCommand::CastVote {
+                proposal_id: id("p1"),
+                voter: gen(),
+                choice: icn_governance::VoteChoice::Against,
+                comment: None,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(fence(e), FenceRefusal::Sealed);
+        assert_eq!(state.list_votes(&id("p1")).unwrap().len(), voter_rows);
+        let e = handle
+            .submit(delegate(DelegationScope::Domain(l())))
+            .await
+            .unwrap_err();
+        assert_eq!(fence(e), FenceRefusal::Sealed);
+        // ... while revocation of the existing delegation into L stays possible ...
+        handle
+            .submit(GovernanceCommand::RevokeDelegation {
+                id: in_l.id.clone(),
+                revoked_at: in_l.created_at + 1,
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            state.get_delegation(&in_l.id).unwrap().unwrap().revoked_at,
+            Some(in_l.created_at + 1)
+        );
+        // ... and the unrelated domain keeps voting.
+        handle.submit(vote("q1", &node)).await.unwrap();
+        assert!(state.get_vote(&id("q1"), &node).unwrap().is_some());
     }
 
     #[tokio::test]
@@ -1029,6 +1526,121 @@ mod tests {
         .await
         .unwrap();
         (s, owner, handle)
+    }
+
+    #[tokio::test]
+    async fn an_interrupted_vote_is_abandoned_and_a_final_revocation_survives_restart() {
+        use crate::predecessor_lifecycle_store::LIFECYCLE_JOURNAL_PREFIX;
+        use icn_store::recovery::{Outcome, RecoveryJournal};
+        let dir = tempfile::tempdir().unwrap();
+        let receipts = Arc::new(Backend::default());
+        let node = icn_identity::IdentityBundle::generate()
+            .unwrap()
+            .did()
+            .clone();
+        {
+            let s = SledStore::open(dir.path()).unwrap();
+            s.put(
+                &domain_key(&l()),
+                &serde_json::to_vec(&member_domain(L, &node)).unwrap(),
+            )
+            .unwrap();
+            s.flush().unwrap();
+        }
+        let id = |x: &str| ProposalId(x.to_string());
+        let (s, owner, h) = boot(dir.path(), &receipts, &node).await;
+        h.submit(create("p1", L)).await.unwrap();
+        h.submit(open("p1")).await.unwrap();
+        let d = Delegation::new(
+            node.clone(),
+            icn_identity::IdentityBundle::generate()
+                .unwrap()
+                .did()
+                .clone(),
+            DelegationScope::Domain(l()),
+        );
+        h.submit(GovernanceCommand::CreateDelegation {
+            delegation: d.clone(),
+        })
+        .await
+        .unwrap();
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+
+        // Interrupted: the owner dies after journaling a draining vote, before applying it.
+        owner
+            .arm_before_apply_for_tests(Box::new(|_: &SledStore| panic!("crash mid-commit")))
+            .unwrap();
+        assert!(h.submit(vote("p1", &node)).await.is_err(), "interrupted");
+        let state = SledGovernanceStateStore::new(Arc::new(s.share()));
+        assert!(
+            state.get_vote(&id("p1"), &node).unwrap().is_none(),
+            "nothing applied"
+        );
+        let outcomes = RecoveryJournal::new(&s, LIFECYCLE_JOURNAL_PREFIX)
+            .unwrap()
+            .classify()
+            .unwrap();
+        assert_eq!(outcomes.len(), 1);
+        assert!(matches!(outcomes[0], Outcome::NotApplied(_)));
+        s.flush().unwrap();
+        h.shutdown().await;
+        drop((h, owner, state));
+        drop(s);
+
+        // Restart: recovery abandons the unapplied vote; the voter can still vote (drainage).
+        let (s, owner, h) = boot(dir.path(), &receipts, &node).await;
+        assert!(RecoveryJournal::new(&s, LIFECYCLE_JOURNAL_PREFIX)
+            .unwrap()
+            .classify()
+            .unwrap()
+            .is_empty());
+        let state = SledGovernanceStateStore::new(Arc::new(s.share()));
+        assert!(state.get_vote(&id("p1"), &node).unwrap().is_none());
+        h.submit(vote("p1", &node)).await.unwrap();
+        assert!(state.get_vote(&id("p1"), &node).unwrap().is_some());
+        // The delegator withdraws, then L drains and seals.
+        let t = d.created_at + 1;
+        h.submit(GovernanceCommand::RevokeDelegation {
+            id: d.id.clone(),
+            revoked_at: t,
+        })
+        .await
+        .unwrap();
+        h.submit(close("p1")).await.unwrap();
+        owner.seal_for_tests(&l(), 1, k(0x4D)).unwrap();
+        s.flush().unwrap();
+        h.shutdown().await;
+        drop((h, owner, state));
+        drop(s);
+
+        // Restart again: the revocation is durable and final; L stays sealed for votes.
+        let (s, _owner, h) = boot(dir.path(), &receipts, &node).await;
+        let state = SledGovernanceStateStore::new(Arc::new(s.share()));
+        assert_eq!(
+            state.get_delegation(&d.id).unwrap().unwrap().revoked_at,
+            Some(t)
+        );
+        let e = h
+            .submit(GovernanceCommand::RevokeDelegation {
+                id: d.id.clone(),
+                revoked_at: t + 100,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(fence(e), FenceRefusal::RevocationFinal);
+        assert_eq!(
+            state.get_delegation(&d.id).unwrap().unwrap().revoked_at,
+            Some(t)
+        );
+        let late = icn_identity::IdentityBundle::generate()
+            .unwrap()
+            .did()
+            .clone();
+        assert_eq!(
+            fence(h.submit(vote("p1", &late)).await.unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        h.shutdown().await;
     }
 
     #[tokio::test]

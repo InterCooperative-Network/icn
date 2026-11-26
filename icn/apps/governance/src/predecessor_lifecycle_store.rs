@@ -57,7 +57,7 @@ use crate::close_journal::CloseJournalEntry;
 use crate::seal_evidence::{BoundSealEvidence, SealEvidence};
 use crate::state_store::{
     check_domain_overwrite, check_proposal_overwrite, close_intent_key, close_intent_key_prefix,
-    domain_key, proposal_key, proposal_key_prefix, ProposalWriteRefused,
+    delegation_key, domain_key, proposal_key, proposal_key_prefix, vote_key, ProposalWriteRefused,
 };
 use icn_governance::predecessor_seal::{classify, evaluate_drain, DrainStatus};
 
@@ -1032,6 +1032,181 @@ impl<'a> LifecycleStore<'a> {
         )
     }
 
+    /// Fenced vote write for a stored proposal of L (S29 operation contract, row "vote").
+    ///
+    /// The vote must name the proposal it is stored under, and that proposal must be stored in
+    /// L: a vote without a stored proposal has no institutional context and is refused. The
+    /// lifecycle decides next ([`vote_fence`]): Legacy keeps ordinary rules; Pending accepts
+    /// votes only on Open proposals (drainage of existing obligations); Sealed accepts none.
+    /// The proposal row is a commit guard, so a close racing the vote conflicts instead of
+    /// being outrun. A byte-identical vote is an idempotent replay and writes nothing.
+    ///
+    /// This is the lifecycle fence only. Ordinary vote validity (Open state and eligibility
+    /// for Legacy domains) stays with the actor, unchanged here.
+    pub fn write_vote(
+        &self,
+        loaded: &LoadedLifecycle,
+        proposal_id: &ProposalId,
+        vote: &icn_governance::Vote,
+        txid: [u8; 16],
+    ) -> anyhow::Result<FencedWrite> {
+        if vote.proposal_id != *proposal_id {
+            return Err(FenceRefusal::VoteProposalMismatch.into());
+        }
+        let pkey = proposal_key(proposal_id);
+        let pbytes = self
+            .store
+            .get(&pkey)?
+            .ok_or(FenceRefusal::VoteWithoutProposal)?;
+        let proposal: Proposal =
+            serde_json::from_slice(&pbytes).map_err(|_| FenceRefusal::UnreadableProposal)?;
+        if proposal.domain_id != loaded.predecessor {
+            return Err(FenceRefusal::OtherDomain.into());
+        }
+        let key = vote_key(proposal_id, &vote.voter);
+        let next = serde_json::to_vec(vote)?;
+        let stored = self.store.get(&key)?;
+        if stored.as_deref() == Some(next.as_slice()) {
+            return Ok(FencedWrite::Unchanged);
+        }
+        vote_fence(&loaded.state, &proposal)?;
+        self.fenced_commit(
+            loaded,
+            key,
+            stored,
+            Some(next),
+            vec![(pkey, Some(pbytes))],
+            txid,
+        )
+    }
+
+    /// Create-only delegation write (S29 contract, rows "Domain/Proposal/Blanket delegation").
+    ///
+    /// `loaded` is the lifecycle of the domain the delegation's scope resolves into, or `None`
+    /// for a scope that resolves into no domain (Blanket). A stored delegation is never
+    /// replaced by a different one: creation may not silently re-point existing authority
+    /// (revocation is [`Self::write_revocation`]). A byte-identical row is a replay.
+    ///
+    /// Scoped delegations (`Domain(L)`, or `Proposal(P)` with P stored in L) follow
+    /// [`delegation_fence`]. Legacy allows. Pending refuses as a **scoped experimental
+    /// interim**: tallies resolve delegations at close, so a new delegation would change who
+    /// decides L's draining proposals. Sealed refuses: no new authority enters a sealed domain.
+    /// A `Proposal(P)` scope must name a stored proposal. Blanket is never refused by any
+    /// domain's lifecycle: one institution's transition must not disable authority in
+    /// unrelated institutions (no network-wide refusal).
+    pub fn write_delegation(
+        &self,
+        loaded: Option<&LoadedLifecycle>,
+        delegation: &icn_governance::Delegation,
+        txid: [u8; 16],
+    ) -> anyhow::Result<FencedWrite> {
+        use icn_governance::DelegationScope;
+        let key = delegation_key(&delegation.id);
+        let next = serde_json::to_vec(delegation)?;
+        let stored = self.store.get(&key)?;
+        if stored.as_deref() == Some(next.as_slice()) {
+            return Ok(FencedWrite::Unchanged);
+        }
+        if stored.is_some() {
+            return Err(FenceRefusal::DelegationExists.into());
+        }
+        let mut guards = Vec::new();
+        match (&delegation.scope, loaded) {
+            (DelegationScope::Blanket, None) => {}
+            (DelegationScope::Blanket, Some(_)) | (_, None) => {
+                return Err(FenceRefusal::OtherDomain.into())
+            }
+            (DelegationScope::Domain(d), Some(loaded)) => {
+                if *d != loaded.predecessor {
+                    return Err(FenceRefusal::OtherDomain.into());
+                }
+            }
+            (DelegationScope::Proposal(p), Some(loaded)) => {
+                let pkey = proposal_key(p);
+                let pbytes = self
+                    .store
+                    .get(&pkey)?
+                    .ok_or(FenceRefusal::DelegationWithoutProposal)?;
+                let proposal: Proposal = serde_json::from_slice(&pbytes)
+                    .map_err(|_| FenceRefusal::UnreadableProposal)?;
+                if proposal.domain_id != loaded.predecessor {
+                    return Err(FenceRefusal::OtherDomain.into());
+                }
+                guards.push((pkey, Some(pbytes)));
+            }
+        }
+        match loaded {
+            Some(loaded) => {
+                delegation_fence(&loaded.state)?;
+                self.fenced_commit(loaded, key, None, Some(next), guards, txid)
+            }
+            None => {
+                self.commit(RecoveryIntent {
+                    txid,
+                    expected: vec![(key.clone(), None)],
+                    intended: vec![(key, Some(next))],
+                })?;
+                Ok(FencedWrite::Written { revision: 0 })
+            }
+        }
+    }
+
+    /// Prospective, write-once revocation of a stored delegation (S29 contract, row
+    /// "revocation"). Permitted in **every** lifecycle state: no subject is trapped in
+    /// delegated authority, and revoking changes no finalized decision.
+    ///
+    /// `delegation` must equal the stored row apart from `revoked_at`: the revocation names the
+    /// delegation it withdraws, not a re-pointed one. `revoked_at` may not precede the
+    /// delegation's creation, and a recorded revocation is final: an identical revocation is a
+    /// replay, and a different time is refused rather than moved. `loaded` is the lifecycle of
+    /// the scope's domain (journaled under L's record), or `None` for a scope with no lifecycle.
+    pub fn write_revocation(
+        &self,
+        loaded: Option<&LoadedLifecycle>,
+        delegation: &icn_governance::Delegation,
+        revoked_at: icn_governance::Timestamp,
+        txid: [u8; 16],
+    ) -> anyhow::Result<FencedWrite> {
+        let key = delegation_key(&delegation.id);
+        let stored = self
+            .store
+            .get(&key)?
+            .ok_or(FenceRefusal::RevocationWithoutDelegation)?;
+        let current: icn_governance::Delegation =
+            serde_json::from_slice(&stored).map_err(|_| FenceRefusal::UnreadableDelegation)?;
+        // Compared as stored bytes: the governance type has no equality, and the stored
+        // serialization is the identity the store keeps.
+        let mut named = delegation.clone();
+        named.revoked_at = current.revoked_at;
+        if serde_json::to_vec(&named)? != serde_json::to_vec(&current)? {
+            return Err(FenceRefusal::RevocationMismatch.into());
+        }
+        match current.revoked_at {
+            Some(t) if t == revoked_at => return Ok(FencedWrite::Unchanged),
+            Some(_) => return Err(FenceRefusal::RevocationFinal.into()),
+            None => {}
+        }
+        if revoked_at < current.created_at {
+            return Err(FenceRefusal::RevocationBeforeCreation.into());
+        }
+        let mut next = current;
+        next.revoked_at = Some(revoked_at);
+        let next = serde_json::to_vec(&next)?;
+        match loaded {
+            Some(loaded) => {
+                self.fenced_commit(loaded, key, Some(stored), Some(next), Vec::new(), txid)
+            }
+            None => {
+                self.commit(RecoveryIntent {
+                    txid,
+                    expected: vec![(key.clone(), Some(stored))],
+                    intended: vec![(key, Some(next))],
+                })?;
+                Ok(FencedWrite::Written { revision: 0 })
+            }
+        }
+    }
+
     /// L's current stored domain record must hash to the pin `loaded` retains (Pending or
     /// Sealed). Returns the exact bytes checked, for use as a commit guard.
     fn check_domain_pin(&self, loaded: &LoadedLifecycle) -> anyhow::Result<Vec<u8>> {
@@ -1133,6 +1308,28 @@ pub enum FenceRefusal {
     IntentOutstanding,
     /// A stored close intent cannot be decoded.
     UnreadableIntent,
+    /// A vote names a different proposal from the one it is written under.
+    VoteProposalMismatch,
+    /// A vote names no stored proposal, so it has no institutional context.
+    VoteWithoutProposal,
+    /// L is CutoverPending: only Open proposals (drainage) accept votes.
+    VoteNotDraining,
+    /// A different delegation is already stored under this id; creation never replaces it.
+    DelegationExists,
+    /// A proposal-scoped delegation names no stored proposal.
+    DelegationWithoutProposal,
+    /// L is CutoverPending: no new delegation may resolve into L (scoped experimental interim).
+    DelegationWhilePending,
+    /// The delegation to revoke is not stored.
+    RevocationWithoutDelegation,
+    /// The revocation names a delegation that differs from the stored one.
+    RevocationMismatch,
+    /// The delegation is already revoked at a different time; a revocation is final.
+    RevocationFinal,
+    /// The revocation time precedes the delegation's creation.
+    RevocationBeforeCreation,
+    /// A stored delegation cannot be decoded.
+    UnreadableDelegation,
 }
 
 impl std::fmt::Display for FenceRefusal {
@@ -1156,6 +1353,19 @@ impl std::fmt::Display for FenceRefusal {
             Self::CloseNotCompleted => {
                 "the close has not landed or contradicts the stored proposal; intent kept"
             }
+            Self::VoteProposalMismatch => "the vote names a different proposal",
+            Self::VoteWithoutProposal => "the vote names no stored proposal",
+            Self::VoteNotDraining => "while a cutover is pending only open proposals accept votes",
+            Self::DelegationExists => "a different delegation is already stored under this id",
+            Self::DelegationWithoutProposal => "the delegation names no stored proposal",
+            Self::DelegationWhilePending => {
+                "no new delegation may resolve into the domain while a cutover is pending"
+            }
+            Self::RevocationWithoutDelegation => "the delegation to revoke is not stored",
+            Self::RevocationMismatch => "the revocation names a different delegation",
+            Self::RevocationFinal => "the delegation is already revoked; a revocation is final",
+            Self::RevocationBeforeCreation => "the revocation precedes the delegation's creation",
+            Self::UnreadableDelegation => "the stored delegation cannot be decoded",
         })
     }
 }
@@ -1197,6 +1407,37 @@ pub fn proposal_fence(
             }
             Ok(())
         }
+    }
+}
+
+/// The fence policy for a vote on a stored proposal of L, as a pure function.
+///
+/// | L state | vote on an Open proposal | vote on any other proposal |
+/// |---|---|---|
+/// | Legacy | allow (ordinary rules apply in the actor) | allow (ordinary rules apply in the actor) |
+/// | CutoverPending | allow (drainage) | refuse `VoteNotDraining` |
+/// | Sealed | refuse | refuse |
+pub fn vote_fence(
+    lifecycle: &PredecessorLifecycle,
+    proposal: &Proposal,
+) -> Result<(), FenceRefusal> {
+    match lifecycle {
+        PredecessorLifecycle::Legacy { .. } => Ok(()),
+        PredecessorLifecycle::Sealed { .. } => Err(FenceRefusal::Sealed),
+        PredecessorLifecycle::CutoverPending { .. } => match proposal.state {
+            ProposalState::Open { .. } => Ok(()),
+            _ => Err(FenceRefusal::VoteNotDraining),
+        },
+    }
+}
+
+/// The fence policy for creating a delegation whose scope resolves into L, as a pure function.
+/// Blanket scopes resolve into no domain and never reach it. Revocation never reaches it.
+pub fn delegation_fence(lifecycle: &PredecessorLifecycle) -> Result<(), FenceRefusal> {
+    match lifecycle {
+        PredecessorLifecycle::Legacy { .. } => Ok(()),
+        PredecessorLifecycle::Sealed { .. } => Err(FenceRefusal::Sealed),
+        PredecessorLifecycle::CutoverPending { .. } => Err(FenceRefusal::DelegationWhilePending),
     }
 }
 
