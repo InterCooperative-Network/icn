@@ -623,9 +623,9 @@ impl<'a> LifecycleStore<'a> {
         let pkey = proposal_key(&next.id);
         let stored = self.store.get(&pkey)?;
         let previous: Option<Proposal> = match stored.as_deref() {
-            Some(bytes) => Some(
-                serde_json::from_slice(bytes).map_err(|_| FenceRefusal::UnreadableProposal)?,
-            ),
+            Some(bytes) => {
+                Some(serde_json::from_slice(bytes).map_err(|_| FenceRefusal::UnreadableProposal)?)
+            }
             None => None,
         };
         if let Some(prev) = &previous {
@@ -640,7 +640,7 @@ impl<'a> LifecycleStore<'a> {
         proposal_fence(&loaded.state, previous.as_ref(), next)?;
         let rkey = lifecycle_key(l)?;
         let wkey = witness_key(l)?;
-        let mut expected = vec![
+        let expected = vec![
             (pkey.clone(), stored),
             (rkey.clone(), loaded.record_bytes.clone()),
             (wkey, loaded.witness_bytes.clone()),
@@ -697,7 +697,9 @@ impl std::fmt::Display for FenceRefusal {
             Self::OtherDomain => "the proposal is not in the fenced domain",
             Self::UnreadableProposal => "the stored proposal cannot be decoded",
             Self::CreateWhilePending => "no proposal may be created while a cutover is pending",
-            Self::ActivationWhilePending => "a draft may not be activated while a cutover is pending",
+            Self::ActivationWhilePending => {
+                "a draft may not be activated while a cutover is pending"
+            }
             Self::Sealed => "the domain is sealed; its proposals are final",
         })
     }
@@ -955,7 +957,10 @@ mod tests {
     fn prop(id: &str) -> Proposal {
         let mut p = Proposal::new(
             l(),
-            icn_identity::IdentityBundle::generate().unwrap().did().clone(),
+            icn_identity::IdentityBundle::generate()
+                .unwrap()
+                .did()
+                .clone(),
             "t".into(),
             "d".into(),
             icn_governance::ProposalPayload::Text { body: "b".into() },
@@ -969,7 +974,8 @@ mod tests {
     }
 
     fn fence(e: anyhow::Error) -> FenceRefusal {
-        *e.downcast_ref::<FenceRefusal>().expect("a typed FenceRefusal")
+        *e.downcast_ref::<FenceRefusal>()
+            .expect("a typed FenceRefusal")
     }
 
     #[test]
@@ -977,14 +983,17 @@ mod tests {
         let s = store();
         let ls = live(&s);
         let p = prop("p1");
-        let w = ls.write_proposal(&ls.load(&l()).unwrap(), &p, [9; 16]).unwrap();
+        let w = ls
+            .write_proposal(&ls.load(&l()).unwrap(), &p, [9; 16])
+            .unwrap();
         assert_eq!(w, FencedWrite::Written { revision: 0 });
         assert!(row(&s, &p).is_some());
         assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), None);
         assert_eq!(s.get(&witness_key(&l()).unwrap()).unwrap(), None);
         // Identical rewrite: nothing written, nothing bumped.
         assert_eq!(
-            ls.write_proposal(&ls.load(&l()).unwrap(), &p, [10; 16]).unwrap(),
+            ls.write_proposal(&ls.load(&l()).unwrap(), &p, [10; 16])
+                .unwrap(),
             FencedWrite::Unchanged
         );
         admitted(&s);
@@ -999,8 +1008,12 @@ mod tests {
         ls.write_proposal(&legacy, &draft, [1; 16]).unwrap();
         let mut deliberating = prop("delib");
         deliberating.start_deliberation(60).unwrap();
-        ls.write_proposal(&ls.load(&l()).unwrap(), &deliberating, [2; 16]).unwrap();
-        let pending = written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [3; 16]).unwrap());
+        ls.write_proposal(&ls.load(&l()).unwrap(), &deliberating, [2; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [3; 16])
+                .unwrap(),
+        );
         let r0 = pending.revision();
 
         // A new proposal (the phantom) is refused.
@@ -1015,11 +1028,18 @@ mod tests {
         let mut activated = draft.clone();
         activated.start_deliberation(60).unwrap();
         assert_eq!(
-            fence(ls.write_proposal(&pending, &activated, [5; 16]).unwrap_err()),
+            fence(
+                ls.write_proposal(&pending, &activated, [5; 16])
+                    .unwrap_err()
+            ),
             FenceRefusal::ActivationWhilePending
         );
         assert_eq!(row(&s, &draft), before);
-        assert_eq!(ls.load(&l()).unwrap().revision(), r0, "a refusal bumps nothing");
+        assert_eq!(
+            ls.load(&l()).unwrap().revision(),
+            r0,
+            "a refusal bumps nothing"
+        );
 
         // Deliberation -> Open is allowed and bumps L's revision.
         deliberating.force_end_deliberation(60).unwrap();
@@ -1048,8 +1068,12 @@ mod tests {
         let ls = live(&s);
         let mut p = prop("p");
         p.start_deliberation(60).unwrap();
-        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16]).unwrap();
-        let pending = written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16]).unwrap());
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
+                .unwrap(),
+        );
         // Concurrent activation lands between the Seal's read and its write.
         p.force_end_deliberation(60).unwrap();
         ls.write_proposal(&pending, &p, [3; 16]).unwrap();
@@ -1103,8 +1127,12 @@ mod tests {
         let ls = live(&s);
         let mut p = prop("p");
         p.cancel().unwrap();
-        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16]).unwrap();
-        let pending = written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16]).unwrap());
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
+                .unwrap(),
+        );
         let ids = ["p"];
         let sealed = written(
             ls.transition(
@@ -1129,7 +1157,10 @@ mod tests {
             FenceRefusal::Sealed
         );
         assert_eq!(
-            fence(ls.write_proposal(&sealed, &prop("new"), [6; 16]).unwrap_err()),
+            fence(
+                ls.write_proposal(&sealed, &prop("new"), [6; 16])
+                    .unwrap_err()
+            ),
             FenceRefusal::Sealed
         );
         assert_eq!(ls.load(&l()).unwrap().revision(), sealed.revision());
@@ -1143,7 +1174,10 @@ mod tests {
         let mut other = prop("x");
         other.domain_id = GovernanceDomainId("other.coop".into());
         assert_eq!(
-            fence(ls.write_proposal(&ls.load(&l()).unwrap(), &other, [1; 16]).unwrap_err()),
+            fence(
+                ls.write_proposal(&ls.load(&l()).unwrap(), &other, [1; 16])
+                    .unwrap_err()
+            ),
             FenceRefusal::OtherDomain
         );
         assert!(row(&s, &other).is_none());
@@ -1188,9 +1222,12 @@ mod tests {
         let ls = live(s);
         let mut p = prop("p");
         p.start_deliberation(60).unwrap();
-        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16]).unwrap();
-        let pending =
-            written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16]).unwrap());
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
+                .unwrap(),
+        );
         p.force_end_deliberation(60).unwrap();
         let bumped = LifecycleRecordV1 {
             revision: pending.revision() + 1,
@@ -1227,7 +1264,9 @@ mod tests {
         assert_eq!(row(&s, &p), before, "nothing was applied");
         let ls = recovery.into_live().map_err(|(_, e)| e).unwrap();
         // The write can now be made, against the recovered state.
-        assert!(ls.write_proposal(&ls.load(&l()).unwrap(), &p, [0xC1; 16]).is_ok());
+        assert!(ls
+            .write_proposal(&ls.load(&l()).unwrap(), &p, [0xC1; 16])
+            .is_ok());
     }
 
     #[test]
@@ -1248,7 +1287,10 @@ mod tests {
         let report = recovery.resolve_safe().unwrap();
         assert_eq!(report.quarantined.len(), 1);
         assert!(matches!(report.quarantined[0], Outcome::Partial(_)));
-        assert!(recovery.into_live().is_err(), "no authoritative access over a torn write");
+        assert!(
+            recovery.into_live().is_err(),
+            "no authoritative access over a torn write"
+        );
     }
 
     #[test]
@@ -1270,7 +1312,10 @@ mod tests {
         assert_eq!((report.completed, report.abandoned), (1, 0));
         let ls = recovery.into_live().map_err(|(_, e)| e).unwrap();
         let now = ls.load(&l()).unwrap();
-        assert!(matches!(now.state(), PredecessorLifecycle::CutoverPending { .. }));
+        assert!(matches!(
+            now.state(),
+            PredecessorLifecycle::CutoverPending { .. }
+        ));
         assert_eq!(row(&s, &p), Some(serde_json::to_vec(&p).unwrap()));
     }
 
@@ -1278,8 +1323,10 @@ mod tests {
     fn after_an_abort_fenced_writes_bump_the_revision_and_keep_k_first_and_the_witness() {
         let s = store();
         let ls = live(&s);
-        let pending =
-            written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16]).unwrap());
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
+                .unwrap(),
+        );
         let aborted = written(
             ls.transition(
                 &pending,
@@ -1293,7 +1340,9 @@ mod tests {
         );
         let witness = s.get(&witness_key(&l()).unwrap()).unwrap();
         // Legacy again, but with history: creation is allowed and is fenced.
-        let w = ls.write_proposal(&aborted, &prop("after"), [3; 16]).unwrap();
+        let w = ls
+            .write_proposal(&aborted, &prop("after"), [3; 16])
+            .unwrap();
         assert_eq!(
             w,
             FencedWrite::Written {
@@ -1301,7 +1350,11 @@ mod tests {
             }
         );
         let now = ls.load(&l()).unwrap();
-        assert_eq!(now.state(), aborted.state(), "still Legacy, attempt history intact");
+        assert_eq!(
+            now.state(),
+            aborted.state(),
+            "still Legacy, attempt history intact"
+        );
         assert_eq!(
             now.stored.as_ref().unwrap().first_commitment_hash,
             k(0x4D),
@@ -1316,9 +1369,12 @@ mod tests {
         let s = store();
         let ls = live(&s);
         let mut p = prop("p");
-        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16]).unwrap();
-        let pending =
-            written(ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16]).unwrap());
+        ls.write_proposal(&ls.load(&l()).unwrap(), &p, [1; 16])
+            .unwrap();
+        let pending = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
+                .unwrap(),
+        );
         let maxed = LifecycleRecordV1 {
             revision: u64::MAX,
             ..pending.stored.clone().unwrap()
