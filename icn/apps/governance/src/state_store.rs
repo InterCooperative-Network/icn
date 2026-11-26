@@ -523,9 +523,10 @@ pub fn permitted_state_change(
         (S::Draft, S::Deliberation { .. } | S::Open { .. }) => true,
         (S::Deliberation { .. }, S::Open { .. }) => true,
         (S::Open { .. }, t) if t.is_closed() => true,
-        (S::Draft | S::Deliberation { .. } | S::Open { .. }, S::Cancelled { .. } | S::Vetoed { .. }) => {
-            true
-        }
+        (
+            S::Draft | S::Deliberation { .. } | S::Open { .. },
+            S::Cancelled { .. } | S::Vetoed { .. },
+        ) => true,
         (S::Deliberation { .. }, S::ForceClosed { .. }) => true,
         _ => false,
     }
