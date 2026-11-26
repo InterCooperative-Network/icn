@@ -577,7 +577,28 @@ impl GovernanceHandle {
         store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
     ) {
         let mut actor = self.inner.write().await;
+        if actor.receipt_store_bound {
+            let same = actor
+                .receipt_store
+                .as_ref()
+                .is_some_and(|bound| Arc::ptr_eq(bound, &store));
+            if !same {
+                error!(
+                    "refusing to replace the receipt store bound at construction: the \
+                     lifecycle Seal reads that backend's evidence"
+                );
+            }
+            return;
+        }
         actor.receipt_store = Some(store);
+    }
+
+    /// Test-only: the receipt store the actor currently holds.
+    #[cfg(test)]
+    pub(crate) async fn receipt_store_for_tests(
+        &self,
+    ) -> Option<Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>> {
+        self.inner.read().await.receipt_store.clone()
     }
 
     /// Replay any incomplete write-ahead close-journal entries to completion.
@@ -1246,6 +1267,10 @@ pub struct GovernanceActor {
     /// (proposal_id, effect_kind) keeps this safe when the HTTP handler
     /// also invokes emission after the actor-backed close returns.
     receipt_store: Option<Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>>,
+    /// Set when the receipt backend was bound at construction (lifecycle-aware mode, S28): the
+    /// Seal's evidence reads that exact backend, so a later install of a different one is
+    /// refused rather than silently diverging from it.
+    receipt_store_bound: bool,
     /// Durable per-`(author, domain)` sequence source for signed governance emission (#2469).
     ///
     /// Consumed only on the emission path, and only after an operation has been found
@@ -1266,6 +1291,98 @@ impl GovernanceActor {
     pub async fn spawn(
         did: Did,
         store: Arc<dyn icn_store::Store>,
+        gossip: Arc<RwLock<GossipActor>>,
+        resolver: Arc<dyn MembershipResolver + Send + Sync>,
+        event_bus: Option<Arc<dyn EventEmitter>>,
+        signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
+    ) -> Result<GovernanceHandle> {
+        let state: Arc<dyn GovernanceStateStore> =
+            Arc::new(SledGovernanceStateStore::new(store.clone()));
+        Self::spawn_with_state(
+            did,
+            store,
+            state,
+            None,
+            gossip,
+            resolver,
+            event_bus,
+            signing_key,
+        )
+        .await
+    }
+
+    /// P5b increment 3 (EXPERIMENTAL, INACTIVE: crate-private, no production caller). Spawn the
+    /// actor over the daemon's owning governance database with every authoritative proposal,
+    /// domain and close-intent write routed through the lifecycle owner
+    /// ([`crate::lifecycle_owner`]). The owner claims the database and completes safe recovery
+    /// before this returns; if anything stays quarantined the actor is not spawned. The receipt
+    /// backend is bound here, both as the Seal's evidence and as the actor's receipt store; a
+    /// later `install_receipt_store` of a different backend is refused.
+    #[cfg_attr(not(test), allow(dead_code))]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn spawn_lifecycle_aware(
+        did: Did,
+        store: &icn_store::SledStore,
+        receipts: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
+        gossip: Arc<RwLock<GossipActor>>,
+        resolver: Arc<dyn MembershipResolver + Send + Sync>,
+        event_bus: Option<Arc<dyn EventEmitter>>,
+        signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
+    ) -> Result<GovernanceHandle> {
+        use crate::lifecycle_owner::LifecycleOwner;
+        use crate::seal_evidence::BoundSealEvidence;
+        let owner = LifecycleOwner::start(store, BoundSealEvidence::receipts(receipts.clone()))
+            .map_err(|e| anyhow::anyhow!("lifecycle-aware governance refused to start: {e}"))?;
+        Self::spawn_with_owner(
+            did,
+            store,
+            owner,
+            receipts,
+            gossip,
+            resolver,
+            event_bus,
+            signing_key,
+        )
+        .await
+    }
+
+    /// Spawn over an already-started lifecycle owner (crate-private; tests keep a handle to the
+    /// owner for test-only lifecycle transitions). `receipts` must be the backend the owner's
+    /// evidence was bound to.
+    #[cfg_attr(not(test), allow(dead_code))]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn spawn_with_owner(
+        did: Did,
+        store: &icn_store::SledStore,
+        owner: crate::lifecycle_owner::LifecycleOwner,
+        receipts: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
+        gossip: Arc<RwLock<GossipActor>>,
+        resolver: Arc<dyn MembershipResolver + Send + Sync>,
+        event_bus: Option<Arc<dyn EventEmitter>>,
+        signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
+    ) -> Result<GovernanceHandle> {
+        let state: Arc<dyn GovernanceStateStore> = Arc::new(
+            crate::lifecycle_owner::FencedGovernanceStateStore::new(store, owner),
+        );
+        Self::spawn_with_state(
+            did,
+            Arc::new(store.share()),
+            state,
+            Some(receipts),
+            gossip,
+            resolver,
+            event_bus,
+            signing_key,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn spawn_with_state(
+        did: Did,
+        store: Arc<dyn icn_store::Store>,
+        state: Arc<dyn GovernanceStateStore>,
+        bound_receipts: Option<Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>>,
         gossip: Arc<RwLock<GossipActor>>,
         resolver: Arc<dyn MembershipResolver + Send + Sync>,
         event_bus: Option<Arc<dyn EventEmitter>>,
@@ -1299,8 +1416,8 @@ impl GovernanceActor {
             }
         }
 
-        // Wrap raw store in typed state store abstraction
-        let store: Arc<dyn GovernanceStateStore> = Arc::new(SledGovernanceStateStore::new(store));
+        // The typed state store: plain, or lifecycle-aware (routed through the owner).
+        let store: Arc<dyn GovernanceStateStore> = state;
 
         // Subscribe to governance topic
         {
@@ -1397,7 +1514,8 @@ impl GovernanceActor {
             signing_key,
             executor: None,
             action_item_store: None,
-            receipt_store: None,
+            receipt_store: bound_receipts.clone(),
+            receipt_store_bound: bound_receipts.is_some(),
             replication_sequences,
             signing_key_did,
         };
