@@ -536,4 +536,13 @@ fn k_first_is_retained_and_cross_checked_after_every_attempt() {
     let mut bad_first = pending(1, 1);
     bad_first.first_commitment_hash = [0x01; 32];
     assert!(LifecycleWitnessV1::for_first_pending(&bad_first).is_err());
+    // At a later attempt the record's own attempt-1 rule does not apply, so the derivation must
+    // refuse a K_first that differs from the Pending commitment it would witness.
+    let mut later_first = pending(3, 2);
+    later_first.first_commitment_hash = [0x02; 32];
+    assert!(later_first.encode().is_ok(), "a valid later-attempt record");
+    assert_eq!(
+        LifecycleWitnessV1::for_first_pending(&later_first),
+        Err(E::FirstCommitmentMismatch)
+    );
 }
