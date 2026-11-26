@@ -13,7 +13,9 @@ use icn_governance::{
     Grantee, Mandate, MandateId, MeetingAttendanceReceipt, ProofOutcome, Timestamp, VoteTally,
 };
 use icn_governance_actor::dispatch_evidence::EffectDispatchEvidence;
-use icn_governance_actor::grant_minting::{MANDATE_IDENTITY_AMBIGUOUS, MANDATE_IDENTITY_TAKEN};
+use icn_governance_actor::grant_minting::{
+    MANDATE_IDENTITY_AMBIGUOUS, MANDATE_IDENTITY_CONFLICT, MANDATE_IDENTITY_TAKEN,
+};
 use icn_governance_actor::institutional_effect::{
     InstitutionalEffectRecord, INSTITUTIONAL_EFFECT_IDENTITY_TAKEN,
 };
@@ -2128,7 +2130,9 @@ impl ReceiptStore {
     /// the proposal's identity entry, before staging anything:
     /// - absent: the identity entry, the mandate, its indexes and all grants
     ///   are written together;
-    /// - present with this mandate's id: an idempotent rewrite;
+    /// - present with this mandate's id: a rewrite, allowed only when the
+    ///   stored record differs at most in its lifecycle `status`; any other
+    ///   difference is refused with [`MANDATE_IDENTITY_CONFLICT`];
     /// - present with another id: refused with an error starting with
     ///   [`MANDATE_IDENTITY_TAKEN`]; nothing (no grant either) is written.
     ///
@@ -2211,6 +2215,25 @@ impl ReceiptStore {
                     )));
                 }
             }
+            // Same mandate id: its commitments (decision, payload, grant set,
+            // executor, deadline, issue time) are immutable. Only the
+            // lifecycle status may change on a rewrite.
+            if let Some(stored) = tx.get(mandate_primary_key.as_slice())? {
+                let mut stored: Mandate = serde_json::from_slice(&stored).map_err(|e| {
+                    ConflictableTransactionError::Abort(format!(
+                        "deserialize stored Mandate {}: {e}",
+                        mandate.id
+                    ))
+                })?;
+                stored.status = mandate.status;
+                if stored != *mandate {
+                    return Err(ConflictableTransactionError::Abort(format!(
+                        "{MANDATE_IDENTITY_CONFLICT}: mandate {} is already stored with \
+                         different commitments; refusing to replace them",
+                        mandate.id
+                    )));
+                }
+            }
             tx.insert(identity_key.as_slice(), mandate_id_bytes.as_slice())?;
             for pg in &prepared {
                 tx.insert(pg.primary_key.as_slice(), pg.value.as_slice())?;
@@ -2241,7 +2264,10 @@ impl ReceiptStore {
         });
         match outcome {
             Ok(()) => Ok(()),
-            Err(TransactionError::Abort(msg)) if msg.starts_with(MANDATE_IDENTITY_TAKEN) => {
+            Err(TransactionError::Abort(msg))
+                if msg.starts_with(MANDATE_IDENTITY_TAKEN)
+                    || msg.starts_with(MANDATE_IDENTITY_CONFLICT) =>
+            {
                 Err(msg)
             }
             Err(e) => Err(format!("sled put_mandate_with_grants tx aborted: {e:?}")),
@@ -6371,6 +6397,62 @@ mod mandate_identity_tests {
         assert_eq!(
             store.get_mandate_by_proposal("p-reopen").unwrap(),
             Some(first)
+        );
+    }
+
+    /// The same mandate id must not let a rewrite replace its immutable
+    /// commitments (decision hash, payload hash, grant set). Only the lifecycle
+    /// status may change; the stored record and indexes stay as they were.
+    #[test]
+    fn same_id_rewrite_cannot_replace_commitments() {
+        let store = ReceiptStore::new(temp_db());
+        let first = mandate("p-same-id", [1u8; 32], [7u8; 32], 10);
+        store.put_mandate(&first).unwrap();
+        let stored = |s: &ReceiptStore| {
+            s.db.get(ReceiptStore::mandate_primary_key(&first.id))
+                .unwrap()
+                .unwrap()
+                .to_vec()
+        };
+        let before = stored(&store);
+
+        let mut other_decision = first.clone();
+        other_decision.decision.decision_hash = [2u8; 32];
+        let mut other_payload = first.clone();
+        other_payload.payload_hash = [8u8; 32];
+        let mut other_grants = first.clone();
+        other_grants.grants = vec![AuthorityGrantId::new()];
+        for (what, m) in [
+            ("decision", other_decision),
+            ("payload", other_payload),
+            ("grants", other_grants),
+        ] {
+            let res = store.put_mandate(&m);
+            assert!(
+                res.is_err(),
+                "{what}: a same-id rewrite replaced a commitment"
+            );
+            assert_eq!(stored(&store), before, "{what}: stored bytes changed");
+        }
+        assert!(store
+            .list_mandates_by_decision(&[2u8; 32])
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            store.get_mandate_by_proposal("p-same-id").unwrap(),
+            Some(first.clone())
+        );
+
+        // A lifecycle status change on the same id is still a permitted rewrite.
+        let mut progressed = first.clone();
+        progressed.status = icn_governance::MandateStatus::InProgress;
+        store.put_mandate(&progressed).unwrap();
+        assert_eq!(
+            store
+                .get_mandate_by_proposal("p-same-id")
+                .unwrap()
+                .map(|m| m.status),
+            Some(icn_governance::MandateStatus::InProgress)
         );
     }
 
