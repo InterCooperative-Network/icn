@@ -44,6 +44,7 @@ pub mod manager;
 pub mod mandate_gate;
 pub mod predecessor_lifecycle_store;
 pub mod receipt_backend;
+pub mod seal_evidence;
 pub mod registry;
 pub mod rehearsal_workspace;
 pub mod replication_emission;
