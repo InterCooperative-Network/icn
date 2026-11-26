@@ -227,6 +227,37 @@ pub struct CloseJournalEntry {
     /// non-execution-required institutional-effect / mandate emission without
     /// re-deriving the hash from votes/tally.
     pub governance_decision_hash: Option<String>,
+    /// Whether [`Self::commit`] also writes the close's execution closure —
+    /// the institutional-effect record and the ADR-0014 mandate (with its
+    /// derived grants and any SDIS lifecycle revocations) — for an accepted,
+    /// execution-required proposal.
+    ///
+    /// Those writes are execution authority: the mandate gate resolves grants
+    /// from them and lifecycle revocations end other grants. When this is
+    /// `true` they happen only behind this durable intent, so a decision that
+    /// never became durable cannot leave authority behind, and an interrupted
+    /// one is completed by retry or startup recovery. Every write is
+    /// idempotent (`AlreadyEmitted` / `AlreadyMinted`), so replay never adds a
+    /// second mandate.
+    ///
+    /// Set by the force-accept path. Entries written before this field existed
+    /// deserialize as `false`, which matches what they did: their close wrote
+    /// those artifacts itself, before the intent.
+    #[serde(default)]
+    pub execution_closure: bool,
+}
+
+/// True when `state` records an accepted outcome — an ordinary accepted close
+/// or a force-close whose forced outcome is acceptance.
+pub(crate) fn is_accepted(state: &icn_governance::ProposalState) -> bool {
+    matches!(
+        state,
+        icn_governance::ProposalState::Accepted { .. }
+            | icn_governance::ProposalState::ForceClosed {
+                outcome: icn_governance::ProposalOutcome::Accepted,
+                ..
+            }
+    )
 }
 
 impl CloseJournalEntry {
@@ -234,8 +265,9 @@ impl CloseJournalEntry {
     /// state.
     ///
     /// Order mirrors the pre-journal close path so behavior is unchanged on the
-    /// happy path: Db-A receipts (v3 → v1 → allocation) → proof bytes (Db-B) →
-    /// terminal `save_proposal` (Db-B). Every write is idempotent, so calling
+    /// happy path: Db-A receipts (v3 → v1 → allocation) → execution closure
+    /// (Db-A, only when [`Self::execution_closure`] is set) → proof bytes
+    /// (Db-B) → terminal `save_proposal` (Db-B). Every write is idempotent, so calling
     /// `commit` again (on recovery, or after a transient partial failure)
     /// cannot duplicate or corrupt provenance.
     ///
@@ -259,10 +291,78 @@ impl CloseJournalEntry {
                 .apply(backend, true)
                 .map_err(|e| anyhow::anyhow!(e))?;
         }
+        if self.execution_closure {
+            let backend = backend.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "close journal for proposal '{}' carries an execution closure but no receipt backend is wired",
+                    self.proposal.id.0
+                )
+            })?;
+            self.apply_execution_closure(backend)?;
+        }
         if let Some(proof) = &self.proof_bytes {
             state.save_proof_bytes(&self.proposal.id, proof)?;
         }
         state.save_proposal(&self.proposal)?;
         Ok(())
+    }
+
+    /// Idempotently write the execution closure: institutional-effect record,
+    /// then the ADR-0014 mandate (and its grants / lifecycle revocations).
+    ///
+    /// Uses `decided_at` as the write time so a replay reproduces the same
+    /// records rather than restamping them with the restart time. Fails closed
+    /// unless the entry records an accepted outcome with a well-formed decision
+    /// hash — a mandate must never be minted for anything else.
+    fn apply_execution_closure(
+        &self,
+        backend: &dyn GovernanceReceiptBackend,
+    ) -> anyhow::Result<()> {
+        let proposal_id = &self.proposal.id.0;
+        if !is_accepted(&self.proposal.state) {
+            anyhow::bail!(
+                "close journal for proposal '{proposal_id}' carries an execution closure but does not record an accepted outcome"
+            );
+        }
+        let decision_hash: icn_kernel_api::Hash = self
+            .governance_decision_hash
+            .as_deref()
+            .and_then(|h| hex::decode(h).ok())
+            .and_then(|v| <[u8; 32]>::try_from(v.as_slice()).ok())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "close journal for proposal '{proposal_id}' carries an execution closure without a valid decision hash"
+                )
+            })?;
+        crate::institutional_effect::emit_accepted_effect(
+            backend,
+            proposal_id,
+            &self.proposal.domain_id.0,
+            Some(decision_hash),
+            &self.proposal.payload,
+            self.decided_at,
+        )
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "execution closure for proposal '{proposal_id}' failed: institutional effect: {e}"
+            )
+        })?;
+        match crate::grant_minting::mint_and_persist_for_accepted(
+            backend,
+            proposal_id,
+            &self.proposal.domain_id,
+            decision_hash,
+            &self.proposal.payload,
+            self.decided_at,
+        ) {
+            Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
+            | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted { .. }) => Ok(()),
+            Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => anyhow::bail!(
+                "execution closure for proposal '{proposal_id}' failed: mandate payload hash failed"
+            ),
+            Err(e) => {
+                anyhow::bail!("execution closure for proposal '{proposal_id}' failed: mandate: {e}")
+            }
+        }
     }
 }

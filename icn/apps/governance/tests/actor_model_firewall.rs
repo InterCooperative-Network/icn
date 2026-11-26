@@ -514,6 +514,7 @@ fn terminal_journal_for(
         receipts: Default::default(),
         decided_at: 1,
         governance_decision_hash: None,
+        execution_closure: false,
     }
 }
 

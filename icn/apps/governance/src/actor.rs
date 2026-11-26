@@ -1798,8 +1798,12 @@ impl GovernanceActor {
         //    action items, non-execution-required institutional-effect +
         //    mandate). All idempotent.
         let outcome = match &entry.proposal.state {
-            ProposalState::Accepted { .. } => DecisionOutcome::Accepted,
-            ProposalState::NoQuorum { .. } => DecisionOutcome::NoQuorum,
+            state if crate::close_journal::is_accepted(state) => DecisionOutcome::Accepted,
+            ProposalState::NoQuorum { .. }
+            | ProposalState::ForceClosed {
+                outcome: ProposalOutcome::NoQuorum,
+                ..
+            } => DecisionOutcome::NoQuorum,
             _ => DecisionOutcome::Rejected,
         };
         if let Err(e) = self
@@ -2856,6 +2860,10 @@ impl GovernanceActor {
                     },
                     decided_at: now,
                     governance_decision_hash: governance_decision_hash.clone(),
+                    // The ordinary close still writes its execution closure in
+                    // the preflight above (before this intent); see
+                    // `CloseJournalEntry::execution_closure`.
+                    execution_closure: false,
                 };
                 self.store.save_close_intent(&journal_entry)?;
                 journal_entry.commit(self.receipt_store.as_deref(), self.store.as_ref())?;
@@ -3043,6 +3051,39 @@ impl GovernanceActor {
                 // Notify scheduler to cancel any pending events (if scheduled)
                 let _ = self.cancel_tx.send(proposal_id.clone());
 
+                // Map ForcedOutcome to ProposalOutcome for the state
+                let proposal_outcome = match &forced_outcome {
+                    ForcedOutcome::Accept => ProposalOutcome::Accepted,
+                    ForcedOutcome::Reject => ProposalOutcome::Rejected,
+                    ForcedOutcome::Cancel => ProposalOutcome::NoQuorum, // Treat Cancel as NoQuorum
+                };
+
+                // A retry of a force-close whose decision is already durably
+                // journaled (an earlier attempt failed or was interrupted after
+                // its intent was written) completes THAT decision — same
+                // closed_at, same decision hash, same mandate — rather than
+                // deciding again. Only an intent that is itself a force-close
+                // with the same forced outcome counts as "the same request";
+                // anything else falls through to the generic rule below.
+                if let Some(existing) = self.store.get_close_intent(&proposal_id)? {
+                    if matches!(
+                        &existing.proposal.state,
+                        ProposalState::ForceClosed { outcome, .. } if *outcome == proposal_outcome
+                    ) {
+                        info!(
+                            proposal_id = %proposal_id.0,
+                            "In-flight force-close journal entry found; completing it instead of deciding again"
+                        );
+                        return self.complete_journaled_close(existing).await.map_err(|e| {
+                            anyhow::anyhow!(
+                                "Force-close retry for proposal '{}' could not complete the in-flight \
+                                 journal entry: {e}",
+                                proposal_id.0
+                            )
+                        });
+                    }
+                }
+
                 // A durable close intent records an already-made decision.
                 self.complete_pending_close_first(&proposal_id, "force-close")
                     .await?;
@@ -3051,13 +3092,6 @@ impl GovernanceActor {
                 let mut proposal = self
                     .load_proposal(&proposal_id)?
                     .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
-
-                // Map ForcedOutcome to ProposalOutcome for the state
-                let proposal_outcome = match &forced_outcome {
-                    ForcedOutcome::Accept => ProposalOutcome::Accepted,
-                    ForcedOutcome::Reject => ProposalOutcome::Rejected,
-                    ForcedOutcome::Cancel => ProposalOutcome::NoQuorum, // Treat Cancel as NoQuorum
-                };
 
                 let requires_execution_closure = matches!(&forced_outcome, ForcedOutcome::Accept)
                     && proposal.payload.requires_execution_closure();
@@ -3068,19 +3102,18 @@ impl GovernanceActor {
                     );
                 }
 
-                // Invariant 7 gate + closure preflight for forced accepts.
-                //
-                // Force-close is an administrative override of vote thresholds,
-                // not of governance-receipt correctness. The gate still applies:
-                // a forced Accept must produce an internally consistent
-                // GovernanceDecisionReceipt before terminal proposal state is
-                // persisted. Forced accepts use VoteTally::empty() and no votes
-                // — the receipt still verifies because the stored hash is
-                // derived from those exact inputs.
-                let force_decision_hash: Option<icn_kernel_api::receipts::Hash> = if matches!(
-                    &forced_outcome,
-                    ForcedOutcome::Accept
-                ) {
+                // Force close the proposal in memory FIRST. A proposal that is not
+                // Open/Deliberating is refused here, before anything durable —
+                // in particular before any execution authority — is written.
+                proposal.force_close(proposal_outcome.clone(), reason.clone())?;
+
+                if matches!(&forced_outcome, ForcedOutcome::Accept) {
+                    // Invariant 7 gate. Force-close overrides vote thresholds, not
+                    // governance-receipt correctness: a forced Accept must produce
+                    // an internally consistent GovernanceDecisionReceipt. Forced
+                    // accepts use VoteTally::empty() and no votes — the receipt
+                    // still verifies because the stored hash is derived from those
+                    // exact inputs. Pure: nothing is written.
                     use icn_governance::proof::ProofOutcome;
                     let forced_receipt = GovernanceDecisionReceipt::new(
                         proposal_id.0.clone(),
@@ -3107,203 +3140,48 @@ impl GovernanceActor {
                         "Invariant 7 gate passed (forced accept)"
                     );
 
-                    // Execution-required preflight: prove closure artifacts
-                    // are persistable before committing terminal state.
-                    if requires_execution_closure {
-                        if let Some(ref store) = self.receipt_store {
-                            let now = now_seconds();
-                            crate::institutional_effect::emit_accepted_effect(
-                                    store.as_ref(),
-                                    &proposal_id.0,
-                                    &proposal.domain_id.0,
-                                    Some(decision_hash),
-                                    &proposal.payload,
-                                    now,
-                                )
-                                .map_err(|e| {
-                                    anyhow::anyhow!(
-                                        "Proposal '{}' requires execution closure but force-accept effect preflight failed: {e}",
-                                        proposal_id.0
-                                    )
-                                })?;
-
-                            match crate::grant_minting::mint_and_persist_for_accepted(
-                                store.as_ref(),
-                                &proposal_id.0,
-                                &proposal.domain_id,
-                                decision_hash,
-                                &proposal.payload,
-                                now,
-                            ) {
-                                Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
-                                | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
-                                    ..
-                                }) => {}
-                                Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
-                                    anyhow::bail!(
-                                            "Proposal '{}' requires execution closure but force-accept mandate preflight hash failed.",
-                                            proposal_id.0
-                                        );
-                                }
-                                Err(e) => {
-                                    anyhow::bail!(
-                                            "Proposal '{}' requires execution closure but force-accept mandate preflight persistence failed: {e}",
-                                            proposal_id.0
-                                        );
-                                }
-                            }
-                        }
-                    }
-
-                    Some(decision_hash)
-                } else {
-                    None
-                };
-
-                // Force close the proposal
-                proposal.force_close(proposal_outcome.clone(), reason.clone())?;
-
-                // Persist updated state
-                self.store.save_proposal(&proposal)?;
-
-                // Emit appropriate event
-                if let Some(ref event_bus) = self.event_bus {
-                    let now = now_seconds();
-                    let event = match &forced_outcome {
-                        ForcedOutcome::Accept => match serde_json::to_value(&proposal.payload) {
-                            Ok(payload) => {
-                                let canonical_payload_hash = serde_json::to_string(&payload)
-                                    .ok()
-                                    .map(|s| blake3::hash(s.as_bytes()).to_hex().to_string());
-                                // Reuse the gate-verified decision hash computed in the
-                                // preflight block above. VoteTally{0,0,0} accurately
-                                // represents "forced by authority — no votes were cast."
-                                let forced_decision_hash = force_decision_hash.map(hex::encode);
-                                SystemEvent::ProposalAccepted {
-                                    proposal_id: proposal_id.0.clone(),
-                                    domain_id: proposal.domain_id.0.clone(),
-                                    payload,
-                                    decided_at: now,
-                                    canonical_payload_hash,
-                                    governance_decision_hash: forced_decision_hash,
-                                }
-                            }
-                            Err(e) => {
-                                warn!(
-                                        "Failed to serialize payload for force-accepted proposal {}: {e}",
-                                        proposal_id.0
-                                    );
-                                SystemEvent::ProposalExecutionFailed {
-                                    proposal_id: proposal_id.0.clone(),
-                                    proposal_type: proposal.payload.type_name().to_string(),
-                                    error: format!("payload serialization failed: {e}"),
-                                    failed_at: now,
-                                }
-                            }
-                        },
-                        _ => SystemEvent::ProposalRejected {
-                            proposal_id: proposal_id.0.clone(),
-                            domain_id: proposal.domain_id.0.clone(),
-                            decided_at: now,
-                        },
+                    // A force-accept is an institutional decision and its
+                    // execution closure (institutional-effect record + ADR-0014
+                    // mandate, grants, lifecycle revocations) is execution
+                    // authority. Route it through the write-ahead close journal,
+                    // exactly like an ordinary close: the intent is made durable
+                    // BEFORE any authority is written, and `commit` writes the
+                    // closure then the terminal proposal. A failure before the
+                    // intent leaves nothing; a failure after it leaves the intent,
+                    // which a retry (above) or startup recovery completes
+                    // idempotently. The downstream event, action items and — for
+                    // non-execution-required payloads — the effect record and
+                    // mandate are replayed by `complete_journaled_close` too.
+                    let journal_entry = crate::close_journal::CloseJournalEntry {
+                        proposal: proposal.clone(),
+                        proof_bytes: None,
+                        receipts: crate::close_journal::CloseReceipts::default(),
+                        decided_at: now_seconds(),
+                        governance_decision_hash: Some(hex::encode(decision_hash)),
+                        execution_closure: requires_execution_closure,
                     };
-                    event_bus.emit(event).await;
-                }
-
-                // Decision-to-Action bridge for force-accepted proposals
-                if matches!(forced_outcome, ForcedOutcome::Accept)
-                    && !proposal.action_items_on_accept.is_empty()
-                {
-                    if let Some(ref store) = self.action_item_store {
-                        let now = now_seconds();
-                        // Force-close is outside the write-ahead-journal close path,
-                        // so this stays best-effort: log materialization failures
-                        // rather than gating (there is no journal entry to retain).
-                        if let Err(e) =
-                            Self::materialize_action_items(store, &proposal, &proposal_id, now)
-                        {
-                            warn!(
-                                proposal_id = %proposal_id.0,
-                                error = %e,
-                                "Force-close failed to materialize one or more action items"
-                            );
-                        }
-                    }
-                }
-
-                // Canonical institutional-effect emission for force-accepted
-                // non-execution-required proposals. Execution-required
-                // payloads already emitted + minted in the preflight block
-                // above (this path's sole writer for them is the preflight);
-                // repeating the idempotent helpers here would be wasted work.
-                // For declarative / non-execution-required force-accepts we
-                // still need a writer, and this block is it — keeping audit
-                // semantics path-agnostic.
-                if matches!(&forced_outcome, ForcedOutcome::Accept) && !requires_execution_closure {
-                    // Reuse the gate-verified decision hash computed in the
-                    // preflight block above so we don't rebuild the receipt
-                    // twice per command. `force_decision_hash` is `Some`
-                    // whenever `forced_outcome == Accept`; if that invariant
-                    // ever breaks the inner block degrades to a no-op rather
-                    // than panicking.
-                    if let (Some(ref store), Some(forced_decision_hash)) =
-                        (self.receipt_store.as_ref(), force_decision_hash)
-                    {
-                        let now = now_seconds();
-                        match crate::institutional_effect::emit_accepted_effect(
-                            store.as_ref(),
-                            &proposal_id.0,
-                            &proposal.domain_id.0,
-                            Some(forced_decision_hash),
-                            &proposal.payload,
-                            now,
-                        ) {
-                            Ok(
-                                crate::institutional_effect::AcceptanceEmissionOutcome::Emitted {
-                                    ..
-                                },
-                            ) => {
-                                debug!(
-                                    proposal_id = %proposal_id.0,
-                                    "Force-accept emitted InstitutionalEffectRecord"
-                                );
-                            }
-                            Ok(_) => {}
-                            Err(e) => {
-                                error!(
-                                    proposal_id = %proposal_id.0,
-                                    error = %e,
-                                    "Force-accept failed to emit InstitutionalEffectRecord (non-fatal)"
-                                );
-                            }
-                        }
-
-                        match crate::grant_minting::mint_and_persist_for_accepted(
-                            store.as_ref(),
-                            &proposal_id.0,
-                            &proposal.domain_id,
-                            forced_decision_hash,
-                            &proposal.payload,
-                            now,
-                        ) {
-                            Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
-                            | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
-                                ..
-                            }) => {}
-                            Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
-                                tracing::error!(
-                                    proposal_id = %proposal_id.0,
-                                    "Force-accept failed to hash payload for mandate — declining to mint"
-                                );
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    proposal_id = %proposal_id.0,
-                                    error = %e,
-                                    "Force-accept failed to persist ADR-0014 mandate (non-fatal)"
-                                );
-                            }
-                        }
+                    self.store.save_close_intent(&journal_entry)?;
+                    self.complete_journaled_close(journal_entry)
+                        .await
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Force-accept of proposal '{}' is durably decided but did not \
+                                 complete: {e}; a retry or restart completes it",
+                                proposal_id.0
+                            )
+                        })?;
+                } else {
+                    // Forced reject / cancel writes no authority: persist the
+                    // terminal state and notify downstream.
+                    self.store.save_proposal(&proposal)?;
+                    if let Some(ref event_bus) = self.event_bus {
+                        event_bus
+                            .emit(SystemEvent::ProposalRejected {
+                                proposal_id: proposal_id.0.clone(),
+                                domain_id: proposal.domain_id.0.clone(),
+                                decided_at: now_seconds(),
+                            })
+                            .await;
                     }
                 }
 
