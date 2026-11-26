@@ -45,16 +45,14 @@ use icn_governance::{
     InstitutionalDomain, Proposal, ProposalId, Timestamp, Vote,
 };
 use icn_identity::Did;
-use icn_store::{SledStore, Store};
+use icn_store::SledStore;
 
 use crate::close_journal::CloseJournalEntry;
 use crate::predecessor_lifecycle_store::{
     LifecycleRecovery, LifecycleStore, LifecycleStoreError, RecoveryReport,
 };
 use crate::seal_evidence::BoundSealEvidence;
-use crate::state_store::{
-    proposal_key, GovernanceStateStore, ProposalWriteRefused, SledGovernanceStateStore,
-};
+use crate::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 
 /// How many times a routed write reloads and retries after ordinary contention (`Stale`). A
 /// conflict writes nothing, so a retry is safe; contention is never escalated to quarantine.
@@ -246,15 +244,9 @@ fn apply(live: &LifecycleStore<'_>, store: &SledStore, write: &Write) -> Result<
 fn apply_once(live: &LifecycleStore<'_>, store: &SledStore, write: &Write) -> Result<()> {
     match write {
         Write::CreateProposal(p) => {
-            // Create-if-absent (#2953): any existing row under the id is refused, even an
-            // identical one, and left unchanged. The fenced write expects the absence it saw.
-            if store.get(&proposal_key(&p.id))?.is_some() {
-                return Err(ProposalWriteRefused::AlreadyExists {
-                    proposal: p.id.0.clone(),
-                }
-                .into());
-            }
-            live.write_proposal(&live.load(&p.domain_id)?, p, txid())?;
+            // Create-if-absent (#2953) under the fence: the commit expects the id's absence, so a
+            // row racing the check conflicts and the retry refuses it as AlreadyExists.
+            live.create_proposal(&live.load(&p.domain_id)?, p, txid())?;
         }
         Write::SaveProposal(p) => {
             live.write_proposal(&live.load(&p.domain_id)?, p, txid())?;
@@ -418,8 +410,9 @@ mod tests {
     use crate::predecessor_lifecycle_store::tests::{commitment, k};
     use crate::predecessor_lifecycle_store::FenceRefusal;
     use crate::seal_evidence::tests::Backend;
-    use crate::state_store::domain_key;
+    use crate::state_store::{domain_key, ProposalWriteRefused};
     use icn_governance::ProposalState;
+    use icn_store::Store;
 
     const L: &str = "legacy.coop.example";
 
@@ -529,7 +522,10 @@ mod tests {
         // Activation of a Draft: refused.
         let mut activated = draft.clone();
         activated.open(60).unwrap();
-        assert!(store.save_proposal(&activated).is_err());
+        assert_eq!(
+            fence(store.save_proposal(&activated).unwrap_err()),
+            FenceRefusal::ActivationWhilePending
+        );
         assert_eq!(bytes(&store, &draft.id), js(&draft));
         // An existing obligation drains: the open proposal closes.
         open.close(ProposalState::Rejected { closed_at: 4 })
@@ -557,6 +553,9 @@ mod tests {
         store.create_proposal(&c).unwrap();
         c.cancel().unwrap();
         store.save_proposal(&c).unwrap();
+        // A never-activated Draft does not block the Seal and is preserved by it.
+        let draft = prop("draft");
+        store.create_proposal(&draft).unwrap();
         owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
         owner.seal_for_tests(&l(), 1, k(0x4D)).unwrap();
         // The matching Seal replays.
@@ -565,10 +564,22 @@ mod tests {
             fence(store.create_proposal(&prop("late")).unwrap_err()),
             FenceRefusal::Sealed
         );
-        let mut rewrite = c.clone();
-        rewrite.title = "changed".into();
-        assert!(store.save_proposal(&rewrite).is_err());
+        // Activating the Draft: only the Sealed fence can refuse this (it is not closed).
+        let mut activated = draft.clone();
+        activated.open(60).unwrap();
+        assert_eq!(
+            fence(store.save_proposal(&activated).unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        // The domain record is final once sealed.
+        let mut d = store.get_domain(&l()).unwrap().expect("L's domain record");
+        d.name = format!("{}-renamed", d.name);
+        assert_eq!(
+            fence(store.save_domain(&d).unwrap_err()),
+            FenceRefusal::Sealed
+        );
         assert_eq!(bytes(&store, &c.id), js(&c), "history kept");
+        assert_eq!(bytes(&store, &draft.id), js(&draft), "history kept");
     }
 
     #[test]
@@ -688,13 +699,14 @@ mod tests {
         assert_eq!(fence(e), FenceRefusal::CreateWhilePending);
         assert!(state.get_proposal(&id("p2")).unwrap().is_none());
         // Activating a Draft of L is refused too; the row is unchanged.
-        assert!(handle
+        let e = handle
             .submit(GovernanceCommand::OpenProposal {
                 proposal_id: id("d1"),
                 voting_period_seconds: 600,
             })
             .await
-            .is_err());
+            .unwrap_err();
+        assert_eq!(fence(e), FenceRefusal::ActivationWhilePending);
         assert_eq!(
             serde_json::to_vec(&state.get_proposal(&id("d1")).unwrap()).unwrap(),
             d1_before
