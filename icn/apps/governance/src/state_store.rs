@@ -387,6 +387,20 @@ pub enum ProposalWriteRefused {
     Unreadable { proposal: String, reason: String },
     /// Concurrent writers kept changing the row; the caller may retry.
     Contended { proposal: String },
+    /// The write would change a field that is fixed when the proposal is created
+    /// (see [`PROPOSAL_FIELDS_FIXED_AT_CREATION`]).
+    ImmutableField {
+        proposal: String,
+        field: &'static str,
+    },
+    /// The write changes the state in a way no typed lifecycle command does (see
+    /// [`permitted_state_change`]): a backward move, a skipped step that no command
+    /// performs, or an in-place edit of the current state's fields.
+    IllegalTransition {
+        proposal: String,
+        stored: &'static str,
+        requested: &'static str,
+    },
 }
 
 impl std::fmt::Display for ProposalWriteRefused {
@@ -414,6 +428,18 @@ impl std::fmt::Display for ProposalWriteRefused {
                 "Proposal '{proposal}': stored record cannot be read ({reason}); refusing to \
                  overwrite it"
             ),
+            Self::ImmutableField { proposal, field } => write!(
+                f,
+                "Proposal '{proposal}': `{field}` is fixed at creation; refusing to change it"
+            ),
+            Self::IllegalTransition {
+                proposal,
+                stored,
+                requested,
+            } => write!(
+                f,
+                "Proposal '{proposal}' is {stored}; no lifecycle command moves it to {requested}"
+            ),
             Self::Contended { proposal } => write!(
                 f,
                 "Proposal '{proposal}': gave up saving after {SAVE_PROPOSAL_MAX_ATTEMPTS} \
@@ -424,6 +450,87 @@ impl std::fmt::Display for ProposalWriteRefused {
 }
 
 impl std::error::Error for ProposalWriteRefused {}
+
+/// Proposal field-transition matrix for the update path (`save_proposal`).
+///
+/// Derived from every production writer (S27 inventory): proposals are created by
+/// `CreateProposal`, and every later write goes through one of the lifecycle methods on
+/// `Proposal` (`start_deliberation`, `end_deliberation_and_open`, `force_end_deliberation`,
+/// `open`, `close`, `cancel`, `veto`, `force_close`) or a close-journal replay. Those
+/// change only `state` and `updated_at`. No writer edits a Draft's content: Draft editing
+/// is not a supported operation, so there is nothing legitimate to preserve here. If it is
+/// ever added, it must be its own typed transition, not a relaxation of this list.
+///
+/// | field | update path |
+/// |---|---|
+/// | `id`, `domain_id` | fixed (domain checked separately: `DomainChange`) |
+/// | `proposer` | fixed (authorship) |
+/// | `title`, `description`, `payload`, `scope`, `action_items_on_accept` | fixed (decision content) |
+/// | `created_at` | fixed |
+/// | `state` | forward only: Draft → Deliberation → Open → closed (closed is final) |
+/// | `updated_at` | free |
+pub const PROPOSAL_FIELDS_FIXED_AT_CREATION: [&str; 8] = [
+    "id",
+    "proposer",
+    "title",
+    "description",
+    "payload",
+    "scope",
+    "action_items_on_accept",
+    "created_at",
+];
+
+fn state_name(state: &icn_governance::ProposalState) -> &'static str {
+    use icn_governance::ProposalState as S;
+    match state {
+        S::Draft => "Draft",
+        S::Deliberation { .. } => "Deliberation",
+        S::Open { .. } => "Open",
+        S::Accepted { .. } => "Accepted",
+        S::Rejected { .. } => "Rejected",
+        S::NoQuorum { .. } => "NoQuorum",
+        S::Cancelled { .. } => "Cancelled",
+        S::Vetoed { .. } => "Vetoed",
+        S::ForceClosed { .. } => "ForceClosed",
+    }
+}
+
+/// The proposal state machine as the typed lifecycle commands implement it (each row is a
+/// precondition in `icn_governance::Proposal`), not a phase ordering:
+///
+/// | from | to | command |
+/// |---|---|---|
+/// | Draft | Deliberation | `start_deliberation` |
+/// | Draft | Open | `open` (skipping deliberation is a typed command) |
+/// | Deliberation | Open | `end_deliberation_and_open`, `force_end_deliberation` |
+/// | Open | any closed state | `close` |
+/// | Draft, Deliberation, Open | Cancelled / Vetoed | `cancel` / `veto` |
+/// | Deliberation, Open | ForceClosed | `force_close` |
+///
+/// An unchanged state (an `updated_at`-only rewrite or an idempotent replay) is permitted. No
+/// writer edits the fields of the current state in place (S27 audit), so that is refused,
+/// as is everything not in the table (for example Draft → Accepted, Open → Deliberation).
+/// Closed states are final and handled before this (`ClosedIsFinal`).
+pub fn permitted_state_change(
+    from: &icn_governance::ProposalState,
+    to: &icn_governance::ProposalState,
+) -> bool {
+    use icn_governance::ProposalState as S;
+    if from == to {
+        return true;
+    }
+    match (from, to) {
+        (S::Draft, S::Deliberation { .. } | S::Open { .. }) => true,
+        (S::Deliberation { .. }, S::Open { .. }) => true,
+        (S::Open { .. }, t) if t.is_closed() => true,
+        (
+            S::Draft | S::Deliberation { .. } | S::Open { .. },
+            S::Cancelled { .. } | S::Vetoed { .. },
+        ) => true,
+        (S::Deliberation { .. }, S::ForceClosed { .. }) => true,
+        _ => false,
+    }
+}
 
 /// Decide whether `next` may replace the stored proposal bytes `stored`.
 fn check_proposal_overwrite(stored: &[u8], next: &Proposal) -> Result<()> {
@@ -444,6 +551,27 @@ fn check_proposal_overwrite(stored: &[u8], next: &Proposal) -> Result<()> {
     {
         return Err(ProposalWriteRefused::ClosedIsFinal {
             proposal: next.id.0.clone(),
+        }
+        .into());
+    }
+    let (old, new) = (
+        serde_json::to_value(&existing)?,
+        serde_json::to_value(next)?,
+    );
+    for field in PROPOSAL_FIELDS_FIXED_AT_CREATION {
+        if old.get(field) != new.get(field) {
+            return Err(ProposalWriteRefused::ImmutableField {
+                proposal: next.id.0.clone(),
+                field,
+            }
+            .into());
+        }
+    }
+    if !permitted_state_change(&existing.state, &next.state) {
+        return Err(ProposalWriteRefused::IllegalTransition {
+            proposal: next.id.0.clone(),
+            stored: state_name(&existing.state),
+            requested: state_name(&next.state),
         }
         .into());
     }
@@ -1269,7 +1397,7 @@ mod proposal_identity_tests {
 
     use super::test_support::HookStore;
     use super::*;
-    use icn_governance::{ProposalOutcome, ProposalPayload};
+    use icn_governance::{ProposalOutcome, ProposalPayload, ProposalState};
     use icn_identity::IdentityBundle;
     use icn_store::SledStore;
 
@@ -1472,6 +1600,201 @@ mod proposal_identity_tests {
     }
 
     #[test]
+    fn every_fixed_field_is_present_in_the_stored_form() {
+        // The matrix compares serialized fields by name; a renamed or skipped field would
+        // make its check vacuous, so prove each name resolves.
+        let v = serde_json::to_value(proposal("d1", "p1", "t")).unwrap();
+        for field in PROPOSAL_FIELDS_FIXED_AT_CREATION {
+            assert!(v.get(field).is_some(), "`{field}` not in the stored form");
+        }
+    }
+
+    #[test]
+    fn save_refuses_replacing_any_field_fixed_at_creation() {
+        type Edit = fn(&mut Proposal);
+        let edits: [(&str, Edit); 7] = [
+            ("proposer", |p| {
+                p.proposer = IdentityBundle::generate().unwrap().did().clone()
+            }),
+            ("title", |p| p.title = "other".into()),
+            ("description", |p| p.description = "other".into()),
+            ("payload", |p| {
+                p.payload = ProposalPayload::Text {
+                    body: "other".into(),
+                }
+            }),
+            ("scope", |p| {
+                p.scope = icn_governance::ProposalScope::Federation("f".into())
+            }),
+            ("action_items_on_accept", |p| {
+                p.action_items_on_accept = vec![icn_governance::ActionItemSpec {
+                    title: "x".into(),
+                    description: None,
+                    assignee: None,
+                    due_offset_seconds: None,
+                    priority: Default::default(),
+                    tags: vec![],
+                }]
+            }),
+            ("created_at", |p| p.created_at += 1),
+        ];
+        for (field, edit) in edits {
+            let (inner, state) = sled();
+            let mut p = proposal("d1", "p1", "t");
+            state.create_proposal(&p).unwrap();
+            let before = raw(inner.as_ref(), "p1").unwrap();
+            // Carried on an otherwise legitimate transition, so only the edit is wrong.
+            p.open(3600).unwrap();
+            edit(&mut p);
+            assert_eq!(
+                refusal(state.save_proposal(&p).unwrap_err()),
+                ProposalWriteRefused::ImmutableField {
+                    proposal: "p1".into(),
+                    field,
+                },
+                "{field}"
+            );
+            assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before, "{field}");
+        }
+    }
+
+    #[test]
+    fn save_refuses_moving_a_proposal_back_to_an_earlier_phase() {
+        let (inner, state) = sled();
+        let mut p = proposal("d1", "p1", "t");
+        state.create_proposal(&p).unwrap();
+        let draft = p.clone();
+        p.start_deliberation(60).unwrap();
+        state.save_proposal(&p).unwrap();
+        let deliberating = p.clone();
+        p.force_end_deliberation(60).unwrap();
+        state.save_proposal(&p).unwrap();
+        let before = raw(inner.as_ref(), "p1").unwrap();
+        for (earlier, stored, requested) in [
+            (&deliberating, "Open", "Deliberation"),
+            (&draft, "Open", "Draft"),
+        ] {
+            let mut back = earlier.clone();
+            back.updated_at = p.updated_at;
+            assert_eq!(
+                refusal(state.save_proposal(&back).unwrap_err()),
+                ProposalWriteRefused::IllegalTransition {
+                    proposal: "p1".into(),
+                    stored,
+                    requested,
+                }
+            );
+        }
+        assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+        // Same-phase rewrites (an idempotent replay, an `updated_at` bump) remain allowed.
+        p.updated_at += 1;
+        state.save_proposal(&p).unwrap();
+    }
+
+    /// Every proposal state reachable through the typed lifecycle commands, paired with the
+    /// state it came from. Drives the real `Proposal` methods, so the table in
+    /// `permitted_state_change` is checked against the commands rather than restated.
+    fn command_transitions() -> Vec<(ProposalState, ProposalState)> {
+        type Cmd = fn(&mut Proposal) -> anyhow::Result<()>;
+        let cmds: [Cmd; 8] = [
+            |p| p.start_deliberation(60),
+            |p| p.open(60),
+            |p| p.force_end_deliberation(60),
+            |p| p.close(ProposalState::Rejected { closed_at: 1 }),
+            |p| p.close(ProposalState::NoQuorum { closed_at: 1 }),
+            |p| p.cancel(),
+            |p| p.veto("r".into()),
+            |p| p.force_close(ProposalOutcome::Accepted, "r".into()),
+        ];
+        let mut starts = vec![proposal("d1", "p", "t")];
+        let mut d = proposal("d1", "p", "t");
+        d.start_deliberation(60).unwrap();
+        starts.push(d.clone());
+        d.force_end_deliberation(60).unwrap();
+        starts.push(d);
+        let mut out = Vec::new();
+        for start in &starts {
+            for cmd in cmds {
+                let mut q = start.clone();
+                if cmd(&mut q).is_ok() {
+                    out.push((start.state.clone(), q.state));
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn every_typed_lifecycle_command_is_a_permitted_state_change() {
+        let transitions = command_transitions();
+        assert!(transitions.len() >= 12, "{}", transitions.len());
+        for (from, to) in transitions {
+            assert!(
+                permitted_state_change(&from, &to),
+                "{} -> {} is made by a command but refused",
+                state_name(&from),
+                state_name(&to)
+            );
+        }
+    }
+
+    #[test]
+    fn save_refuses_transitions_no_command_makes() {
+        use ProposalState as S;
+        let draft = S::Draft;
+        let delib = S::Deliberation {
+            started_at: 1,
+            ends_at: 2,
+        };
+        let open = S::Open {
+            opened_at: 1,
+            closes_at: 2,
+        };
+        let refused = [
+            (draft.clone(), S::Accepted { closed_at: 1 }),
+            (draft.clone(), S::NoQuorum { closed_at: 1 }),
+            (delib.clone(), S::Rejected { closed_at: 1 }),
+            (delib.clone(), S::Accepted { closed_at: 1 }),
+            (open.clone(), delib.clone()),
+            (open.clone(), draft.clone()),
+            (delib.clone(), draft.clone()),
+            // An in-place edit of the current state's fields (e.g. extending a vote).
+            (
+                open.clone(),
+                S::Open {
+                    opened_at: 1,
+                    closes_at: 99,
+                },
+            ),
+        ];
+        for (from, to) in refused {
+            assert!(
+                !permitted_state_change(&from, &to),
+                "{} -> {} must be refused",
+                state_name(&from),
+                state_name(&to)
+            );
+            let (inner, state) = sled();
+            let mut p = proposal("d1", "p1", "t");
+            p.state = from.clone();
+            // Seed the row directly in the `from` state (it is the stored precondition).
+            inner
+                .put(&proposal_key(&p.id), &serde_json::to_vec(&p).unwrap())
+                .unwrap();
+            let before = raw(inner.as_ref(), "p1").unwrap();
+            let mut next = p.clone();
+            next.state = to.clone();
+            assert!(matches!(
+                refusal(state.save_proposal(&next).unwrap_err()),
+                ProposalWriteRefused::IllegalTransition { .. }
+            ));
+            assert_eq!(raw(inner.as_ref(), "p1").unwrap(), before);
+        }
+        // The legitimate skip: Draft -> Open (the `open` command) is permitted.
+        assert!(permitted_state_change(&draft, &open));
+    }
+
+    #[test]
     fn save_keeps_ordinary_transitions() {
         let (_, state) = sled();
         let mut p = proposal("d1", "p1", "t");
@@ -1617,11 +1940,14 @@ mod proposal_identity_tests {
         let state = SledGovernanceStateStore::new(store.clone());
         let mut p = proposal("d1", "p1", "t");
         state.create_proposal(&p).unwrap();
+        // A legitimate concurrent writer: same proposal, only `updated_at` churns (every
+        // other field is fixed at creation, so churning those would be refused instead).
+        let base = p.clone();
         store.arm(
             proposal_key(&p.id),
             Box::new(move |inner, n| {
-                let mut q = proposal("d1", "p1", &format!("churn{n}"));
-                q.created_at = n as u64;
+                let mut q = base.clone();
+                q.updated_at = n as u64;
                 inner
                     .put(
                         &proposal_key(&ProposalId("p1".into())),
