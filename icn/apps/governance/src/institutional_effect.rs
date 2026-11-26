@@ -269,6 +269,15 @@ impl AcceptanceEmissionOutcome {
     }
 }
 
+/// Prefix of the error a [`GovernanceReceiptBackend`] returns from
+/// `put_institutional_effect` when a record with the same semantic identity,
+/// `(proposal_id, effect_kind)`, is already stored under a different
+/// `record_id`. A backend that enforces identity atomically (the production
+/// receipt store does) reports a lost race this way; [`emit_accepted_effect`]
+/// turns it into [`AcceptanceEmissionOutcome::AlreadyEmitted`].
+pub const INSTITUTIONAL_EFFECT_IDENTITY_TAKEN: &str =
+    "institutional effect already recorded for this (proposal_id, effect_kind)";
+
 /// Canonical institutional-effect emission for an accepted proposal.
 ///
 /// This is the ONE code path where the translation
@@ -314,8 +323,25 @@ pub fn emit_accepted_effect(
     }
 
     let record_id = record.record_id.clone();
-    backend.put_institutional_effect(&record)?;
-    Ok(AcceptanceEmissionOutcome::Emitted { record_id })
+    match backend.put_institutional_effect(&record) {
+        Ok(()) => Ok(AcceptanceEmissionOutcome::Emitted { record_id }),
+        // A concurrent emitter stored the same effect between the check above
+        // and this write. The backend refused the duplicate atomically; report
+        // the record that won.
+        Err(e) if e.starts_with(INSTITUTIONAL_EFFECT_IDENTITY_TAKEN) => {
+            let winner = backend
+                .list_institutional_effects_by_proposal(proposal_id)?
+                .into_iter()
+                .find(|r| r.effect_kind == record.effect_kind)
+                .ok_or_else(|| {
+                    format!("{e}; but no stored record of that identity could be listed")
+                })?;
+            Ok(AcceptanceEmissionOutcome::AlreadyEmitted {
+                record_id: winner.record_id,
+            })
+        }
+        Err(e) => Err(e),
+    }
 }
 
 #[cfg(test)]
@@ -483,6 +509,108 @@ mod tests {
                 .cloned()
                 .collect())
         }
+    }
+
+    /// Models a lost race deterministically: the emitter's dedup read sees no
+    /// record, a concurrent emitter's record then lands, and the emitter's own
+    /// write is refused by the backend's identity check.
+    struct RacingBackend {
+        inner: MemoryBackend,
+        lists: std::sync::atomic::AtomicUsize,
+        refusal: String,
+        winner_listable: bool,
+    }
+
+    impl GovernanceReceiptBackend for RacingBackend {
+        fn put_governance(
+            &self,
+            r: &icn_governance::GovernanceDecisionReceipt,
+        ) -> Result<(), String> {
+            self.inner.put_governance(r)
+        }
+        fn get_governance_by_proposal(
+            &self,
+            p: &str,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            self.inner.get_governance_by_proposal(p)
+        }
+        fn put_allocation(
+            &self,
+            a: &icn_kernel_api::AllocationReceipt,
+        ) -> Result<icn_kernel_api::Hash, String> {
+            self.inner.put_allocation(a)
+        }
+        fn get_governance_by_decision(
+            &self,
+            h: &icn_kernel_api::Hash,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            self.inner.get_governance_by_decision(h)
+        }
+        fn list_allocations_by_decision(
+            &self,
+            h: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+            self.inner.list_allocations_by_decision(h)
+        }
+        fn put_institutional_effect(&self, r: &InstitutionalEffectRecord) -> Result<(), String> {
+            // The concurrent winner lands first, under its own record id.
+            let mut winner = r.clone();
+            winner.record_id = "winner".into();
+            if self.winner_listable {
+                self.inner.put_institutional_effect(&winner)?;
+            }
+            Err(self.refusal.clone())
+        }
+        fn list_institutional_effects_by_proposal(
+            &self,
+            p: &str,
+        ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+            let n = self.lists.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if n == 0 {
+                return Ok(vec![]); // the stale pre-race view
+            }
+            self.inner.list_institutional_effects_by_proposal(p)
+        }
+    }
+
+    fn racing(refusal: &str, winner_listable: bool) -> RacingBackend {
+        RacingBackend {
+            inner: MemoryBackend::new(),
+            lists: std::sync::atomic::AtomicUsize::new(0),
+            refusal: refusal.into(),
+            winner_listable,
+        }
+    }
+
+    #[test]
+    fn a_lost_emission_race_reports_the_winner_and_writes_nothing() {
+        let backend = racing(
+            &format!("{INSTITUTIONAL_EFFECT_IDENTITY_TAKEN}: already recorded as 'winner'"),
+            true,
+        );
+        let outcome =
+            emit_accepted_effect(&backend, "p1", "coop", None, &freeze_payload(), 100).unwrap();
+        assert!(
+            matches!(&outcome, AcceptanceEmissionOutcome::AlreadyEmitted { record_id } if record_id == "winner"),
+            "{outcome:?}"
+        );
+        assert_eq!(backend.inner.effects.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn any_other_backend_error_is_propagated_not_reported_as_emitted() {
+        let backend = racing("disk on fire", true);
+        let err =
+            emit_accepted_effect(&backend, "p1", "coop", None, &freeze_payload(), 100).unwrap_err();
+        assert_eq!(err, "disk on fire");
+    }
+
+    #[test]
+    fn an_identity_refusal_without_a_listable_winner_is_an_error() {
+        let backend = racing(INSTITUTIONAL_EFFECT_IDENTITY_TAKEN, false);
+        let err =
+            emit_accepted_effect(&backend, "p1", "coop", None, &freeze_payload(), 100).unwrap_err();
+        assert!(err.contains("no stored record of that identity"), "{err}");
     }
 
     fn freeze_payload() -> ProposalPayload {
