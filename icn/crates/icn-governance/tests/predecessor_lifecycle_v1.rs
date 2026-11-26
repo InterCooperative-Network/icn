@@ -67,6 +67,7 @@ fn pending(revision: u64, attempt: u64) -> LifecycleRecordV1 {
     LifecycleRecordV1 {
         predecessor: d(L),
         revision,
+        first_commitment_hash: k(L),
         state: StoredLifecycle::Pending {
             attempt,
             commitment: commitment(L),
@@ -80,6 +81,7 @@ fn sealed_l2() -> LifecycleRecordV1 {
     LifecycleRecordV1 {
         predecessor: d(L2),
         revision: u64::MAX,
+        first_commitment_hash: k(L2),
         state: StoredLifecycle::Sealed {
             attempt: 1,
             commitment: commitment(L2),
@@ -94,6 +96,7 @@ fn legacy_aborted() -> LifecycleRecordV1 {
     LifecycleRecordV1 {
         predecessor: d(L),
         revision: 3,
+        first_commitment_hash: k(L),
         state: StoredLifecycle::Legacy {
             last_attempt: 1,
             aborted: Some(k(L)),
@@ -179,7 +182,8 @@ const TAG_AT: usize = 4;
 const VERSION_AT: usize = 4 + 39;
 const L_AT: usize = VERSION_AT + 2;
 const REV_AT: usize = L_AT + 4 + 19;
-const STATE_AT: usize = REV_AT + 8;
+const KFIRST_AT: usize = REV_AT + 8;
+const STATE_AT: usize = KFIRST_AT + 32;
 const BODY_AT: usize = STATE_AT + 1;
 
 fn mutated(f: impl FnOnce(&mut Vec<u8>)) -> Result<LifecycleRecordV1, E> {
@@ -192,7 +196,7 @@ fn mutated(f: impl FnOnce(&mut Vec<u8>)) -> Result<LifecycleRecordV1, E> {
 fn structural_corruption_is_refused_with_its_reason() {
     assert_eq!(mutated(|b| b[TAG_AT] ^= 1), Err(E::WrongTag));
     assert_eq!(
-        mutated(|b| b[VERSION_AT + 1] = 2),
+        mutated(|b| b[VERSION_AT + 1] = 3),
         Err(E::UnsupportedVersion)
     );
     assert_eq!(
@@ -330,7 +334,7 @@ fn an_over_long_stored_domain_id_is_refused_before_it_is_read() {
         out.extend_from_slice(x);
     };
     lp(&mut b, b"icn.governance.predecessor-lifecycle.v1");
-    b.extend_from_slice(&1u16.to_be_bytes());
+    b.extend_from_slice(&2u16.to_be_bytes()); // record layout version 2
     lp(&mut b, over.as_bytes());
     b.extend_from_slice(&[0; 64]);
     assert_eq!(
@@ -454,4 +458,82 @@ fn counters_refuse_overflow_and_a_max_revision_is_frozen() {
     let mut zero = pending(1, 1);
     zero.revision = 0;
     assert_eq!(zero.encode(), Err(E::ZeroRevision));
+}
+
+/// S26: K_first is retained by every stored state and checked against the witness on every
+/// load, after any number of attempts.
+#[test]
+fn k_first_is_retained_and_cross_checked_after_every_attempt() {
+    let l = d(L);
+    let w = witness().encode().unwrap();
+    // A layout-version-1 record (no K_first) is refused as unsupported.
+    let mut v1 = vector("RECORD_PENDING");
+    v1[VERSION_AT + 1] = 1;
+    assert_eq!(
+        LifecycleRecordV1::decode_for(&l, &v1),
+        Err(E::UnsupportedVersion)
+    );
+    // At attempt 1 the current K must equal K_first.
+    let mut wrong_first = pending(1, 1);
+    wrong_first.first_commitment_hash = [0x77; 32];
+    assert_eq!(wrong_first.encode(), Err(E::FirstCommitmentMismatch));
+    let mut b = vector("RECORD_PENDING");
+    b[KFIRST_AT] ^= 1;
+    assert_eq!(
+        LifecycleRecordV1::decode_for(&l, &b),
+        Err(E::FirstCommitmentMismatch)
+    );
+    // After a later attempt the record still carries K_first, so a replaced witness is caught
+    // even though the current K differs from K_first.
+    let mut later = pending(6, 2);
+    if let StoredLifecycle::Pending { commitment, .. } = &mut later.state {
+        let mut c = commitment.clone();
+        c.recognition_map_commitment = [0x4E; 32];
+        *commitment = c;
+    }
+    let later_bytes = later.encode().unwrap();
+    assert_eq!(
+        check_witness(&l, Some(&later_bytes), Some(&w)),
+        Ok(LifecyclePresence::Established(Box::new(later.clone())))
+    );
+    let mut replaced = witness();
+    replaced.first_commitment_hash = [0x4E; 32];
+    assert_eq!(
+        check_witness(&l, Some(&later_bytes), Some(&replaced.encode().unwrap())),
+        Err(E::WitnessMismatch)
+    );
+    // A record whose K_first was altered after later attempts is caught too.
+    let mut altered = later.clone();
+    altered.first_commitment_hash = [0x55; 32];
+    assert_eq!(
+        check_witness(&l, Some(&altered.encode().unwrap()), Some(&w)),
+        Err(E::WitnessMismatch)
+    );
+    // Legacy after a second abort still carries K_first.
+    let after_second_abort = LifecycleRecordV1 {
+        predecessor: l.clone(),
+        revision: 7,
+        first_commitment_hash: k(L),
+        state: StoredLifecycle::Legacy {
+            last_attempt: 2,
+            aborted: Some([0x4E; 32]),
+        },
+    };
+    let bytes = after_second_abort.encode().unwrap();
+    assert!(check_witness(&l, Some(&bytes), Some(&w)).is_ok());
+    assert_eq!(
+        check_witness(&l, Some(&bytes), Some(&replaced.encode().unwrap())),
+        Err(E::WitnessMismatch)
+    );
+    // A witness transplanted from another domain after several attempts is refused.
+    let mut foreign = witness();
+    foreign.predecessor = d(L2);
+    assert_eq!(
+        check_witness(&l, Some(&bytes), Some(&foreign.encode().unwrap())),
+        Err(E::WrongDomain)
+    );
+    // The first-Pending witness is derived from (and must match) the record's K_first.
+    let mut bad_first = pending(1, 1);
+    bad_first.first_commitment_hash = [0x01; 32];
+    assert!(LifecycleWitnessV1::for_first_pending(&bad_first).is_err());
 }

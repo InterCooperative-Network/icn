@@ -5,7 +5,8 @@ The cutover commitment C is built with this directory's own P4 reference
 (cutover_commitment_reference.py), which is itself independent of Rust.
 
 lp(x) = u32be(len x) || x
-record  = lp(TAG) || u16be(1) || lp(L) || u64be(revision) || u8(state) || body
+record  = lp(TAG) || u16be(2) || lp(L) || u64be(revision) || K_first[32] || u8(state) || body
+          (record layout version 2, S26: K_first is retained by every stored state)
   0x01 Legacy : u64be(last_attempt) || u8(1) || aborted_K            (stored Legacy always aborted)
   0x02 Pending: u64be(attempt) || lp(C) || K || basis || E
   0x03 Sealed : u64be(attempt) || lp(C) || K || basis || E || F
@@ -67,14 +68,14 @@ def basis(l: str, r_begin: int, e: bytes, p: bytes) -> bytes:
                           + struct.pack(">I", 2) + b"\x01" + e + b"\x02" + p).digest()
 
 
-def head(l: str, revision: int) -> bytes:
-    assert revision >= 1
-    return lp(TAG) + struct.pack(">H", 1) + lp(dom(l)) + u64(revision)
+def head(l: str, revision: int, k_first: bytes) -> bytes:
+    assert revision >= 1 and len(k_first) == 32
+    return lp(TAG) + struct.pack(">H", 2) + lp(dom(l)) + u64(revision) + k_first
 
 
-def legacy(l: str, revision: int, last_attempt: int, aborted_k: bytes) -> bytes:
+def legacy(l: str, revision: int, k_first: bytes, last_attempt: int, aborted_k: bytes) -> bytes:
     assert last_attempt >= 1 and len(aborted_k) == 32
-    return head(l, revision) + b"\x01" + u64(last_attempt) + b"\x01" + aborted_k
+    return head(l, revision, k_first) + b"\x01" + u64(last_attempt) + b"\x01" + aborted_k
 
 
 def attempt_body(attempt: int, c: bytes, b: bytes, e: bytes) -> bytes:
@@ -82,12 +83,12 @@ def attempt_body(attempt: int, c: bytes, b: bytes, e: bytes) -> bytes:
     return u64(attempt) + lp(c) + k_of(c) + b + e
 
 
-def pending(l, revision, attempt, c, b, e):
-    return head(l, revision) + b"\x02" + attempt_body(attempt, c, b, e)
+def pending(l, revision, k_first, attempt, c, b, e):
+    return head(l, revision, k_first) + b"\x02" + attempt_body(attempt, c, b, e)
 
 
-def sealed(l, revision, attempt, c, b, e, f):
-    return head(l, revision) + b"\x03" + attempt_body(attempt, c, b, e) + f
+def sealed(l, revision, k_first, attempt, c, b, e, f):
+    return head(l, revision, k_first) + b"\x03" + attempt_body(attempt, c, b, e) + f
 
 
 def witness(l: str, first_attempt: int, k: bytes) -> bytes:
@@ -109,8 +110,10 @@ if __name__ == "__main__":
     print("BASIS", B.hex())
     print("KEY", (KEY + lp(dom(L))).hex())
     print("WITNESS_KEY", (WKEY + lp(dom(L2))).hex())
-    print("RECORD_LEGACY_ABORTED", legacy(L, 3, 1, k_of(C)).hex())
-    print("RECORD_PENDING", pending(L, 1, 1, C, B, E).hex())
-    print("RECORD_PENDING_AFTER_ABORT", pending(L, 4, 2, C, B, E).hex())
-    print("RECORD_SEALED_MAX_REVISION", sealed(L2, 2**64 - 1, 1, C2, B, E, F).hex())
+    K1 = k_of(C)
+    print("RECORD_LEGACY_ABORTED", legacy(L, 3, K1, 1, K1).hex())
+    print("RECORD_PENDING", pending(L, 1, K1, 1, C, B, E).hex())
+    # A second attempt (here re-proposing the same C) keeps the FIRST attempt's K as K_first.
+    print("RECORD_PENDING_AFTER_ABORT", pending(L, 4, K1, 2, C, B, E).hex())
+    print("RECORD_SEALED_MAX_REVISION", sealed(L2, 2**64 - 1, k_of(C2), 1, C2, B, E, F).hex())
     print("WITNESS", witness(L, 1, k_of(C)).hex())
