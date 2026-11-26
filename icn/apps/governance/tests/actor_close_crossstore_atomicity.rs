@@ -1414,3 +1414,274 @@ async fn close_retry_propagates_completion_failure() {
 
     actor_handle.shutdown().await;
 }
+
+// ---------------------------------------------------------------------------
+// D-S20-13: a durable close intent is an already-made decision. Veto and
+// force-close complete it first (then meet a closed proposal and are refused by
+// the existing rule); recovery never replaces a closed proposal with a different
+// outcome, and a historical contradiction is retained and surfaced.
+// ---------------------------------------------------------------------------
+
+/// Leave a durable close intent with an incomplete application: the receipt is
+/// durable, the terminal proposal save failed, the proposal is still Open.
+async fn interrupted_close(
+    db_path: &std::path::Path,
+) -> (
+    Arc<RecordingReceiptBackend>,
+    Arc<PrefixFailStore>,
+    icn_governance_actor::GovernanceHandle,
+    ProposalId,
+    Arc<dyn GovernanceStateStore>,
+) {
+    let (backend, fail_store, handle, proposal_id) = open_voted_proposal(db_path, None).await;
+    handle.install_receipt_store(backend.clone()).await;
+    fail_store.arm();
+    assert!(handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await
+        .is_err());
+    let state: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(fail_store.clone()));
+    assert!(matches!(
+        state.get_proposal(&proposal_id).unwrap().unwrap().state,
+        ProposalState::Open { .. }
+    ));
+    assert_eq!(state.list_close_intents().unwrap().len(), 1);
+    assert_eq!(backend.governance_count(), 1);
+    (backend, fail_store, handle, proposal_id, state)
+}
+
+fn veto(id: &ProposalId) -> GovernanceCommand {
+    GovernanceCommand::VetoProposal {
+        proposal_id: id.clone(),
+        reason: "late veto".into(),
+    }
+}
+
+fn force_close(id: &ProposalId, outcome: icn_governance::ForcedOutcome) -> GovernanceCommand {
+    GovernanceCommand::ForceCloseProposal {
+        proposal_id: id.clone(),
+        forced_outcome: outcome,
+        reason: "late force-close".into(),
+    }
+}
+
+fn assert_decided_close_completed(
+    state: &Arc<dyn GovernanceStateStore>,
+    backend: &RecordingReceiptBackend,
+    id: &ProposalId,
+) {
+    assert!(
+        matches!(
+            state.get_proposal(id).unwrap().unwrap().state,
+            ProposalState::Accepted { .. }
+        ),
+        "the durably decided close must stand"
+    );
+    assert_eq!(
+        state.list_close_intents().unwrap().len(),
+        0,
+        "journal cleared"
+    );
+    assert_eq!(
+        backend.governance_count(),
+        1,
+        "no duplicate decision receipt"
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn interrupted_close_then_veto_completes_the_decision_and_refuses_the_veto() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (backend, fail_store, handle, id, state) = interrupted_close(tmp.path()).await;
+    fail_store.disarm();
+
+    let err = handle.submit(veto(&id)).await.unwrap_err().to_string();
+    assert!(
+        err.contains("was already decided; it has now been completed"),
+        "{err}"
+    );
+    assert_decided_close_completed(&state, &backend, &id);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn interrupted_close_then_force_close_completes_the_decision_and_refuses_it() {
+    for outcome in [
+        icn_governance::ForcedOutcome::Reject,
+        icn_governance::ForcedOutcome::Cancel,
+        icn_governance::ForcedOutcome::Accept,
+    ] {
+        let tmp = tempfile::tempdir().unwrap();
+        let (backend, fail_store, handle, id, state) = interrupted_close(tmp.path()).await;
+        fail_store.disarm();
+
+        let err = handle
+            .submit(force_close(&id, outcome.clone()))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("was already decided; it has now been completed"),
+            "{outcome:?}: {err}"
+        );
+        assert_decided_close_completed(&state, &backend, &id);
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn veto_is_refused_and_writes_nothing_while_the_pending_close_cannot_complete() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (backend, _fail_store, handle, id, state) = interrupted_close(tmp.path()).await;
+    // Still armed: the decided close cannot be completed yet.
+    let before = serde_json::to_value(state.get_proposal(&id).unwrap().unwrap()).unwrap();
+
+    let err = handle.submit(veto(&id)).await.unwrap_err().to_string();
+    assert!(
+        err.contains("already-decided close could not be completed first"),
+        "{err}"
+    );
+    assert_eq!(
+        serde_json::to_value(state.get_proposal(&id).unwrap().unwrap()).unwrap(),
+        before,
+        "the proposal must not be vetoed underneath a pending decision"
+    );
+    assert_eq!(
+        state.list_close_intents().unwrap().len(),
+        1,
+        "intent retained"
+    );
+    assert_eq!(backend.governance_count(), 1);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn after_restart_a_veto_still_completes_the_decided_close_first() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (backend, fail_store, handle, id, state) = interrupted_close(tmp.path()).await;
+    handle.shutdown().await;
+    fail_store.disarm();
+
+    // Restart without running recovery: the veto itself must honour the intent.
+    let bundle = IdentityBundle::generate().unwrap();
+    let gossip = gossip_with_governance_topic(bundle.did().clone()).await;
+    let store2: Arc<dyn Store> = fail_store.clone();
+    let actor2 = GovernanceActor::spawn(
+        bundle.did().clone(),
+        store2,
+        gossip,
+        Arc::new(StaticMembershipResolver::new()),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    actor2.install_receipt_store(backend.clone()).await;
+
+    assert!(actor2.submit(veto(&id)).await.is_err());
+    assert_decided_close_completed(&state, &backend, &id);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn repeated_and_concurrent_terminal_operations_leave_one_decision() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (backend, fail_store, handle, id, state) = interrupted_close(tmp.path()).await;
+    fail_store.disarm();
+
+    let (a, b) = tokio::join!(
+        handle.submit(veto(&id)),
+        handle.submit(force_close(&id, icn_governance::ForcedOutcome::Reject)),
+    );
+    assert!(a.is_err() && b.is_err(), "a={a:?} b={b:?}");
+    // Repeated operations after completion change nothing.
+    assert!(handle.submit(veto(&id)).await.is_err());
+    handle.recover_incomplete_closes().await;
+    handle.recover_incomplete_closes().await;
+    assert_decided_close_completed(&state, &backend, &id);
+    assert!(handle.close_conflicts().await.unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_historical_contradiction_is_retained_surfaced_and_blocks_terminal_changes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (backend, fail_store, handle, id, state) = interrupted_close(tmp.path()).await;
+    fail_store.disarm();
+
+    // Data written before this fix: a veto landed over the pending decision.
+    let mut vetoed = state.get_proposal(&id).unwrap().unwrap();
+    vetoed.veto("pre-fix veto".into()).unwrap();
+    state.save_proposal(&vetoed).unwrap();
+    let stored_before = serde_json::to_value(state.get_proposal(&id).unwrap().unwrap()).unwrap();
+    let intent_before = serde_json::to_value(state.list_close_intents().unwrap()).unwrap();
+
+    // Recovery chooses neither outcome.
+    handle.recover_incomplete_closes().await;
+    // Every further terminal operation is refused.
+    let close = handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        close.contains("contradicts its stored terminal state"),
+        "{close}"
+    );
+    for cmd in [
+        veto(&id),
+        force_close(&id, icn_governance::ForcedOutcome::Accept),
+    ] {
+        let e = handle.submit(cmd).await.unwrap_err().to_string();
+        assert!(e.contains("contradicts its stored terminal state"), "{e}");
+    }
+
+    // Both records are preserved unchanged, and the contradiction is exposed.
+    assert_eq!(
+        serde_json::to_value(state.get_proposal(&id).unwrap().unwrap()).unwrap(),
+        stored_before
+    );
+    assert_eq!(
+        serde_json::to_value(state.list_close_intents().unwrap()).unwrap(),
+        intent_before
+    );
+    assert_eq!(backend.governance_count(), 1);
+    let conflicts = handle.close_conflicts().await.unwrap();
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(conflicts[0].proposal_id, id.0);
+    assert_eq!(conflicts[0].journaled_state, "Accepted");
+    assert_eq!(conflicts[0].stored_state, "Vetoed");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_completed_close_whose_intent_lingered_is_not_a_conflict() {
+    // The commit succeeded (stored row == journaled value) but clearing the
+    // intent did not: the most common real recovery case. It must be completed
+    // and cleared, never reported as a contradiction.
+    let tmp = tempfile::tempdir().unwrap();
+    let (backend, fail_store, handle, id, state) = interrupted_close(tmp.path()).await;
+    fail_store.disarm();
+    let lingering = state.list_close_intents().unwrap().remove(0);
+    handle.recover_incomplete_closes().await;
+    assert_decided_close_completed(&state, &backend, &id);
+    state.save_close_intent(&lingering).unwrap(); // the delete "failed"
+
+    assert!(handle.close_conflicts().await.unwrap().is_empty());
+    let err = handle.submit(veto(&id)).await.unwrap_err().to_string();
+    assert!(
+        err.contains("was already decided; it has now been completed"),
+        "{err}"
+    );
+    assert_decided_close_completed(&state, &backend, &id);
+
+    // Recovery alone also clears such an entry.
+    state.save_close_intent(&lingering).unwrap();
+    handle.recover_incomplete_closes().await;
+    assert_decided_close_completed(&state, &backend, &id);
+}

@@ -13,7 +13,9 @@ use icn_governance::{
     Grantee, Mandate, MandateId, MeetingAttendanceReceipt, ProofOutcome, Timestamp, VoteTally,
 };
 use icn_governance_actor::dispatch_evidence::EffectDispatchEvidence;
-use icn_governance_actor::institutional_effect::InstitutionalEffectRecord;
+use icn_governance_actor::institutional_effect::{
+    InstitutionalEffectRecord, INSTITUTIONAL_EFFECT_IDENTITY_TAKEN,
+};
 use icn_governance_actor::receipt_backend::GovernanceReceiptBackend;
 use icn_identity::Did;
 use icn_kernel_api::economics::SettlementIntent;
@@ -70,6 +72,10 @@ const MEETING_ATTENDANCE_BY_MEETING_PREFIX: &[u8] = b"receipt:meeting_attendance
 const INSTITUTIONAL_EFFECT_PREFIX: &[u8] = b"effect:institutional:";
 /// Secondary index: effect records by proposal_id (sortable by recorded_at)
 const INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX: &[u8] = b"effect:institutional:by_proposal:";
+/// `(proposal_id, effect_kind)` → `record_id`: the semantic identity of an
+/// institutional effect record. Deliberately NOT under `effect:institutional:`,
+/// so no scan of primary records can ever match one of these keys.
+const INSTITUTIONAL_EFFECT_IDENTITY_PREFIX: &[u8] = b"effect:institutional_identity:";
 /// Key prefix for dispatch evidence (primary by evidence_id)
 const DISPATCH_EVIDENCE_PREFIX: &[u8] = b"effect:dispatch_evidence:";
 /// Secondary index: dispatch evidence by effect_record_id (sortable by recorded_at)
@@ -676,10 +682,25 @@ impl ReceiptStore {
     /// secondary index on `(proposal_id, recorded_at, record_id)` so
     /// reads can recover records in chronological order per proposal.
     ///
-    /// Benign duplicate writes (same `record_id`) overwrite the existing
-    /// entry with identical bytes; the index key is idempotent by
-    /// construction. The store does NOT enforce one-record-per-proposal —
-    /// callers enforce that invariant upstream.
+    /// **One record per semantic identity.** A record's identity is
+    /// `(proposal_id, effect_kind)`. The identity entry, the primary record and
+    /// the index entry are written in one sled transaction that first reads the
+    /// identity entry:
+    /// - absent: all three are written;
+    /// - present with the same `record_id`: an idempotent rewrite (identical
+    ///   bytes for an identical record);
+    /// - present with a different `record_id`: refused with an error starting
+    ///   with [`INSTITUTIONAL_EFFECT_IDENTITY_TAKEN`]; nothing is written.
+    ///
+    /// Distinct effect kinds of one proposal are distinct identities and are
+    /// all kept. A crash during the write recovers none of it, so a retry
+    /// cannot leave an unindexed primary that dedup would miss. As with every
+    /// sled transaction, an `Err` from a storage fault after the commit began
+    /// does not by itself prove that nothing was written; the caller re-reads.
+    ///
+    /// Records stored before identity entries existed have none. Emission's
+    /// list-by-proposal check still sees them, so a new duplicate of such a
+    /// record is not created through `emit_accepted_effect`.
     pub fn put_institutional_effect(
         &self,
         record: &InstitutionalEffectRecord,
@@ -688,21 +709,40 @@ impl ReceiptStore {
         primary_key.extend_from_slice(record.record_id.as_bytes());
         let value = serde_json::to_vec(record)
             .map_err(|e| format!("Failed to serialize InstitutionalEffectRecord: {e}"))?;
-        self.db
-            .insert(&primary_key, value)
-            .map_err(|e| format!("sled insert primary: {e}"))?;
-
         // Secondary index uses the colon-safe length-prefix scheme so
         // `foo` and `foo:bar` cannot alias under `scan_prefix` — required
         // because `emit_accepted_effect` dedup is
         // `list_institutional_effects_by_proposal(proposal_id)`.
         let idx_key =
             Self::ier_by_proposal_key(&record.proposal_id, record.recorded_at, &record.record_id);
-        self.db
-            .insert(&idx_key, record.record_id.as_bytes())
-            .map_err(|e| format!("sled insert index: {e}"))?;
+        let identity_key = Self::ier_identity_key(&record.proposal_id, &record.effect_kind);
+        let record_id = record.record_id.as_bytes();
 
-        Ok(())
+        let outcome: Result<(), TransactionError<Vec<u8>>> = self.db.transaction(|tx| {
+            // Read before staging anything.
+            if let Some(existing) = tx.get(&identity_key)? {
+                if existing.as_ref() != record_id {
+                    return Err(ConflictableTransactionError::Abort(existing.to_vec()));
+                }
+            }
+            tx.insert(identity_key.as_slice(), record_id)?;
+            tx.insert(primary_key.as_slice(), value.as_slice())?;
+            tx.insert(idx_key.as_slice(), record_id)?;
+            Ok(())
+        });
+        match outcome {
+            Ok(()) => Ok(()),
+            Err(TransactionError::Abort(existing)) => Err(format!(
+                "{INSTITUTIONAL_EFFECT_IDENTITY_TAKEN}: proposal '{}' kind '{}' is already \
+                 recorded as '{}'",
+                record.proposal_id,
+                record.effect_kind,
+                String::from_utf8_lossy(&existing)
+            )),
+            Err(TransactionError::Storage(e)) => {
+                Err(format!("sled transaction (institutional effect): {e}"))
+            }
+        }
     }
 
     /// Persist a downstream dispatch evidence entry attached to a
@@ -1070,6 +1110,16 @@ impl ReceiptStore {
         key.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
         key.extend_from_slice(&recorded_at.to_be_bytes());
         key.extend_from_slice(record_id.as_bytes());
+        key
+    }
+
+    /// Semantic-identity key of an institutional effect record:
+    /// `prefix ‖ lp(proposal_id) ‖ lp(effect_kind)`, length-prefixed so no two
+    /// distinct pairs can alias.
+    fn ier_identity_key(proposal_id: &str, effect_kind: &str) -> Vec<u8> {
+        let mut key = INSTITUTIONAL_EFFECT_IDENTITY_PREFIX.to_vec();
+        key.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
+        key.extend_from_slice(&Self::len_prefixed(effect_kind.as_bytes()));
         key
     }
 
@@ -2874,6 +2924,152 @@ mod tests {
             .list_intents_by_decision(&decision_hash)
             .unwrap();
         assert_eq!(intents.len(), 1); // Deduplicated by canonical hash
+    }
+
+    fn ier(proposal: &str, kind: &str, at: u64) -> InstitutionalEffectRecord {
+        InstitutionalEffectRecord::new(
+            proposal,
+            "coop-a",
+            Some([7u8; 32]),
+            kind,
+            Some("did:icn:x".into()),
+            None,
+            None,
+            at,
+            serde_json::json!({}),
+        )
+    }
+
+    #[test]
+    fn an_effect_identity_is_recorded_once_and_a_duplicate_writes_nothing() {
+        let store = ReceiptStore::new(temp_db());
+        let first = ier("prop-1", "freeze_member", 100);
+        store.put_institutional_effect(&first).unwrap();
+
+        // Same (proposal, kind), different record id: refused, nothing written.
+        let dup = ier("prop-1", "freeze_member", 200);
+        let err = store.put_institutional_effect(&dup).unwrap_err();
+        assert!(
+            err.starts_with(INSTITUTIONAL_EFFECT_IDENTITY_TAKEN),
+            "{err}"
+        );
+        assert!(err.contains(&first.record_id), "{err}");
+        let listed = store
+            .list_institutional_effects_by_proposal("prop-1")
+            .unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].record_id, first.record_id);
+        let mut dup_primary = INSTITUTIONAL_EFFECT_PREFIX.to_vec();
+        dup_primary.extend_from_slice(dup.record_id.as_bytes());
+        assert!(
+            store.db.get(&dup_primary).unwrap().is_none(),
+            "no orphan primary"
+        );
+
+        // Re-writing the identical record is idempotent.
+        store.put_institutional_effect(&first).unwrap();
+        assert_eq!(
+            store
+                .list_institutional_effects_by_proposal("prop-1")
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn distinct_effect_kinds_of_one_proposal_are_all_kept() {
+        let store = ReceiptStore::new(temp_db());
+        store
+            .put_institutional_effect(&ier("prop-1", "freeze_member", 1))
+            .unwrap();
+        store
+            .put_institutional_effect(&ier("prop-1", "unfreeze_member", 2))
+            .unwrap();
+        store
+            .put_institutional_effect(&ier("prop-2", "freeze_member", 3))
+            .unwrap();
+        assert_eq!(
+            store
+                .list_institutional_effects_by_proposal("prop-1")
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn effect_identity_keys_cannot_alias_across_the_separator() {
+        let store = ReceiptStore::new(temp_db());
+        store.put_institutional_effect(&ier("a:b", "c", 1)).unwrap();
+        store.put_institutional_effect(&ier("a", "b:c", 2)).unwrap();
+        assert_ne!(
+            ReceiptStore::ier_identity_key("a:b", "c"),
+            ReceiptStore::ier_identity_key("a", "b:c")
+        );
+        assert!(!ReceiptStore::ier_identity_key("p", "k").starts_with(INSTITUTIONAL_EFFECT_PREFIX));
+    }
+
+    #[test]
+    fn concurrent_writers_of_one_effect_identity_store_exactly_one_record() {
+        // Eight writers race to store the same (proposal, kind) under distinct record ids:
+        // the identity check and the writes are one transaction, so exactly one wins and every
+        // other is refused with the typed identity error (which `emit_accepted_effect` turns into
+        // `AlreadyEmitted`; that translation is tested in the governance crate).
+        let store = std::sync::Arc::new(ReceiptStore::new(temp_db()));
+        let threads: Vec<_> = (0..8)
+            .map(|i| {
+                let store = store.clone();
+                std::thread::spawn(move || {
+                    let rec = ier("prop-race", "freeze_member", i);
+                    (rec.record_id.clone(), store.put_institutional_effect(&rec))
+                })
+            })
+            .collect();
+        let results: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        let winners: Vec<&String> = results
+            .iter()
+            .filter(|(_, r)| r.is_ok())
+            .map(|(id, _)| id)
+            .collect();
+        assert_eq!(winners.len(), 1, "{results:?}");
+        for (_, r) in &results {
+            if let Err(e) = r {
+                assert!(e.starts_with(INSTITUTIONAL_EFFECT_IDENTITY_TAKEN), "{e}");
+                assert!(e.contains(winners[0].as_str()), "{e}");
+            }
+        }
+        let listed = store
+            .list_institutional_effects_by_proposal("prop-race")
+            .unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(&listed[0].record_id, winners[0]);
+    }
+
+    #[test]
+    fn a_reopened_store_still_refuses_a_duplicate_identity() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = ier("prop-1", "freeze_member", 1);
+        {
+            let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
+            store.put_institutional_effect(&first).unwrap();
+            store.db.flush().unwrap();
+        }
+        let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
+        let err = store
+            .put_institutional_effect(&ier("prop-1", "freeze_member", 2))
+            .unwrap_err();
+        assert!(
+            err.starts_with(INSTITUTIONAL_EFFECT_IDENTITY_TAKEN),
+            "{err}"
+        );
+        assert_eq!(
+            store
+                .list_institutional_effects_by_proposal("prop-1")
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]
