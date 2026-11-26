@@ -18,19 +18,20 @@
 //!   same write. The journal flushes before acknowledging.
 //! * A Seal's `F` is recomputed here from the enumerated final set; a caller's `F` is never taken.
 //!   Seal carries the Pending record's basis and `E` unchanged. Sealed is terminal (P5a).
-//! * [`LifecycleStore::open`] succeeds only when the recovery journal admits. [`recover`] resolves
-//!   what is safe to resolve (a fully applied or a never-applied intent; each is fully described
-//!   by its intent). It leaves partial, foreign, torn or corrupt records quarantined, and admission
-//!   stays closed until an authorized reconciliation.
+//! * **Exclusive ownership (typestate).** [`LifecycleRecovery::claim`] takes a process-wide claim
+//!   on the database's fault domain; a second owner is refused while it lives. Recovery can
+//!   [`inspect`](LifecycleRecovery::inspect) and [`resolve_safe`](LifecycleRecovery::resolve_safe)
+//!   (Applied and NotApplied only: the intent fully describes them). Everything else is
+//!   quarantined. [`into_live`](LifecycleRecovery::into_live) **consumes** the recovery owner and
+//!   returns the only live [`LifecycleStore`], only once the journal admits. After an ambiguous
+//!   storage fault every operation is refused until the database is reopened, which requires a
+//!   new claim and recovery again.
 //!
-//! # Witness correspondence (stated precisely)
-//! The witness records the first attempt and its `K`. While L's record is at that first attempt
-//! (Pending, Sealed, or Legacy after aborting it), `K_first` is cross-checked against the record's
-//! `K`. After a later Begin, the record no longer carries the first attempt's `K`, so only
-//! `attempt ≥ first_attempt` and L's identity remain checkable. `K_first` is then preserved but
-//! **not re-verified**. Extending this would need the record to carry `K_first` (32 more bytes in
-//! the slice 1a layout), an experimental change proposed, not made. Simultaneous deletion or
-//! rollback of both record and witness cannot be detected without independent evidence.
+//! # Witness correspondence
+//! Since record layout v2 (S26) the record retains `K_first` in every stored state, and every
+//! load checks it against the witness. A replaced or transplanted witness is refused after any
+//! number of attempts. Simultaneous deletion, modification or rollback of both record and witness
+//! cannot be detected without independent durable evidence.
 //!
 //! # Ownership boundary
 //! The store must be the daemon's owning governance [`SledStore`], so its fault domain covers every
@@ -47,7 +48,8 @@ use icn_governance::predecessor_seal::{
     TransitionOutcome,
 };
 use icn_store::recovery::{Entry, Outcome, RecoveryError, RecoveryIntent, RecoveryJournal};
-use icn_store::{CompareAndWrite, SledStore, Store};
+use icn_store::{CompareAndWrite, FaultDomain, SledStore, Store};
+use std::sync::{Arc, Mutex, Weak};
 
 use crate::state_store::domain_key;
 
@@ -84,6 +86,10 @@ pub enum LifecycleStoreError {
     Inconsistent,
     /// A Begin replay names a different electorate commitment than the one recorded.
     ReplayMismatch,
+    /// Another lifecycle owner (recovery or live) already holds this database.
+    AlreadyClaimed,
+    /// The process-wide claim registry is poisoned (a panic while it was held).
+    ClaimPoisoned,
 }
 
 impl std::fmt::Display for LifecycleStoreError {
@@ -96,6 +102,8 @@ impl std::fmt::Display for LifecycleStoreError {
             Self::Inconsistent => {
                 "the stored record does not carry the Pending basis needed to seal"
             }
+            Self::AlreadyClaimed => "another lifecycle owner already holds this database",
+            Self::ClaimPoisoned => "the lifecycle claim registry is poisoned",
             Self::ReplayMismatch => {
                 "a Begin replay names a different electorate commitment than the one recorded"
             }
@@ -165,7 +173,113 @@ pub enum Committed {
 
 /// Test-only hook type (see `LifecycleStore::before_apply`).
 #[cfg(test)]
-type BeforeApplyHook<'a> = Box<dyn FnOnce(&SledStore) + 'a>;
+type BeforeApplyHook<'a> = Box<dyn FnOnce(&SledStore) + Send + 'a>;
+
+/// Databases (identified by their fault domain) currently claimed by a lifecycle owner.
+static CLAIMS: Mutex<Vec<Weak<FaultDomain>>> = Mutex::new(Vec::new());
+
+/// Exclusive ownership of one database's lifecycle keyspace, in this process. It is identified
+/// by the database's fault domain (the owner boundary of `icn-store`), so a second claim on the
+/// same database (recovery or live) is refused while this one lives. It does not, and cannot,
+/// stop a raw handle to the same database. In daemon mode no such holder exists (S24 ownership
+/// audit), and standalone gateway mode must never construct a lifecycle owner.
+struct Claim {
+    domain: Arc<FaultDomain>,
+}
+
+impl Claim {
+    fn acquire(store: &SledStore) -> anyhow::Result<Self> {
+        let domain = store.fault_domain();
+        let mut claims = CLAIMS
+            .lock()
+            .map_err(|_| LifecycleStoreError::ClaimPoisoned)?;
+        claims.retain(|w| w.strong_count() > 0);
+        if claims
+            .iter()
+            .any(|w| w.upgrade().is_some_and(|d| Arc::ptr_eq(&d, &domain)))
+        {
+            return Err(LifecycleStoreError::AlreadyClaimed.into());
+        }
+        claims.push(Arc::downgrade(&domain));
+        Ok(Self { domain })
+    }
+}
+
+impl Drop for Claim {
+    fn drop(&mut self) {
+        if let Ok(mut claims) = CLAIMS.lock() {
+            claims.retain(|w| w.upgrade().is_some_and(|d| !Arc::ptr_eq(&d, &self.domain)));
+        }
+    }
+}
+
+/// Recovery-only ownership of a database's lifecycle keyspace. The only way to obtain a live
+/// [`LifecycleStore`] is to consume this with [`LifecycleRecovery::into_live`], which succeeds only
+/// when the journal admits. While either exists, no other lifecycle owner can claim the database.
+pub struct LifecycleRecovery<'a> {
+    store: &'a SledStore,
+    journal: RecoveryJournal<'a>,
+    claim: Claim,
+}
+
+impl<'a> LifecycleRecovery<'a> {
+    /// Claim the database for lifecycle recovery. Crate-private and without a production call
+    /// site (operationally inactive until P5b activation).
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn claim(store: &'a SledStore) -> anyhow::Result<Self> {
+        let claim = Claim::acquire(store)?;
+        let journal = RecoveryJournal::new(store, LIFECYCLE_JOURNAL_PREFIX)?;
+        Ok(Self {
+            store,
+            journal,
+            claim,
+        })
+    }
+
+    /// Read-only inspection of every outstanding record: transaction id, keys, expected and
+    /// intended values, classification (the recovery journal's [`Outcome`]).
+    pub fn inspect(&self) -> anyhow::Result<Vec<Outcome>> {
+        self.journal.classify()
+    }
+
+    /// Resolve only what the durable intent fully describes: complete Applied, abandon
+    /// NotApplied (each re-classified and race-checked by the journal's retirement). Everything
+    /// else stays quarantined; admission remains closed while any remains.
+    pub fn resolve_safe(&self) -> anyhow::Result<RecoveryReport> {
+        let mut report = RecoveryReport::default();
+        for outcome in self.journal.classify()? {
+            match &outcome {
+                Outcome::Applied(i) => {
+                    self.journal.complete(&i.txid)?;
+                    report.completed += 1;
+                }
+                Outcome::NotApplied(i) => {
+                    self.journal.abandon(&i.txid)?;
+                    report.abandoned += 1;
+                }
+                _ => report.quarantined.push(outcome),
+            }
+        }
+        Ok(report)
+    }
+
+    /// Consume recovery and become live, only if nothing remains unresolved. On refusal the
+    /// recovery owner is handed back unchanged (the claim is kept).
+    pub fn into_live(self) -> Result<LifecycleStore<'a>, (Self, anyhow::Error)> {
+        let admission = match self.journal.admit() {
+            Ok(a) => a,
+            Err(e) => return Err((self, e)),
+        };
+        Ok(LifecycleStore {
+            store: self.store,
+            journal: self.journal,
+            _admission: admission,
+            _claim: self.claim,
+            #[cfg(test)]
+            before_apply: Mutex::new(None),
+        })
+    }
+}
 
 /// The admitted, owning-store-only lifecycle persistence.
 pub struct LifecycleStore<'a> {
@@ -173,13 +287,15 @@ pub struct LifecycleStore<'a> {
     journal: RecoveryJournal<'a>,
     /// Held for the store's lifetime; admission is also re-checked before every transition.
     _admission: icn_store::recovery::Admission<'a>,
+    /// The database claim, moved here from recovery; released when the live store drops.
+    _claim: Claim,
     /// Test-only: runs once between journaling an intent and applying it, to model a concurrent
     /// writer landing in that window.
     #[cfg(test)]
-    before_apply: std::cell::RefCell<Option<BeforeApplyHook<'a>>>,
+    before_apply: Mutex<Option<BeforeApplyHook<'a>>>,
 }
 
-/// What [`recover`] did.
+/// What [`LifecycleRecovery::resolve_safe`] did.
 #[derive(Debug, Default)]
 pub struct RecoveryReport {
     pub completed: usize,
@@ -188,44 +304,16 @@ pub struct RecoveryReport {
     pub quarantined: Vec<Outcome>,
 }
 
-/// Resolve the lifecycle journal after a restart: complete fully applied intents and abandon
-/// never-applied ones. Every other record is quarantined.
-// Operationally inactive by design: no production call site until P5b slice 2 / activation.
-#[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn recover(store: &SledStore) -> anyhow::Result<RecoveryReport> {
-    let journal = RecoveryJournal::new(store, LIFECYCLE_JOURNAL_PREFIX)?;
-    let mut report = RecoveryReport::default();
-    for outcome in journal.classify()? {
-        match &outcome {
-            Outcome::Applied(i) => {
-                journal.complete(&i.txid)?;
-                report.completed += 1;
-            }
-            Outcome::NotApplied(i) => {
-                journal.abandon(&i.txid)?;
-                report.abandoned += 1;
-            }
-            _ => report.quarantined.push(outcome),
-        }
-    }
-    Ok(report)
-}
-
 impl<'a> LifecycleStore<'a> {
-    /// The only constructor: over the owning governance store, and only once the recovery
-    /// journal admits.
-    // Operationally inactive by design: no production call site until P5b slice 2 / activation.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn open(store: &'a SledStore) -> anyhow::Result<Self> {
-        let journal = RecoveryJournal::new(store, LIFECYCLE_JOURNAL_PREFIX)?;
-        let admission = journal.admit()?;
-        Ok(Self {
-            store,
-            journal,
-            _admission: admission,
-            #[cfg(test)]
-            before_apply: std::cell::RefCell::new(None),
-        })
+    /// Give up live operation and return to recovery (for example to inspect after an error).
+    /// The claim moves with it; after an ambiguous storage fault every operation is refused
+    /// anyway until the database is reopened, which requires a fresh claim and recovery.
+    pub fn into_recovery(self) -> LifecycleRecovery<'a> {
+        LifecycleRecovery {
+            store: self.store,
+            journal: self.journal,
+            claim: self._claim,
+        }
     }
 
     /// Load and cross-check L's record and witness.
@@ -398,9 +486,18 @@ impl<'a> LifecycleStore<'a> {
                 }
             }
         };
+        // K_first: set by the first Begin from its own commitment, carried unchanged ever after.
+        let first_commitment_hash = match &loaded.stored {
+            Some(previous) => previous.first_commitment_hash,
+            None => match &state {
+                StoredLifecycle::Pending { commitment, .. } => commitment.commitment()?,
+                _ => return Err(LifecycleStoreError::Inconsistent.into()),
+            },
+        };
         let record = LifecycleRecordV1 {
             predecessor: l.clone(),
             revision,
+            first_commitment_hash,
             state,
         };
         let record_bytes = record.encode()?;
@@ -442,8 +539,11 @@ impl<'a> LifecycleStore<'a> {
             });
         }
         #[cfg(test)]
-        if let Some(hook) = self.before_apply.borrow_mut().take() {
-            hook(self.store);
+        {
+            let hook = self.before_apply.lock().ok().and_then(|mut h| h.take());
+            if let Some(hook) = hook {
+                hook(self.store);
+            }
         }
         match self.journal.apply(&intent)? {
             CompareAndWrite::Applied => self.journal.complete(&txid)?,
@@ -527,6 +627,15 @@ mod tests {
         }
     }
 
+    /// Claim, then go live (the only path to a live store).
+    fn live(s: &SledStore) -> LifecycleStore<'_> {
+        LifecycleRecovery::claim(s)
+            .unwrap()
+            .into_live()
+            .map_err(|(_, e)| e)
+            .unwrap()
+    }
+
     fn admitted(s: &SledStore) {
         RecoveryJournal::new(s, LIFECYCLE_JOURNAL_PREFIX)
             .unwrap()
@@ -537,7 +646,7 @@ mod tests {
     #[test]
     fn the_first_begin_establishes_record_and_witness_together() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let fresh = ls.load(&l()).unwrap();
         assert_eq!(fresh.state, PredecessorLifecycle::initial());
         assert_eq!(fresh.revision, 0);
@@ -569,7 +678,7 @@ mod tests {
     #[test]
     fn an_exact_replay_writes_nothing_and_a_different_begin_is_refused() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let p = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -586,7 +695,7 @@ mod tests {
     #[test]
     fn abort_then_retry_keeps_the_witness_and_advances_both_counters() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let p1 = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -615,9 +724,69 @@ mod tests {
     }
 
     #[test]
+    fn k_first_survives_abort_and_retries_and_a_replaced_witness_is_refused_later() {
+        let s = store();
+        let ls = live(&s);
+        let p1 = written(
+            ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
+                .unwrap(),
+        );
+        let a1 = written(
+            ls.transition(
+                &p1,
+                LifecycleRequest::Abort {
+                    attempt: 1,
+                    commitment_hash: k(0x4D),
+                },
+                [2; 16],
+            )
+            .unwrap(),
+        );
+        let p2 = written(ls.transition(&a1, begin(2, 0x4E), [3; 16]).unwrap());
+        let a2 = written(
+            ls.transition(
+                &p2,
+                LifecycleRequest::Abort {
+                    attempt: 2,
+                    commitment_hash: k(0x4E),
+                },
+                [4; 16],
+            )
+            .unwrap(),
+        );
+        let p3 = written(ls.transition(&a2, begin(3, 0x4F), [5; 16]).unwrap());
+        let ids = ["p"];
+        let sealed = written(
+            ls.transition(
+                &p3,
+                LifecycleRequest::Seal {
+                    attempt: 3,
+                    commitment_hash: k(0x4F),
+                    final_ids: &ids,
+                },
+                [6; 16],
+            )
+            .unwrap(),
+        );
+        for r in [&a1, &p2, &a2, &p3, &sealed] {
+            assert_eq!(r.stored.as_ref().unwrap().first_commitment_hash, k(0x4D));
+        }
+        // Restart: reload through a fresh owner, still consistent.
+        drop(ls);
+        let ls = live(&s);
+        assert_eq!(ls.load(&l()).unwrap(), sealed);
+        // A witness replaced after several attempts (claiming another K_first) is refused.
+        let wkey = witness_key(&l()).unwrap();
+        let mut w = LifecycleWitnessV1::decode_for(&l(), &s.get(&wkey).unwrap().unwrap()).unwrap();
+        w.first_commitment_hash = k(0x4F);
+        s.put(&wkey, &w.encode().unwrap()).unwrap();
+        assert!(ls.load(&l()).is_err());
+    }
+
+    #[test]
     fn seal_recomputes_f_and_is_terminal() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let p = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -651,7 +820,7 @@ mod tests {
     #[test]
     fn a_stale_view_conflicts_and_leaves_no_journal_record() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let fresh = ls.load(&l()).unwrap();
         written(ls.transition(&fresh, begin(1, 0x4D), [1; 16]).unwrap());
         let e = ls.transition(&fresh, begin(1, 0x4E), [2; 16]).unwrap_err();
@@ -693,7 +862,7 @@ mod tests {
     #[test]
     fn a_domain_change_between_load_and_write_is_caught_by_the_pin_guard() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let fresh = ls.load(&l()).unwrap();
         // The domain is read inside `transition`; a concurrent edit after that read is modelled
         // by changing it while the intent is open, then applying: the write must conflict.
@@ -729,7 +898,7 @@ mod tests {
     #[test]
     fn seal_carries_the_pending_basis_and_electorate_unchanged() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let p = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -762,9 +931,9 @@ mod tests {
     #[test]
     fn a_domain_edit_after_begin_read_it_makes_the_begin_stale_and_leaves_nothing() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let fresh = ls.load(&l()).unwrap();
-        *ls.before_apply.borrow_mut() = Some(Box::new(|st: &SledStore| {
+        *ls.before_apply.lock().unwrap() = Some(Box::new(|st: &SledStore| {
             st.put(&domain_key(&l()), b"edited concurrently").unwrap();
         }));
         let e = ls.transition(&fresh, begin(1, 0x4D), [1; 16]).unwrap_err();
@@ -788,9 +957,9 @@ mod tests {
     #[test]
     fn a_record_write_landing_after_journaling_is_stale_and_retired_through_the_store() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let fresh = ls.load(&l()).unwrap();
-        *ls.before_apply.borrow_mut() = Some(Box::new(|st: &SledStore| {
+        *ls.before_apply.lock().unwrap() = Some(Box::new(|st: &SledStore| {
             st.put(&lifecycle_key(&l()).unwrap(), b"another writer")
                 .unwrap();
         }));
@@ -810,7 +979,7 @@ mod tests {
     #[test]
     fn a_begin_replay_with_a_different_electorate_is_refused() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let p = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -830,7 +999,7 @@ mod tests {
     #[test]
     fn a_replay_against_a_stale_snapshot_is_refused() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let p = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -857,7 +1026,7 @@ mod tests {
     #[test]
     fn invalid_transitions_are_refused_and_write_nothing() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let fresh = ls.load(&l()).unwrap();
         let ids = ["p"];
         // Seal from the untouched legacy state; Begin with an attempt gap.
@@ -902,7 +1071,7 @@ mod tests {
     #[test]
     fn a_witness_tampered_after_abort_and_retry_is_refused() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let p1 = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -939,7 +1108,7 @@ mod tests {
     #[test]
     fn an_unresolved_record_on_any_domain_closes_transitions() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let fresh = ls.load(&l()).unwrap();
         // Another domain's write left an unresolved intent after this store opened.
         let other = lifecycle_key(&GovernanceDomainId("other.coop".into())).unwrap();
@@ -956,28 +1125,71 @@ mod tests {
     }
 
     #[test]
-    fn concurrent_begins_have_one_winner() {
-        let s = std::sync::Arc::new(store());
-        let results: Vec<_> = (0..6u8)
-            .map(|t| {
-                let s = s.clone();
-                std::thread::spawn(move || {
-                    let ls = LifecycleStore::open(&s).unwrap();
-                    let fresh = ls.load(&l()).unwrap();
-                    ls.transition(&fresh, begin(1, 0x40 + t), [t + 1; 16])
-                        .is_ok()
+    fn concurrent_begins_through_one_owner_have_one_winner() {
+        let s = store();
+        let ls = live(&s);
+        let results: Vec<bool> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..6u8)
+                .map(|t| {
+                    let ls = &ls;
+                    scope.spawn(move || {
+                        let fresh = ls.load(&l()).unwrap();
+                        ls.transition(&fresh, begin(1, 0x40 + t), [t + 1; 16])
+                            .is_ok()
+                    })
                 })
-            })
-            .map(|h| h.join().unwrap())
-            .collect();
+                .collect();
+            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        });
         assert_eq!(results.iter().filter(|ok| **ok).count(), 1, "{results:?}");
+        drop(ls);
         admitted(&s);
+    }
+
+    #[test]
+    fn a_database_has_one_lifecycle_owner_at_a_time() {
+        let s = store();
+        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let e = LifecycleRecovery::claim(&s).err().unwrap();
+        assert_eq!(
+            e.downcast_ref::<LifecycleStoreError>(),
+            Some(&LifecycleStoreError::AlreadyClaimed)
+        );
+        // Going live keeps the claim: still no second owner.
+        let ls = recovery.into_live().map_err(|(_, e)| e).unwrap();
+        assert!(LifecycleRecovery::claim(&s).is_err());
+        // Another database (another fault domain) is independent.
+        let other = store();
+        assert!(LifecycleRecovery::claim(&other).is_ok());
+        // Back to recovery and dropped: the claim is released.
+        drop(ls.into_recovery());
+        assert!(LifecycleRecovery::claim(&s).is_ok());
+    }
+
+    #[test]
+    fn into_live_is_refused_while_anything_is_unresolved_and_hands_recovery_back() {
+        let s = store();
+        let journal = RecoveryJournal::new(&s, LIFECYCLE_JOURNAL_PREFIX).unwrap();
+        let rkey = lifecycle_key(&l()).unwrap();
+        journal
+            .begin(&RecoveryIntent {
+                txid: [1; 16],
+                expected: vec![(rkey.clone(), None)],
+                intended: vec![(rkey, Some(b"r".to_vec()))],
+            })
+            .unwrap();
+        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let (recovery, _e) = recovery.into_live().err().expect("refused");
+        assert_eq!(recovery.inspect().unwrap().len(), 1);
+        let report = recovery.resolve_safe().unwrap();
+        assert_eq!(report.abandoned, 1);
+        assert!(recovery.into_live().is_ok());
     }
 
     #[test]
     fn a_missing_or_transplanted_record_or_witness_is_refused_never_legacy() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -1004,7 +1216,7 @@ mod tests {
     #[test]
     fn revision_exhaustion_is_refused() {
         let s = store();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let p = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
                 .unwrap(),
@@ -1033,7 +1245,7 @@ mod tests {
     #[test]
     fn a_begin_without_the_domain_record_is_refused() {
         let s = SledStore::temporary().unwrap();
-        let ls = LifecycleStore::open(&s).unwrap();
+        let ls = live(&s);
         let e = ls
             .transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [1; 16])
             .unwrap_err();
@@ -1071,11 +1283,12 @@ mod tests {
             (applied, not)
         };
         let s = SledStore::open(dir.path()).unwrap();
-        assert!(LifecycleStore::open(&s).is_err(), "closed after restart");
-        let report = recover(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let (recovery, _) = recovery.into_live().err().expect("closed after restart");
+        let report = recovery.resolve_safe().unwrap();
         assert_eq!((report.completed, report.abandoned), (1, 1));
         assert!(report.quarantined.is_empty());
-        assert!(LifecycleStore::open(&s).is_ok());
+        assert!(recovery.into_live().is_ok());
         assert_eq!(
             s.get(&intent_applied.intended[0].0).unwrap(),
             Some(b"r".to_vec())
@@ -1100,10 +1313,15 @@ mod tests {
         journal.begin(&intent).unwrap();
         // Simulated prefix of the commit: the record landed, the witness did not.
         s.put(&rkey, b"r").unwrap();
-        let report = recover(&s).unwrap();
+        let recovery = LifecycleRecovery::claim(&s).unwrap();
+        let report = recovery.resolve_safe().unwrap();
         assert_eq!(report.quarantined.len(), 1);
         assert!(matches!(report.quarantined[0], Outcome::Partial(_)));
-        assert!(LifecycleStore::open(&s).is_err());
+        assert!(matches!(
+            recovery.inspect().unwrap()[0],
+            Outcome::Partial(_)
+        ));
+        assert!(recovery.into_live().is_err());
     }
 
     #[test]
