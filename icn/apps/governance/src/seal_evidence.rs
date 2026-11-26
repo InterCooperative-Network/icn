@@ -300,6 +300,7 @@ pub(crate) mod tests {
         pub(crate) no_enumerate: bool,
         /// When set, the by-proposal lookup returns this copy (an index/primary disagreement).
         pub(crate) by_proposal_copy: Mutex<Option<Mandate>>,
+        pub(crate) grants: Mutex<Vec<icn_governance::authority::AuthorityGrant>>,
         pub(crate) flush_fails: bool,
     }
 
@@ -367,6 +368,28 @@ pub(crate) mod tests {
                 .filter(|x| x.decision.decision_hash == *h)
                 .cloned()
                 .collect())
+        }
+        fn put_mandate(&self, m: &Mandate) -> Result<(), String> {
+            self.mandates.lock().unwrap().push(m.clone());
+            Ok(())
+        }
+        fn put_institutional_effect(&self, r: &InstitutionalEffectRecord) -> Result<(), String> {
+            self.effects.lock().unwrap().push(r.clone());
+            Ok(())
+        }
+        fn put_authority_grant(
+            &self,
+            g: &icn_governance::authority::AuthorityGrant,
+        ) -> Result<(), String> {
+            self.grants.lock().unwrap().push(g.clone());
+            Ok(())
+        }
+        fn get_authority_grant(
+            &self,
+            id: &icn_governance::authority::AuthorityGrantId,
+        ) -> Result<Option<icn_governance::authority::AuthorityGrant>, String> {
+            let g = self.grants.lock().unwrap();
+            Ok(g.iter().find(|x| x.id == *id).cloned())
         }
         fn flush(&self) -> Result<(), String> {
             if self.flush_fails {

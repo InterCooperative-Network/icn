@@ -197,7 +197,7 @@ pub enum Committed {
 
 /// Test-only hook type (see `LifecycleStore::before_apply`).
 #[cfg(test)]
-type BeforeApplyHook<'a> = Box<dyn FnOnce(&SledStore) + Send + 'a>;
+pub(crate) type BeforeApplyHook<'a> = Box<dyn FnOnce(&SledStore) + Send + 'a>;
 
 /// Databases (identified by their fault domain) currently claimed by a lifecycle owner.
 static CLAIMS: Mutex<Vec<Weak<FaultDomain>>> = Mutex::new(Vec::new());
@@ -344,6 +344,14 @@ pub struct RecoveryReport {
 }
 
 impl<'a> LifecycleStore<'a> {
+    /// Test-only: run `hook` once between journaling the next intent and applying it.
+    #[cfg(test)]
+    pub(crate) fn set_before_apply(&self, hook: BeforeApplyHook<'a>) {
+        if let Ok(mut slot) = self.before_apply.lock() {
+            *slot = Some(hook);
+        }
+    }
+
     /// Give up live operation and return to recovery (for example to inspect after an error).
     /// The claim moves with it; after an ambiguous storage fault every operation is refused
     /// anyway until the database is reopened, which requires a fresh claim and recovery.

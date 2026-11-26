@@ -74,6 +74,8 @@ enum Write {
         commitment: Box<icn_governance::cutover::CutoverCommitmentV1>,
     },
     #[cfg(test)]
+    TestArmHook(crate::predecessor_lifecycle_store::BeforeApplyHook<'static>),
+    #[cfg(test)]
     TestSeal {
         domain: GovernanceDomainId,
         attempt: u64,
@@ -156,6 +158,16 @@ impl LifecycleOwner {
         })
     }
 
+    /// Test-only: run `hook` inside the owner thread between journaling its next write's
+    /// intent and applying it (a panic there models a crash of the owner mid-commit).
+    #[cfg(test)]
+    pub(crate) fn arm_before_apply_for_tests(
+        &self,
+        hook: crate::predecessor_lifecycle_store::BeforeApplyHook<'static>,
+    ) -> Result<()> {
+        self.call(Write::TestArmHook(hook))
+    }
+
     /// Test-only: Seal through the owner's bound evidence.
     #[cfg(test)]
     pub(crate) fn seal_for_tests(
@@ -200,6 +212,12 @@ fn owner_main(
     }
     // Requests are served one at a time: the owner is the single authoritative writer.
     for req in rx {
+        #[cfg(test)]
+        if let Write::TestArmHook(hook) = req.write {
+            live.set_before_apply(hook);
+            let _ = req.reply.send(Ok(()));
+            continue;
+        }
         let _ = req.reply.send(apply(&live, &store, &req.write));
     }
 }
@@ -280,6 +298,10 @@ fn apply_once(live: &LifecycleStore<'_>, store: &SledStore, write: &Write) -> Re
                 electorate: ElectorateCommitment::unverified_for_tests([0xE1; 32]),
             };
             live.transition(&live.load(domain)?, request, txid())?;
+        }
+        #[cfg(test)]
+        Write::TestArmHook(_) => {
+            unreachable!("armed in the owner loop, never applied")
         }
         #[cfg(test)]
         Write::TestSeal {
@@ -892,5 +914,360 @@ mod tests {
             FenceRefusal::Sealed
         );
         assert_eq!(s.get(&close_intent_key(&c.id)).unwrap(), Some(raw));
+    }
+
+    #[test]
+    fn a_create_racing_a_same_id_row_retries_and_refuses_already_exists() {
+        // S28 routing delta-review FOLLOW_UP: the owner's Stale retry surfaces AlreadyExists.
+        use crate::state_store::state_store_test_put;
+        let s = sled();
+        let (owner, store) = started(&s);
+        let mut planted = prop("x");
+        planted.title = "planted".into();
+        let racer = planted.clone();
+        owner
+            .arm_before_apply_for_tests(Box::new(move |st: &SledStore| {
+                state_store_test_put(st, &racer);
+            }))
+            .unwrap();
+        let e = store.create_proposal(&prop("x")).unwrap_err();
+        assert!(
+            matches!(
+                e.downcast_ref::<ProposalWriteRefused>(),
+                Some(ProposalWriteRefused::AlreadyExists { .. })
+            ),
+            "{e:#}"
+        );
+        assert_eq!(
+            bytes(&store, &planted.id),
+            js(&planted),
+            "never overwritten"
+        );
+    }
+
+    // ---- S28 §8: isolated institutional lifecycle, end to end ----
+    //
+    // EXPERIMENTAL lifecycle integration, NOT production succession: Begin and Seal use the
+    // owner's cfg(test) routes with an unverified test electorate, and the receipt backend is
+    // the crate's in-memory test backend (it records what the actor's close path writes:
+    // decision receipts, mandates, effect records, grants). Everything else is real: a sled
+    // database on disk, the lifecycle owner, recovery, and the actor's typed commands.
+
+    fn vote(id: &str, voter: &Did) -> GovernanceCommand {
+        GovernanceCommand::CastVote {
+            proposal_id: ProposalId(id.into()),
+            voter: voter.clone(),
+            choice: icn_governance::VoteChoice::For,
+            comment: None,
+        }
+    }
+
+    fn close(id: &str) -> GovernanceCommand {
+        GovernanceCommand::CloseProposal {
+            proposal_id: ProposalId(id.into()),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        }
+    }
+
+    fn open(id: &str) -> GovernanceCommand {
+        GovernanceCommand::OpenProposal {
+            proposal_id: ProposalId(id.into()),
+            voting_period_seconds: 600,
+        }
+    }
+
+    fn create_with(id: &str, dom: &str, payload: ProposalPayload) -> GovernanceCommand {
+        GovernanceCommand::CreateProposal {
+            proposal_id: ProposalId(id.to_string()),
+            domain_id: GovernanceDomainId::new(dom),
+            title: "t".to_string(),
+            description: "d".to_string(),
+            payload,
+            scope: ProposalScope::Local,
+            action_items_on_accept: vec![],
+        }
+    }
+
+    /// Open the database at `path`, start the owner (claim + safe recovery) and the actor.
+    async fn boot(
+        path: &std::path::Path,
+        receipts: &Arc<Backend>,
+        node: &Did,
+    ) -> (SledStore, LifecycleOwner, GovernanceHandle) {
+        // A real reopen: the previous process image released every handle (actor shut down,
+        // owner thread gone); the owner thread exits asynchronously, so allow it a moment.
+        let mut opened = None;
+        for _ in 0..400 {
+            match SledStore::open(path) {
+                Ok(s) => {
+                    opened = Some(s);
+                    break;
+                }
+                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(10)).await,
+            }
+        }
+        let s = opened.expect("the database reopens once every handle is released");
+        let owner =
+            LifecycleOwner::start(&s, BoundSealEvidence::receipts(receipts.clone())).unwrap();
+        let gossip = GossipActor::spawn(node.clone(), None);
+        gossip.write().await.create_topic(Topic::new(
+            "governance:proposal".into(),
+            AccessControl::Public,
+        ));
+        let handle = GovernanceActor::spawn_with_owner(
+            node.clone(),
+            &s,
+            owner.clone(),
+            receipts.clone(),
+            gossip,
+            Arc::new(StaticMembershipResolver::new()),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        (s, owner, handle)
+    }
+
+    #[tokio::test]
+    async fn an_institution_drains_survives_a_crash_seals_and_stays_sealed_across_restart() {
+        use icn_governance::predecessor_lifecycle::{
+            check_witness, domain_record_pin, lifecycle_key, witness_key, LifecyclePresence,
+            StoredLifecycle,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let node = icn_identity::IdentityBundle::generate()
+            .unwrap()
+            .did()
+            .clone();
+        let m_dom = "other.coop.example";
+        {
+            let s = SledStore::open(dir.path()).unwrap();
+            for id in [L, m_dom] {
+                s.put(
+                    &domain_key(&GovernanceDomainId::new(id)),
+                    &serde_json::to_vec(&member_domain(id, &node)).unwrap(),
+                )
+                .unwrap();
+            }
+            s.flush().unwrap();
+        }
+        let receipts = Arc::new(Backend::default());
+        let lifecycle = |s: &SledStore| -> LifecyclePresence {
+            check_witness(
+                &l(),
+                s.get(&lifecycle_key(&l()).unwrap()).unwrap().as_deref(),
+                s.get(&witness_key(&l()).unwrap()).unwrap().as_deref(),
+            )
+            .unwrap()
+        };
+        let stored = |s: &SledStore, id: &str| -> Option<Proposal> {
+            SledGovernanceStateStore::new(Arc::new(s.share()))
+                .get_proposal(&ProposalId(id.into()))
+                .unwrap()
+        };
+        let budget = || ProposalPayload::Budget {
+            amount: 5,
+            currency: "hours".into(),
+            recipient: icn_identity::IdentityBundle::generate()
+                .unwrap()
+                .did()
+                .clone(),
+            purpose: "p".into(),
+        };
+        let text = || ProposalPayload::Text { body: "b".into() };
+
+        // ---- Legacy: ordinary governance through the typed command path ----
+        let (s, owner, h) = boot(dir.path(), &receipts, &node).await;
+        for (id, payload) in [("a", text()), ("b", budget())] {
+            h.submit(create_with(id, L, payload)).await.unwrap();
+            h.submit(open(id)).await.unwrap();
+            h.submit(vote(id, &node)).await.unwrap();
+            h.submit(close(id)).await.unwrap();
+            assert!(stored(&s, id).unwrap().state.is_closed(), "{id} closed");
+        }
+        // The execution-required acceptance left its durable intent in the receipt backend.
+        let b_mandate = receipts
+            .mandates
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|m| m.decision.proposal_id == "b");
+        assert!(b_mandate, "mandate for b");
+        assert!(receipts
+            .receipts
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|r| r.proposal_id == "b"));
+        h.submit(create_with("draft", L, text())).await.unwrap();
+        h.submit(create_with("o", L, text())).await.unwrap();
+        h.submit(open("o")).await.unwrap();
+        h.submit(vote("o", &node)).await.unwrap();
+        assert!(matches!(lifecycle(&s), LifecyclePresence::NeverBegun));
+
+        // ---- Begin (test-authorized) ----
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        let pinned_domain = s.get(&domain_key(&l())).unwrap().unwrap();
+        let begin_rev = match lifecycle(&s) {
+            LifecyclePresence::Established(r) => match r.state {
+                StoredLifecycle::Pending {
+                    begin_revision,
+                    domain_pin,
+                    ..
+                } => {
+                    assert_eq!(domain_pin, domain_record_pin(&pinned_domain));
+                    assert_eq!(begin_revision, 0, "fenced on the never-begun state");
+                    r.revision
+                }
+                other => panic!("expected Pending, got {other:?}"),
+            },
+            other => panic!("expected a record, got {other:?}"),
+        };
+
+        // ---- Pending: new commitments refused, the institution elsewhere unaffected ----
+        let refused = |e: anyhow::Error| fence(e);
+        assert_eq!(
+            refused(h.submit(create_with("new", L, text())).await.unwrap_err()),
+            FenceRefusal::CreateWhilePending
+        );
+        assert_eq!(
+            refused(h.submit(open("draft")).await.unwrap_err()),
+            FenceRefusal::ActivationWhilePending
+        );
+        let mut cfg = member_domain(L, &node).config;
+        cfg.params.voting_period_seconds += 60;
+        assert_eq!(
+            refused(
+                h.submit(GovernanceCommand::UpdateDomainConfig {
+                    domain_id: l(),
+                    new_config: cfg,
+                })
+                .await
+                .unwrap_err()
+            ),
+            FenceRefusal::DomainChangeWhilePending
+        );
+        assert_eq!(s.get(&domain_key(&l())).unwrap().unwrap(), pinned_domain);
+        h.submit(create_with("m1", m_dom, text())).await.unwrap();
+
+        // ---- Interrupted: the owner dies after journaling the drain's first write ----
+        owner
+            .arm_before_apply_for_tests(Box::new(|_: &SledStore| panic!("crash mid-commit")))
+            .unwrap();
+        assert!(
+            h.submit(close("o")).await.is_err(),
+            "the close is interrupted"
+        );
+        assert!(
+            !stored(&s, "o").unwrap().state.is_closed(),
+            "nothing applied"
+        );
+        {
+            // The crash left exactly one durable intent, classified NotApplied.
+            use crate::predecessor_lifecycle_store::LIFECYCLE_JOURNAL_PREFIX;
+            use icn_store::recovery::{Outcome, RecoveryJournal};
+            let journal = RecoveryJournal::new(&s, LIFECYCLE_JOURNAL_PREFIX).unwrap();
+            let outcomes = journal.classify().unwrap();
+            assert_eq!(outcomes.len(), 1);
+            assert!(matches!(outcomes[0], Outcome::NotApplied(_)));
+        }
+        s.flush().unwrap();
+        h.shutdown().await;
+        drop((h, owner));
+        drop(s);
+
+        // ---- Restart: claim, safe recovery (the unapplied write is abandoned), live ----
+        let (s, owner, h) = boot(dir.path(), &receipts, &node).await;
+        h.recover_incomplete_closes().await;
+        {
+            use crate::predecessor_lifecycle_store::LIFECYCLE_JOURNAL_PREFIX;
+            use icn_store::recovery::RecoveryJournal;
+            let journal = RecoveryJournal::new(&s, LIFECYCLE_JOURNAL_PREFIX).unwrap();
+            assert!(
+                journal.classify().unwrap().is_empty(),
+                "recovery abandoned it"
+            );
+        }
+        // The legitimate obligation drains after the restart.
+        h.submit(close("o")).await.unwrap();
+        assert!(stored(&s, "o").unwrap().state.is_closed());
+        let drained_rev = match lifecycle(&s) {
+            LifecyclePresence::Established(r) => r.revision,
+            other => panic!("{other:?}"),
+        };
+        assert!(
+            drained_rev > begin_rev,
+            "fenced writes advanced the revision"
+        );
+
+        // ---- Seal from what is stored, with the bound receipt evidence; replay ----
+        owner.seal_for_tests(&l(), 1, k(0x4D)).unwrap();
+        owner.seal_for_tests(&l(), 1, k(0x4D)).unwrap();
+        let sealed_bytes = s.get(&lifecycle_key(&l()).unwrap()).unwrap();
+        match lifecycle(&s) {
+            LifecyclePresence::Established(r) => {
+                assert!(matches!(r.state, StoredLifecycle::Sealed { .. }));
+                assert_eq!(r.first_commitment_hash, k(0x4D), "K_first witness");
+            }
+            other => panic!("{other:?}"),
+        }
+
+        // ---- Sealed: predecessor authority refused through the command path ----
+        assert_eq!(
+            refused(h.submit(create_with("late", L, text())).await.unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        assert_eq!(
+            refused(h.submit(open("draft")).await.unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        let mut cfg = member_domain(L, &node).config;
+        cfg.params.voting_period_seconds += 120;
+        assert_eq!(
+            refused(
+                h.submit(GovernanceCommand::UpdateDomainConfig {
+                    domain_id: l(),
+                    new_config: cfg,
+                })
+                .await
+                .unwrap_err()
+            ),
+            FenceRefusal::Sealed
+        );
+        assert_eq!(s.get(&domain_key(&l())).unwrap().unwrap(), pinned_domain);
+        h.submit(create_with("m2", m_dom, text())).await.unwrap();
+        let history: Vec<_> = ["a", "b", "o", "draft"]
+            .iter()
+            .map(|id| serde_json::to_vec(&stored(&s, id).unwrap()).unwrap())
+            .collect();
+        s.flush().unwrap();
+        h.shutdown().await;
+        drop((h, owner));
+        drop(s);
+
+        // ---- Restart again: nothing resurrects the predecessor ----
+        let (s, _owner, h) = boot(dir.path(), &receipts, &node).await;
+        h.recover_incomplete_closes().await;
+        assert_eq!(s.get(&lifecycle_key(&l()).unwrap()).unwrap(), sealed_bytes);
+        assert_eq!(
+            refused(h.submit(create_with("again", L, text())).await.unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        assert_eq!(
+            refused(h.submit(open("draft")).await.unwrap_err()),
+            FenceRefusal::Sealed
+        );
+        let after: Vec<_> = ["a", "b", "o", "draft"]
+            .iter()
+            .map(|id| serde_json::to_vec(&stored(&s, id).unwrap()).unwrap())
+            .collect();
+        assert_eq!(
+            after, history,
+            "predecessor history preserved byte for byte"
+        );
+        h.submit(create_with("m3", m_dom, text())).await.unwrap();
     }
 }
