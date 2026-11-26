@@ -692,7 +692,31 @@ pub async fn handle_governance_vote_cast(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::internal_error(id, e),
+        Err(e) => vote_refusal_response(id, e),
+    }
+}
+
+/// The RPC response for a refused `governance.vote.cast`.
+///
+/// The governance actor's typed admission refusals get specific codes with a
+/// fixed message; anything else stays an opaque internal error.
+fn vote_refusal_response(id: u64, e: anyhow::Error) -> RpcResponse {
+    use icn_governance::GovernanceError as G;
+    match e.downcast_ref::<G>() {
+        Some(G::ProposalNotFound(_)) => {
+            RpcResponse::error(id, NOT_FOUND, "Proposal not found".to_string())
+        }
+        Some(G::ProposalNotOpen(_)) => RpcResponse::error(
+            id,
+            crate::error_codes::CONFLICT,
+            "Proposal is not open for voting".to_string(),
+        ),
+        Some(G::NotAMember(_)) => RpcResponse::error(
+            id,
+            PERMISSION_DENIED,
+            "Caller is not an eligible voter in this proposal's domain".to_string(),
+        ),
+        _ => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -1069,6 +1093,8 @@ mod delegation_auth_tests {
     #[derive(Clone, Default)]
     struct RecordingGovernance {
         delegations: Arc<Mutex<Vec<Delegation>>>,
+        /// Scripted outcome of the next `cast_vote`: `Some(e)` refuses with `e`.
+        vote_refusal: Arc<Mutex<Option<anyhow::Error>>>,
     }
 
     #[async_trait::async_trait]
@@ -1200,7 +1226,10 @@ mod delegation_auth_tests {
             _choice: icn_governance::VoteChoice,
             _comment: Option<String>,
         ) -> anyhow::Result<()> {
-            unimplemented!()
+            match self.vote_refusal.lock().unwrap().take() {
+                Some(e) => Err(e),
+                None => Ok(()),
+            }
         }
         async fn close_proposal(
             &self,
@@ -1273,6 +1302,43 @@ mod delegation_auth_tests {
 
     fn new_did() -> icn_identity::Did {
         KeyPair::generate().unwrap().did().clone()
+    }
+
+    /// Typed vote refusals from the governance actor surface as specific RPC
+    /// error codes; anything else stays an opaque internal error.
+    #[tokio::test]
+    async fn vote_cast_maps_typed_refusals_to_specific_codes() {
+        use icn_governance::GovernanceError as G;
+        let ctx = RpcContext::new(new_did(), None, vec![]);
+        let params = serde_json::json!({ "proposal_id": "p", "choice": "for" });
+        let cases: Vec<(anyhow::Error, i32)> = vec![
+            (G::ProposalNotFound("p".into()).into(), NOT_FOUND),
+            (
+                G::ProposalNotOpen("p".into()).into(),
+                crate::error_codes::CONFLICT,
+            ),
+            (G::NotAMember("d".into()).into(), PERMISSION_DENIED),
+            (
+                G::AlreadyVoted("x".into()).into(),
+                crate::error_codes::INTERNAL_ERROR,
+            ),
+            (
+                anyhow::anyhow!("store failure"),
+                crate::error_codes::INTERNAL_ERROR,
+            ),
+        ];
+        for (refusal, want) in cases {
+            let gov = RecordingGovernance::default();
+            *gov.vote_refusal.lock().unwrap() = Some(refusal);
+            let state = test_state(gov);
+            let resp = handle_governance_vote_cast(1, &params, &state, Some(&ctx)).await;
+            let err = resp.error.expect("refusal must be an error response");
+            assert_eq!(err.code, want, "message: {}", err.message);
+        }
+        // Control: an accepted vote is a success.
+        let state = test_state(RecordingGovernance::default());
+        let resp = handle_governance_vote_cast(1, &params, &state, Some(&ctx)).await;
+        assert!(resp.error.is_none(), "{:?}", resp.error);
     }
 
     #[tokio::test]
