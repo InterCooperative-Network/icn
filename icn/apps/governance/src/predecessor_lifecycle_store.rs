@@ -3237,7 +3237,10 @@ pub(crate) mod tests {
     /// cancelled) after the second Begin, so the Seal runs several revisions past `r_begin`.
     fn drained_after_retry(s: &SledStore) -> (LifecycleStore<'_>, LoadedLifecycle) {
         let ls = live(s);
-        ls.write_proposal(&ls.load(&l()).unwrap(), &prop("a"), [1; 16])
+        // One proposal value throughout: `prop` mints a fresh proposer each call, and a
+        // proposal's proposer is fixed at creation (#2962 field immutability).
+        let a0 = prop("a");
+        ls.write_proposal(&ls.load(&l()).unwrap(), &a0, [1; 16])
             .unwrap();
         let p1 = written(
             ls.transition(&ls.load(&l()).unwrap(), begin(1, 0x4D), [2; 16])
@@ -3249,7 +3252,7 @@ pub(crate) mod tests {
         };
         let aborted = written(ls.transition(&p1, abort, [3; 16]).unwrap());
         written(ls.transition(&aborted, begin(2, 0x4E), [4; 16]).unwrap());
-        let mut a = prop("a");
+        let mut a = a0.clone();
         a.cancel().unwrap();
         ls.write_proposal(&ls.load(&l()).unwrap(), &a, [5; 16])
             .unwrap();
