@@ -2363,8 +2363,10 @@ mod tests {
         let s = store();
         let (ls, pending) = drained(&s);
         // A row of another domain is ignored.
+        // A terminal row of another domain is ignored (it would change F if counted).
         let mut other = prop("z");
         other.domain_id = GovernanceDomainId("other.coop".into());
+        other.cancel().unwrap();
         crate::state_store::state_store_test_put(&s, &other);
         let ev = Evidence::default();
         let sealed = written(ls.seal(&pending, &ev, [5; 16]).unwrap());
