@@ -18,9 +18,10 @@
 //! * The Seal evidence is bound when the owner starts ([`BoundSealEvidence`]); it is the owner's
 //!   for its whole life and nothing installed later replaces it.
 //! * [`FencedGovernanceStateStore`] implements the actor's existing [`GovernanceStateStore`]
-//!   trait. Reads pass through. The five authoritative writes the lifecycle governs
+//!   trait. Reads pass through. The authoritative writes the lifecycle governs
 //!   (`create_proposal`, `save_proposal`, `save_domain`, `save_close_intent`,
-//!   `delete_close_intent`) become requests to the owner thread, which loads the domain's
+//!   `delete_close_intent`; since S29 also `save_vote`, `save_delegation` and
+//!   `save_revoked_delegation`) become requests to the owner thread, which loads the domain's
 //!   lifecycle and applies the fenced, journaled write. Every actor path that writes through
 //!   its state store (direct commands, scheduler callbacks, startup close recovery) is therefore
 //!   routed by construction, with one funnel and no lifecycle rule restated outside the store.
@@ -369,7 +370,8 @@ enum ScopeUse {
 ///   been begun, so revoking such a delegation is unfenced rather than trapped; creating one
 ///   fails like every other routed write for that id (writer inventory, DP-7).
 /// * `Proposal(P)` resolves to P's stored domain. Creating one requires a stored P. Revoking
-///   one whose P is not stored (rows the pre-fence path accepted) is unfenced, never trapped.
+///   one whose P is not stored or not readable, or whose domain id can never have a lifecycle
+///   (rows the pre-fence path accepted), is unfenced, never trapped.
 fn scope_lifecycle(
     live: &LifecycleStore<'_>,
     store: &SledStore,
@@ -384,11 +386,24 @@ fn scope_lifecycle(
             }
             Ok(Some(live.load(d)?))
         }
-        DelegationScope::Proposal(p) => match reader(store).get_proposal(p)? {
-            Some(proposal) => Ok(Some(live.load(&proposal.domain_id)?)),
-            None if usage == ScopeUse::Revoke => Ok(None),
-            None => Err(FenceRefusal::DelegationWithoutProposal.into()),
-        },
+        DelegationScope::Proposal(p) => {
+            // Revocation is never trapped: a proposal row that cannot be read, or whose domain
+            // can never have a lifecycle, revokes unfenced (as for `Domain(D)` above).
+            let found = match (usage, reader(store).get_proposal(p)) {
+                (ScopeUse::Revoke, Err(_)) => return Ok(None),
+                (_, found) => found?,
+            };
+            match found {
+                Some(proposal)
+                    if usage == ScopeUse::Revoke && lifecycle_key(&proposal.domain_id).is_err() =>
+                {
+                    Ok(None)
+                }
+                Some(proposal) => Ok(Some(live.load(&proposal.domain_id)?)),
+                None if usage == ScopeUse::Revoke => Ok(None),
+                None => Err(FenceRefusal::DelegationWithoutProposal.into()),
+            }
+        }
     }
 }
 
@@ -1470,6 +1485,50 @@ mod tests {
             "no vote on a closed proposal"
         );
         assert_eq!(bytes(&store, &p.id), js(&closed), "the close stands");
+    }
+
+    #[test]
+    fn a_vote_after_the_close_intent_is_journaled_is_refused() {
+        // S29 review FOLLOW_UP 1: once the close intent fixes the decision, no new vote may
+        // change the stored rows the decision evidence was computed from.
+        let s = sled();
+        let (owner, store) = started(&s);
+        let p = opened(&store, "p", L);
+        owner.begin_for_tests(&l(), 1, commitment(0x4D)).unwrap();
+        store
+            .save_close_intent(&intent_for(&p, ProposalState::Rejected { closed_at: 5 }))
+            .unwrap();
+        let voter = did();
+        assert_eq!(
+            fence(store.save_vote(&p.id, &ballot("p", &voter)).unwrap_err()),
+            FenceRefusal::VoteWhileClosing
+        );
+        assert_eq!(vote_row(&store, "p", &voter), None);
+    }
+
+    #[test]
+    fn revoking_a_proposal_scoped_delegation_in_a_lifecycle_less_domain_is_not_trapped() {
+        // S29 review FOLLOW_UP 2: a stored proposal whose domain id can never key a lifecycle
+        // (pre-fence data) must not make its delegations unrevocable.
+        use crate::state_store::state_store_test_put;
+        let s = sled();
+        let (_owner, store) = started(&s);
+        let mut odd = prop("odd");
+        odd.domain_id = GovernanceDomainId::new("");
+        assert!(
+            lifecycle_key(&odd.domain_id).is_err(),
+            "precondition: no lifecycle key"
+        );
+        state_store_test_put(&s, &odd);
+        let d = deleg(DelegationScope::Proposal(odd.id.clone()));
+        SledGovernanceStateStore::new(Arc::new(s.share()))
+            .save_delegation(&d)
+            .unwrap();
+        store.save_revoked_delegation(&d, d.created_at).unwrap();
+        assert_eq!(
+            store.get_delegation(&d.id).unwrap().unwrap().revoked_at,
+            Some(d.created_at)
+        );
     }
 
     // ---- S28 §8: isolated institutional lifecycle, end to end ----

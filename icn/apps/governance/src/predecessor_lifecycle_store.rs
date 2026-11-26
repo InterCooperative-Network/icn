@@ -1070,12 +1070,19 @@ impl<'a> LifecycleStore<'a> {
             return Ok(FencedWrite::Unchanged);
         }
         vote_fence(&loaded.state, &proposal)?;
+        // A journaled close intent means the decision (and its receipt) is already fixed; a
+        // vote landing before the intent completes would leave stored votes that no longer
+        // match the decision evidence. The intent's absence is a commit guard too.
+        let ikey = close_intent_key(proposal_id);
+        if self.store.get(&ikey)?.is_some() {
+            return Err(FenceRefusal::VoteWhileClosing.into());
+        }
         self.fenced_commit(
             loaded,
             key,
             stored,
             Some(next),
-            vec![(pkey, Some(pbytes))],
+            vec![(pkey, Some(pbytes)), (ikey, None)],
             txid,
         )
     }
@@ -1314,6 +1321,8 @@ pub enum FenceRefusal {
     VoteWithoutProposal,
     /// L is CutoverPending: only Open proposals (drainage) accept votes.
     VoteNotDraining,
+    /// A close intent for the proposal is journaled: its decision is fixed; no new vote.
+    VoteWhileClosing,
     /// A different delegation is already stored under this id; creation never replaces it.
     DelegationExists,
     /// A proposal-scoped delegation names no stored proposal.
@@ -1356,6 +1365,7 @@ impl std::fmt::Display for FenceRefusal {
             Self::VoteProposalMismatch => "the vote names a different proposal",
             Self::VoteWithoutProposal => "the vote names no stored proposal",
             Self::VoteNotDraining => "while a cutover is pending only open proposals accept votes",
+            Self::VoteWhileClosing => "the proposal's close is journaled; it accepts no new vote",
             Self::DelegationExists => "a different delegation is already stored under this id",
             Self::DelegationWithoutProposal => "the delegation names no stored proposal",
             Self::DelegationWhilePending => {
