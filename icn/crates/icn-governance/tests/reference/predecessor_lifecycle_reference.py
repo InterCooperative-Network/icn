@@ -5,11 +5,13 @@ The cutover commitment C is built with this directory's own P4 reference
 (cutover_commitment_reference.py), which is itself independent of Rust.
 
 lp(x) = u32be(len x) || x
-record  = lp(TAG) || u16be(2) || lp(L) || u64be(revision) || K_first[32] || u8(state) || body
-          (record layout version 2, S26: K_first is retained by every stored state)
+record  = lp(TAG) || u16be(3) || lp(L) || u64be(revision) || K_first[32] || u8(state) || body
+          (record layout version 3, S28: K_first in every stored state since v2; the basis
+          inputs r_begin and pin retained beside the basis since v3, basis recomputed from them)
   0x01 Legacy : u64be(last_attempt) || u8(1) || aborted_K            (stored Legacy always aborted)
-  0x02 Pending: u64be(attempt) || lp(C) || K || basis || E
-  0x03 Sealed : u64be(attempt) || lp(C) || K || basis || E || F
+  0x02 Pending: u64be(attempt) || lp(C) || K || u64be(r_begin) || pin || basis || E
+  0x03 Sealed : u64be(attempt) || lp(C) || K || u64be(r_begin) || pin || basis || E || F
+  with r_begin < revision and basis = basis(L, r_begin, E, pin)
 witness = lp(WTAG) || u16be(1) || lp(L) || u64be(first_attempt) || K_first
 pin     = SHA-256(lp(PIN_TAG) || lp(stored_domain_bytes))
 basis   = SHA-256(lp(BASIS_TAG) || u16be(1) || lp(L) || u64be(r_begin) || u32be(2)
@@ -70,7 +72,7 @@ def basis(l: str, r_begin: int, e: bytes, p: bytes) -> bytes:
 
 def head(l: str, revision: int, k_first: bytes) -> bytes:
     assert revision >= 1 and len(k_first) == 32
-    return lp(TAG) + struct.pack(">H", 2) + lp(dom(l)) + u64(revision) + k_first
+    return lp(TAG) + struct.pack(">H", 3) + lp(dom(l)) + u64(revision) + k_first
 
 
 def legacy(l: str, revision: int, k_first: bytes, last_attempt: int, aborted_k: bytes) -> bytes:
@@ -78,17 +80,19 @@ def legacy(l: str, revision: int, k_first: bytes, last_attempt: int, aborted_k: 
     return head(l, revision, k_first) + b"\x01" + u64(last_attempt) + b"\x01" + aborted_k
 
 
-def attempt_body(attempt: int, c: bytes, b: bytes, e: bytes) -> bytes:
-    assert attempt >= 1
-    return u64(attempt) + lp(c) + k_of(c) + b + e
+def attempt_body(l: str, revision: int, attempt: int, c: bytes, r_begin: int, p: bytes,
+                 e: bytes) -> bytes:
+    assert attempt >= 1 and 0 <= r_begin < revision and len(p) == 32
+    return u64(attempt) + lp(c) + k_of(c) + u64(r_begin) + p + basis(l, r_begin, e, p) + e
 
 
-def pending(l, revision, k_first, attempt, c, b, e):
-    return head(l, revision, k_first) + b"\x02" + attempt_body(attempt, c, b, e)
+def pending(l, revision, k_first, attempt, c, r_begin, p, e):
+    return head(l, revision, k_first) + b"\x02" + attempt_body(l, revision, attempt, c, r_begin, p, e)
 
 
-def sealed(l, revision, k_first, attempt, c, b, e, f):
-    return head(l, revision, k_first) + b"\x03" + attempt_body(attempt, c, b, e) + f
+def sealed(l, revision, k_first, attempt, c, r_begin, p, e, f):
+    return (head(l, revision, k_first) + b"\x03"
+            + attempt_body(l, revision, attempt, c, r_begin, p, e) + f)
 
 
 def witness(l: str, first_attempt: int, k: bytes) -> bytes:
@@ -112,8 +116,11 @@ if __name__ == "__main__":
     print("WITNESS_KEY", (WKEY + lp(dom(L2))).hex())
     K1 = k_of(C)
     print("RECORD_LEGACY_ABORTED", legacy(L, 3, K1, 1, K1).hex())
-    print("RECORD_PENDING", pending(L, 1, K1, 1, C, B, E).hex())
-    # A second attempt (here re-proposing the same C) keeps the FIRST attempt's K as K_first.
-    print("RECORD_PENDING_AFTER_ABORT", pending(L, 4, K1, 2, C, B, E).hex())
-    print("RECORD_SEALED_MAX_REVISION", sealed(L2, 2**64 - 1, k_of(C2), 1, C2, B, E, F).hex())
+    # The first Begin is fenced on the absent record (r_begin = 0) and writes revision 1.
+    print("RECORD_PENDING", pending(L, 1, K1, 1, C, 0, P, E).hex())
+    # A second attempt (here re-proposing the same C) keeps the FIRST attempt's K as K_first;
+    # it began on the Legacy record at revision 3.
+    print("RECORD_PENDING_AFTER_ABORT", pending(L, 4, K1, 2, C, 3, P, E).hex())
+    print("RECORD_SEALED_MAX_REVISION",
+          sealed(L2, 2**64 - 1, k_of(C2), 1, C2, 7, P, E, F).hex())
     print("WITNESS", witness(L, 1, k_of(C)).hex())

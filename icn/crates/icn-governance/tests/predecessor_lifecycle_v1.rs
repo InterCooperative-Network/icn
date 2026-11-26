@@ -12,8 +12,8 @@ use icn_governance::domain::GovernanceDomainId;
 use icn_governance::predecessor_lifecycle::{
     check_witness, domain_record_pin, lifecycle_basis, lifecycle_key, next_attempt, next_revision,
     witness_key, LifecycleCodecError as E, LifecyclePresence, LifecycleRecordV1,
-    LifecycleWitnessV1, StoredLifecycle, LIFECYCLE_KEY_PREFIX, MAX_COMMITMENT_LEN,
-    WITNESS_KEY_PREFIX,
+    LifecycleWitnessV1, StoredLifecycle, LIFECYCLE_KEY_PREFIX, LIFECYCLE_RECORD_VERSION,
+    MAX_COMMITMENT_LEN, WITNESS_KEY_PREFIX,
 };
 use icn_identity::authority_log::SubjectId;
 
@@ -59,11 +59,24 @@ fn k(l: &str) -> [u8; 32] {
     commitment(l).commitment().unwrap()
 }
 
-fn basis() -> [u8; 32] {
-    lifecycle_basis(&d(L), 1, &EL, &domain_record_pin(STORED_DOMAIN)).unwrap()
+fn pin() -> [u8; 32] {
+    domain_record_pin(STORED_DOMAIN)
 }
 
+fn basis() -> [u8; 32] {
+    lifecycle_basis(&d(L), 1, &EL, &pin()).unwrap()
+}
+
+fn basis_at(l: &str, r_begin: u64) -> [u8; 32] {
+    lifecycle_basis(&d(l), r_begin, &EL, &pin()).unwrap()
+}
+
+/// A Pending record at `revision`, begun on revision `revision - 1` (no fenced writes since).
 fn pending(revision: u64, attempt: u64) -> LifecycleRecordV1 {
+    pending_begun_at(revision, attempt, revision - 1)
+}
+
+fn pending_begun_at(revision: u64, attempt: u64, r_begin: u64) -> LifecycleRecordV1 {
     LifecycleRecordV1 {
         predecessor: d(L),
         revision,
@@ -71,7 +84,9 @@ fn pending(revision: u64, attempt: u64) -> LifecycleRecordV1 {
         state: StoredLifecycle::Pending {
             attempt,
             commitment: commitment(L),
-            basis: basis(),
+            begin_revision: r_begin,
+            domain_pin: pin(),
+            basis: basis_at(L, r_begin),
             electorate: EL,
         },
     }
@@ -85,7 +100,9 @@ fn sealed_l2() -> LifecycleRecordV1 {
         state: StoredLifecycle::Sealed {
             attempt: 1,
             commitment: commitment(L2),
-            basis: basis(),
+            begin_revision: 7,
+            domain_pin: pin(),
+            basis: basis_at(L2, 7),
             electorate: EL,
             final_set: F,
         },
@@ -195,10 +212,14 @@ fn mutated(f: impl FnOnce(&mut Vec<u8>)) -> Result<LifecycleRecordV1, E> {
 #[test]
 fn structural_corruption_is_refused_with_its_reason() {
     assert_eq!(mutated(|b| b[TAG_AT] ^= 1), Err(E::WrongTag));
-    assert_eq!(
-        mutated(|b| b[VERSION_AT + 1] = 3),
-        Err(E::UnsupportedVersion)
-    );
+    // Layout versions 1 and 2 are refused, never reinterpreted; so is any later version.
+    for v in [0u8, 1, 2, 4] {
+        assert_eq!(
+            mutated(|b| b[VERSION_AT + 1] = v),
+            Err(E::UnsupportedVersion),
+            "version {v}"
+        );
+    }
     assert_eq!(
         mutated(|b| b[REV_AT..REV_AT + 8].copy_from_slice(&[0; 8])),
         Err(E::ZeroRevision)
@@ -334,7 +355,7 @@ fn an_over_long_stored_domain_id_is_refused_before_it_is_read() {
         out.extend_from_slice(x);
     };
     lp(&mut b, b"icn.governance.predecessor-lifecycle.v1");
-    b.extend_from_slice(&2u16.to_be_bytes()); // record layout version 2
+    b.extend_from_slice(&LIFECYCLE_RECORD_VERSION.to_be_bytes()); // the current layout
     lp(&mut b, over.as_bytes());
     b.extend_from_slice(&[0; 64]);
     assert_eq!(
@@ -545,4 +566,84 @@ fn k_first_is_retained_and_cross_checked_after_every_attempt() {
         LifecycleWitnessV1::for_first_pending(&later_first),
         Err(E::FirstCommitmentMismatch)
     );
+}
+
+/// S28 (layout v3): Pending and Sealed retain the basis inputs `r_begin` and the domain-record
+/// pin, the decoder recomputes the basis from them, and every retained input is cross-checked.
+#[test]
+fn the_basis_inputs_are_retained_and_the_basis_is_recomputed_on_decode() {
+    let l = d(L);
+    // Later fenced writes move the revision; the retained inputs still verify the basis.
+    let drained = pending_begun_at(9, 1, 0);
+    let bytes = drained.encode().unwrap();
+    assert_eq!(LifecycleRecordV1::decode_for(&l, &bytes).unwrap(), drained);
+    assert_eq!(drained.state.domain_pin(), Some(&pin()));
+    assert_eq!(sealed_l2().state.domain_pin(), Some(&pin()));
+    assert_eq!(legacy_aborted().state.domain_pin(), None);
+
+    // Every basis input, and the basis itself, is checked when encoding.
+    let with = |f: &dyn Fn(&mut StoredLifecycle)| {
+        let mut r = pending_begun_at(9, 1, 0);
+        f(&mut r.state);
+        r.encode()
+    };
+    let set = |pick: u8| {
+        move |s: &mut StoredLifecycle| {
+            if let StoredLifecycle::Pending {
+                begin_revision,
+                domain_pin,
+                basis,
+                electorate,
+                ..
+            } = s
+            {
+                match pick {
+                    0 => *begin_revision = 1,
+                    1 => domain_pin[0] ^= 1,
+                    2 => basis[0] ^= 1,
+                    _ => electorate[0] ^= 1,
+                }
+            }
+        }
+    };
+    for pick in 0..4u8 {
+        assert_eq!(with(&set(pick)), Err(E::BasisMismatch), "input {pick}");
+    }
+    // r_begin must precede the record's revision (the Begin wrote r_begin + 1).
+    assert_eq!(
+        pending_begun_at(4, 2, 4).encode(),
+        Err(E::BeginRevisionNotBefore)
+    );
+    assert_eq!(
+        pending_begun_at(4, 2, u64::MAX).encode(),
+        Err(E::BeginRevisionNotBefore)
+    );
+    let mut s = sealed_l2();
+    if let StoredLifecycle::Sealed { domain_pin, .. } = &mut s.state {
+        domain_pin[31] ^= 1;
+    }
+    assert_eq!(s.encode(), Err(E::BasisMismatch));
+
+    // The same refusals at the byte level, on the golden Pending vector.
+    let v = vector("RECORD_PENDING");
+    let c_len = u32::from_be_bytes(v[BODY_AT + 8..BODY_AT + 12].try_into().unwrap()) as usize;
+    let r_begin_at = BODY_AT + 12 + c_len + 32;
+    let pin_at = r_begin_at + 8;
+    let basis_at = pin_at + 32;
+    let e_at = basis_at + 32;
+    assert_eq!(e_at + 32, v.len(), "Pending body layout");
+    assert_eq!(&v[pin_at..pin_at + 32], &pin());
+    for at in [r_begin_at + 7, pin_at, basis_at + 31, e_at] {
+        let mut b = v.clone();
+        b[at] ^= 1;
+        let got = LifecycleRecordV1::decode_for(&l, &b);
+        assert!(
+            got == Err(E::BasisMismatch) || got == Err(E::BeginRevisionNotBefore),
+            "byte {at}: {got:?}"
+        );
+    }
+    // A v2-shaped body (no r_begin, no pin) under the v3 version is refused, never reinterpreted.
+    let mut v2_body = v.clone();
+    v2_body.drain(r_begin_at..pin_at + 32);
+    assert!(LifecycleRecordV1::decode_for(&l, &v2_body).is_err());
 }
