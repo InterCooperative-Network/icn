@@ -59,6 +59,34 @@ impl EventEmitter for NoopKernelEvents {
     async fn emit(&self, _event: SystemEvent) {}
 }
 
+/// A `TrustService` whose above-threshold set is exactly one DID (the node's own).
+struct SelfOnlyTrust(String);
+
+impl icn_kernel_api::services::TrustService for SelfOnlyTrust {
+    fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+        unimplemented!("governance membership resolution never asks for the oracle")
+    }
+
+    fn trust_score(&self, actor: &icn_kernel_api::types::Did) -> f64 {
+        if *actor == self.0 {
+            1.0
+        } else {
+            0.0
+        }
+    }
+
+    fn get_dids_above_threshold(&self, _threshold: f64) -> Result<Vec<String>, String> {
+        Ok(vec![self.0.clone()])
+    }
+
+    fn record_event(
+        &self,
+        _actor: &icn_kernel_api::types::Did,
+        _event: icn_kernel_api::services::TrustEvent,
+    ) {
+    }
+}
+
 /// A node wired exactly as production wires one, optionally holding its own signing key.
 ///
 /// `with_key` mirrors `lifecycle.rs:782`: the key is derived from the node's *own* identity
@@ -85,9 +113,22 @@ impl Node {
     }
 
     async fn spawn(with_key: bool) -> Self {
+        Self::spawn_with(with_key, false).await
+    }
+
+    /// `with_trust` wires a `TrustService` whose threshold electorate is exactly this
+    /// node, as the daemon does when its registry holds one. The actor then resolves
+    /// `TrustThreshold` domains through `TrustServiceMembershipResolver`; without it the
+    /// fallback `StaticMembershipResolver` cannot name a `TrustThreshold` electorate, so
+    /// no vote there could be admitted (nor the domain's proposals closed).
+    async fn spawn_with(with_key: bool, with_trust: bool) -> Self {
         let tmp = tempfile::tempdir().expect("tempdir");
         let bundle = IdentityBundle::generate().expect("IdentityBundle::generate");
         let did = bundle.did().clone();
+        let trust_service = with_trust.then(|| {
+            Arc::new(SelfOnlyTrust(did.to_string()))
+                as Arc<dyn icn_kernel_api::services::TrustService>
+        });
 
         let signing_key = with_key.then(|| {
             let kp = bundle.keypair().expect("keypair");
@@ -113,7 +154,7 @@ impl Node {
                 gossip_handle: gossip.clone(),
                 event_bus: Arc::new(NoopKernelEvents),
                 signing_key,
-                trust_service: None,
+                trust_service,
             },
         )
         .await
@@ -228,14 +269,27 @@ impl Node {
 
     /// Establish a `StaticList` domain containing this node, plus an open proposal.
     async fn seed_static_domain(&self, domain: &str, scope: ProposalScope) -> ProposalId {
+        self.seed_static_domain_with(domain, scope, Vec::new())
+            .await
+    }
+
+    /// As [`Self::seed_static_domain`], with further members listed beside this node.
+    async fn seed_static_domain_with(
+        &self,
+        domain: &str,
+        scope: ProposalScope,
+        others: Vec<icn_identity::Did>,
+    ) -> ProposalId {
         let domain_id = GovernanceDomainId(domain.to_string());
+        let mut members = vec![self.did.clone()];
+        members.extend(others);
         self.ops
             .create_domain(
                 domain_id.clone(),
                 format!("Domain {domain}"),
                 "cooperative_default".to_string(),
                 GovernanceParams::new(50, 50, 3600),
-                MembershipConfig::static_list(vec![self.did.clone()]),
+                MembershipConfig::static_list(members),
             )
             .await
             .expect("create_domain");
@@ -544,7 +598,9 @@ async fn a_per_federation_topic_is_never_created_in_the_default_configuration() 
 /// configuration. Turning it into an error would break ordinary governance for most domains.
 #[tokio::test(flavor = "current_thread")]
 async fn a_trust_threshold_domain_emits_the_legacy_payload() {
-    let node = Node::spawn(true).await;
+    // Production resolves a TrustThreshold electorate through the registry's TrustService;
+    // the node is in it, so its vote is admitted and only the emission shape is under test.
+    let node = Node::spawn_with(true, true).await;
     let proposal_id = node.seed_trust_threshold_domain("trust-domain").await;
 
     node.ops
@@ -608,11 +664,12 @@ async fn a_node_without_a_signing_key_emits_the_legacy_payload() {
 #[tokio::test(flavor = "current_thread")]
 async fn a_vote_cast_for_another_member_is_never_signed() {
     let node = Node::spawn(true).await;
-    let proposal_id = node
-        .seed_static_domain("relay-domain", ProposalScope::Local)
-        .await;
-
+    // Bob must actually be a member: the actor refuses votes from non-members, and this test
+    // is about relaying a *member's* vote, not about a stranger's.
     let bob = IdentityBundle::generate().unwrap().did().clone();
+    let proposal_id = node
+        .seed_static_domain_with("relay-domain", ProposalScope::Local, vec![bob.clone()])
+        .await;
 
     node.ops
         .cast_vote(proposal_id.clone(), bob.clone(), VoteChoice::For, None)

@@ -2084,6 +2084,17 @@ impl GovernanceActor {
             } => {
                 info!("Creating proposal: {} (scope: {:?})", title, scope);
 
+                // A proposal belongs to a governance domain this node holds.
+                // Refuse one for an unknown domain before anything is persisted
+                // or broadcast: such a proposal could never be voted on or
+                // closed (admission and close both resolve its domain).
+                if self.load_domain(&domain_id)?.is_none() {
+                    return Err(icn_governance::GovernanceError::DomainNotFound(
+                        domain_id.0.clone(),
+                    )
+                    .into());
+                }
+
                 let mut proposal = Proposal::new(
                     domain_id,
                     self.did.clone(),
@@ -2342,6 +2353,37 @@ impl GovernanceActor {
                     icn_governance::LegacyRailOp::VoteCast,
                 )?;
 
+                // Vote admission. This command is the single write boundary for
+                // vote rows: HTTP, JSON-RPC, the `/v1` alias, the manager and the
+                // handle all arrive here, so eligibility is decided here and not
+                // left to whichever caller happened to check. An authenticated
+                // caller DID is not by itself an eligible voter: the proposal
+                // must exist and be Open, and the voter's principal must be one
+                // the domain's membership resolver names -- the same electorate
+                // the close-time quorum denominator is drawn from. Each refusal
+                // happens before any row is read for update or written.
+                let proposal = self.load_proposal(&proposal_id)?.ok_or_else(|| {
+                    icn_governance::GovernanceError::ProposalNotFound(proposal_id.0.clone())
+                })?;
+                if !proposal.state.is_open() {
+                    return Err(icn_governance::GovernanceError::ProposalNotOpen(format!(
+                        "proposal {} is {:?}",
+                        proposal_id.0, proposal.state
+                    ))
+                    .into());
+                }
+                let domain = self.load_domain(&proposal.domain_id)?.ok_or_else(|| {
+                    icn_governance::GovernanceError::DomainNotFound(proposal.domain_id.0.clone())
+                })?;
+                let electorate = electorate_principals(&self.resolver.resolve_members(&domain)?)?;
+                if !electorate.contains(&VotingPrincipal::of(&voter)?) {
+                    return Err(icn_governance::GovernanceError::NotAMember(format!(
+                        "{} is not an eligible voter in domain {}",
+                        voter, proposal.domain_id.0
+                    ))
+                    .into());
+                }
+
                 // One stored row per cryptographic principal (#2641). This path
                 // has no duplicate-vote guard, so a voter re-spelling their DID
                 // in another accepted multibase encoding used to write a second
@@ -2389,9 +2431,7 @@ impl GovernanceActor {
                 self.publish(vote_msg.clone()).await?;
 
                 // Forward vote to federation topic if proposal is federation-scoped
-                if let Some(proposal) = self.load_proposal(&proposal_id)? {
-                    self.publish_federation_if_scoped(&proposal, vote_msg).await;
-                }
+                self.publish_federation_if_scoped(&proposal, vote_msg).await;
 
                 info!("✓ Vote cast: {:?}", choice);
             }
@@ -2470,24 +2510,36 @@ impl GovernanceActor {
                 // is the §7.5 migration's decision, not a spelling's (#2641).
                 icn_governance::effective_votes(&all_votes)?;
 
-                let votes: Vec<Vote> = match &eligible_voters {
+                let standing_votes: Vec<Vote> = match &eligible_voters {
                     Some(filter) => all_votes
                         .into_iter()
                         .filter(|v| filter.contains(&v.voter))
                         .collect(),
                     None => all_votes,
                 };
-                // The tally that decides the outcome, so it must give one
-                // cryptographic principal one effective vote and fail closed on
-                // conflicting historical rows, exactly like the read-only
-                // `get_vote_tally` (#2641).
-                let mut tally = VoteTally::try_from_votes(&votes)?;
 
                 // Resolve eligible membership (list needed for delegation resolution).
                 // eligible_count uses the FULL member list as the quorum denominator —
                 // standing revalidation filters whose votes count but does not shrink
                 // the community for quorum purposes.
                 let eligible_members = self.resolver.resolve_members(&domain)?;
+
+                // Counted votes come from the same electorate as the quorum
+                // denominator, on every close path (handle, RPC, scheduler, HTTP).
+                // Admission enforces this at cast time; this also keeps a row
+                // stored before admission was enforced -- by a principal the
+                // resolver does not name -- out of the decision. Such rows are
+                // not deleted or rewritten: they stay in the store and simply do
+                // not count. The standing filter above can only narrow this set.
+                let votes = counted_by_electorate(
+                    &standing_votes,
+                    &electorate_principals(&eligible_members)?,
+                )?;
+                // The tally that decides the outcome, so it must give one
+                // cryptographic principal one effective vote and fail closed on
+                // conflicting historical rows, exactly like the read-only
+                // `get_vote_tally` (#2641).
+                let mut tally = VoteTally::try_from_votes(&votes)?;
 
                 // The quorum denominator counts distinct voting principals, not
                 // DID spellings. The numerator is principal-reduced (#2641), so
@@ -2523,8 +2575,11 @@ impl GovernanceActor {
                         .collect(),
                     None => eligible_members.clone(),
                 };
+                // Delegation sources are the standing-filtered rows, unchanged:
+                // a member's delegated weight follows the delegate that member
+                // chose, exactly as before. Only direct counting is narrowed.
                 self.apply_delegation_to_tally(
-                    &votes,
+                    &standing_votes,
                     &delegation_scope,
                     &proposal.domain_id,
                     &proposal_id,
@@ -3602,9 +3657,26 @@ impl GovernanceActor {
     /// Get vote tally for a proposal
     fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         let votes = self.load_votes(proposal_id)?;
+        // While a proposal is Open, show the direct votes a close would count:
+        // rows whose principal the domain's resolver names (close-time
+        // delegation expansion is not applied here). Conflicts are checked
+        // across every stored row first, as the close does. A terminal
+        // proposal is not re-derived: its decision is fixed in its receipt,
+        // and the electorate it was decided against is not recoverable here.
+        let counted = match self.load_proposal(proposal_id)? {
+            Some(p) if p.state.is_open() => {
+                icn_governance::effective_votes(&votes)?;
+                let domain = self.load_domain(&p.domain_id)?.ok_or_else(|| {
+                    icn_governance::GovernanceError::DomainNotFound(p.domain_id.0.clone())
+                })?;
+                let electorate = electorate_principals(&self.resolver.resolve_members(&domain)?)?;
+                counted_by_electorate(&votes, &electorate)?
+            }
+            _ => votes,
+        };
         // One effective vote per cryptographic principal; conflicting
         // historical rows fail closed rather than double-counting (#2641).
-        Ok(VoteTally::try_from_votes(&votes)?)
+        Ok(VoteTally::try_from_votes(&counted)?)
     }
 
     /// Get list of voter DIDs for a proposal
@@ -4194,6 +4266,37 @@ fn observe_replicated_governance_message(msg: &GovernanceMessage, local_did: &Di
 }
 
 // ---- Utility functions ----
+
+/// The voting principals a resolved member list names.
+///
+/// Vote admission and close-time counting both test membership by
+/// cryptographic principal, the identity the tally and the quorum denominator
+/// already use (#2641), so one key named under another spelling is the same
+/// member and a key the list does not name is not. Fails closed on a member
+/// DID that names no principal, exactly as `distinct_principals` does.
+fn electorate_principals(members: &[Did]) -> Result<std::collections::HashSet<VotingPrincipal>> {
+    members
+        .iter()
+        .map(|m| VotingPrincipal::of(m).map_err(anyhow::Error::from))
+        .collect()
+}
+
+/// The rows whose voter principal is in `electorate`, in stored order.
+///
+/// The counted set for a decision: a row from a principal the resolver does not
+/// name is kept in the store but never counted.
+fn counted_by_electorate(
+    rows: &[Vote],
+    electorate: &std::collections::HashSet<VotingPrincipal>,
+) -> Result<Vec<Vote>> {
+    let mut counted = Vec::with_capacity(rows.len());
+    for v in rows {
+        if electorate.contains(&VotingPrincipal::of(&v.voter)?) {
+            counted.push(v.clone());
+        }
+    }
+    Ok(counted)
+}
 
 fn now_seconds() -> u64 {
     icn_time::current_timestamp_secs()
