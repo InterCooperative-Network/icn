@@ -803,7 +803,7 @@ impl GovernanceStateStore for SledGovernanceStateStore {
     fn save_close_intent(&self, entry: &CloseJournalEntry) -> Result<()> {
         self.store.put(
             &close_intent_key(&entry.proposal.id),
-            &serde_json::to_vec(entry)?,
+            &entry.to_stored_bytes()?,
         )?;
         // Force the write-ahead record durable BEFORE the caller writes any
         // cross-store provenance artifact. `Store::put` only buffers the sled
@@ -824,13 +824,13 @@ impl GovernanceStateStore for SledGovernanceStateStore {
     fn list_close_intents(&self) -> Result<Vec<CloseJournalEntry>> {
         let rows = self.store.scan(close_intent_key_prefix())?;
         rows.into_iter()
-            .map(|(_k, v)| Ok(serde_json::from_slice::<CloseJournalEntry>(&v)?))
+            .map(|(_k, v)| CloseJournalEntry::from_stored_bytes(&v))
             .collect()
     }
 
     fn get_close_intent(&self, proposal_id: &ProposalId) -> Result<Option<CloseJournalEntry>> {
         match self.store.get(&close_intent_key(proposal_id))? {
-            Some(bytes) => Ok(Some(serde_json::from_slice::<CloseJournalEntry>(&bytes)?)),
+            Some(bytes) => Ok(Some(CloseJournalEntry::from_stored_bytes(&bytes)?)),
             None => Ok(None),
         }
     }

@@ -84,6 +84,12 @@ pub enum MandateMintOutcome {
     HashFailed,
 }
 
+/// Prefix of the error [`mint_and_persist_for_accepted`] returns when the
+/// proposal already has a mandate bound to a different decision hash or a
+/// different payload hash. The stored mandate is left untouched and no new
+/// one is written.
+pub const MANDATE_IDENTITY_CONFLICT: &str = "mandate_identity_conflict";
+
 /// Mint and persist the constitutional-memory artifacts for an accepted
 /// decision — zero or more [`AuthorityGrant`]s plus one [`Mandate`].
 ///
@@ -94,8 +100,10 @@ pub enum MandateMintOutcome {
 /// record lands regardless of which path produced the acceptance.
 ///
 /// Idempotency: if a mandate already exists for `proposal_id` in the
-/// backend, returns [`MandateMintOutcome::AlreadyMinted`] without
-/// writing. This matches the actor/HTTP idempotency pattern used by
+/// backend and is bound to the same `decision_hash` and payload hash,
+/// returns [`MandateMintOutcome::AlreadyMinted`] without writing; if it is
+/// bound to a different one, returns an `Err` prefixed with
+/// [`MANDATE_IDENTITY_CONFLICT`], also without writing. This matches the actor/HTTP idempotency pattern used by
 /// the institutional-effect seam.
 ///
 /// Caller contract: only invoke after the proposal has been recorded
@@ -114,7 +122,34 @@ pub fn mint_and_persist_for_accepted(
     // (the default-no-op) return `Ok(None)`, which falls through to the
     // mint path; in that case duplicate minting is acceptable because
     // the default-no-op put is also a no-op.
+    //
+    // "Already minted" means already minted FOR THIS DECISION. A stored
+    // mandate bound to a different decision hash, or to a different payload
+    // hash, is not this acceptance's mandate: reusing it would let the
+    // proposal's terminal record and its authority disagree about which
+    // decision authorized it. Refuse with [`MANDATE_IDENTITY_CONFLICT`] and
+    // write nothing; reconciling the two is an authorized operator decision.
     if let Some(prior) = backend.get_mandate_by_proposal(proposal_id)? {
+        if prior.decision.decision_hash != decision_hash {
+            return Err(format!(
+                "{MANDATE_IDENTITY_CONFLICT}: proposal '{proposal_id}' already has mandate {} \
+                 bound to decision {}, but this acceptance carries decision {}",
+                prior.id,
+                hex::encode(prior.decision.decision_hash),
+                hex::encode(decision_hash)
+            ));
+        }
+        let payload_hash = match hash_proposal_payload(payload) {
+            Ok(h) => h,
+            Err(_) => return Ok(MandateMintOutcome::HashFailed),
+        };
+        if prior.payload_hash != payload_hash {
+            return Err(format!(
+                "{MANDATE_IDENTITY_CONFLICT}: proposal '{proposal_id}' already has mandate {} \
+                 bound to a different payload hash",
+                prior.id
+            ));
+        }
         return Ok(MandateMintOutcome::AlreadyMinted {
             mandate_id: prior.id,
         });
@@ -3180,5 +3215,75 @@ mod tests {
             .unwrap();
         assert_eq!(all.len(), 1, "only domain_b's original grant exists");
         assert_eq!(all[0].grantor, GrantorEntityId(domain_b.0));
+    }
+
+    fn appoint(candidate: u8) -> ProposalPayload {
+        ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(candidate),
+                sponsors: vec![did(1)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: 3_600,
+            },
+        }
+    }
+
+    /// A stored mandate bound to another decision is not this acceptance's
+    /// mandate: the seam refuses instead of reporting `AlreadyMinted`, and
+    /// writes nothing.
+    #[test]
+    fn existing_mandate_for_a_different_decision_is_refused_not_reused() {
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        mint_and_persist_for_accepted(&backend, "p-id", &dom, [0x01u8; 32], &appoint(20), 1_000)
+            .unwrap();
+        let before = backend.mandates.lock().unwrap().clone();
+
+        let err = mint_and_persist_for_accepted(
+            &backend,
+            "p-id",
+            &dom,
+            [0x02u8; 32],
+            &appoint(20),
+            1_000,
+        )
+        .unwrap_err();
+        assert!(err.starts_with(MANDATE_IDENTITY_CONFLICT), "{err}");
+        assert_eq!(*backend.mandates.lock().unwrap(), before, "nothing written");
+
+        // The same decision is still idempotent.
+        let again = mint_and_persist_for_accepted(
+            &backend,
+            "p-id",
+            &dom,
+            [0x01u8; 32],
+            &appoint(20),
+            1_000,
+        )
+        .unwrap();
+        assert!(matches!(again, MandateMintOutcome::AlreadyMinted { .. }));
+    }
+
+    /// Same decision hash, different payload: also refused.
+    #[test]
+    fn existing_mandate_for_a_different_payload_is_refused_not_reused() {
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        mint_and_persist_for_accepted(&backend, "p-id", &dom, [0x01u8; 32], &appoint(20), 1_000)
+            .unwrap();
+        let before = backend.mandates.lock().unwrap().clone();
+
+        let err = mint_and_persist_for_accepted(
+            &backend,
+            "p-id",
+            &dom,
+            [0x01u8; 32],
+            &appoint(21),
+            1_000,
+        )
+        .unwrap_err();
+        assert!(err.starts_with(MANDATE_IDENTITY_CONFLICT), "{err}");
+        assert_eq!(*backend.mandates.lock().unwrap(), before, "nothing written");
     }
 }

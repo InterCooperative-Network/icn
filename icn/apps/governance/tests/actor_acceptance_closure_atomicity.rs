@@ -693,9 +693,10 @@ async fn veto_redispatch_is_idempotent() {
 /// Re-dispatching a `ForceCloseProposal` (force-accept of an execution-required
 /// proposal) for an already-force-closed proposal must surface as `Err`,
 /// preserve the terminal `ForceClosed` state, and NOT re-write the durable
-/// outcome side effects. The force-accept preflight re-runs on replay, but its
-/// institutional-effect and mandate writes are idempotent, so the durable write
-/// counts stay exactly where the first dispatch left them.
+/// outcome side effects. The terminal-state refusal now happens before any
+/// write (the force-accept's execution closure runs only behind its durable
+/// close intent), so the durable write counts stay exactly where the first
+/// dispatch left them.
 #[tokio::test(flavor = "current_thread")]
 async fn force_close_redispatch_does_not_repeat_effects() {
     let tmp = tempfile::tempdir().expect("tempdir");
