@@ -60,9 +60,19 @@ fn err_internal(msg: impl Into<String>) -> ApiError {
     ApiError::Internal(msg.into())
 }
 
-/// Map anyhow error to ApiError::Internal.
+/// Map anyhow error to ApiError.
+///
+/// The governance actor's typed vote refusals are client errors: an unknown
+/// proposal is 404, a proposal not open for voting is 409, and a caller who is
+/// not an eligible voter is 403. Every other error stays 500 Internal.
 fn anyhow_to_api(e: anyhow::Error) -> ApiError {
-    ApiError::Internal(e.to_string())
+    use icn_governance::GovernanceError as G;
+    match e.downcast_ref::<G>() {
+        Some(G::ProposalNotFound(_)) => ApiError::NotFound(e.to_string()),
+        Some(G::ProposalNotOpen(_)) => ApiError::Conflict(e.to_string()),
+        Some(G::NotAMember(_)) => ApiError::Forbidden(e.to_string()),
+        _ => ApiError::Internal(e.to_string()),
+    }
 }
 
 /// Parse a DID string, returning ApiError::BadRequest on failure.
@@ -10200,5 +10210,132 @@ mod tests {
         )
         .await;
         assert_eq!(resp.status().as_u16(), 400);
+    }
+
+    // ------------------------------------------------------------------
+    // Typed vote refusals from the actor map to client statuses
+    // ------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn typed_vote_refusals_map_to_client_statuses_and_others_stay_internal() {
+        use icn_governance::GovernanceError as G;
+        let status = |e: anyhow::Error| match anyhow_to_api(e) {
+            ApiError::NotFound(_) => 404,
+            ApiError::Conflict(_) => 409,
+            ApiError::Forbidden(_) => 403,
+            ApiError::Internal(_) => 500,
+            other => panic!("unexpected mapping {other:?}"),
+        };
+        assert_eq!(status(G::ProposalNotFound("p".into()).into()), 404);
+        assert_eq!(status(G::ProposalNotOpen("p".into()).into()), 409);
+        assert_eq!(status(G::NotAMember("d".into()).into()), 403);
+        // Every other error keeps its existing mapping.
+        assert_eq!(status(G::DomainNotFound("d".into()).into()), 500);
+        assert_eq!(status(G::AlreadyVoted("x".into()).into()), 500);
+        assert_eq!(status(anyhow::anyhow!("Proposal not found: p")), 500);
+        // A typed refusal wrapped in context is still recognised.
+        assert_eq!(
+            status(anyhow::Error::from(G::NotAMember("d".into())).context("cast_vote")),
+            403
+        );
+    }
+
+    /// The real vote route over an actor-backed manager: a non-member vote is
+    /// 403 and a vote on an unopened proposal is 409, not 500.
+    #[tokio::test]
+    async fn vote_route_returns_403_for_non_member_and_409_for_unopened() {
+        use crate::actor::GovernanceActor;
+        use icn_gossip::{AccessControl, GossipActor, Topic};
+        use icn_governance::GovernanceOps;
+        use icn_identity::KeyPair;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let node = KeyPair::generate().unwrap().did().clone();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let mallory = KeyPair::generate().unwrap().did().clone();
+        let store = Arc::new(icn_store::SledStore::open(tmp.path()).unwrap());
+        let gossip = GossipActor::spawn(node.clone(), None);
+        gossip.write().await.create_topic(Topic::new(
+            "governance:proposal".into(),
+            AccessControl::Public,
+        ));
+        let handle = GovernanceActor::spawn(
+            node,
+            store,
+            gossip,
+            Arc::new(icn_governance::StaticMembershipResolver::new()),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let mgr = Arc::new(GovernanceManager::with_handle(
+            Arc::new(handle) as Arc<dyn GovernanceOps + Send + Sync>
+        ));
+        let domain = GovernanceDomainId("http-vote".to_string());
+        mgr.create_domain(
+            domain.clone(),
+            "d".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![alice.clone()]),
+        )
+        .await
+        .unwrap();
+        let mk = |t: &str| {
+            let mgr = mgr.clone();
+            let domain = domain.clone();
+            let alice = alice.clone();
+            let t = t.to_string();
+            async move {
+                mgr.create_proposal(
+                    ProposalId("_".to_string()),
+                    domain,
+                    alice,
+                    t,
+                    "d".to_string(),
+                    ProposalPayload::Text { body: "b".into() },
+                    ProposalScope::Local,
+                )
+                .await
+                .unwrap()
+            }
+        };
+        let open = mk("open").await;
+        mgr.open_proposal(open.clone(), 3600).await.unwrap();
+        let draft = mk("draft").await;
+
+        let post_vote = |caller: Did, id: ProposalId| {
+            let ctx = membership_mutation_ctx(mgr.clone(), None, GovernanceContextBuildMode::Test);
+            async move {
+                let caller_str = caller.to_string();
+                let app = test::init_service(
+                    App::new()
+                        .app_data(web::Data::new(ctx))
+                        .wrap_fn(move |req, srv| {
+                            req.extensions_mut().insert(BasicClaims {
+                                sub: caller_str.clone(),
+                                scope: Some("governance:write".to_string()),
+                            });
+                            srv.call(req)
+                        })
+                        .route(
+                            "/proposals/{proposal_id}/vote",
+                            web::post().to(cast_vote::<NoopEventEmitter>),
+                        ),
+                )
+                .await;
+                let req = test::TestRequest::post()
+                    .uri(&format!("/proposals/{}/vote", id.0))
+                    .set_json(serde_json::json!({ "choice": "for" }))
+                    .to_request();
+                test::call_service(&app, req).await.status().as_u16()
+            }
+        };
+
+        assert_eq!(post_vote(mallory, open.clone()).await, 403);
+        assert_eq!(post_vote(alice.clone(), draft).await, 409);
+        // Control: the member's vote on the open proposal succeeds.
+        assert_eq!(post_vote(alice, open).await, 200);
     }
 }
