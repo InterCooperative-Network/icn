@@ -7,7 +7,7 @@ deciders: ["Matt Faherty"]
 tags: ["governance", "authority", "mandate", "grant-minting", "institutional-domain", "domain-policy"]
 supersedes: []
 superseded_by: []
-amends: ["ADR-0019 (minted-class set; executor authorization, point 3)"]
+amends: ["ADR-0019 (minted-class set; executor authorization, point 3)", "ADR-0014 (MandateStatus: InProgress, Revoked causes)"]
 implementation_status: "not-started"
 references:
   - "ADR-0014 (Constitutional Object Model: AuthorityGrant, Mandate, MandateStatus, TypedScope)"
@@ -28,7 +28,7 @@ references:
 Proposed. This ADR is a design for maintainer review. Nothing here is implemented, and
 nothing here changes production issuance until it is accepted.
 
-Revisions 2 and 3 incorporate an independent architecture review and its delta review. The
+Revisions 2–4 incorporate an independent architecture review and its delta reviews. The
 BLOCKERs and FOLLOW_UPs are resolved below; the policy questions are listed under
 *Open maintainer decisions*.
 
@@ -94,7 +94,9 @@ There is no generic "grant authority" payload. Each new act class needs its own 
 its own ADR-level justification.
 
 The gate's class-level `proposal_class` tokens for these acts ("DomainPolicy",
-"InstitutionalDomain") are discretionary scope and are removed for these acts.
+"InstitutionalDomain") are discretionary scope and are removed for these acts. Specific-action
+grants are minted with an **empty** `proposal_class`, so no gate, old or new, can match them
+by class.
 
 ### 3. Action commitment (exact content binding)
 
@@ -151,7 +153,7 @@ commit-boundary rule, not its replay-by-overwrite mechanics.
 2. **Apply (Db-B, compare-and-put).** Apply the effect only if the domain is in the expected prior state:
    - adoption: `current_policy == expected_prior`;
    - declaration: the domain is absent.
-   In the **same** compare-and-put, write an append-only **apply marker** keyed by the mandate id, recording the effect it applied. Later acts never remove or overwrite a marker.
+   The **apply marker** is carried **inside the domain record's own value**: an append-only list of `(mandate id, applied effect)` entries. A single-key compare-and-put therefore covers the effect and its marker together. Later acts append; they never remove or rewrite an entry. No multi-key write is involved, so a partially replayed commit cannot leave a marker without its effect.
 3. **Discharge (Db-A, one transaction).** Move `InProgress → Discharged`, revoke the mandate's grant (`revoked_at`), complete the effect record, and clear the `InProgress` index entry.
 
 **Recovery.** For each `InProgress` mandate, recovery decides by its **apply marker**, never by the domain's current state:
@@ -159,11 +161,23 @@ commit-boundary rule, not its replay-by-overwrite mechanics.
 | Marker | Precondition | Recovery action |
 |---|---|---|
 | present | — | Discharge (the act happened, even if a later act has since changed the domain) |
-| absent | still holds | Release the claim back to `Pending` (nothing happened; the executor may retry while the mandate is valid) |
+| absent | still holds | Release the claim back to `Pending`, conditional on the stamped execution id (nothing happened; the executor may retry while the mandate is valid) |
 | absent | no longer holds | Set the mandate to `Revoked`, revoke its grant, and record the outcome `stale` on the effect record |
 
 `Discharged` keeps its ADR-0014 meaning: all authorized effects applied. A stale execution is
 `Revoked`, never `Discharged`. Recovery never re-applies an effect.
+
+**When recovery runs.** Recovery runs only while no live execution path for the domain is
+admitted: at startup, or under the per-domain execution lock. That stops a released claim
+racing an in-flight apply.
+
+**Live failures.** A live execution whose compare-and-put fails (no crash) takes the same
+outcome as recovery's third row: `Revoked`, with the effect-record outcome `stale`.
+
+**ADR-0014 amendment.**
+- `InProgress` is redefined as "claimed for execution; effects may or may not have been applied".
+- `InProgress → Pending` is permitted only as recovery's claim release.
+- "Stale refusal" is added as a cause of `Revoked`, alongside explicit revocation and supersession.
 
 **Multi-writer.** Two processes writing the same stores are declared unsupported for this
 path. The claim transaction is the fence within one store.
@@ -176,7 +190,8 @@ path. The claim transaction is the fence within one store.
   - Subject-mode domains refuse legacy principals (ADR-0092). This path applies to legacy-mode domains until a principal-typed executor is specified (open decision D12).
 - **Losing standing.** Live specific-action grants are revoked by a member-removal or freeze decision against the executor, or by an explicit revoke-mandate decision.
 - **Replacement.** Replacing an executor is a new decision, and it also revokes the old mandate. Two live mandates with different content can never both execute.
-- **The claim is the cut-off.** A revocation, replacement or seal that reaches a mandate already `InProgress` does not interrupt it: the claimed execution completes, or recovery resolves it per §5. Only `Pending` mandates are revocable. Revoking a mandate atomically with its claim is refused.
+- **The claim is the cut-off.** A revocation or replacement that reaches a mandate already `InProgress` does not interrupt it: the claimed execution completes, or recovery resolves it per §5. Only `Pending` mandates are revocable. Revoking a mandate atomically with its claim is refused.
+- **Sealing waits for claims.** Sealing a domain (§11) requires **no** `InProgress` claims for that domain. A seal attempted while a claim exists is refused until the claim resolves. No claim made before a seal can change the domain after it.
 
 ### 7. Idempotent, non-shadowing discharge
 
@@ -223,13 +238,15 @@ Under the Context Authority Log direction, institutional authority transitions m
 CAL-bound domains. This ADR is a **legacy-mode bridge**.
 
 When a domain is sealed for cutover, pending specific-action mandates are refused (stale
-execution across a cutover), never carried over. The governance meaning stays in the app
+execution across a cutover), never carried over. Sealing requires that no claim is in progress
+for the domain (§6). The governance meaning stays in the app
 layer and does not enter kernel crates.
 
 ### 12. Rollback
 
 - **Downgrade with live grants.** The versioned act tokens (§3) make a pre-ADR binary fail closed on specific-action grants. Rolling back therefore never re-opens content-free adoption.
 - **Downgrade with live claims.** Rolling back while `InProgress` claims exist is unsupported. A pre-ADR binary cannot recover them. This is the same rule as for pending enveloped close intents. The runbook requires every claim to be resolved before a downgrade.
+- **Downgrade with new payloads.** Stored proposals that carry the new payload variants cannot be deserialized by a pre-ADR binary, so proposal hydration and listing would fail. A downgrade is supported only with no such proposals stored, or after rolling forward again. This is the same resolve-or-roll-forward runbook rule.
 
 ## Consequences
 
