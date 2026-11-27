@@ -611,7 +611,21 @@ pub async fn handle_governance_proposal_open(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::internal_error(id, e),
+        Err(e) => open_refusal_response(id, e),
+    }
+}
+
+/// Map a `governance.proposal.open` failure: a period beyond what governance
+/// state can represent is a client error (refused before any transition);
+/// anything else stays an opaque internal error.
+fn open_refusal_response(id: u64, e: anyhow::Error) -> RpcResponse {
+    match e.downcast_ref::<GovernanceError>() {
+        Some(GovernanceError::UnrepresentableDeadline(_)) => RpcResponse::error(
+            id,
+            INVALID_PARAMS,
+            "voting period is not representable".to_string(),
+        ),
+        _ => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -712,6 +726,11 @@ fn vote_refusal_response(id: u64, e: anyhow::Error) -> RpcResponse {
             id,
             crate::error_codes::CONFLICT,
             "Proposal is not open for voting".to_string(),
+        ),
+        Some(G::VotingPeriodEnded(_)) => RpcResponse::error(
+            id,
+            crate::error_codes::CONFLICT,
+            "Voting period has ended".to_string(),
         ),
         Some(G::NotAMember(_)) => RpcResponse::error(
             id,
@@ -1306,6 +1325,17 @@ mod delegation_auth_tests {
         KeyPair::generate().unwrap().did().clone()
     }
 
+    #[test]
+    fn open_maps_an_unrepresentable_period_to_invalid_params() {
+        let r = open_refusal_response(
+            7,
+            GovernanceError::UnrepresentableDeadline("p".into()).into(),
+        );
+        assert_eq!(r.error.as_ref().map(|e| e.code), Some(INVALID_PARAMS));
+        let other = open_refusal_response(7, anyhow::anyhow!("boom"));
+        assert_ne!(other.error.as_ref().map(|e| e.code), Some(INVALID_PARAMS));
+    }
+
     /// Typed vote refusals from the governance actor surface as specific RPC
     /// error codes; anything else stays an opaque internal error.
     #[tokio::test]
@@ -1317,6 +1347,10 @@ mod delegation_auth_tests {
             (G::ProposalNotFound("p".into()).into(), NOT_FOUND),
             (
                 G::ProposalNotOpen("p".into()).into(),
+                crate::error_codes::CONFLICT,
+            ),
+            (
+                G::VotingPeriodEnded("p".into()).into(),
                 crate::error_codes::CONFLICT,
             ),
             (G::NotAMember("d".into()).into(), PERMISSION_DENIED),

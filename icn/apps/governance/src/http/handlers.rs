@@ -69,7 +69,10 @@ fn anyhow_to_api(e: anyhow::Error) -> ApiError {
     use icn_governance::GovernanceError as G;
     match e.downcast_ref::<G>() {
         Some(G::ProposalNotFound(_)) => ApiError::NotFound(e.to_string()),
-        Some(G::ProposalNotOpen(_)) => ApiError::Conflict(e.to_string()),
+        Some(G::UnrepresentableDeadline(_)) => ApiError::BadRequest(e.to_string()),
+        Some(G::ProposalNotOpen(_)) | Some(G::VotingPeriodEnded(_)) => {
+            ApiError::Conflict(e.to_string())
+        }
         Some(G::NotAMember(_)) => ApiError::Forbidden(e.to_string()),
         _ => ApiError::Internal(e.to_string()),
     }
@@ -10221,6 +10224,7 @@ mod tests {
         use icn_governance::GovernanceError as G;
         let status = |e: anyhow::Error| match anyhow_to_api(e) {
             ApiError::NotFound(_) => 404,
+            ApiError::BadRequest(_) => 400,
             ApiError::Conflict(_) => 409,
             ApiError::Forbidden(_) => 403,
             ApiError::Internal(_) => 500,
@@ -10228,6 +10232,8 @@ mod tests {
         };
         assert_eq!(status(G::ProposalNotFound("p".into()).into()), 404);
         assert_eq!(status(G::ProposalNotOpen("p".into()).into()), 409);
+        assert_eq!(status(G::VotingPeriodEnded("p".into()).into()), 409);
+        assert_eq!(status(G::UnrepresentableDeadline("p".into()).into()), 400);
         assert_eq!(status(G::NotAMember("d".into()).into()), 403);
         // Every other error keeps its existing mapping.
         assert_eq!(status(G::DomainNotFound("d".into()).into()), 500);

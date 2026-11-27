@@ -238,6 +238,11 @@ pub enum ResourceAccessAction {
     Revoke,
 }
 
+/// Largest deadline (Unix seconds) governance state may hold: timestamps must
+/// round-trip through `i64` encodings. A technical representability limit,
+/// not an institutional voting duration.
+pub const MAX_REPRESENTABLE_DEADLINE_SECS: u64 = i64::MAX as u64;
+
 /// Unique identifier for a proposal
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ProposalId(pub String);
@@ -1408,6 +1413,23 @@ impl Proposal {
     /// During deliberation, members can comment and discuss the proposal.
     /// Voting is not yet open. Call `end_deliberation_and_open()` to
     /// transition to voting when the deliberation period ends.
+    /// The deadline `period_seconds` after `now`, checked.
+    ///
+    /// Refuses with [`crate::GovernanceError::UnrepresentableDeadline`] when the
+    /// sum overflows or exceeds [`MAX_REPRESENTABLE_DEADLINE_SECS`]. This is a
+    /// representability limit of the state encoding, not an institutional
+    /// voting duration: any period that fits is accepted unchanged.
+    pub fn deadline_after(now: Timestamp, period_seconds: u64) -> anyhow::Result<Timestamp> {
+        match now.checked_add(period_seconds) {
+            Some(deadline) if deadline <= MAX_REPRESENTABLE_DEADLINE_SECS => Ok(deadline),
+            _ => Err(crate::GovernanceError::UnrepresentableDeadline(format!(
+                "{period_seconds}s after {now} exceeds the representable deadline \
+                 {MAX_REPRESENTABLE_DEADLINE_SECS}"
+            ))
+            .into()),
+        }
+    }
+
     pub fn start_deliberation(&mut self, deliberation_period_seconds: u64) -> anyhow::Result<()> {
         if !matches!(self.state, ProposalState::Draft) {
             anyhow::bail!("Can only start deliberation from Draft state");
@@ -1418,7 +1440,7 @@ impl Proposal {
 
         self.state = ProposalState::Deliberation {
             started_at: now,
-            ends_at: now + deliberation_period_seconds,
+            ends_at: Self::deadline_after(now, deliberation_period_seconds)?,
         };
         self.updated_at = now;
 
@@ -1451,7 +1473,7 @@ impl Proposal {
 
         self.state = ProposalState::Open {
             opened_at: now,
-            closes_at: now + voting_period_seconds,
+            closes_at: Self::deadline_after(now, voting_period_seconds)?,
         };
         self.updated_at = now;
 
@@ -1472,7 +1494,7 @@ impl Proposal {
 
         self.state = ProposalState::Open {
             opened_at: now,
-            closes_at: now + voting_period_seconds,
+            closes_at: Self::deadline_after(now, voting_period_seconds)?,
         };
         self.updated_at = now;
 
@@ -1496,7 +1518,7 @@ impl Proposal {
 
         self.state = ProposalState::Open {
             opened_at: now,
-            closes_at: now + voting_period_seconds,
+            closes_at: Self::deadline_after(now, voting_period_seconds)?,
         };
         self.updated_at = now;
 
@@ -1588,6 +1610,45 @@ impl Proposal {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn deadline_after_refuses_unrepresentable_deadlines() {
+        assert_eq!(Proposal::deadline_after(100, 50).unwrap(), 150);
+        assert_eq!(
+            Proposal::deadline_after(0, MAX_REPRESENTABLE_DEADLINE_SECS).unwrap(),
+            MAX_REPRESENTABLE_DEADLINE_SECS
+        );
+        for (now, period) in [
+            (1, MAX_REPRESENTABLE_DEADLINE_SECS),
+            (u64::MAX, 1),
+            (10, u64::MAX),
+        ] {
+            let err = Proposal::deadline_after(now, period).unwrap_err();
+            assert!(matches!(
+                err.downcast_ref::<crate::GovernanceError>(),
+                Some(crate::GovernanceError::UnrepresentableDeadline(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn unrepresentable_periods_leave_the_proposal_unchanged() {
+        let mut p = Proposal::new(
+            crate::GovernanceDomainId::new("d"),
+            icn_identity::Did::from_anchor_id(&[1u8; 32]),
+            "t".into(),
+            "d".into(),
+            ProposalPayload::Text { body: "b".into() },
+        );
+        let before = p.clone();
+        assert!(p.open(u64::MAX).is_err());
+        assert_eq!(p.state, before.state, "open refused before any transition");
+        assert!(p.start_deliberation(u64::MAX).is_err());
+        assert_eq!(
+            p.state, before.state,
+            "deliberation refused before any transition"
+        );
+    }
     use super::*;
     use crate::domain::GovernanceDomainId;
     use icn_identity::KeyPair;

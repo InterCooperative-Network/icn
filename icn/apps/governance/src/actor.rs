@@ -37,6 +37,21 @@ const GOVERNANCE_TOPIC: &str = "governance:proposal";
 /// 10 seconds provides reasonable responsiveness without excessive polling.
 const SCHEDULER_INTERVAL: Duration = Duration::from_secs(10);
 
+/// Furthest ahead a scheduled event is placed. A longer remaining period is
+/// reached in steps: when an event fires, the scheduler re-reads the
+/// proposal's authoritative deadline and reschedules until it is due, so a
+/// distant deadline is honoured exactly without unrepresentable `Instant`s.
+const SCHEDULE_HORIZON: Duration = Duration::from_secs(24 * 3600);
+
+/// The instant to schedule an event `remaining_secs` from `now`, at most
+/// [`SCHEDULE_HORIZON`] ahead. Never panics: the bounded addition cannot
+/// overflow in practice, and if it ever did the event fires at `now` and is
+/// re-evaluated against its authoritative deadline.
+fn schedule_instant(now: Instant, remaining_secs: u64) -> Instant {
+    let delay = Duration::from_secs(remaining_secs).min(SCHEDULE_HORIZON);
+    now.checked_add(delay).unwrap_or(now)
+}
+
 /// Default voting period when domain config is unavailable.
 /// 7 days is a reasonable default for cooperative decision-making, allowing
 /// time for member participation while not delaying governance indefinitely.
@@ -242,6 +257,19 @@ pub enum GovernanceCommand {
         /// `GovernanceDecisionReceiptV3` only when this is `Some`; the timer
         /// path emits no v3 because no scope was presented.
         capability_scope: Option<String>,
+    },
+    /// Close a proposal on behalf of the voting-deadline scheduler.
+    ///
+    /// A typed internal origin, distinct from manual and forced closes: the
+    /// actor re-verifies, under its serialized command processing, that the
+    /// proposal is Open with a trustworthy deadline that has passed on a
+    /// readable clock, and only then performs an ordinary close (no
+    /// eligibility filter, no capability scope). A storage error, an
+    /// unreadable clock, a malformed deadline or a deadline not yet reached
+    /// refuses with nothing written.
+    CloseScheduled {
+        /// Proposal whose voting deadline is believed to have passed
+        proposal_id: ProposalId,
     },
     /// Emergency veto - marks a proposal as vetoed
     VetoProposal {
@@ -1423,7 +1451,14 @@ impl GovernanceActor {
         }
 
         // Create unified event scheduler and cancellation channel
-        let event_scheduler = Arc::new(RwLock::new(BinaryHeap::new()));
+        // The scheduler heap is in memory, so a restart would otherwise drop every
+        // pending close and leave Open proposals Open past their deadline.
+        // Rebuild it from durable proposal state.
+        let event_scheduler = Arc::new(RwLock::new(rehydrate_schedule(
+            store.as_ref(),
+            Instant::now(),
+            icn_time::current_timestamp_secs(),
+        )));
         let (cancel_tx, mut cancel_rx) = mpsc::unbounded_channel();
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
@@ -1464,6 +1499,9 @@ impl GovernanceActor {
         let scheduler_clone = event_scheduler.clone();
         let scheduler_join = tokio::spawn(async move {
             let mut interval = tokio::time::interval(SCHEDULER_INTERVAL);
+            // Consecutive failed dispatches per proposal, for retry backoff.
+            let mut failed_attempts: std::collections::HashMap<ProposalId, u32> =
+                std::collections::HashMap::new();
             loop {
                 tokio::select! {
                     biased;
@@ -1494,19 +1532,67 @@ impl GovernanceActor {
                         // If a manual transition races with the scheduler, the command will
                         // fail gracefully with a warning. This is expected behavior.
                         for event in expired_events {
+                            // The scheduler only facilitates: re-read the
+                            // proposal's authoritative deadline and act only once
+                            // it is due. Not yet due -> reschedule (events are
+                            // placed at most SCHEDULE_HORIZON ahead); clock
+                            // unreadable -> retry, never act.
+                            let lookup = match handle_clone.get_proposal(event_proposal(&event)).await {
+                                Err(e) => {
+                                    warn!("Scheduled event deferred: proposal unreadable ({e})");
+                                    EventLookup::Unreadable
+                                }
+                                Ok(None) => EventLookup::Missing,
+                                Ok(Some(p)) => EventLookup::Found(match (&event, &p.state) {
+                                    (ScheduledEvent::CloseVoting { .. }, ProposalState::Open { closes_at, .. }) => Some(*closes_at),
+                                    (ScheduledEvent::EndDeliberation { .. }, ProposalState::Deliberation { ends_at, .. }) => Some(*ends_at),
+                                    _ => None,
+                                }),
+                            };
+                            let now_secs = icn_time::try_current_timestamp_secs().ok();
+                            match scheduled_event_due(lookup, now_secs) {
+                                Due::Act => {}
+                                Due::Drop => {
+                                    info!("Scheduled event dropped: proposal {} is gone or has moved on", event_proposal(&event).0);
+                                    failed_attempts.remove(event_proposal(&event));
+                                    continue;
+                                }
+                                Due::RecheckIn(secs) => {
+                                    if now_secs.is_none() {
+                                        warn!("Scheduled event deferred: clock unavailable");
+                                    }
+                                    scheduler_clone.write().await.push(Reverse(ScheduledGovernanceEvent {
+                                        at: schedule_instant(Instant::now(), secs),
+                                        event,
+                                    }));
+                                    continue;
+                                }
+                            }
                             match event {
                                 ScheduledEvent::CloseVoting { proposal_id } => {
                                     info!("Auto-closing expired proposal: {}", proposal_id.0);
-                                    if let Err(e) = handle_clone.submit(GovernanceCommand::CloseProposal {
+                                    // Typed scheduler origin: the actor re-verifies that
+                                    // the deadline has passed before closing.
+                                    if let Err(e) = handle_clone.submit(GovernanceCommand::CloseScheduled {
                                         proposal_id: proposal_id.clone(),
-                                        eligible_voters: None,
-                                        excluded_delegators: None,
-                                        // Scheduler/timer auto-close: no capability scope
-                                        // was presented, so emit no process-authorized v3.
-                                        capability_scope: None,
                                     }).await {
-                                        // May fail if proposal was manually closed (race condition - expected)
-                                        warn!("Scheduled close for proposal {} skipped: {}", proposal_id.0, e);
+                                        // Refused (not yet due on the actor's clock) or
+                                        // failed (e.g. a transient read error): re-check
+                                        // later. The next wake re-reads authoritative
+                                        // state, so a proposal closed meanwhile drops.
+                                        let delay = retry_backoff(&mut failed_attempts, &proposal_id);
+                                        warn!("Scheduled close for proposal {} deferred {}s: {}", proposal_id.0, delay, e);
+                                        // The failed attempt may already have asked
+                                        // the scheduler to cancel this proposal's
+                                        // events; that cancel must not delete this
+                                        // retry (the next wake re-reads state).
+                                        apply_cancels_except(&mut cancel_rx, &scheduler_clone, &proposal_id).await;
+                                        scheduler_clone.write().await.push(Reverse(ScheduledGovernanceEvent {
+                                            at: schedule_instant(Instant::now(), delay),
+                                            event: ScheduledEvent::CloseVoting { proposal_id },
+                                        }));
+                                    } else {
+                                        failed_attempts.remove(&proposal_id);
                                     }
                                 }
                                 ScheduledEvent::EndDeliberation { proposal_id, voting_period_seconds } => {
@@ -1515,8 +1601,17 @@ impl GovernanceActor {
                                         proposal_id: proposal_id.clone(),
                                         voting_period_seconds,
                                     }).await {
-                                        // May fail if deliberation was manually ended (race condition - expected)
-                                        warn!("Scheduled deliberation end for proposal {} skipped: {}", proposal_id.0, e);
+                                        // Re-check later; a proposal that has left
+                                        // deliberation meanwhile drops on the next wake.
+                                        let delay = retry_backoff(&mut failed_attempts, &proposal_id);
+                                        warn!("Scheduled deliberation end for proposal {} deferred {}s: {}", proposal_id.0, delay, e);
+                                        apply_cancels_except(&mut cancel_rx, &scheduler_clone, &proposal_id).await;
+                                        scheduler_clone.write().await.push(Reverse(ScheduledGovernanceEvent {
+                                            at: schedule_instant(Instant::now(), delay),
+                                            event: ScheduledEvent::EndDeliberation { proposal_id, voting_period_seconds },
+                                        }));
+                                    } else {
+                                        failed_attempts.remove(&proposal_id);
                                     }
                                 }
                             }
@@ -1525,6 +1620,7 @@ impl GovernanceActor {
 
                     Some(proposal_id) = cancel_rx.recv() => {
                         // Manual action - remove any pending events for this proposal
+                        failed_attempts.remove(&proposal_id);
                         let mut scheduler = scheduler_clone.write().await;
                         scheduler.retain(|Reverse(sc)| sc.proposal_id() != &proposal_id);
                     }
@@ -2036,9 +2132,66 @@ impl GovernanceActor {
         }
     }
 
+    /// Refuse a scheduler-originated close unless the proposal is Open with a
+    /// trustworthy deadline that has passed on a readable clock. Proposals no
+    /// longer Open pass through: the ordinary close refuses them or completes
+    /// a durably decided close, exactly as for any other caller.
+    fn require_scheduled_close_due(&self, proposal_id: &ProposalId) -> Result<()> {
+        let proposal = self.load_proposal(proposal_id)?.ok_or_else(|| {
+            icn_governance::GovernanceError::ProposalNotFound(proposal_id.0.clone())
+        })?;
+        if let ProposalState::Open { closes_at, .. } = proposal.state {
+            if closes_at > icn_governance::MAX_REPRESENTABLE_DEADLINE_SECS {
+                return Err(icn_governance::GovernanceError::ProposalNotOpen(format!(
+                    "proposal {} has a stored deadline beyond the representable limit; \
+                     scheduled close refused, authorized reconciliation needed",
+                    proposal_id.0
+                ))
+                .into());
+            }
+            let now = icn_time::try_current_timestamp_secs().map_err(|e| {
+                anyhow::anyhow!(
+                    "scheduled close of {} refused: clock unavailable ({e})",
+                    proposal_id.0
+                )
+            })?;
+            if now < closes_at {
+                return Err(icn_governance::GovernanceError::CloseNotDue(format!(
+                    "proposal {} closes for voting at {closes_at}",
+                    proposal_id.0
+                ))
+                .into());
+            }
+        }
+        Ok(())
+    }
+
     /// Handle a governance command
     async fn handle(&mut self, cmd: GovernanceCommand) -> Result<()> {
+        // Resolve the scheduler's typed close before dispatch: it becomes an
+        // ordinary close only once the deadline is verified to have passed.
+        let cmd = match cmd {
+            GovernanceCommand::CloseScheduled { proposal_id } => {
+                self.require_scheduled_close_due(&proposal_id)?;
+                GovernanceCommand::CloseProposal {
+                    proposal_id,
+                    eligible_voters: None,
+                    excluded_delegators: None,
+                    // Scheduler auto-close: no capability scope was presented,
+                    // so no process-authorized v3 receipt is emitted.
+                    capability_scope: None,
+                }
+            }
+            other => other,
+        };
         match cmd {
+            // Resolved into CloseProposal above; never dispatched as itself.
+            GovernanceCommand::CloseScheduled { proposal_id } => {
+                return Err(anyhow::anyhow!(
+                    "internal: scheduled close of {} reached dispatch unresolved",
+                    proposal_id.0
+                ));
+            }
             GovernanceCommand::CreateDomain {
                 domain_id,
                 name,
@@ -2189,8 +2342,7 @@ impl GovernanceActor {
                 };
 
                 // Schedule auto-transition from Deliberation to Open when deliberation ends
-                let ends_at_instant =
-                    Instant::now() + Duration::from_secs(deliberation_period_seconds);
+                let ends_at_instant = schedule_instant(Instant::now(), deliberation_period_seconds);
                 let scheduled = ScheduledGovernanceEvent {
                     at: ends_at_instant,
                     event: ScheduledEvent::EndDeliberation {
@@ -2248,7 +2400,7 @@ impl GovernanceActor {
                 self.store.save_proposal(&proposal)?;
 
                 // Schedule auto-close for voting
-                let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
+                let closes_at_instant = schedule_instant(Instant::now(), voting_period_seconds);
                 let scheduled = ScheduledGovernanceEvent {
                     at: closes_at_instant,
                     event: ScheduledEvent::CloseVoting {
@@ -2314,7 +2466,7 @@ impl GovernanceActor {
                 self.store.save_proposal(&proposal)?;
 
                 // Schedule auto-close
-                let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
+                let closes_at_instant = schedule_instant(Instant::now(), voting_period_seconds);
                 let scheduled = ScheduledGovernanceEvent {
                     at: closes_at_instant,
                     event: ScheduledEvent::CloseVoting {
@@ -2372,6 +2524,14 @@ impl GovernanceActor {
                     ))
                     .into());
                 }
+                // The voting period is part of the decision, not a scheduler
+                // detail: a vote at or after `closes_at` is refused whether or
+                // not the close has run yet (it may be delayed, or lost across a
+                // restart). An unreadable clock refuses rather than admits.
+                let now = icn_time::try_current_timestamp_secs().map_err(|e| {
+                    anyhow::anyhow!("vote on {} refused: clock unavailable ({e})", proposal_id.0)
+                })?;
+                voting_window_admits(&proposal_id, &proposal.state, now)?;
                 let domain = self.load_domain(&proposal.domain_id)?.ok_or_else(|| {
                     icn_governance::GovernanceError::DomainNotFound(proposal.domain_id.0.clone())
                 })?;
@@ -4300,6 +4460,293 @@ fn counted_by_electorate(
 
 fn now_seconds() -> u64 {
     icn_time::current_timestamp_secs()
+}
+
+#[cfg(test)]
+mod voting_window_tests {
+    use super::*;
+
+    #[test]
+    fn a_fired_event_acts_only_once_its_deadline_is_due() {
+        use EventLookup::*;
+        let retry = SCHEDULER_INTERVAL.as_secs();
+        assert_eq!(
+            scheduled_event_due(Found(Some(200)), Some(199)),
+            Due::RecheckIn(1)
+        );
+        assert_eq!(scheduled_event_due(Found(Some(200)), Some(200)), Due::Act);
+        assert_eq!(scheduled_event_due(Found(Some(200)), Some(201)), Due::Act);
+        // A distant deadline is re-checked, never acted on early.
+        assert_eq!(
+            scheduled_event_due(Found(Some(u64::MAX / 2)), Some(100)),
+            Due::RecheckIn(u64::MAX / 2 - 100)
+        );
+        // Unknown time: never act.
+        assert_eq!(
+            scheduled_event_due(Found(Some(200)), None),
+            Due::RecheckIn(retry)
+        );
+        // Unreadable proposal (a storage error), even past the deadline: never act.
+        assert_eq!(
+            scheduled_event_due(Unreadable, Some(10_000)),
+            Due::RecheckIn(retry)
+        );
+        assert_eq!(scheduled_event_due(Unreadable, None), Due::RecheckIn(retry));
+        // Missing proposal: discard.
+        assert_eq!(scheduled_event_due(Missing, Some(100)), Due::Drop);
+        // The proposal moved on (closed, or no longer deliberating): discard,
+        // so a refused or failed dispatch can be retried without looping.
+        assert_eq!(scheduled_event_due(Found(None), Some(100)), Due::Drop);
+    }
+
+    #[test]
+    fn retry_backoff_doubles_and_is_capped() {
+        let mut attempts = std::collections::HashMap::new();
+        let id = ProposalId("p".into());
+        let base = SCHEDULER_INTERVAL.as_secs();
+        assert_eq!(retry_backoff(&mut attempts, &id), base);
+        assert_eq!(retry_backoff(&mut attempts, &id), base * 2);
+        assert_eq!(retry_backoff(&mut attempts, &id), base * 4);
+        for _ in 0..100 {
+            let d = retry_backoff(&mut attempts, &id);
+            assert!(d > 0 && d <= MAX_RETRY_BACKOFF.as_secs(), "{d}");
+        }
+        assert_eq!(
+            retry_backoff(&mut attempts, &id),
+            MAX_RETRY_BACKOFF.as_secs()
+        );
+    }
+
+    #[test]
+    fn schedule_instant_is_bounded_and_never_panics() {
+        let now = Instant::now();
+        for secs in [0, 1, 3600, u64::MAX / 2, u64::MAX] {
+            let at = schedule_instant(now, secs);
+            assert!(at >= now && at <= now + SCHEDULE_HORIZON, "{secs}");
+        }
+        assert_eq!(schedule_instant(now, 5), now + Duration::from_secs(5));
+    }
+
+    #[test]
+    fn window_is_open_strictly_before_closes_at() {
+        let id = ProposalId("p".into());
+        let open = ProposalState::Open {
+            opened_at: 100,
+            closes_at: 200,
+        };
+        assert!(voting_window_admits(&id, &open, 100).is_ok());
+        assert!(voting_window_admits(&id, &open, 199).is_ok());
+        for at in [200, 201, u64::MAX] {
+            assert!(matches!(
+                voting_window_admits(&id, &open, at),
+                Err(icn_governance::GovernanceError::VotingPeriodEnded(_))
+            ));
+        }
+        // Malformed stored deadline: refused even though "now" is before it.
+        let malformed = ProposalState::Open {
+            opened_at: 100,
+            closes_at: icn_governance::MAX_REPRESENTABLE_DEADLINE_SECS + 1,
+        };
+        assert!(matches!(
+            voting_window_admits(&id, &malformed, 150),
+            Err(icn_governance::GovernanceError::ProposalNotOpen(_))
+        ));
+        // The largest representable deadline is a legitimate distant deadline.
+        let distant = ProposalState::Open {
+            opened_at: 100,
+            closes_at: icn_governance::MAX_REPRESENTABLE_DEADLINE_SECS,
+        };
+        assert!(voting_window_admits(&id, &distant, 150).is_ok());
+        for state in [
+            ProposalState::Draft,
+            ProposalState::Accepted { closed_at: 150 },
+        ] {
+            assert!(matches!(
+                voting_window_admits(&id, &state, 150),
+                Err(icn_governance::GovernanceError::ProposalNotOpen(_))
+            ));
+        }
+    }
+}
+
+/// What the scheduler found when it re-read a fired event's proposal.
+#[derive(Debug, PartialEq, Eq)]
+enum EventLookup {
+    /// The proposal could not be read (a storage error): never authorizes action.
+    Unreadable,
+    /// The proposal no longer exists.
+    Missing,
+    /// The proposal was read: its authoritative deadline for this event, or
+    /// `None` when it is no longer in the event's state (nothing to do).
+    Found(Option<u64>),
+}
+
+/// What the scheduler does with a fired event.
+#[derive(Debug, PartialEq, Eq)]
+enum Due {
+    /// Due: dispatch. A scheduled close is re-verified by the actor regardless.
+    Act,
+    /// The proposal no longer exists or has left the event's state: discard.
+    Drop,
+    /// Not yet due, proposal unreadable, or clock unreadable: check again in
+    /// this many seconds.
+    RecheckIn(u64),
+}
+
+/// Decide a fired event. Never acts on unreadable evidence, early, or on an
+/// unknown time.
+fn scheduled_event_due(lookup: EventLookup, now: Option<u64>) -> Due {
+    let retry = SCHEDULER_INTERVAL.as_secs();
+    match lookup {
+        EventLookup::Unreadable => Due::RecheckIn(retry),
+        EventLookup::Missing => Due::Drop,
+        EventLookup::Found(None) => Due::Drop,
+        EventLookup::Found(Some(deadline)) => match now {
+            None => Due::RecheckIn(retry),
+            Some(n) if n < deadline => Due::RecheckIn(deadline - n),
+            Some(_) => Due::Act,
+        },
+    }
+}
+
+/// Longest delay between retries of a failing scheduled dispatch.
+const MAX_RETRY_BACKOFF: Duration = Duration::from_secs(3600);
+
+/// Record one more failed dispatch for `proposal_id` and return the delay
+/// before the next attempt: SCHEDULER_INTERVAL doubling per consecutive
+/// failure, capped at MAX_RETRY_BACKOFF. Overflow-free.
+fn retry_backoff(
+    attempts: &mut std::collections::HashMap<ProposalId, u32>,
+    proposal_id: &ProposalId,
+) -> u64 {
+    let n = attempts.entry(proposal_id.clone()).or_insert(0);
+    // 2^n, then multiply: both checked, so a large n saturates to the cap
+    // instead of wrapping (a plain `checked_shl` drops shifted-out bits).
+    let delay = 1u64
+        .checked_shl(*n)
+        .and_then(|factor| SCHEDULER_INTERVAL.as_secs().checked_mul(factor))
+        .unwrap_or(u64::MAX)
+        .min(MAX_RETRY_BACKOFF.as_secs());
+    *n = n.saturating_add(1);
+    delay
+}
+
+/// Apply pending scheduler cancels, except those for `keep` (a cancel queued
+/// by `keep`'s own failed dispatch must not delete its retry).
+async fn apply_cancels_except(
+    cancel_rx: &mut mpsc::UnboundedReceiver<ProposalId>,
+    scheduler: &Arc<RwLock<BinaryHeap<Reverse<ScheduledGovernanceEvent>>>>,
+    keep: &ProposalId,
+) {
+    while let Ok(cancelled) = cancel_rx.try_recv() {
+        if &cancelled != keep {
+            scheduler
+                .write()
+                .await
+                .retain(|Reverse(sc)| sc.proposal_id() != &cancelled);
+        }
+    }
+}
+
+fn event_proposal(event: &ScheduledEvent) -> &ProposalId {
+    match event {
+        ScheduledEvent::CloseVoting { proposal_id } => proposal_id,
+        ScheduledEvent::EndDeliberation { proposal_id, .. } => proposal_id,
+    }
+}
+
+/// Scheduled transitions recovered from durable proposal state at spawn.
+///
+/// Every stored `Open` proposal gets its `CloseVoting` event at `closes_at`
+/// (immediately when that has passed). The scheduler only facilitates the
+/// close: votes at or after `closes_at` are refused at the vote boundary
+/// regardless (`voting_window_admits`), and a duplicate or late close of an
+/// already-closed proposal is refused by the close command itself.
+///
+/// `Deliberation` proposals are not rescheduled: the voting period chosen when
+/// deliberation began is not persisted, so the deliberation→open transition
+/// cannot be reproduced; such a proposal stays in deliberation (admitting no
+/// votes) until it is opened explicitly. An unreadable proposal list schedules
+/// nothing and is logged; votes past a deadline are still refused.
+fn rehydrate_schedule(
+    store: &dyn GovernanceStateStore,
+    now_instant: Instant,
+    now_secs: u64,
+) -> BinaryHeap<Reverse<ScheduledGovernanceEvent>> {
+    let mut heap = BinaryHeap::new();
+    let proposals = match store.list_proposals() {
+        Ok(p) => p,
+        Err(e) => {
+            error!(
+                "Scheduler rehydration: stored proposals unreadable ({e}); no closes rescheduled"
+            );
+            return heap;
+        }
+    };
+    for proposal in proposals {
+        if let ProposalState::Open { closes_at, .. } = proposal.state {
+            if closes_at > icn_governance::MAX_REPRESENTABLE_DEADLINE_SECS {
+                // Malformed stored state: not scheduled (votes on it are refused),
+                // reported, and never allowed to stop the actor or other proposals.
+                error!(
+                    proposal_id = %proposal.id.0,
+                    closes_at,
+                    "Scheduler rehydration: stored deadline is beyond the representable \
+                     limit; proposal left Open, votes refused, authorized reconciliation needed"
+                );
+                continue;
+            }
+            heap.push(Reverse(ScheduledGovernanceEvent {
+                at: schedule_instant(now_instant, closes_at.saturating_sub(now_secs)),
+                event: ScheduledEvent::CloseVoting {
+                    proposal_id: proposal.id.clone(),
+                },
+            }));
+        }
+    }
+    if !heap.is_empty() {
+        info!(
+            "Scheduler rehydration: {} pending close(s) restored",
+            heap.len()
+        );
+    }
+    heap
+}
+
+/// Whether a vote at `now` falls inside `state`'s voting window: Open, and
+/// strictly before `closes_at` (the instant the scheduled close fires). A
+/// proposal that is not Open has no window.
+pub(crate) fn voting_window_admits(
+    proposal_id: &ProposalId,
+    state: &ProposalState,
+    now: u64,
+) -> Result<(), icn_governance::GovernanceError> {
+    match state {
+        // A stored deadline beyond what governance state can represent is not
+        // trustworthy deadline evidence: refuse rather than admit.
+        ProposalState::Open { closes_at, .. }
+            if *closes_at > icn_governance::MAX_REPRESENTABLE_DEADLINE_SECS =>
+        {
+            // Untrustworthy stored state, not a caller error: the proposal is
+            // not open for voting until an authorized reconciliation.
+            Err(icn_governance::GovernanceError::ProposalNotOpen(format!(
+                "proposal {} has a stored deadline {closes_at} beyond the representable limit; \
+                 it needs an authorized reconciliation",
+                proposal_id.0
+            )))
+        }
+        ProposalState::Open { closes_at, .. } if now < *closes_at => Ok(()),
+        ProposalState::Open { closes_at, .. } => {
+            Err(icn_governance::GovernanceError::VotingPeriodEnded(format!(
+                "{} closed for voting at {closes_at}",
+                proposal_id.0
+            )))
+        }
+        other => Err(icn_governance::GovernanceError::ProposalNotOpen(format!(
+            "proposal {} is {:?}",
+            proposal_id.0, other
+        ))),
+    }
 }
 
 /// Validate a stored `GovernanceProofV2` before it is served to a reader.

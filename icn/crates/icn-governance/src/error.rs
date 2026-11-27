@@ -52,6 +52,15 @@ pub enum GovernanceError {
     #[error("voting period ended for proposal: {0}")]
     VotingPeriodEnded(String),
 
+    /// A scheduled close arrived before the proposal's voting deadline
+    #[error("close not due: {0}")]
+    CloseNotDue(String),
+
+    /// A requested period would put a deadline beyond what governance state can
+    /// represent (a technical limit, not an institutional voting duration)
+    #[error("unrepresentable deadline: {0}")]
+    UnrepresentableDeadline(String),
+
     /// Insufficient quorum
     #[error("insufficient quorum: got {actual}, required {required}")]
     InsufficientQuorum { actual: u64, required: u64 },
