@@ -1960,7 +1960,8 @@ impl GovernanceActor {
 
         // Non-execution-required accepted proposals emit their
         // InstitutionalEffectRecord + ADR-0014 mandate here; execution-required
-        // ones already did so as a preflight before the journal. Idempotent on
+        // ones write them in `CloseJournalEntry::commit` (`execution_closure`).
+        // Idempotent on
         // (proposal_id, effect_kind) / mandate id.
         let requires_execution_closure = matches!(outcome, DecisionOutcome::Accepted)
             && proposal.payload.requires_execution_closure();
@@ -1971,20 +1972,31 @@ impl GovernanceActor {
                         .as_deref()
                         .and_then(|h| hex::decode(h).ok())
                         .and_then(|v| <[u8; 32]>::try_from(v.as_slice()).ok());
-                if let Err(e) = crate::institutional_effect::emit_accepted_effect(
+                match crate::institutional_effect::emit_accepted_effect(
                     store.as_ref(),
                     &proposal.id.0,
                     &proposal.domain_id.0,
                     decision_hash,
                     &proposal.payload,
                     decided_at,
-                ) {
-                    error!(
-                        proposal_id = %proposal.id.0,
-                        error = %e,
-                        "Actor failed to emit InstitutionalEffectRecord"
-                    );
-                    failures.push(format!("institutional effect: {e}"));
+                )
+                .and_then(|outcome| {
+                    crate::close_journal::require_effect_bound_to_decision(
+                        store.as_ref(),
+                        &proposal.id.0,
+                        &outcome,
+                        decision_hash,
+                    )
+                }) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        error!(
+                            proposal_id = %proposal.id.0,
+                            error = %e,
+                            "Actor failed to emit InstitutionalEffectRecord"
+                        );
+                        failures.push(format!("institutional effect: {e}"));
+                    }
                 }
                 if let Some(decision_hash) = decision_hash {
                     match crate::grant_minting::mint_and_persist_for_accepted(
@@ -2575,6 +2587,12 @@ impl GovernanceActor {
                     DecisionOutcome::NoQuorum => ProposalState::NoQuorum { closed_at: now },
                 };
 
+                // Flip the proposal to its terminal state in memory FIRST. A
+                // proposal that is not Open (vetoed, already closed, still in
+                // deliberation) is refused here, before any receipt, effect
+                // record, mandate, grant or lifecycle revocation is written.
+                proposal.close(new_state)?;
+
                 let requires_execution_closure =
                     matches!(outcome_result, DecisionOutcome::Accepted)
                         && proposal.payload.requires_execution_closure();
@@ -2637,76 +2655,36 @@ impl GovernanceActor {
                         "Invariant 7 gate passed"
                     );
 
-                    // Execution-required preflight: prove closure artifacts are
-                    // persistable before committing terminal proposal state.
-                    if requires_execution_closure {
-                        if let Some(ref store) = self.receipt_store {
-                            crate::institutional_effect::emit_accepted_effect(
-                                store.as_ref(),
-                                &proposal_id.0,
-                                &proposal.domain_id.0,
-                                Some(decision_hash),
+                    // Execution-required: the execution closure (institutional
+                    // effect record + ADR-0014 mandate, grants and lifecycle
+                    // revocations) is execution authority, so it is NOT written
+                    // here. It is journaled (`execution_closure` below) and
+                    // written by `CloseJournalEntry::commit` only after the
+                    // close intent is durable.
+                    if requires_execution_closure && self.receipt_store.is_some() {
+                        // Gap C parity: capture the v1 GovernanceDecisionReceipt
+                        // + allocation/contribution receipt that the in-process
+                        // GovernanceManager close path persists
+                        // (`manager.rs::close_proposal_inner`). These v1
+                        // artifacts are what the audit read path
+                        // indexes by `decision_hash`
+                        // (`GET /v1/receipts/chain/{decision_hash}` / `icnctl
+                        // audit verify`). They are DEFERRED to after the v3 +
+                        // proof preflights (drained just before the terminal save)
+                        // so a later preflight failure can never leave a
+                        // chain-observable accepted receipt behind for a still-Open
+                        // proposal. `gate_receipt` is the canonical v1 receipt
+                        // built above for the Invariant-7 gate (same
+                        // `decision_hash`) and is unused afterwards, so it moves
+                        // into the deferred holder.
+                        let allocation_receipt =
+                            crate::manager::GovernanceManager::create_allocation_receipt(
                                 &proposal.payload,
-                                now,
-                            )
-                            .map_err(|e| {
-                                anyhow::anyhow!(
-                                    "Proposal '{}' requires execution closure but actor effect emission preflight failed: {e}",
-                                    proposal_id.0
-                                )
-                            })?;
-
-                            match crate::grant_minting::mint_and_persist_for_accepted(
-                                store.as_ref(),
-                                &proposal_id.0,
-                                &proposal.domain_id,
                                 decision_hash,
-                                &proposal.payload,
-                                now,
-                            ) {
-                                Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
-                                | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
-                                    ..
-                                }) => {}
-                                Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
-                                    anyhow::bail!(
-                                        "Proposal '{}' requires execution closure but actor mandate preflight hash failed.",
-                                        proposal_id.0
-                                    );
-                                }
-                                Err(e) => {
-                                    anyhow::bail!(
-                                        "Proposal '{}' requires execution closure but actor mandate preflight persistence failed: {e}",
-                                        proposal_id.0
-                                    );
-                                }
-                            }
-
-                            // Gap C parity: capture the v1 GovernanceDecisionReceipt
-                            // + allocation/contribution receipt that the in-process
-                            // GovernanceManager close path persists
-                            // (`manager.rs::close_proposal_inner`). The actor already
-                            // wrote the institutional-effect record and the mandate
-                            // above; these v1 artifacts are what the audit read path
-                            // indexes by `decision_hash`
-                            // (`GET /v1/receipts/chain/{decision_hash}` / `icnctl
-                            // audit verify`). They are DEFERRED to after the v3 +
-                            // proof preflights (drained just before the terminal save)
-                            // so a later preflight failure can never leave a
-                            // chain-observable accepted receipt behind for a still-Open
-                            // proposal. `gate_receipt` is the canonical v1 receipt
-                            // built above for the Invariant-7 gate (same
-                            // `decision_hash`) and is unused afterwards, so it moves
-                            // into the deferred holder.
-                            let allocation_receipt =
-                                crate::manager::GovernanceManager::create_allocation_receipt(
-                                    &proposal.payload,
-                                    decision_hash,
-                                    &proposal_id,
-                                    &proposal.domain_id,
-                                );
-                            pending_chain_receipts = Some((gate_receipt, allocation_receipt));
-                        }
+                                &proposal_id,
+                                &proposal.domain_id,
+                            );
+                        pending_chain_receipts = Some((gate_receipt, allocation_receipt));
                     }
 
                     Some(hex::encode(decision_hash))
@@ -2826,10 +2804,6 @@ impl GovernanceActor {
                     None
                 };
 
-                // Flip the proposal to its terminal state in memory. A bail here
-                // (not Open / non-terminal state) leaves nothing durable behind.
-                proposal.close(new_state)?;
-
                 // Cross-store-atomic close via the write-ahead close journal
                 // (Codex P2 on PR #1985). The v3 receipt, GovernanceProofV2 bytes,
                 // and the v1 governance/allocation receipts (`pending_chain_receipts`)
@@ -2871,10 +2845,9 @@ impl GovernanceActor {
                     },
                     decided_at: now,
                     governance_decision_hash: governance_decision_hash.clone(),
-                    // The ordinary close still writes its execution closure in
-                    // the preflight above (before this intent); see
-                    // `CloseJournalEntry::execution_closure`.
-                    execution_closure: false,
+                    // An accepted, execution-required close writes its execution
+                    // closure inside `commit`, behind this durable intent.
+                    execution_closure: requires_execution_closure,
                 };
                 self.store.save_close_intent(&journal_entry)?;
                 journal_entry.commit(self.receipt_store.as_deref(), self.store.as_ref())?;
