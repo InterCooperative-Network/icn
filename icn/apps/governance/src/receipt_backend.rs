@@ -456,6 +456,23 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         proposal_id: &str,
     ) -> Result<Option<GovernanceDecisionReceipt>, String>;
 
+    /// Every governance decision receipt stored for `proposal_id`, strictly.
+    ///
+    /// [`Self::get_governance_by_proposal`] returns one receipt and hides
+    /// whether others exist, so it cannot tell a single decision from two
+    /// contradictory ones. Decision-commitment verification
+    /// ([`crate::decision_commitment`]) needs the whole set. An index entry
+    /// whose receipt cannot be read is an error here, never a skipped row.
+    ///
+    /// The default refuses: a backend that cannot enumerate receipts cannot
+    /// supply commitment evidence, and a commitment check over it fails closed.
+    fn list_governance_by_proposal(
+        &self,
+        _proposal_id: &str,
+    ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+        Err("list_governance_by_proposal is not supported by this receipt backend".to_string())
+    }
+
     /// Persist an allocation receipt linked to a governance decision.
     ///
     /// Called by the governance manager when a budget/treasury proposal

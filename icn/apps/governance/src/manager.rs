@@ -3434,6 +3434,9 @@ pub struct GovernanceManager {
     /// space so a future migration to actor-backed mode reads the same
     /// records.
     domain_store: Option<Arc<dyn GovernanceStateStore>>,
+    /// Authoritative decision-commitment source (the governance actor's),
+    /// when wired. Takes precedence over the standalone in-memory view.
+    commitments: Option<Arc<dyn crate::decision_commitment::DecisionCommitmentSource>>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
     receipt_store: Option<Arc<dyn GovernanceReceiptBackend>>,
     /// Isolated rehearsal review workspaces (#1726/#2386). Only the
@@ -3488,6 +3491,7 @@ impl GovernanceManager {
             milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: None,
             domain_store: None,
+            commitments: None,
             receipt_store: None,
             rehearsal_state: Default::default(),
             milestone_event_log: None,
@@ -3529,6 +3533,7 @@ impl GovernanceManager {
             milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: Some(handle),
             domain_store: None,
+            commitments: None,
             receipt_store: None,
             rehearsal_state: Default::default(),
             milestone_event_log: None,
@@ -3582,6 +3587,22 @@ impl GovernanceManager {
         self
     }
 
+    /// Wire the authoritative decision-commitment source (the governance
+    /// actor's [`crate::actor::GovernanceHandle::decision_commitments`]).
+    pub fn with_decision_commitments(
+        mut self,
+        source: Arc<dyn crate::decision_commitment::DecisionCommitmentSource>,
+    ) -> Self {
+        self.commitments = Some(source);
+        self
+    }
+
+    pub(crate) fn authoritative_commitments(
+        &self,
+    ) -> Option<Arc<dyn crate::decision_commitment::DecisionCommitmentSource>> {
+        self.commitments.clone()
+    }
+
     /// Clone the attached [`GovernanceStateStore`], if one is wired.
     ///
     /// Used by the persisted domain-policy adoption seam to load/save
@@ -3589,6 +3610,25 @@ impl GovernanceManager {
     /// callers must fail closed in that case.
     pub(crate) fn domain_state_store(&self) -> Option<Arc<dyn GovernanceStateStore>> {
         self.domain_store.clone()
+    }
+
+    /// The proposal this manager holds in memory for `proposal_id`, if any
+    /// (standalone mode keeps proposals here). Used as decision-commitment
+    /// evidence; a poisoned lock is an error, never "absent".
+    pub(crate) fn held_proposal(&self, proposal_id: &str) -> Result<Option<Proposal>, String> {
+        let proposals = self
+            .proposals
+            .read()
+            .map_err(|e| format!("Proposals storage lock poisoned (concurrent panic?): {e}"))?;
+        Ok(proposals.get(&ProposalId::new(proposal_id)).cloned())
+    }
+
+    /// Test-only: hold `proposal` in memory as standalone mode does.
+    #[cfg(test)]
+    pub(crate) fn hold_proposal_for_test(&self, proposal: Proposal) {
+        if let Ok(mut proposals) = self.proposals.write() {
+            proposals.insert(proposal.id.clone(), proposal);
+        }
     }
 
     /// Acquire (creating on first use) the per-domain serialization lock for
@@ -3698,6 +3738,7 @@ impl GovernanceManager {
             // Actor-backed mode: the actor owns its own state store. Standalone-mode
             // domain persistence is intentionally not wired here.
             domain_store: None,
+            commitments: None,
             milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),
             program_event_log: Some(Arc::new(SledProgramEventLog::new(db))),
             domain_adoption_locks: Mutex::new(HashMap::new()),
@@ -3757,6 +3798,7 @@ impl GovernanceManager {
             milestone_store: Arc::new(SledMilestoneStore::new(db.clone())),
             governance_handle: None,
             domain_store: Some(domain_store),
+            commitments: None,
             receipt_store: None,
             rehearsal_state: Default::default(),
             milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),

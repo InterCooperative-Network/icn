@@ -125,6 +125,20 @@ pub struct MandateIdentityStatus {
 
 pub use icn_governance_actor::mandate_inventory::MandateStanding;
 
+/// A governance receipt that a proposal-scoped lookup cannot see
+/// ([`ReceiptStore::governance_receipt_index_report`]). Report only.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GovernanceReceiptIndexGap {
+    /// Proposal the receipt names.
+    pub proposal_id: String,
+    /// Hex decision hash of the receipt.
+    pub decision_hash: String,
+    /// The `by_proposal` index entry is missing.
+    pub missing_proposal_index: bool,
+    /// The by-decision index entry is missing.
+    pub missing_decision_index: bool,
+}
+
 /// One row of [`ReceiptStore::mandate_authority_inventory`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MandateAuthorityRow {
@@ -446,24 +460,96 @@ impl ReceiptStore {
         let key = Self::make_key(GOVERNANCE_PREFIX, &hash);
         let value = serde_json::to_vec(receipt)
             .map_err(|e| format!("Failed to serialize governance receipt: {}", e))?;
-
-        self.db
-            .insert(&key, value)
-            .map_err(|e| format!("Failed to store governance receipt: {}", e))?;
-
-        // Index by decision_hash (for chain lookups)
         let decision_key = Self::make_decision_index_key(&hash, b"governance", &hash);
-        self.db
-            .insert(&decision_key, &hash[..])
-            .map_err(|e| format!("Failed to index governance receipt by decision_hash: {}", e))?;
-
-        // Index by proposal_id (for proposal → receipt lookups)
         let proposal_key = Self::make_proposal_index_key(&receipt.proposal_id, &hash);
-        self.db
-            .insert(&proposal_key, &hash[..])
-            .map_err(|e| format!("Failed to index governance receipt by proposal_id: {}", e))?;
 
-        Ok(hash)
+        // The primary record and both indexes commit together: a decision is
+        // never stored without the proposal index that makes it visible to
+        // `list_governance_by_proposal` (a hidden receipt could conceal a
+        // contradicting decision).
+        //
+        // Identity is the canonical decision hash, not the stored bytes: a
+        // re-put of the same decision is an idempotent no-op even when a
+        // newer binary serializes the receipt differently (close-journal
+        // replay after an upgrade must not wedge). Both records must verify
+        // against their hashed fields, so equal hashes mean equal decisions.
+        // An unreadable or unverifiable stored record, or an incoming record
+        // whose fields do not hash to its decision hash, aborts with nothing
+        // written; existing bytes are never rewritten.
+        if !receipt.verify() {
+            return Err(format!(
+                "governance receipt {} does not verify against its fields; refused",
+                hex::encode(hash)
+            ));
+        }
+        let outcome: Result<(), TransactionError<String>> = self.db.transaction(|tx| {
+            match tx.get(&key)? {
+                Some(existing) => {
+                    let stored: GovernanceDecisionReceipt = serde_json::from_slice(&existing)
+                        .map_err(|e| {
+                            ConflictableTransactionError::Abort(format!(
+                                "stored record is unreadable ({e})"
+                            ))
+                        })?;
+                    if !stored.verify() || stored.decision_hash != hash {
+                        return Err(ConflictableTransactionError::Abort(
+                            "stored record does not verify as this decision".to_string(),
+                        ));
+                    }
+                }
+                None => {
+                    tx.insert(key.as_slice(), value.as_slice())?;
+                }
+            }
+            tx.insert(decision_key.as_slice(), &hash[..])?;
+            tx.insert(proposal_key.as_slice(), &hash[..])?;
+            Ok(())
+        });
+        match outcome {
+            Ok(()) => Ok(hash),
+            Err(TransactionError::Abort(why)) => Err(format!(
+                "governance receipt {}: {why}; a decision record is immutable",
+                hex::encode(hash)
+            )),
+            Err(TransactionError::Storage(e)) => {
+                Err(format!("sled transaction (governance receipt): {e}"))
+            }
+        }
+    }
+
+    /// Read-only: governance receipts whose proposal or decision index entry
+    /// is missing (written by the earlier non-atomic `put_governance`).
+    ///
+    /// Such a receipt is invisible to [`Self::list_governance_by_proposal`],
+    /// so it could conceal a contradicting decision. This reports; it never
+    /// writes or repairs.
+    pub fn governance_receipt_index_report(
+        &self,
+    ) -> Result<Vec<GovernanceReceiptIndexGap>, String> {
+        let mut gaps = Vec::new();
+        for entry in self.db.scan_prefix(GOVERNANCE_PREFIX) {
+            let (_, bytes) = entry.map_err(|e| format!("scan governance receipts: {e}"))?;
+            let receipt: GovernanceDecisionReceipt = serde_json::from_slice(&bytes)
+                .map_err(|e| format!("decode governance receipt: {e}"))?;
+            let hash = receipt.decision_hash;
+            let has_proposal_index = self
+                .db
+                .contains_key(Self::make_proposal_index_key(&receipt.proposal_id, &hash))
+                .map_err(|e| format!("read proposal index: {e}"))?;
+            let has_decision_index = self
+                .db
+                .contains_key(Self::make_decision_index_key(&hash, b"governance", &hash))
+                .map_err(|e| format!("read decision index: {e}"))?;
+            if !has_proposal_index || !has_decision_index {
+                gaps.push(GovernanceReceiptIndexGap {
+                    proposal_id: receipt.proposal_id,
+                    decision_hash: hex::encode(hash),
+                    missing_proposal_index: !has_proposal_index,
+                    missing_decision_index: !has_decision_index,
+                });
+            }
+        }
+        Ok(gaps)
     }
 
     /// Test helper: store a governance receipt for a proposal in the test domain.
@@ -527,6 +613,41 @@ impl ReceiptStore {
             );
         }
         Ok(None)
+    }
+
+    /// Every governance decision receipt indexed under `proposal_id`.
+    ///
+    /// Unlike [`Self::get_governance_by_proposal`], this is strict: a malformed
+    /// index value or an index entry whose primary record is missing is an
+    /// error, because callers use the full set as commitment evidence and a
+    /// silently dropped receipt could hide a contradiction.
+    pub fn list_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+        let prefix = Self::make_proposal_scan_prefix(proposal_id);
+        let mut out = Vec::new();
+        for entry in self.db.scan_prefix(&prefix) {
+            let (_, hash_bytes) =
+                entry.map_err(|e| format!("Failed to scan proposal index: {}", e))?;
+            let hash: Hash = hash_bytes.as_ref().try_into().map_err(|_| {
+                format!(
+                    "governance proposal index for '{proposal_id}' holds a malformed hash ({} bytes)",
+                    hash_bytes.len()
+                )
+            })?;
+            match self.get_governance(&hash)? {
+                Some(receipt) => out.push(receipt),
+                None => {
+                    return Err(format!(
+                        "governance proposal index skew for '{proposal_id}': receipt {} is indexed \
+                         but its primary record is missing",
+                        hex::encode(hash)
+                    ))
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// List governance decision receipts for a decision hash.
@@ -2696,6 +2817,13 @@ impl GovernanceReceiptBackend for ReceiptStore {
         self.get_governance_by_proposal(proposal_id)
     }
 
+    fn list_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+        self.list_governance_by_proposal(proposal_id)
+    }
+
     fn put_allocation(&self, receipt: &AllocationReceipt) -> Result<Hash, String> {
         // Gap C: persist the allocation AND its settlement/contribution intents,
         // so `get_chain_by_decision` (which reads the separate intent index)
@@ -3097,6 +3225,162 @@ mod tests {
     // ========================================================================
     // Governance receipt tests
     // ========================================================================
+
+    #[test]
+    fn list_governance_by_proposal_returns_every_receipt_for_that_proposal_only() {
+        let store = ReceiptStore::new(temp_db());
+        let first = make_test_governance_receipt("prop-a");
+        // A genuinely different decision for the same proposal (other tally).
+        let second = GovernanceDecisionReceipt::new(
+            "prop-a".to_string(),
+            "test-domain".to_string(),
+            ProofOutcome::Accepted,
+            VoteTally::new(2, 1, 0),
+            &[],
+        );
+        assert_ne!(second.decision_hash, first.decision_hash);
+        store.put_governance(&first).unwrap();
+        store.put_governance(&second).unwrap();
+        store
+            .put_governance(&make_test_governance_receipt("prop-a:b"))
+            .unwrap();
+
+        let mut hashes: Vec<Hash> = store
+            .list_governance_by_proposal("prop-a")
+            .unwrap()
+            .into_iter()
+            .map(|r| r.decision_hash)
+            .collect();
+        hashes.sort_unstable();
+        let mut expected = vec![first.decision_hash, second.decision_hash];
+        expected.sort_unstable();
+        assert_eq!(
+            hashes, expected,
+            "both receipts, and none of the prefix-sharing proposal"
+        );
+        assert!(store
+            .list_governance_by_proposal("prop-none")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn put_governance_is_atomic_idempotent_and_immutable_across_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let receipt = make_test_governance_receipt("prop-atomic");
+        {
+            let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
+            store.put_governance(&receipt).unwrap();
+            // Identical replay is a no-op.
+            store.put_governance(&receipt).unwrap();
+            // Same decision hash, different content: refused, nothing changes.
+            let mut forged = receipt.clone();
+            forged.domain_id = "another-domain".into();
+            let err = store.put_governance(&forged).unwrap_err();
+            assert!(err.contains("does not verify"), "{err}");
+            assert!(store.governance_receipt_index_report().unwrap().is_empty());
+            store.db.flush().unwrap();
+        }
+        // An upgrade-era encoding of the same decision (an extra field) is the
+        // same decision: the re-put is a no-op and the stored bytes are kept.
+        {
+            let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
+            let key = ReceiptStore::make_key(GOVERNANCE_PREFIX, &receipt.decision_hash);
+            let mut v = serde_json::to_value(&receipt).unwrap();
+            v["future_field"] = serde_json::json!(1);
+            let variant = serde_json::to_vec(&v).unwrap();
+            store.db.insert(&key, variant.clone()).unwrap();
+            store.put_governance(&receipt).unwrap();
+            assert_eq!(
+                store.db.get(&key).unwrap().unwrap().as_ref(),
+                variant.as_slice()
+            );
+            store.db.flush().unwrap();
+        }
+        // Restart: the record and both indexes are still there, unchanged.
+        let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
+        let listed = store.list_governance_by_proposal("prop-atomic").unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].domain_id, receipt.domain_id);
+        assert!(store
+            .get_governance_by_decision(&receipt.decision_hash)
+            .unwrap()
+            .is_some());
+        assert!(store.governance_receipt_index_report().unwrap().is_empty());
+    }
+
+    #[test]
+    fn index_report_finds_a_legacy_receipt_the_proposal_lookup_cannot_see() {
+        // A receipt as the old non-atomic writer could leave it after a crash:
+        // primary record durable, indexes never written.
+        let store = ReceiptStore::new(temp_db());
+        let visible = make_test_governance_receipt("prop-legacy");
+        store.put_governance(&visible).unwrap();
+        let mut hidden = make_test_governance_receipt("prop-legacy");
+        hidden.decision_hash = [0x5A; 32];
+        store
+            .db
+            .insert(
+                ReceiptStore::make_key(GOVERNANCE_PREFIX, &hidden.decision_hash),
+                serde_json::to_vec(&hidden).unwrap(),
+            )
+            .unwrap();
+
+        // The proposal lookup sees one decision; the report exposes the other.
+        assert_eq!(
+            store
+                .list_governance_by_proposal("prop-legacy")
+                .unwrap()
+                .len(),
+            1
+        );
+        let gaps = store.governance_receipt_index_report().unwrap();
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0].decision_hash, hex::encode([0x5A; 32]));
+        assert!(gaps[0].missing_proposal_index && gaps[0].missing_decision_index);
+        // Read-only: still exactly one visible.
+        assert_eq!(
+            store
+                .list_governance_by_proposal("prop-legacy")
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn list_governance_by_proposal_refuses_index_skew_and_malformed_entries() {
+        let store = ReceiptStore::new(temp_db());
+        let receipt = make_test_governance_receipt("prop-a");
+        store.put_governance(&receipt).unwrap();
+        // An index entry whose primary record is missing.
+        let dangling = [0xCD; 32];
+        store
+            .db
+            .insert(
+                ReceiptStore::make_proposal_index_key("prop-a", &dangling),
+                &dangling[..],
+            )
+            .unwrap();
+        let err = store.list_governance_by_proposal("prop-a").unwrap_err();
+        assert!(err.contains("index skew"), "{err}");
+        // The lenient single lookup still answers (pre-existing behaviour).
+        assert!(store
+            .get_governance_by_proposal("prop-a")
+            .unwrap()
+            .is_some());
+
+        let store = ReceiptStore::new(temp_db());
+        store
+            .db
+            .insert(
+                ReceiptStore::make_proposal_index_key("prop-b", &[0xEE; 32]),
+                &b"short"[..],
+            )
+            .unwrap();
+        let err = store.list_governance_by_proposal("prop-b").unwrap_err();
+        assert!(err.contains("malformed"), "{err}");
+    }
 
     #[test]
     fn test_put_get_governance() {

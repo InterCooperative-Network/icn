@@ -80,6 +80,34 @@ impl GovernanceReceiptBackend for TestBackend {
     ) -> Result<Option<GovernanceDecisionReceipt>, String> {
         Ok(None)
     }
+    /// One accepted v1 receipt per seeded mandate's decision, as a completed
+    /// close leaves behind (decision-commitment evidence).
+    fn list_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+        let mut out: Vec<GovernanceDecisionReceipt> = Vec::new();
+        for m in self
+            .mandates
+            .iter()
+            .filter(|m| m.decision.proposal_id == proposal_id)
+        {
+            if out
+                .iter()
+                .all(|r| r.decision_hash != m.decision.decision_hash)
+            {
+                out.push(GovernanceDecisionReceipt {
+                    proposal_id: proposal_id.into(),
+                    domain_id: GOV_DOMAIN.into(),
+                    outcome: icn_governance::proof::ProofOutcome::Accepted,
+                    vote_tally: icn_governance::VoteTally::new(1, 0, 0),
+                    vote_hash: [0u8; 32],
+                    decision_hash: m.decision.decision_hash,
+                });
+            }
+        }
+        Ok(out)
+    }
     fn put_allocation(&self, _: &AllocationReceipt) -> Result<Hash, String> {
         Ok([0u8; 32])
     }
@@ -160,8 +188,15 @@ fn declare_grant(actor: Did, dom: &str, grant_id: AuthorityGrantId) -> Authority
 }
 
 fn backing_mandate(grant_id: AuthorityGrantId) -> Mandate {
-    Mandate::new(decision(), [9u8; 32], vec![grant_id], None, None, 0)
-        .expect("grant-bearing mandate is valid")
+    Mandate::new(
+        decision(),
+        committed_payload_hash(),
+        vec![grant_id],
+        None,
+        None,
+        0,
+    )
+    .expect("grant-bearing mandate is valid")
 }
 
 struct Harness {
@@ -172,10 +207,39 @@ struct Harness {
 /// Manager wired with the gate backend + a temp Sled `InstitutionalDomain`
 /// store, in `Test`-mode context. No `GovernanceDomain` is seeded: the declare
 /// route does not apply the membership gate (see the handler docs).
+/// Governance domain of the proposal that `decision()` names.
+const GOV_DOMAIN: &str = "gov-route";
+
+/// The accepted proposal `decision()` names; stored by `make_harness` as the
+/// decision commitment the gate requires before a mandate authorizes.
+fn committed_proposal() -> icn_governance::Proposal {
+    let mut p = icn_governance::Proposal::new(
+        icn_governance::GovernanceDomainId::new(GOV_DOMAIN),
+        fresh_did(),
+        "declare domain".into(),
+        "fixture".into(),
+        icn_governance::ProposalPayload::Text {
+            body: "declare coop-alpha".into(),
+        },
+    );
+    p.id = icn_governance::ProposalId::new("prop-1");
+    p.state = icn_governance::ProposalState::Accepted { closed_at: 1 };
+    p
+}
+
+/// The mandate seam's payload hash (blake3 over the payload's JSON bytes).
+fn committed_payload_hash() -> Hash {
+    let bytes = serde_json::to_vec(&committed_proposal().payload).expect("payload json");
+    *blake3::hash(&bytes).as_bytes()
+}
+
 fn make_harness(backend: Arc<TestBackend>) -> Harness {
     let store: Arc<dyn GovernanceStateStore> = Arc::new(SledGovernanceStateStore::new(Arc::new(
         icn_store::SledStore::temporary().expect("temp sled"),
     )));
+    store
+        .save_proposal(&committed_proposal())
+        .expect("store the committed proposal");
     let manager = GovernanceManager::new()
         .with_receipt_store(backend as Arc<dyn GovernanceReceiptBackend>)
         .with_domain_store(store.clone());

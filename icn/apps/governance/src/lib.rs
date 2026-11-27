@@ -26,6 +26,7 @@
 
 pub mod actor;
 pub mod close_journal;
+pub mod decision_commitment;
 pub mod dispatch_evidence;
 pub mod dispatch_evidence_sink;
 pub mod domain_policy_adoption;
