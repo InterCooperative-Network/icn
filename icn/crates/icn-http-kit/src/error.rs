@@ -31,6 +31,11 @@ pub enum ApiError {
 
     #[error("internal error: {0}")]
     Internal(String),
+
+    /// A required server-side dependency is unavailable; the request was not
+    /// carried out.
+    #[error("service unavailable: {0}")]
+    ServiceUnavailable(String),
 }
 
 impl ApiError {
@@ -67,6 +72,7 @@ impl ResponseError for ApiError {
             ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ApiError::Conflict(_) => StatusCode::CONFLICT,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ApiError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
         }
     }
 

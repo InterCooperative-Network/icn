@@ -49,7 +49,9 @@ pub mod replication_emission;
 pub mod replication_sequence;
 pub mod state_store;
 
-pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
+pub use actor::{
+    EvidenceReadiness, GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle,
+};
 pub use close_journal::{CloseJournalEntry, CloseReceipts, DecisionV3Entry};
 pub use dispatch_evidence::{
     derive_reconciliation_status, reconciliation_label, EffectDispatchEvidence,

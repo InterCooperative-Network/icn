@@ -60,6 +60,11 @@ fn err_internal(msg: impl Into<String>) -> ApiError {
     ApiError::Internal(msg.into())
 }
 
+/// Client-facing message for a terminal transition refused because the
+/// governance evidence path is unavailable.
+const EVIDENCE_UNAVAILABLE_MESSAGE: &str =
+    "governance decision evidence is unavailable on this node; the transition was not carried out";
+
 /// Map anyhow error to ApiError.
 ///
 /// The governance actor's typed vote refusals are client errors: an unknown
@@ -69,8 +74,15 @@ fn anyhow_to_api(e: anyhow::Error) -> ApiError {
     use icn_governance::GovernanceError as G;
     match e.downcast_ref::<G>() {
         Some(G::ProposalNotFound(_)) => ApiError::NotFound(e.to_string()),
-        Some(G::ProposalNotOpen(_)) => ApiError::Conflict(e.to_string()),
+        Some(G::UnrepresentableDeadline(_)) => ApiError::BadRequest(e.to_string()),
+        Some(G::ProposalNotOpen(_)) | Some(G::VotingPeriodEnded(_)) => {
+            ApiError::Conflict(e.to_string())
+        }
         Some(G::NotAMember(_)) => ApiError::Forbidden(e.to_string()),
+        // A fixed message: the internal startup cause is not client-facing.
+        Some(G::EvidenceUnavailable(_)) => {
+            ApiError::ServiceUnavailable(EVIDENCE_UNAVAILABLE_MESSAGE.to_string())
+        }
         _ => ApiError::Internal(e.to_string()),
     }
 }
@@ -10221,6 +10233,7 @@ mod tests {
         use icn_governance::GovernanceError as G;
         let status = |e: anyhow::Error| match anyhow_to_api(e) {
             ApiError::NotFound(_) => 404,
+            ApiError::BadRequest(_) => 400,
             ApiError::Conflict(_) => 409,
             ApiError::Forbidden(_) => 403,
             ApiError::Internal(_) => 500,
@@ -10228,6 +10241,8 @@ mod tests {
         };
         assert_eq!(status(G::ProposalNotFound("p".into()).into()), 404);
         assert_eq!(status(G::ProposalNotOpen("p".into()).into()), 409);
+        assert_eq!(status(G::VotingPeriodEnded("p".into()).into()), 409);
+        assert_eq!(status(G::UnrepresentableDeadline("p".into()).into()), 400);
         assert_eq!(status(G::NotAMember("d".into()).into()), 403);
         // Every other error keeps its existing mapping.
         assert_eq!(status(G::DomainNotFound("d".into()).into()), 500);
@@ -10238,6 +10253,27 @@ mod tests {
             status(anyhow::Error::from(G::NotAMember("d".into())).context("cast_vote")),
             403
         );
+    }
+
+    /// A terminal transition refused because the governance evidence path is
+    /// unavailable is 503 with a fixed message: neither an internal error nor
+    /// a client error, and the internal startup cause is not exposed.
+    #[tokio::test]
+    async fn evidence_unavailable_is_503_with_a_fixed_message() {
+        use actix_web::ResponseError;
+        use icn_governance::GovernanceError as G;
+        let refused = anyhow::Error::from(G::EvidenceUnavailable(
+            "internal startup cause: gateway_store flock".into(),
+        ))
+        .context("close_proposal");
+        let api = anyhow_to_api(refused);
+        assert_eq!(
+            api.status_code(),
+            actix_web::http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        let text = api.to_string();
+        assert!(text.contains(EVIDENCE_UNAVAILABLE_MESSAGE), "{text}");
+        assert!(!text.contains("flock"), "internal cause leaked: {text}");
     }
 
     /// The real vote route over an actor-backed manager: a non-member vote is

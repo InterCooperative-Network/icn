@@ -97,16 +97,18 @@ pub struct GatewayHandles {
 /// The gateway runs in a dedicated thread with its own tokio runtime
 /// because actix-web has specific runtime requirements.
 ///
-/// Returns true only after the gateway has initialized and bound its socket;
-/// returns false if disabled or if startup fails before readiness.
+/// Returns [`GatewayStartup::Ready`] only after the gateway has initialized
+/// (installing the governance evidence sinks and running close recovery) and
+/// bound its socket; [`GatewayStartup::Disabled`] when configured off; and
+/// [`GatewayStartup::Failed`] with the cause otherwise.
 pub async fn spawn_gateway(
     config: &GatewayConfig,
     data_dir: PathBuf,
     handles: GatewayHandles,
-) -> bool {
+) -> GatewayStartup {
     if !config.enabled {
         debug!("Gateway API disabled in configuration");
-        return false;
+        return GatewayStartup::Disabled;
     }
 
     info!(
@@ -119,7 +121,9 @@ pub async fn spawn_gateway(
         Err(e) => {
             warn!("Failed to parse gateway bind address: {}", e);
             icn_obs::metrics::supervisor::error_inc("gateway_bind_addr_invalid");
-            return false;
+            return GatewayStartup::Failed(GatewayStartupFailure::InvalidConfiguration(format!(
+                "bind address: {e}"
+            )));
         }
     };
 
@@ -129,7 +133,7 @@ pub async fn spawn_gateway(
         warn!("Set jwt_secret in config or ICN_GATEWAY_JWT_SECRET environment variable");
         icn_obs::metrics::supervisor::error_inc("gateway_jwt_secret_missing");
         icn_obs::metrics::supervisor::actor_active_set("gateway", false);
-        return false;
+        return GatewayStartup::Failed(GatewayStartupFailure::MissingCredentials);
     }
 
     // Validate security-sensitive policy before creating a thread. The server
@@ -146,7 +150,9 @@ pub async fn spawn_gateway(
             );
             icn_obs::metrics::supervisor::error_inc("gateway_token_lifetime_invalid");
             icn_obs::metrics::supervisor::actor_active_set("gateway", false);
-            return false;
+            return GatewayStartup::Failed(GatewayStartupFailure::InvalidConfiguration(format!(
+                "token_expiry_hours: {error}"
+            )));
         }
     };
 
@@ -201,12 +207,16 @@ pub async fn spawn_gateway(
     // the actor active.
     let (startup_tx, startup_rx) = tokio::sync::oneshot::channel();
     let (activation_tx, activation_rx) = tokio::sync::oneshot::channel();
+    // The thread's own startup error, if it exits before readiness. Sent after
+    // the startup sender is dropped, so it is awaited only on that path.
+    let (failure_tx, failure_rx) = tokio::sync::oneshot::channel::<GatewayStartupFailure>();
     std::thread::spawn(move || {
         let rt = match tokio::runtime::Runtime::new() {
             Ok(runtime) => runtime,
             Err(error) => {
                 warn!("Failed to create gateway async runtime: {}", error);
                 icn_obs::metrics::supervisor::error_inc("gateway_server");
+                let _ = failure_tx.send(GatewayStartupFailure::RuntimeInit(error.to_string()));
                 return;
             }
         };
@@ -339,6 +349,9 @@ pub async fn spawn_gateway(
             if let Err(e) = result {
                 warn!("Gateway server error: {}", e);
                 icn_obs::metrics::supervisor::error_inc("gateway_server");
+                let _ = failure_tx.send(GatewayStartupFailure::ExitedBeforeReadiness(Some(
+                    e.to_string(),
+                )));
             }
         });
     });
@@ -351,10 +364,10 @@ pub async fn spawn_gateway(
                 icn_obs::metrics::supervisor::error_inc("gateway_activation_ack");
                 icn_obs::metrics::supervisor::actor_active_set("gateway", false);
                 warn!("Gateway exited before supervisor acknowledged activation");
-                false
+                GatewayStartup::Failed(GatewayStartupFailure::ExitedBeforeActivation)
             } else {
                 info!("Gateway API ready on {}", gateway_addr);
-                true
+                GatewayStartup::Ready
             }
         }
         Err(error) => {
@@ -364,9 +377,109 @@ pub async fn spawn_gateway(
                 "Gateway startup thread exited without reporting readiness: {}",
                 error
             );
-            false
+            // The thread is exiting; it either reports its cause or drops the
+            // sender (e.g. on panic), so this wait is bounded.
+            GatewayStartup::Failed(
+                failure_rx
+                    .await
+                    .unwrap_or(GatewayStartupFailure::ExitedBeforeReadiness(None)),
+            )
         }
     }
+}
+
+/// How gateway startup ended, as the supervisor acts on it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GatewayStartup {
+    /// Initialized and bound. Its startup installed the governance evidence
+    /// sinks and ran close recovery before reporting readiness.
+    Ready,
+    /// Disabled by configuration: gateway-less operation.
+    Disabled,
+    /// Configured, but did not reach readiness.
+    Failed(GatewayStartupFailure),
+}
+
+/// Why a configured gateway did not reach readiness.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GatewayStartupFailure {
+    /// A configured value is invalid (bind address, token policy).
+    InvalidConfiguration(String),
+    /// Enabled without the required JWT secret.
+    MissingCredentials,
+    /// The gateway's async runtime could not be created.
+    RuntimeInit(String),
+    /// The server exited before readiness (storage initialization, bind, or
+    /// another startup error; the server's error text when it reported one).
+    ExitedBeforeReadiness(Option<String>),
+    /// The server became ready but exited before the supervisor acknowledged it.
+    ExitedBeforeActivation,
+}
+
+/// Settle the governance actor's evidence readiness from the gateway outcome.
+///
+/// The gateway is currently the component that installs the governance
+/// receipt store and dispatch-evidence backend and runs close recovery, so:
+/// - `Ready`: recovery has already settled the actor (`Ready`); nothing to do.
+/// - `Disabled`: no evidence path is provisioned; scheduled governance work
+///   proceeds as it always has, without receipt-backed guarantees.
+/// - `Failed`: unless the actor already reached `Ready` (the failure came after
+///   its evidence path was established), hold scheduled work and refuse
+///   terminal transitions rather than complete decisions without evidence.
+///
+/// Returns the governance evidence state in effect, if an actor is present.
+pub fn settle_governance_evidence(
+    startup: &GatewayStartup,
+    governance: Option<&icn_governance_actor::GovernanceHandle>,
+) -> Option<icn_governance_actor::EvidenceReadiness> {
+    use icn_governance_actor::EvidenceReadiness;
+    let handle = governance?;
+    let state = match startup {
+        GatewayStartup::Ready => handle.evidence_readiness(),
+        GatewayStartup::Disabled => {
+            let state = handle.declare_evidence_not_provisioned();
+            info!(
+                ?state,
+                "Gateway disabled: governance runs without receipt-backed evidence"
+            );
+            state
+        }
+        GatewayStartup::Failed(cause) => {
+            let state = handle.mark_evidence_unavailable();
+            if state == EvidenceReadiness::Ready {
+                warn!(
+                    ?cause,
+                    "Gateway failed after governance evidence and recovery were \
+                     established; governance continues"
+                );
+            } else {
+                icn_obs::metrics::supervisor::error_inc("governance_evidence_unavailable");
+                tracing::error!(
+                    ?cause,
+                    ?state,
+                    "Configured gateway failed before governance evidence was \
+                     established: scheduled governance work is held and \
+                     close/veto/force-close are refused until a restart with a \
+                     working evidence path"
+                );
+            }
+            state
+        }
+    };
+    Some(state)
+}
+
+/// Spawn the gateway, then settle governance evidence readiness from how its
+/// startup ended. This is the supervisor's gateway startup step.
+pub async fn start_gateway(
+    config: &GatewayConfig,
+    data_dir: PathBuf,
+    handles: GatewayHandles,
+) -> GatewayStartup {
+    let governance = handles.governance_actor_handle.clone();
+    let startup = spawn_gateway(config, data_dir, handles).await;
+    settle_governance_evidence(&startup, governance.as_ref());
+    startup
 }
 
 #[cfg(test)]
@@ -384,12 +497,15 @@ mod tests {
         let data_dir = tempfile::tempdir().expect("temporary gateway data directory");
 
         assert!(
-            !spawn_gateway(
-                &config,
-                data_dir.path().to_path_buf(),
-                GatewayHandles::default()
-            )
-            .await,
+            matches!(
+                spawn_gateway(
+                    &config,
+                    data_dir.path().to_path_buf(),
+                    GatewayHandles::default()
+                )
+                .await,
+                GatewayStartup::Failed(GatewayStartupFailure::InvalidConfiguration(_))
+            ),
             "invalid authority policy must not report a ready gateway actor"
         );
     }

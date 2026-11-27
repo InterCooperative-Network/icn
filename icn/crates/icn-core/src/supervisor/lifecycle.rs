@@ -150,9 +150,10 @@ pub async fn run_supervisor(
         spawn_without_identity(&config, &shutdown_tx, &mut background_tasks).await
     };
 
-    // Spawn Gateway API server if enabled
+    // Spawn Gateway API server if enabled, then settle governance evidence
+    // readiness from how its startup ended (see `settle_governance_evidence`).
     // commons is taken from gateway_handles (populated above, shared with kernel executor)
-    super::init_gateway::spawn_gateway(
+    super::init_gateway::start_gateway(
         &config.gateway,
         config.data_dir.clone(),
         super::init_gateway::GatewayHandles {
