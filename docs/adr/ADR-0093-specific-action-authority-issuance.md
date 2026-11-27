@@ -28,8 +28,9 @@ references:
 Proposed. This ADR is a design for maintainer review. Nothing here is implemented, and
 nothing here changes production issuance until it is accepted.
 
-Revision 2 incorporates an independent architecture review. Its BLOCKERs and FOLLOW_UPs are
-resolved below; its policy questions are listed under *Open maintainer decisions*.
+Revisions 2 and 3 incorporate an independent architecture review and its delta review. The
+BLOCKERs and FOLLOW_UPs are resolved below; the policy questions are listed under
+*Open maintainer decisions*.
 
 ## Context
 
@@ -121,10 +122,17 @@ invariant).
 The commitment is shape-agnostic. A future discretionary scope can be expressed as a set of
 admissible commitments (§10).
 
+**Versioned act tokens (downgrade safety).** Specific-action grants are minted under new act
+tokens, `domain_policy:adopt/v1` and `institutional_domain:declare/v1`. A binary that
+predates this ADR recognizes only the unversioned tokens, so it finds no matching grant and
+fails closed. It never treats a specific-action grant as content-free authority. The
+unversioned tokens are never minted.
+
 ### 4. Grantor and scope binding
 
 - **At mint:** refuse when `payload.domain` differs from the deciding governance domain. A domain's decision cannot mint authority over another domain.
 - **At the gate:** for these acts, require `grant.grantor == scope.domain == request.domain`.
+- This rule assumes D6's draft answer (the domain decides for itself). If D6 admits another sovereign forum, this rule is replaced by "grantor == the forum D6 names", and §4 is conditional on D6.
 - **Platform identities:** a node operator, gateway or daemon identity is never a grantor or an implicit executor.
 
 ### 5. Durable, recoverable, single execution
@@ -138,17 +146,24 @@ Execution is a three-step protocol. It reuses existing objects and only the clos
 commit-boundary rule, not its replay-by-overwrite mechanics.
 
 1. **Claim (Db-A, one transaction).** Move the mandate `Pending → InProgress`, stamp an execution id, and reserve the act's `InstitutionalEffectRecord` identity (already transactionally unique per proposal and effect kind). A second concurrent execution fails the claim.
+   - The claim also writes an `InProgress` index entry, so recovery can enumerate claims.
+   - It writes a commitment-keyed index entry, so a replay can find the execution record from the act content.
 2. **Apply (Db-B, compare-and-put).** Apply the effect only if the domain is in the expected prior state:
    - adoption: `current_policy == expected_prior`;
    - declaration: the domain is absent.
-   The domain record also records the mandate that set it.
-3. **Discharge (Db-A, one transaction).** Move `InProgress → Discharged`, revoke the mandate's grant (`revoked_at`), and complete the effect record.
+   In the **same** compare-and-put, write an append-only **apply marker** keyed by the mandate id, recording the effect it applied. Later acts never remove or overwrite a marker.
+3. **Discharge (Db-A, one transaction).** Move `InProgress → Discharged`, revoke the mandate's grant (`revoked_at`), complete the effect record, and clear the `InProgress` index entry.
 
-**Recovery.** An `InProgress` mandate rolls forward by **reading Db-B**:
-- if the domain already holds this mandate's effect, recovery discharges it;
-- if the precondition no longer holds, recovery records a refused execution and discharges it without applying anything.
+**Recovery.** For each `InProgress` mandate, recovery decides by its **apply marker**, never by the domain's current state:
 
-Recovery never re-applies an effect over newer state.
+| Marker | Precondition | Recovery action |
+|---|---|---|
+| present | — | Discharge (the act happened, even if a later act has since changed the domain) |
+| absent | still holds | Release the claim back to `Pending` (nothing happened; the executor may retry while the mandate is valid) |
+| absent | no longer holds | Set the mandate to `Revoked`, revoke its grant, and record the outcome `stale` on the effect record |
+
+`Discharged` keeps its ADR-0014 meaning: all authorized effects applied. A stale execution is
+`Revoked`, never `Discharged`. Recovery never re-applies an effect.
 
 **Multi-writer.** Two processes writing the same stores are declared unsupported for this
 path. The claim transaction is the fence within one store.
@@ -161,12 +176,13 @@ path. The claim transaction is the fence within one store.
   - Subject-mode domains refuse legacy principals (ADR-0092). This path applies to legacy-mode domains until a principal-typed executor is specified (open decision D12).
 - **Losing standing.** Live specific-action grants are revoked by a member-removal or freeze decision against the executor, or by an explicit revoke-mandate decision.
 - **Replacement.** Replacing an executor is a new decision, and it also revokes the old mandate. Two live mandates with different content can never both execute.
+- **The claim is the cut-off.** A revocation, replacement or seal that reaches a mandate already `InProgress` does not interrupt it: the claimed execution completes, or recovery resolves it per §5. Only `Pending` mandates are revocable. Revoking a mandate atomically with its claim is refused.
 
 ### 7. Idempotent, non-shadowing discharge
 
 - **Terminal state.** A discharged mandate's grant is revoked, so the gate no longer lists it.
 - **No early return.** Resolution skips dead or uncommitted candidates and keeps looking, so a discharged mandate cannot shadow later valid authority.
-- **Replay.** Re-requesting an act that already executed returns the prior result from its `InstitutionalEffectRecord`, the durable execution receipt. The gate is not involved.
+- **Replay.** Re-requesting an act that already executed returns the prior result from its `InstitutionalEffectRecord`, the durable execution receipt. It is found through the commitment-keyed index (§5). The gate is not involved.
 
 ### 8. Stale execution
 
@@ -210,6 +226,11 @@ When a domain is sealed for cutover, pending specific-action mandates are refuse
 execution across a cutover), never carried over. The governance meaning stays in the app
 layer and does not enter kernel crates.
 
+### 12. Rollback
+
+- **Downgrade with live grants.** The versioned act tokens (§3) make a pre-ADR binary fail closed on specific-action grants. Rolling back therefore never re-opens content-free adoption.
+- **Downgrade with live claims.** Rolling back while `InProgress` claims exist is unsupported. A pre-ADR binary cannot recover them. This is the same rule as for pending enveloped close intents. The runbook requires every claim to be resolved before a downgrade.
+
 ## Consequences
 
 - **Legitimate authority.** The two gated consumers gain a legitimate source of authority under a one-decision, one-act model. Content binding, grantor binding, single execution and crash recovery are all specified.
@@ -221,7 +242,7 @@ layer and does not enter kernel crates.
 | # | Decision | This draft |
 |---|---|---|
 | D1–D5, D9 | Shape, vehicle, payload form, execution model, binding/reuse, class tokens | As proposed above |
-| D6 | Who may decide a declaration | Open. Draft: the future domain's own electorate, subject to §9's stated limit |
+| D6 | Who may decide a declaration | Open. Draft: the future domain's own electorate, subject to §9's stated limit. §4's grantor rule follows this answer |
 | D7 | Charter-direct grants (`granted_by: None`) | Open. Draft keeps them skipped |
 | D8 | Office/role authority | Deferred (§10) |
 | D10 | ADR-0083 status | Open: accept with an amendment pointing here, or supersede its authority section |
