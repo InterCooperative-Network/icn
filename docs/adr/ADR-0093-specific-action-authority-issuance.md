@@ -7,17 +7,18 @@ deciders: ["Matt Faherty"]
 tags: ["governance", "authority", "mandate", "grant-minting", "institutional-domain", "domain-policy"]
 supersedes: []
 superseded_by: []
-amends: []
+amends: ["ADR-0019 (minted-class set; executor authorization, point 3)"]
 implementation_status: "not-started"
 references:
-  - "ADR-0014 (Constitutional Object Model — AuthorityGrant, Mandate, TypedScope, payload_hash)"
-  - "ADR-0019 (Authority Grant Minting and Mandate Persistence Seam — broadening requires a follow-up ADR)"
+  - "ADR-0014 (Constitutional Object Model: AuthorityGrant, Mandate, MandateStatus, TypedScope)"
+  - "ADR-0019 (Authority Grant Minting and Mandate Persistence Seam)"
   - "ADR-0083 (proposed) (InstitutionalDomain and DomainPolicy runtime root)"
-  - "docs/architecture/IDENTITY_SEMANTICS.md (institutional authority is a governance decision, never one key's signature)"
-  - "icn/apps/governance/src/grant_minting.rs (derive_grants_for_accepted_proposal)"
-  - "icn/apps/governance/src/mandate_gate.rs (DefaultMandateGate)"
-  - "icn/apps/governance/src/decision_commitment.rs (decision-commitment verification)"
-  - "icn/apps/governance/src/domain_policy_adoption.rs (the two gated consumers)"
+  - "ADR-0092 (proposed, PR #2935) (Context Authority Log convergence)"
+  - "docs/architecture/IDENTITY_SEMANTICS.md"
+  - "icn/apps/governance/src/grant_minting.rs"
+  - "icn/apps/governance/src/mandate_gate.rs"
+  - "icn/apps/governance/src/domain_policy_adoption.rs"
+  - "icn/apps/governance/src/close_journal.rs"
 ---
 
 # ADR 0093: Specific-Action Authority Issuance for Institutional-Domain Acts
@@ -27,6 +28,9 @@ references:
 Proposed. This ADR is a design for maintainer review. Nothing here is implemented, and
 nothing here changes production issuance until it is accepted.
 
+Revision 2 incorporates an independent architecture review. Its BLOCKERs and FOLLOW_UPs are
+resolved below; its policy questions are listed under *Open maintainer decisions*.
+
 ## Context
 
 Two production acts are gated on ADR-0014 authority:
@@ -34,147 +38,193 @@ Two production acts are gated on ADR-0014 authority:
 - `adopt_domain_policy_gated`, which sets an `InstitutionalDomain`'s current policy;
 - `declare_institutional_domain_gated`, which creates an `InstitutionalDomain`.
 
-Each requires, through `DefaultMandateGate`:
-
-- an **Execution** `AuthorityGrant` to the actor;
-- a scope that binds the domain and the act token (`domain_policy:adopt` / `institutional_domain:declare`);
-- a mandate behind it whose proposal has committed to exactly the mandate's decision and payload.
+Each requires, through `DefaultMandateGate`, an **Execution** `AuthorityGrant` to the actor
+whose scope binds the domain and the act token (`domain_policy:adopt` /
+`institutional_domain:declare`).
 
 **No legitimate decision produces that authority today.**
 
 - `derive_grants_for_accepted_proposal` mints grants only for SDIS steward proposals, which yield Attestation-class grants.
-- Every other accepted proposal records a pending-grants mandate, which authorizes nothing.
-- ADR-0019 deliberately keeps the minting set small and requires a follow-up ADR to broaden it. That is this ADR.
-- So authority for these acts can currently exist only if written outside governance. The gates fail closed and must stay fail-closed until this ADR is decided.
+- ADR-0019 keeps the minting set small and requires a follow-up ADR to broaden it. That is this ADR.
+- Authority for these acts can currently exist only if written outside governance. The gates must stay fail-closed until this ADR is decided and implemented.
 
-**The consumers have a second gap.** Adoption does not compare the policy it is given with the decision that authorized it, and it never discharges the mandate. A grant obtained for one policy could therefore adopt another, repeatedly, until it expires.
+**Gaps on main that this design must close, not inherit:**
+
+1. **Content binding.** The gate never reads `Mandate.payload_hash`. Resolution returns the first matching mandate with no content filter. A consumer that compared fields after resolution could pick the wrong mandate, and would be comparing against data that is not bound to the decision.
+2. **Discharge shadowing.** Domain-target resolution returns at the first matched mandate's lifecycle failure. A discharged mandate would therefore block a later, valid mandate for the same executor and domain.
+3. **Mutable pointer.** `InstitutionalDomain.current_policy` is a mutable pointer written by a plain put, with no record of which authority set it. Replaying an old execution could silently revert a newer one.
+4. **Grantor.** The gate compares `scope.domain` with the request but never the grantor, so authority minted by one domain could name another.
+5. **Ungated declaration.** `declare_institutional_domain` is `pub` and ungated "for bootstrap … authority established out of band". That is operator sovereignty.
+
+**Dependency.** This ADR assumes decision-commitment verification: a mandate authorizes only when its proposal has committed to exactly the mandate's decision. That verification is implemented on a pending branch, not on main. Implementing this ADR requires it to land first.
 
 ## Decision (proposed)
 
 ### 1. Specific-action authority first
 
-The first issuance path is **specific-action authority**. An accepted proposal authorizes exactly
-one institutional act with exactly specified content, executed by a named executor.
+The first issuance path is **specific-action authority**. One accepted proposal authorizes
+exactly one institutional act with exactly specified content, performed by one named executor.
 
-Future shapes are acknowledged but **not** introduced here (see §9):
-- scoped discretionary authority;
-- continuing office or role authority;
-- conditional authority under institutional rules.
+Scoped discretionary, office/role and conditional authority are acknowledged and **not**
+introduced (§10).
 
 ### 2. Dedicated typed payloads
 
-The proposal payload gains two dedicated variants. Names and fields may be refined in review:
+Two dedicated proposal payload variants. Names and fields may be refined in review:
 
 ```
 AdoptDomainPolicy {
-    domain: GovernanceDomainId,      // the InstitutionalDomain whose policy changes
-    policy_id: DomainPolicyId,       // content address of the exact policy text
-    executor: Did,                   // who may perform the adoption
-    valid_for: Seconds,              // truthful time bound (ADR-0019)
+    domain: GovernanceDomainId,
+    policy_id: DomainPolicyId,                 // content address of the exact policy text
+    expected_prior: Option<DomainPolicyId>,    // the current_policy this decision replaces
+    executor: <principal>,                     // see §6
+    valid_for: Seconds,
 }
 DeclareInstitutionalDomain {
     domain: GovernanceDomainId,
     owning_entity_class: BootstrapEntityType,
     charter_ref: Option<CharterId>,
-    executor: Did,
+    executor: <principal>,
     valid_for: Seconds,
 }
 ```
 
-There is **no** generic "grant authority" payload. Each new act class needs its own variant
-and its own ADR-level justification. That is the ADR-0019 "small on purpose" rule applied
-again.
+There is no generic "grant authority" payload. Each new act class needs its own variant and
+its own ADR-level justification.
 
-### 3. Exact action-content binding
+The gate's class-level `proposal_class` tokens for these acts ("DomainPolicy",
+"InstitutionalDomain") are discretionary scope and are removed for these acts.
 
-On acceptance, the derive seam mints **one** Execution grant to `executor`:
-- scope `{domain, action_kind: [<act token>]}`;
-- validity `now .. now + valid_for`;
-- provenance = the decision.
+### 3. Action commitment (exact content binding)
 
-The mandate's `payload_hash` already binds the mandate to the payload (ADR-0014). The consumer
-must additionally check the requested act against the **accepted payload**, not only the act
-token:
-- adoption requires `policy.id == payload.policy_id` and `policy.domain_id == payload.domain`;
-- declaration requires the full `(domain, owning_entity_class, charter_ref)` tuple.
+**What it is.** Each specific-action mandate carries an **action commitment**: a fixed-layout,
+domain-separated blake3 hash over:
 
-A substituted action is refused even when every other check passes.
+- a version and domain-separation tag (e.g. `icn/specific-action/v1`);
+- the act token;
+- the target domain;
+- the act content:
+  - adoption: `policy_id` and `expected_prior`;
+  - declaration: `owning_entity_class` and `charter_ref`.
 
-The gate's `proposal_class` tokens for these acts ("DomainPolicy", "InstitutionalDomain") are a
-class-level binding. Class-level binding is discretionary scope (§9), so they are removed for these acts.
+**Encoding.** The layout is canonical and length-prefixed. It does **not** reuse the
+serde_json payload hash, because that hash depends on field order and changes when a field
+or serde attribute is added. Golden-vector tests pin the encoding (the canonical-encodings
+invariant).
 
-### 4. Named or explicitly authorized executors
+**How it is enforced.**
+- The commitment is stamped on the mandate at mint time.
+- The requesting act computes the same commitment from what it is about to do and passes it in the `MandateRequest`.
+- The resolver considers **only** mandates whose stamped commitment equals the requested one.
+- A substituted action therefore finds no authority. Holding several live mandates for one domain cannot select the wrong one.
 
-The executor is named in the payload, and the grant's grantee is that executor. A node
-operator, gateway or daemon identity is **never** an implicit executor or grantor:
-- the grantor is the deciding governance domain (ADR-0019);
-- ICN enforces the institution's allocation, it does not originate one.
+The commitment is shape-agnostic. A future discretionary scope can be expressed as a set of
+admissible commitments (§10).
 
-### 5. Durable, recoverable execution
+### 4. Grantor and scope binding
 
-The adoption or declaration itself is the execution of the mandate. It writes, durably and
-atomically with respect to recovery:
-- the act's effect (the `current_policy` pointer, or the declared domain record);
-- the mandate's transition to `Discharged`.
+- **At mint:** refuse when `payload.domain` differs from the deciding governance domain. A domain's decision cannot mint authority over another domain.
+- **At the gate:** for these acts, require `grant.grantor == scope.domain == request.domain`.
+- **Platform identities:** a node operator, gateway or daemon identity is never a grantor or an implicit executor.
 
-A crash between the two must be recoverable. The design follows the existing write-ahead
-close-journal pattern rather than introducing a new mechanism.
+### 5. Durable, recoverable, single execution
 
-### 6. Idempotent mandate discharge
+The act writes to two stores:
 
-A specific-action mandate is **single-use**:
-- After a successful act it is `Discharged`, and `DefaultMandateGate` already refuses discharged mandates.
-- Re-executing the identical act against an already-discharged mandate reports the prior result. It does not repeat the effect and does not fail.
-- A different act against it is refused.
+- the mandate and its effect record, in the receipt store (Db-A);
+- the domain record, in the governance state store (Db-B).
 
-### 7. Constitutive versus constituted authority
+Execution is a three-step protocol. It reuses existing objects and only the close journal's
+commit-boundary rule, not its replay-by-overwrite mechanics.
 
-- **Constituted authority** is authority exercised *within* an existing institution under its established rules. This ADR's adoption path is constituted authority.
-- **Constitutive authority** creates or re-founds the institution itself.
+1. **Claim (Db-A, one transaction).** Move the mandate `Pending → InProgress`, stamp an execution id, and reserve the act's `InstitutionalEffectRecord` identity (already transactionally unique per proposal and effect kind). A second concurrent execution fails the claim.
+2. **Apply (Db-B, compare-and-put).** Apply the effect only if the domain is in the expected prior state:
+   - adoption: `current_policy == expected_prior`;
+   - declaration: the domain is absent.
+   The domain record also records the mandate that set it.
+3. **Discharge (Db-A, one transaction).** Move `InProgress → Discharged`, revoke the mandate's grant (`revoked_at`), and complete the effect record.
 
-Declaring an `InstitutionalDomain` sits at the boundary: the domain being declared does not yet hold authority. This ADR proposes:
-- declaration is decided by the governance domain that will *become* the institutional domain (it must exist to hold a vote);
-- the deciding domain is the grantor.
+**Recovery.** An `InProgress` mandate rolls forward by **reading Db-B**:
+- if the domain already holds this mandate's effect, recovery discharges it;
+- if the precondition no longer holds, recovery records a refused execution and discharges it without applying anything.
 
-That choice is a maintainer decision (D6), not an agent inference.
+Recovery never re-applies an effect over newer state.
 
-### 8. Founding authority
+**Multi-writer.** Two processes writing the same stores are declared unsupported for this
+path. The claim transaction is the fence within one store.
 
-The first act of a new institution cannot be authorized by authority the institution does not
-yet have. Founding authority is integrated with the existing genesis, charter and continuity
-mechanisms, not invented here. Concretely, the founding declaration and first policy adoption
-derive their legitimacy from the institution's genesis or charter ratification record.
+### 6. Executor
 
-The exact linkage is a maintainer decision (D11). It must not resolve to "the node operator decides".
+- **Executor and deadline fields.** The executor is set in `Mandate.executor`, and the mandate deadline is `now + valid_for`. The mandate deadline is the gate's authoritative expiry.
+- **Principal typing.**
+  - Legacy-mode domains: the executor is a legacy principal.
+  - Subject-mode domains refuse legacy principals (ADR-0092). This path applies to legacy-mode domains until a principal-typed executor is specified (open decision D12).
+- **Losing standing.** Live specific-action grants are revoked by a member-removal or freeze decision against the executor, or by an explicit revoke-mandate decision.
+- **Replacement.** Replacing an executor is a new decision, and it also revokes the old mandate. Two live mandates with different content can never both execute.
 
-### 9. Future authority shapes (acknowledged, not introduced)
+### 7. Idempotent, non-shadowing discharge
 
-- **Scoped discretionary authority:** a class of acts bounded by a typed scope and institutional constraints (for example, an allowlist of policy ids). It needs a TypedScope extension and its own ADR.
-- **Continuing office/role authority:** authority attached to a `RoleAssignment` for its tenure. It needs role-to-grant minting, revocation at tenure end, and Role grantees or targets in the gate (ADR-0014 future work).
-- **Conditional authority:** authority established by institutional rules (charter clauses, policy evaluation). It needs a charter authority-clause schema and an evaluator.
+- **Terminal state.** A discharged mandate's grant is revoked, so the gate no longer lists it.
+- **No early return.** Resolution skips dead or uncommitted candidates and keeps looking, so a discharged mandate cannot shadow later valid authority.
+- **Replay.** Re-requesting an act that already executed returns the prior result from its `InstitutionalEffectRecord`, the durable execution receipt. The gate is not involved.
+
+### 8. Stale execution
+
+A decision records `expected_prior`. If the domain has moved on by execution time (another
+policy adopted, or the domain declared meanwhile), the compare-and-put refuses. A later
+decision does not silently override an earlier one. Whether an institution may instead want
+"latest decision supersedes" is open decision D13.
+
+### 9. Constitutive versus constituted authority; founding
+
+- **Constituted authority** is exercised within an existing institution under its established rules. Adoption is constituted authority.
+- **Constitutive authority** creates or re-founds the institution itself. Declaration is constitutive.
+
+**Stated limit.** The existing genesis and charter mechanisms do not yet supply
+non-operator founding authority:
+
+- governance-domain creation and charter activation are gated by capability scope;
+- charter ratification counts founders without verifying their signatures.
+
+Until a founding mechanism is chosen (D11), a declaration decided by the future domain's own
+electorate inherits whatever authority set up that electorate. That is operator-mediated
+founding, and this ADR does not claim otherwise.
+
+**Ungated declaration.** The ungated `declare_institutional_domain` is retired from
+production surfaces. It becomes test-only, or it is gated by the chosen founding mechanism.
+
+### 10. Future authority shapes (acknowledged, not introduced)
+
+- **Scoped discretionary authority:** a set of admissible action commitments bounded by institutional constraints. Needs its own ADR.
+- **Continuing office/role authority:** needs role-to-grant minting, revocation at tenure end, and `Grantee::Role` / `MandateTarget::Role` support in the gate (which currently refuses Role).
+- **Conditional authority:** needs a charter authority-clause schema and an evaluator.
 
 None of these may be emulated by widening the specific-action path.
 
+### 11. Relationship to ADR-0092
+
+Under the Context Authority Log direction, institutional authority transitions move to
+CAL-bound domains. This ADR is a **legacy-mode bridge**.
+
+When a domain is sealed for cutover, pending specific-action mandates are refused (stale
+execution across a cutover), never carried over. The governance meaning stays in the app
+layer and does not enter kernel crates.
+
 ## Consequences
 
-- The two gated consumers gain a legitimate source of authority for the first time, under a single-decision, single-act model.
-- A full decision-to-execution integration test becomes possible: create, open, vote, close, mint, adopt, discharge, restart, refuse a repeat.
-- Until this ADR is accepted and implemented, the consumers remain fail-closed. Component tests that seed grants stay component evidence only.
+- **Legitimate authority.** The two gated consumers gain a legitimate source of authority under a one-decision, one-act model. Content binding, grantor binding, single execution and crash recovery are all specified.
+- **End-to-end testing.** A full decision-to-execution test becomes possible: decide, mint, adopt, discharge, restart, replay, refusal of substitution, refusal of stale execution.
+- **Until then.** Until acceptance and implementation, the consumers stay fail-closed, and component tests that seed grants remain component evidence only.
 
 ## Open maintainer decisions
 
-The S31 issuance inventory carries the recommendations. The directions adopted above settle D1–D5 as proposals; the rest remain open.
-
 | # | Decision | This draft |
 |---|---|---|
-| D1 | First authority shape | Specific-action (§1) |
-| D2 | Vehicle | This ADR |
-| D3 | Payload form | Dedicated typed variants (§2) |
-| D4 | Execution model | Grant to a named executor, checked at the gate (§4) |
-| D5 | Consumer binding and reuse | Exact content binding plus single-use discharge (§3, §6) |
-| D6 | Who may decide a declaration | **Open.** Draft proposes the future institutional domain itself (§7) |
-| D7 | Charter-direct grants (`granted_by: None`) | **Open.** Draft keeps them skipped |
-| D8 | Office/role authority | Deferred (§9) |
-| D9 | Class-level tokens for these acts | Removed (§3) |
-| D10 | ADR-0083 status | **Open:** accept ADR-0083 with an amendment pointing here, or supersede its authority section |
-| D11 | Founding-act linkage to genesis/charter | **Open** (§8) |
+| D1–D5, D9 | Shape, vehicle, payload form, execution model, binding/reuse, class tokens | As proposed above |
+| D6 | Who may decide a declaration | Open. Draft: the future domain's own electorate, subject to §9's stated limit |
+| D7 | Charter-direct grants (`granted_by: None`) | Open. Draft keeps them skipped |
+| D8 | Office/role authority | Deferred (§10) |
+| D10 | ADR-0083 status | Open: accept with an amendment pointing here, or supersede its authority section |
+| D11 | Founding mechanism | Open: verified charter founder quorum, CAL genesis, or state operator-mediated founding as a limit |
+| D12 | Executor typing for Subject-mode domains | Open |
+| D13 | Stale execution: refuse, or later decision supersedes | Draft: refuse (§8) |
