@@ -42,7 +42,16 @@ fn now() -> u64 {
     icn_time::current_timestamp_secs()
 }
 
+/// Spawn as production startup does: the actor, then startup recovery (which
+/// releases the scheduler).
 async fn spawn_actor(store: Arc<SledStore>) -> GovernanceHandle {
+    let handle = spawn_actor_unrecovered(store).await;
+    handle.recover_incomplete_closes().await;
+    handle
+}
+
+/// The actor alone, before startup recovery has run.
+async fn spawn_actor_unrecovered(store: Arc<SledStore>) -> GovernanceHandle {
     let node = new_did();
     let gossip = GossipActor::spawn(node.clone(), None);
     gossip.write().await.create_topic(Topic::new(
@@ -351,6 +360,9 @@ use icn_store::{ContentHash, ReplicaMetadata, Store};
 #[derive(Default)]
 struct RecordingReceipts {
     governance: Mutex<Vec<GovernanceDecisionReceipt>>,
+    /// v3 decision receipts, recorded here rather than through the trait's
+    /// fail-closed opaque-storage default, so their absence is observable.
+    decisions_v3: Mutex<Vec<icn_governance::GovernanceDecisionReceiptV3>>,
     effects: Mutex<Vec<InstitutionalEffectRecord>>,
     mandates: Mutex<Vec<icn_governance::Mandate>>,
     grants: Mutex<HashMap<icn_governance::AuthorityGrantId, icn_governance::AuthorityGrant>>,
@@ -368,6 +380,14 @@ impl RecordingReceipts {
 }
 
 impl GovernanceReceiptBackend for RecordingReceipts {
+    fn put_governance_decision_v3(
+        &self,
+        receipt: &icn_governance::GovernanceDecisionReceiptV3,
+        _recorded_at: u64,
+    ) -> Result<(), String> {
+        self.decisions_v3.lock().unwrap().push(receipt.clone());
+        Ok(())
+    }
     fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<(), String> {
         let mut g = self.governance.lock().unwrap();
         if !g.iter().any(|r| r.decision_hash == receipt.decision_hash) {
@@ -661,6 +681,7 @@ async fn the_scheduler_retries_through_a_read_outage_and_then_closes() {
     .unwrap();
     let receipts = Arc::new(RecordingReceipts::default());
     handle.install_receipt_store(receipts.clone()).await;
+    handle.recover_incomplete_closes().await;
 
     // Past at least one scheduler tick during the outage: nothing written.
     tokio::time::sleep(Duration::from_secs(12)).await;
@@ -709,6 +730,7 @@ async fn a_close_that_fails_after_the_scheduler_check_is_retried_not_lost() {
     .unwrap();
     let receipts = Arc::new(RecordingReceipts::default());
     handle.install_receipt_store(receipts.clone()).await;
+    handle.recover_incomplete_closes().await;
 
     // The first tick's close fails after the cancel point.
     tokio::time::sleep(Duration::from_secs(5)).await;
@@ -722,5 +744,199 @@ async fn a_close_that_fails_after_the_scheduler_check_is_retried_not_lost() {
         matches!(s, ProposalState::Accepted { .. }),
         "the retry was lost: {s:?}"
     );
+    handle.shutdown().await;
+}
+
+#[tokio::test]
+async fn without_a_gateway_the_released_scheduler_still_closes_overdue_proposals() {
+    // Gateway disabled by configuration: no evidence path is provisioned, so
+    // the supervisor declares it and scheduled closes proceed as before.
+    let tmp = tempfile::tempdir().unwrap();
+    let alice = new_did();
+    store_with_domain(tmp.path(), std::slice::from_ref(&alice)).await;
+    let t = now();
+    let id = plant_open(tmp.path(), &alice, t - 7200, t - 60);
+    plant_vote(tmp.path(), &id, &alice, VoteChoice::For);
+
+    let handle = spawn_actor_unrecovered(Arc::new(SledStore::open(tmp.path()).unwrap())).await;
+    assert_eq!(
+        handle.declare_evidence_not_provisioned(),
+        icn_governance_actor::EvidenceReadiness::NotProvisioned
+    );
+    let s = wait_closed(&handle, &id).await;
+    assert!(matches!(s, ProposalState::Accepted { .. }), "{s:?}");
+    handle.shutdown().await;
+}
+
+#[tokio::test]
+async fn a_rehydrated_close_waits_for_startup_recovery_before_acting() {
+    // Production startup order: the actor spawns (rehydrating its schedule)
+    // well before the gateway installs the receipt store and then runs
+    // `recover_incomplete_closes`. An overdue close must not run in that
+    // window: an accepted close with no receipt store installed would finish
+    // without writing its decision receipts (the store-gated artifacts are
+    // skipped, not journaled), and nothing would remain to replay.
+    let tmp = tempfile::tempdir().unwrap();
+    let alice = new_did();
+    store_with_domain(tmp.path(), std::slice::from_ref(&alice)).await;
+    let t = now();
+    let id = plant_open(tmp.path(), &alice, t - 7200, t - 60);
+    plant_vote(tmp.path(), &id, &alice, VoteChoice::For);
+
+    let handle = spawn_actor_unrecovered(Arc::new(SledStore::open(tmp.path()).unwrap())).await;
+    // Past at least one scheduler tick, before startup recovery: no close.
+    tokio::time::sleep(Duration::from_secs(12)).await;
+    let s = state_of(&handle, &id).await;
+    assert!(s.is_open(), "closed before startup recovery: {s:?}");
+
+    let receipts = Arc::new(RecordingReceipts::default());
+    handle.install_receipt_store(receipts.clone()).await;
+    handle.recover_incomplete_closes().await;
+    let s = wait_closed(&handle, &id).await;
+    assert!(matches!(s, ProposalState::Accepted { .. }), "{s:?}");
+    // What an accepted declarative (Text) decision writes on a scheduled
+    // close: exactly its ADR-0014 mandate record, which confers no authority
+    // (zero grants). No v1 chain receipt (execution-required payloads only),
+    // no v3 receipt (a scheduled close presents no capability scope), no
+    // institutional effect (Text has none), no authority grant.
+    let mandates = receipts.mandates.lock().unwrap().clone();
+    assert_eq!(
+        mandates.len(),
+        1,
+        "exactly one mandate record: {mandates:?}"
+    );
+    assert_eq!(mandates[0].decision.proposal_id, id.0);
+    assert!(
+        mandates[0].grants.is_empty(),
+        "a Text mandate confers no grant"
+    );
+    assert!(receipts.grants.lock().unwrap().is_empty());
+    assert!(receipts.governance.lock().unwrap().is_empty());
+    assert!(receipts.decisions_v3.lock().unwrap().is_empty());
+    assert!(receipts.effects.lock().unwrap().is_empty());
+    handle.shutdown().await;
+}
+
+fn evidence_refused(r: anyhow::Result<()>) -> bool {
+    matches!(
+        r.err().and_then(|e| e.downcast::<GovernanceError>().ok()),
+        Some(GovernanceError::EvidenceUnavailable(_))
+    )
+}
+
+#[tokio::test]
+async fn a_failed_evidence_path_holds_scheduled_work_and_refuses_terminal_transitions() {
+    // A configured evidence path failed before recovery: no decision may
+    // complete without its evidence, by the scheduler or by hand, while
+    // unrelated governance activity continues.
+    let tmp = tempfile::tempdir().unwrap();
+    let alice = new_did();
+    store_with_domain(tmp.path(), std::slice::from_ref(&alice)).await;
+    let t = now();
+    let overdue = plant_open(tmp.path(), &alice, t - 7200, t - 60);
+    plant_vote(tmp.path(), &overdue, &alice, VoteChoice::For);
+    let live = plant_open(tmp.path(), &alice, t - 60, t + 3600);
+
+    let handle = spawn_actor_unrecovered(Arc::new(SledStore::open(tmp.path()).unwrap())).await;
+    let deliberating = GovernanceOps::create_proposal(
+        &handle,
+        GovernanceDomainId(DOMAIN.to_string()),
+        "deliberating".into(),
+        "d".into(),
+        ProposalPayload::Text { body: "b".into() },
+        icn_governance::ProposalScope::Local,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        handle.mark_evidence_unavailable(),
+        icn_governance_actor::EvidenceReadiness::Failed
+    );
+    // Not downgraded or upgraded by a later disabled-declaration.
+    assert_eq!(
+        handle.declare_evidence_not_provisioned(),
+        icn_governance_actor::EvidenceReadiness::Failed
+    );
+
+    // Past at least one scheduler tick: the overdue proposal is preserved.
+    tokio::time::sleep(Duration::from_secs(12)).await;
+    assert!(state_of(&handle, &overdue).await.is_open());
+
+    // Every terminal transition path is refused, typed.
+    assert!(evidence_refused(
+        handle
+            .submit(GovernanceCommand::CloseProposal {
+                proposal_id: overdue.clone(),
+                eligible_voters: None,
+                excluded_delegators: None,
+                capability_scope: None,
+            })
+            .await
+    ));
+    assert!(evidence_refused(scheduled_close(&handle, &overdue).await));
+    assert!(evidence_refused(
+        handle
+            .submit(GovernanceCommand::VetoProposal {
+                proposal_id: live.clone(),
+                reason: "r".into(),
+            })
+            .await
+    ));
+    assert!(evidence_refused(
+        handle
+            .submit(GovernanceCommand::ForceCloseProposal {
+                proposal_id: live.clone(),
+                forced_outcome: icn_governance::ForcedOutcome::Accept,
+                reason: "r".into(),
+            })
+            .await
+    ));
+    assert!(state_of(&handle, &overdue).await.is_open());
+    assert!(state_of(&handle, &live).await.is_open());
+
+    // Unrelated activity continues: a vote inside the live window, and a
+    // scheduled end of deliberation (it writes no evidence) still opens voting.
+    vote(&handle, &live, &alice, VoteChoice::For).await.unwrap();
+    handle
+        .start_deliberation(deliberating.clone(), 1)
+        .await
+        .unwrap();
+    let deadline = tokio::time::Instant::now() + CLOSE_WAIT;
+    let opened = loop {
+        let s = state_of(&handle, &deliberating).await;
+        if s.is_open() || tokio::time::Instant::now() >= deadline {
+            break s;
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    };
+    assert!(
+        opened.is_open(),
+        "deliberation end must not be held: {opened:?}"
+    );
+    assert!(state_of(&handle, &overdue).await.is_open());
+    handle.shutdown().await;
+}
+
+#[tokio::test]
+async fn a_failure_after_recovery_keeps_governance_ready_and_closing_with_evidence() {
+    let tmp = tempfile::tempdir().unwrap();
+    let alice = new_did();
+    store_with_domain(tmp.path(), std::slice::from_ref(&alice)).await;
+    let t = now();
+    let id = plant_open(tmp.path(), &alice, t - 7200, t - 60);
+    plant_vote(tmp.path(), &id, &alice, VoteChoice::For);
+
+    let handle = spawn_actor_unrecovered(Arc::new(SledStore::open(tmp.path()).unwrap())).await;
+    let receipts = Arc::new(RecordingReceipts::default());
+    handle.install_receipt_store(receipts.clone()).await;
+    handle.recover_incomplete_closes().await;
+    // A later API failure does not downgrade established evidence.
+    assert_eq!(
+        handle.mark_evidence_unavailable(),
+        icn_governance_actor::EvidenceReadiness::Ready
+    );
+    let s = wait_closed(&handle, &id).await;
+    assert!(matches!(s, ProposalState::Accepted { .. }), "{s:?}");
+    assert!(receipts.writes() > 0);
     handle.shutdown().await;
 }

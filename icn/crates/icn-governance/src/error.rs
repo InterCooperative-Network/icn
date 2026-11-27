@@ -56,6 +56,12 @@ pub enum GovernanceError {
     #[error("close not due: {0}")]
     CloseNotDue(String),
 
+    /// The deployment's institutional evidence path (receipt store, dispatch
+    /// evidence, close recovery) was configured but failed to initialize, so a
+    /// terminal transition would complete without its required evidence
+    #[error("governance evidence unavailable: {0}")]
+    EvidenceUnavailable(String),
+
     /// A requested period would put a deadline beyond what governance state can
     /// represent (a technical limit, not an institutional voting duration)
     #[error("unrepresentable deadline: {0}")]

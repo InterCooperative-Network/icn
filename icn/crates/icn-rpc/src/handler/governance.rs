@@ -781,7 +781,26 @@ pub async fn handle_governance_proposal_close(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::internal_error(id, e),
+        Err(e) => close_refusal_response(id, e),
+    }
+}
+
+/// The RPC response for a refused `governance.proposal.close`.
+///
+/// A close refused because this node's governance evidence path is unavailable
+/// is `SERVICE_UNAVAILABLE` with a fixed message (the internal cause is not
+/// client-facing); anything else stays an opaque internal error.
+fn close_refusal_response(id: u64, e: anyhow::Error) -> RpcResponse {
+    // Aliased from the module-level import (see `vote_refusal_response`).
+    use self::GovernanceError as G;
+    match e.downcast_ref::<G>() {
+        Some(G::EvidenceUnavailable(_)) => RpcResponse::error(
+            id,
+            crate::error_codes::SERVICE_UNAVAILABLE,
+            "Governance decision evidence is unavailable on this node; the proposal was not closed"
+                .to_string(),
+        ),
+        _ => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -1116,6 +1135,8 @@ mod delegation_auth_tests {
         delegations: Arc<Mutex<Vec<Delegation>>>,
         /// Scripted outcome of the next `cast_vote`: `Some(e)` refuses with `e`.
         vote_refusal: Arc<Mutex<Option<anyhow::Error>>>,
+        /// Scripted outcome of the next `close_proposal`: `Some(e)` refuses with `e`.
+        close_refusal: Arc<Mutex<Option<anyhow::Error>>>,
     }
 
     #[async_trait::async_trait]
@@ -1256,7 +1277,10 @@ mod delegation_auth_tests {
             &self,
             _proposal_id: icn_governance::ProposalId,
         ) -> anyhow::Result<()> {
-            unimplemented!()
+            match self.close_refusal.lock().unwrap().take() {
+                Some(e) => Err(e),
+                None => Ok(()),
+            }
         }
         async fn update_domain_membership(
             &self,
@@ -1374,6 +1398,45 @@ mod delegation_auth_tests {
         // Control: an accepted vote is a success.
         let state = test_state(RecordingGovernance::default());
         let resp = handle_governance_vote_cast(1, &params, &state, Some(&ctx)).await;
+        assert!(resp.error.is_none(), "{:?}", resp.error);
+    }
+
+    #[tokio::test]
+    async fn close_maps_evidence_unavailable_to_service_unavailable_only() {
+        use super::GovernanceError as G;
+        let ctx = RpcContext::new(new_did(), None, vec![]);
+        let params = serde_json::json!({ "proposal_id": "p" });
+        let cases: Vec<(anyhow::Error, i32)> = vec![
+            (
+                anyhow::Error::from(G::EvidenceUnavailable("gateway_store flock".into()))
+                    .context("close"),
+                crate::error_codes::SERVICE_UNAVAILABLE,
+            ),
+            (
+                G::ProposalNotFound("p".into()).into(),
+                crate::error_codes::INTERNAL_ERROR,
+            ),
+            (
+                anyhow::anyhow!("store failure"),
+                crate::error_codes::INTERNAL_ERROR,
+            ),
+        ];
+        for (refusal, want) in cases {
+            let gov = RecordingGovernance::default();
+            *gov.close_refusal.lock().unwrap() = Some(refusal);
+            let state = test_state(gov);
+            let resp = handle_governance_proposal_close(1, &params, &state, Some(&ctx)).await;
+            let err = resp.error.expect("refusal must be an error response");
+            assert_eq!(err.code, want, "message: {}", err.message);
+            assert!(
+                !err.message.contains("flock"),
+                "internal cause leaked: {}",
+                err.message
+            );
+        }
+        // Control: an accepted close is a success.
+        let state = test_state(RecordingGovernance::default());
+        let resp = handle_governance_proposal_close(1, &params, &state, Some(&ctx)).await;
         assert!(resp.error.is_none(), "{:?}", resp.error);
     }
 

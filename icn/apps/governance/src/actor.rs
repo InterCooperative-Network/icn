@@ -96,6 +96,34 @@ impl Ord for ScheduledGovernanceEvent {
     }
 }
 
+/// Pop every due event and return those to dispatch now.
+///
+/// Events the evidence state holds (see [`EvidenceReadiness`]) are put back
+/// exactly as they were: same due instant, and never dispatched, so they
+/// consume no retry attempt. A held event never blocks a later due event that
+/// may run: every due entry is examined before any held one is re-queued.
+fn take_dispatchable(
+    heap: &mut BinaryHeap<Reverse<ScheduledGovernanceEvent>>,
+    now: Instant,
+    evidence: EvidenceReadiness,
+) -> Vec<ScheduledEvent> {
+    let mut dispatch = Vec::new();
+    let mut held = Vec::new();
+    while heap.peek().is_some_and(|Reverse(next)| next.at <= now) {
+        if let Some(Reverse(entry)) = heap.pop() {
+            if evidence.holds(&entry.event) {
+                held.push(entry);
+            } else {
+                dispatch.push(entry.event);
+            }
+        }
+    }
+    for entry in held {
+        heap.push(Reverse(entry));
+    }
+    dispatch
+}
+
 impl PartialOrd for ScheduledGovernanceEvent {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -338,6 +366,77 @@ pub struct GovernanceHandle {
     /// Read-only decision-commitment evidence over this actor's durable state
     /// and installed receipt store (verdicts only).
     commitments: crate::decision_commitment::ActorDecisionCommitments,
+    /// Institutional evidence readiness, shared with the actor and the
+    /// scheduler task (see [`EvidenceReadiness`]).
+    evidence: Arc<std::sync::atomic::AtomicU8>,
+}
+
+/// Whether the institutional evidence path a terminal transition writes to —
+/// the receipt store and dispatch-evidence sink, with incomplete closes
+/// replayed — is in place.
+///
+/// The scheduler dispatches only in `Ready` or `NotProvisioned`; terminal
+/// transitions (close, veto, force-close) are refused only in `Failed`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum EvidenceReadiness {
+    /// Startup: the evidence path has not been established yet.
+    Pending = 0,
+    /// Sinks installed and startup close recovery has run.
+    Ready = 1,
+    /// The deployment runs no evidence path (gateway disabled by
+    /// configuration). Governance proceeds as before; no receipt-backed
+    /// guarantee is claimed.
+    NotProvisioned = 2,
+    /// The evidence path was configured but failed to initialize. Scheduled
+    /// work is held and terminal transitions are refused, so no decision
+    /// completes without its evidence.
+    Failed = 3,
+}
+
+impl EvidenceReadiness {
+    fn from_u8(v: u8) -> Self {
+        match v {
+            1 => Self::Ready,
+            2 => Self::NotProvisioned,
+            3 => Self::Failed,
+            _ => Self::Pending,
+        }
+    }
+
+    fn load(cell: &std::sync::atomic::AtomicU8) -> Self {
+        Self::from_u8(cell.load(std::sync::atomic::Ordering::Acquire))
+    }
+
+    /// Whether the scheduler holds `event` rather than dispatching it.
+    ///
+    /// `Pending` holds everything until the evidence path is settled.
+    /// `Failed` holds only scheduled closes (the evidence-bearing transition,
+    /// which the actor would refuse anyway); ending deliberation writes no
+    /// evidence and proceeds.
+    fn holds(self, event: &ScheduledEvent) -> bool {
+        match self {
+            Self::Pending => true,
+            Self::Failed => matches!(event, ScheduledEvent::CloseVoting { .. }),
+            Self::Ready | Self::NotProvisioned => false,
+        }
+    }
+
+    /// Leave `Pending` for `to`; any other state is final for startup and is
+    /// kept (in particular `Ready` is never downgraded). Returns the state
+    /// in effect afterwards.
+    fn settle(cell: &std::sync::atomic::AtomicU8, to: Self) -> Self {
+        use std::sync::atomic::Ordering;
+        match cell.compare_exchange(
+            Self::Pending as u8,
+            to as u8,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => to,
+            Err(current) => Self::from_u8(current),
+        }
+    }
 }
 
 impl GovernanceHandle {
@@ -668,8 +767,35 @@ impl GovernanceHandle {
     /// can be installed in between — see the gateway `server.rs` wiring.
     ///
     /// A no-op when there is nothing to recover.
+    ///
+    /// Also releases the scheduler: no scheduled event (including closes
+    /// rehydrated at spawn) is dispatched until this has run.
     pub async fn recover_incomplete_closes(&self) {
         self.inner.read().await.recover_incomplete_closes().await;
+        self.evidence.store(
+            EvidenceReadiness::Ready as u8,
+            std::sync::atomic::Ordering::Release,
+        );
+    }
+
+    /// Current institutional evidence readiness.
+    pub fn evidence_readiness(&self) -> EvidenceReadiness {
+        EvidenceReadiness::load(&self.evidence)
+    }
+
+    /// The deployment runs no evidence path (gateway disabled by
+    /// configuration): scheduled work proceeds without it, as it always has.
+    /// Never overrides an already-settled state. Returns the state in effect.
+    pub fn declare_evidence_not_provisioned(&self) -> EvidenceReadiness {
+        EvidenceReadiness::settle(&self.evidence, EvidenceReadiness::NotProvisioned)
+    }
+
+    /// The configured evidence path failed before startup recovery: hold
+    /// scheduled work and refuse terminal transitions. A no-op once `Ready`
+    /// (the sinks are installed and owned by this actor, so a later API
+    /// failure does not affect them). Returns the state in effect.
+    pub fn mark_evidence_unavailable(&self) -> EvidenceReadiness {
+        EvidenceReadiness::settle(&self.evidence, EvidenceReadiness::Failed)
     }
 
     /// Durable close intents that contradict their proposal's stored terminal
@@ -1328,6 +1454,8 @@ pub struct GovernanceActor {
     /// (proposal_id, effect_kind) keeps this safe when the HTTP handler
     /// also invokes emission after the actor-backed close returns.
     receipt_store: Option<Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>>,
+    /// Shared with the handle; see [`EvidenceReadiness`].
+    evidence: Arc<std::sync::atomic::AtomicU8>,
     /// Durable per-`(author, domain)` sequence source for signed governance emission (#2469).
     ///
     /// Consumed only on the emission path, and only after an operation has been found
@@ -1467,6 +1595,11 @@ impl GovernanceActor {
         // The scheduler heap is in memory, so a restart would otherwise drop every
         // pending close and leave Open proposals Open past their deadline.
         // Rebuild it from durable proposal state.
+        // Evidence readiness starts Pending: the scheduler holds until the
+        // deployment settles it (startup recovery, or the supervisor).
+        let evidence = Arc::new(std::sync::atomic::AtomicU8::new(
+            EvidenceReadiness::Pending as u8,
+        ));
         let event_scheduler = Arc::new(RwLock::new(rehydrate_schedule(
             store.as_ref(),
             Instant::now(),
@@ -1489,6 +1622,7 @@ impl GovernanceActor {
             executor: None,
             action_item_store: None,
             receipt_store: None,
+            evidence: evidence.clone(),
             replication_sequences,
             signing_key_did,
         };
@@ -1506,11 +1640,13 @@ impl GovernanceActor {
             scheduler_shutdown: Arc::new(std::sync::Mutex::new(Some(shutdown_tx))),
             scheduler_task: scheduler_task_slot.clone(),
             commitments: commitments_source,
+            evidence: evidence.clone(),
         };
 
         // Spawn background timer task for scheduled governance events
         let handle_clone = handle.clone();
         let scheduler_clone = event_scheduler.clone();
+        let scheduler_evidence = evidence.clone();
         let scheduler_join = tokio::spawn(async move {
             let mut interval = tokio::time::interval(SCHEDULER_INTERVAL);
             // Consecutive failed dispatches per proposal, for retry backoff.
@@ -1524,22 +1660,13 @@ impl GovernanceActor {
                         break;
                     }
                     _ = interval.tick() => {
-                        // Check for expired events
-                        let now = Instant::now();
-                        let mut expired_events = Vec::new();
-
-                        {
-                            let mut scheduler = scheduler_clone.write().await;
-                            while let Some(Reverse(scheduled)) = scheduler.peek() {
-                                if scheduled.at <= now {
-                                    // SAFETY: We just peeked and confirmed an element exists
-                                    #[allow(clippy::unwrap_used)]
-                                    expired_events.push(scheduler.pop().unwrap().0.event.clone());
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
+                        // Due events the evidence state allows; held ones stay
+                        // queued untouched (see `take_dispatchable`).
+                        let expired_events = take_dispatchable(
+                            &mut *scheduler_clone.write().await,
+                            Instant::now(),
+                            EvidenceReadiness::load(&scheduler_evidence),
+                        );
 
                         // Process expired events.
                         // Note: Command handlers validate proposal state before executing.
@@ -2198,6 +2325,23 @@ impl GovernanceActor {
             }
             other => other,
         };
+        // A terminal transition writes institutional evidence. Where the
+        // configured evidence path failed to initialize, refuse rather than
+        // complete the decision without it.
+        if matches!(
+            cmd,
+            GovernanceCommand::CloseProposal { .. }
+                | GovernanceCommand::VetoProposal { .. }
+                | GovernanceCommand::ForceCloseProposal { .. }
+        ) && EvidenceReadiness::load(&self.evidence) == EvidenceReadiness::Failed
+        {
+            return Err(icn_governance::GovernanceError::EvidenceUnavailable(
+                "the configured receipt/evidence path failed to initialize; \
+                 terminal transitions are refused until it is available"
+                    .to_string(),
+            )
+            .into());
+        }
         match cmd {
             // Resolved into CloseProposal above; never dispatched as itself.
             GovernanceCommand::CloseScheduled { proposal_id } => {
@@ -4810,6 +4954,108 @@ mod tests {
     use super::*;
     use icn_governance::{Delegation, DelegationScope, GovernanceProfileId, Proposal};
     use icn_identity::KeyPair;
+
+    mod take_dispatchable_tests {
+        use super::*;
+
+        fn close(id: &str, at: Instant) -> Reverse<ScheduledGovernanceEvent> {
+            Reverse(ScheduledGovernanceEvent {
+                at,
+                event: ScheduledEvent::CloseVoting {
+                    proposal_id: ProposalId(id.into()),
+                },
+            })
+        }
+
+        fn end_delib(id: &str, at: Instant) -> Reverse<ScheduledGovernanceEvent> {
+            Reverse(ScheduledGovernanceEvent {
+                at,
+                event: ScheduledEvent::EndDeliberation {
+                    proposal_id: ProposalId(id.into()),
+                    voting_period_seconds: 60,
+                },
+            })
+        }
+
+        fn queued(heap: &BinaryHeap<Reverse<ScheduledGovernanceEvent>>) -> Vec<(String, Instant)> {
+            let mut v: Vec<_> = heap
+                .iter()
+                .map(|Reverse(e)| (event_proposal(&e.event).0.clone(), e.at))
+                .collect();
+            v.sort();
+            v
+        }
+
+        fn ids(events: &[ScheduledEvent]) -> Vec<String> {
+            events.iter().map(|e| event_proposal(e).0.clone()).collect()
+        }
+
+        #[test]
+        fn failed_holds_a_due_close_at_its_original_instant_without_dispatching_it() {
+            let now = Instant::now() + Duration::from_secs(3600);
+            let due = now - Duration::from_secs(30);
+            let mut heap = BinaryHeap::new();
+            heap.push(close("c", due));
+            let out = take_dispatchable(&mut heap, now, EvidenceReadiness::Failed);
+            assert!(out.is_empty(), "a held close is never dispatched: {out:?}");
+            assert_eq!(queued(&heap), vec![("c".to_string(), due)]);
+            // Still held on the next pass, still at its original instant.
+            let later = now + Duration::from_secs(10);
+            assert!(take_dispatchable(&mut heap, later, EvidenceReadiness::Failed).is_empty());
+            assert_eq!(queued(&heap), vec![("c".to_string(), due)]);
+        }
+
+        #[test]
+        fn a_held_close_does_not_starve_a_later_due_deliberation_end() {
+            let now = Instant::now() + Duration::from_secs(3600);
+            let mut heap = BinaryHeap::new();
+            heap.push(close("c", now - Duration::from_secs(20)));
+            heap.push(end_delib("d", now - Duration::from_secs(5)));
+            heap.push(close("future", now + Duration::from_secs(60)));
+            let out = take_dispatchable(&mut heap, now, EvidenceReadiness::Failed);
+            assert_eq!(ids(&out), vec!["d".to_string()]);
+            assert_eq!(
+                queued(&heap),
+                vec![
+                    ("c".to_string(), now - Duration::from_secs(20)),
+                    ("future".to_string(), now + Duration::from_secs(60)),
+                ]
+            );
+        }
+
+        #[test]
+        fn pending_holds_every_due_event_untouched() {
+            let now = Instant::now() + Duration::from_secs(3600);
+            let mut heap = BinaryHeap::new();
+            heap.push(close("c", now - Duration::from_secs(20)));
+            heap.push(end_delib("d", now - Duration::from_secs(5)));
+            let before = queued(&heap);
+            assert!(take_dispatchable(&mut heap, now, EvidenceReadiness::Pending).is_empty());
+            assert_eq!(queued(&heap), before);
+        }
+
+        #[test]
+        fn ready_and_not_provisioned_dispatch_due_events_in_order_and_keep_future_ones() {
+            for state in [EvidenceReadiness::Ready, EvidenceReadiness::NotProvisioned] {
+                let now = Instant::now() + Duration::from_secs(3600);
+                let mut heap = BinaryHeap::new();
+                heap.push(end_delib("d", now - Duration::from_secs(5)));
+                heap.push(close("c", now - Duration::from_secs(20)));
+                heap.push(close("future", now + Duration::from_secs(60)));
+                let out = take_dispatchable(&mut heap, now, state);
+                assert_eq!(
+                    ids(&out),
+                    vec!["c".to_string(), "d".to_string()],
+                    "{state:?}"
+                );
+                assert_eq!(
+                    queued(&heap),
+                    vec![("future".to_string(), now + Duration::from_secs(60))],
+                    "{state:?}"
+                );
+            }
+        }
+    }
 
     fn did() -> Did {
         KeyPair::generate().unwrap().did().clone()
