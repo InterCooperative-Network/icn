@@ -11,8 +11,8 @@
 use std::sync::Arc;
 
 use icn_governance::{
-    Delegation, DelegationId, DelegationScope, MembershipSource, ProposalPayload, ProposalState,
-    VoteChoice,
+    Delegation, DelegationId, DelegationScope, GovernanceError, MembershipSource, ProposalPayload,
+    ProposalState, VoteChoice,
 };
 
 use crate::context::RpcContext;
@@ -701,7 +701,9 @@ pub async fn handle_governance_vote_cast(
 /// The governance actor's typed admission refusals get specific codes with a
 /// fixed message; anything else stays an opaque internal error.
 fn vote_refusal_response(id: u64, e: anyhow::Error) -> RpcResponse {
-    use icn_governance::GovernanceError as G;
+    // Aliased from the module-level import: the meaning-firewall ratchet caps
+    // this crate's governance-crate import lines (see icn-core meaning_firewall).
+    use self::GovernanceError as G;
     match e.downcast_ref::<G>() {
         Some(G::ProposalNotFound(_)) => {
             RpcResponse::error(id, NOT_FOUND, "Proposal not found".to_string())
@@ -1308,7 +1310,7 @@ mod delegation_auth_tests {
     /// error codes; anything else stays an opaque internal error.
     #[tokio::test]
     async fn vote_cast_maps_typed_refusals_to_specific_codes() {
-        use icn_governance::GovernanceError as G;
+        use super::GovernanceError as G;
         let ctx = RpcContext::new(new_did(), None, vec![]);
         let params = serde_json::json!({ "proposal_id": "p", "choice": "for" });
         let cases: Vec<(anyhow::Error, i32)> = vec![
