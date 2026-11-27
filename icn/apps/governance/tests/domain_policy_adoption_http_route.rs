@@ -79,6 +79,34 @@ impl GovernanceReceiptBackend for TestBackend {
     ) -> Result<Option<GovernanceDecisionReceipt>, String> {
         Ok(None)
     }
+    /// One accepted v1 receipt per seeded mandate's decision, as a completed
+    /// close leaves behind (decision-commitment evidence).
+    fn list_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+        let mut out: Vec<GovernanceDecisionReceipt> = Vec::new();
+        for m in self
+            .mandates
+            .iter()
+            .filter(|m| m.decision.proposal_id == proposal_id)
+        {
+            if out
+                .iter()
+                .all(|r| r.decision_hash != m.decision.decision_hash)
+            {
+                out.push(GovernanceDecisionReceipt {
+                    proposal_id: proposal_id.into(),
+                    domain_id: GOV_DOMAIN.into(),
+                    outcome: icn_governance::proof::ProofOutcome::Accepted,
+                    vote_tally: icn_governance::VoteTally::new(1, 0, 0),
+                    vote_hash: [0u8; 32],
+                    decision_hash: m.decision.decision_hash,
+                });
+            }
+        }
+        Ok(out)
+    }
     fn put_allocation(&self, _: &AllocationReceipt) -> Result<Hash, String> {
         Ok([0u8; 32])
     }
@@ -160,10 +188,44 @@ fn adopt_grant(actor: Did, dom: &str, grant_id: AuthorityGrantId) -> AuthorityGr
     }
 }
 
-/// A live mandate backing `grant_id` (no deadline → live at any time).
+/// Governance domain of the proposal that `decision()` names.
+const GOV_DOMAIN: &str = "gov-route";
+
+/// The accepted proposal `decision()` names. Stored by `make_harness`, it is
+/// the decision commitment the gate requires before a mandate authorizes.
+fn committed_proposal() -> icn_governance::Proposal {
+    let mut p = icn_governance::Proposal::new(
+        GovernanceDomainId::new(GOV_DOMAIN),
+        fresh_did(),
+        "adopt policy".into(),
+        "fixture".into(),
+        icn_governance::ProposalPayload::Text {
+            body: "adopt the coop-alpha policy".into(),
+        },
+    );
+    p.id = icn_governance::ProposalId::new("prop-1");
+    p.state = icn_governance::ProposalState::Accepted { closed_at: 1 };
+    p
+}
+
+/// The mandate seam's payload hash (blake3 over the payload's JSON bytes).
+fn committed_payload_hash() -> Hash {
+    let bytes = serde_json::to_vec(&committed_proposal().payload).expect("payload json");
+    *blake3::hash(&bytes).as_bytes()
+}
+
+/// A live mandate backing `grant_id` (no deadline → live at any time), bound
+/// to the committed proposal's payload.
 fn backing_mandate(grant_id: AuthorityGrantId) -> Mandate {
-    Mandate::new(decision(), [9u8; 32], vec![grant_id], None, None, 0)
-        .expect("grant-bearing mandate is valid")
+    Mandate::new(
+        decision(),
+        committed_payload_hash(),
+        vec![grant_id],
+        None,
+        None,
+        0,
+    )
+    .expect("grant-bearing mandate is valid")
 }
 
 struct Harness {
@@ -174,6 +236,16 @@ struct Harness {
 /// Build a manager wired with the gate backend + a temp Sled
 /// `InstitutionalDomain` store, then return a `Test`-mode context.
 fn make_harness(backend: Arc<TestBackend>) -> Harness {
+    let h = make_harness_uncommitted(backend);
+    h.store
+        .save_proposal(&committed_proposal())
+        .expect("store the committed proposal");
+    h
+}
+
+/// Like [`make_harness`], without the committed proposal: a mandate here has
+/// no decision commitment behind it.
+fn make_harness_uncommitted(backend: Arc<TestBackend>) -> Harness {
     let store: Arc<dyn GovernanceStateStore> = Arc::new(SledGovernanceStateStore::new(Arc::new(
         icn_store::SledStore::temporary().expect("temp sled"),
     )));
@@ -757,4 +829,41 @@ async fn adopt_route_rejects_oversize_policy_content() {
         reloaded.current_policy().is_none(),
         "nothing may be adopted when the body is rejected"
     );
+}
+
+#[actix_web::test]
+async fn adopt_route_refuses_a_mandate_without_a_committed_decision() {
+    // Same grant and mandate as the success case, but no proposal record:
+    // the mandate's existence alone must not authorize adoption.
+    let caller = fresh_did();
+    let gid = AuthorityGrantId::new();
+    let grant = adopt_grant(caller.clone(), "coop-alpha", gid.clone());
+    let h = make_harness_uncommitted(TestBackend::new(vec![backing_mandate(gid)], vec![grant]));
+    seed_governance_domain(&h.ctx.manager, &caller, "coop-alpha").await;
+    h.ctx
+        .manager
+        .declare_institutional_domain(
+            GovernanceDomainId::new("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .expect("declare");
+
+    let app = gov_app!(h.ctx.clone(), &caller, Some("governance:write".to_string()));
+    let req = test::TestRequest::post()
+        .uri(&adopt_uri("coop-alpha"))
+        .set_json(serde_json::json!({ "policy_content": "policy v1" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "uncommitted authority is refused"
+    );
+    let reloaded = h
+        .store
+        .get_institutional_domain(&GovernanceDomainId::new("coop-alpha"))
+        .expect("load")
+        .expect("declared");
+    assert!(reloaded.current_policy().is_none(), "nothing adopted");
 }

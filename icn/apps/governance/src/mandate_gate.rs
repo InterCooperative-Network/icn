@@ -82,6 +82,7 @@ use icn_governance::{
 };
 use icn_identity::Did;
 
+use crate::decision_commitment::DecisionCommitmentSource;
 use crate::receipt_backend::GovernanceReceiptBackend;
 
 /// A finite, named institutional act. Distinct variants per high/medium-blast
@@ -269,6 +270,11 @@ pub enum MandateRejection {
     Suspended,
     /// The mandate's authority has been withdrawn (revoked or discharged).
     Revoked,
+    /// The mandate is not bound to a decision its proposal has committed to:
+    /// the decision is incomplete, rejected, contradicted or unknown, or the
+    /// mandate's decision/payload hash differs from the committed one
+    /// ([`crate::decision_commitment`]).
+    DecisionNotCommitted,
 }
 
 impl MandateRejection {
@@ -282,6 +288,7 @@ impl MandateRejection {
             MandateRejection::WrongActor => "wrong_actor",
             MandateRejection::Suspended => "suspended",
             MandateRejection::Revoked => "revoked",
+            MandateRejection::DecisionNotCommitted => "decision_not_committed",
         }
     }
 }
@@ -439,18 +446,78 @@ pub trait MandateGate {
 /// `list_active_authority_grants_by_grantee`, which needs no new index and
 /// inherently enforces the grant-grantee actor binding.
 ///
-/// It reads only the receipt backend. It does not consult the stored proposal
-/// state or the close journal, so a mandate resolves as soon as it is written —
-/// for a journaled close that is after the durable close intent and before the
-/// terminal proposal save (see `crate::close_journal`, "Commitment boundary").
-pub struct DefaultMandateGate {
+/// Built with [`Self::new`], it also requires every authorizing mandate to be
+/// bound to the decision its proposal has committed to, as reported by a
+/// [`DecisionCommitmentSource`]: a finalized accepted decision, or a durable
+/// accepted close intent, with the same decision hash and payload hash. A
+/// mandate's existence alone never authorizes. A source read failure is a
+/// fail-closed [`MandateGateError::Backend`].
+///
+/// [`Self::without_commitment_check`] omits that check. It does not contain
+/// authority left behind by an interrupted or contradicted decision, and is
+/// not for production authorization paths.
+pub struct DefaultMandateGate<'c> {
     backend: Arc<dyn GovernanceReceiptBackend>,
+    commitments: CommitmentCheck<'c>,
 }
 
-impl DefaultMandateGate {
-    /// Construct a resolver over the given backend.
-    pub fn new(backend: Arc<dyn GovernanceReceiptBackend>) -> Self {
-        Self { backend }
+/// Where a gate gets its commitment evidence, if it checks at all.
+enum CommitmentCheck<'c> {
+    Borrowed(&'c dyn DecisionCommitmentSource),
+    Shared(Arc<dyn DecisionCommitmentSource>),
+    Unchecked,
+}
+
+impl<'c> DefaultMandateGate<'c> {
+    /// A resolver over `backend` that verifies decision commitments through
+    /// `commitments`.
+    pub fn new(
+        backend: Arc<dyn GovernanceReceiptBackend>,
+        commitments: &'c dyn DecisionCommitmentSource,
+    ) -> Self {
+        Self {
+            backend,
+            commitments: CommitmentCheck::Borrowed(commitments),
+        }
+    }
+
+    /// Like [`Self::new`], owning a shared source (for a long-lived gate such
+    /// as the gateway's `GovernanceContext::mandate_gate`).
+    pub fn with_shared_commitments(
+        backend: Arc<dyn GovernanceReceiptBackend>,
+        commitments: Arc<dyn DecisionCommitmentSource>,
+    ) -> Self {
+        Self {
+            backend,
+            commitments: CommitmentCheck::Shared(commitments),
+        }
+    }
+
+    /// A resolver that reads only the receipt backend and does **not** verify
+    /// decision commitments (the pre-containment behaviour). For tests and
+    /// read-only tooling; production authorization uses [`Self::new`].
+    pub fn without_commitment_check(backend: Arc<dyn GovernanceReceiptBackend>) -> Self {
+        Self {
+            backend,
+            commitments: CommitmentCheck::Unchecked,
+        }
+    }
+
+    /// Require `mandate` to be bound to its proposal's committed decision.
+    fn require_commitment(&self, mandate: &Mandate) -> Result<(), MandateGateError> {
+        let source: &dyn DecisionCommitmentSource = match &self.commitments {
+            CommitmentCheck::Borrowed(source) => *source,
+            CommitmentCheck::Shared(source) => source.as_ref(),
+            CommitmentCheck::Unchecked => return Ok(()),
+        };
+        let commitment = source
+            .decision_commitment(&mandate.decision.proposal_id)
+            .map_err(MandateGateError::Backend)?;
+        if commitment.authorizes(mandate) {
+            Ok(())
+        } else {
+            Err(rejected(MandateRejection::DecisionNotCommitted))
+        }
     }
 
     /// Lifecycle checks shared by every target path, in invariant order:
@@ -525,7 +592,13 @@ impl DefaultMandateGate {
             .map_err(MandateGateError::Backend)?
             .ok_or_else(|| rejected(MandateRejection::NoMandate))?;
 
+        // The mandate the proposal index returns must be this proposal's: a
+        // record naming another proposal is index/store skew, never authority.
+        if mandate.decision.proposal_id != proposal.0 {
+            return Err(rejected(MandateRejection::DecisionNotCommitted));
+        }
         self.validate_mandate_lifecycle(&mandate, req.at)?;
+        self.require_commitment(&mandate)?;
 
         // Authorization is grant-grantee-only: DecisionProvenance never
         // authorizes an actor, so a grantee match on an attached grant is
@@ -550,6 +623,16 @@ impl DefaultMandateGate {
             .collect();
         if authorizing.is_empty() {
             return Err(rejected(MandateRejection::WrongTarget));
+        }
+        // As on the domain path: an authorizing grant must carry the
+        // mandate's own decision as its provenance. A grant claiming another
+        // decision (or none) does not inherit this mandate's commitment.
+        let authorizing: Vec<&AuthorityGrant> = authorizing
+            .into_iter()
+            .filter(|g| g.granted_by.as_ref() == Some(&mandate.decision))
+            .collect();
+        if authorizing.is_empty() {
+            return Err(rejected(MandateRejection::DecisionNotCommitted));
         }
 
         if !authorizing.iter().any(|g| g.is_active_at(req.at)) {
@@ -592,6 +675,12 @@ impl DefaultMandateGate {
         // A charter-direct grant (`granted_by: None`) has no mandate to
         // validate; skip it. If no matching grant yields a mandate, there is no
         // mandate to authorize this act.
+        //
+        // A candidate whose decision is not committed is skipped rather than
+        // returned, so an uncommitted mandate can neither authorize nor shadow
+        // a committed one; if no candidate survives, that rejection is reported.
+        let mut uncommitted = false;
+        let mut lifecycle_rejection: Option<MandateGateError> = None;
         for grant in authorizing {
             let Some(provenance) = &grant.granted_by else {
                 continue;
@@ -603,17 +692,44 @@ impl DefaultMandateGate {
             if let Some(mandate) = mandates.into_iter().find(|m| m.grants.contains(&grant.id)) {
                 // The grant came from `list_active_*` for this grantee, so
                 // actor-is-grantee and grant-time-validity already hold; the
-                // binding/class match was just enforced; only the mandate
-                // lifecycle remains.
-                self.validate_mandate_lifecycle(&mandate, req.at)?;
-                return Ok(mandate);
+                // binding/class match was just enforced; the mandate lifecycle
+                // and its decision commitment remain. A grant whose provenance
+                // names another decision than its mandate is not committed
+                // authority either.
+                // A candidate that is not live (expired, revoked, discharged,
+                // pending-grants) is skipped, not returned: it must not stop a
+                // later live, committed candidate from authorizing. Its
+                // rejection is reported only if no candidate authorizes.
+                if let Err(e) = self.validate_mandate_lifecycle(&mandate, req.at) {
+                    if lifecycle_rejection.is_none() {
+                        lifecycle_rejection = Some(e);
+                    }
+                    continue;
+                }
+                if mandate.decision != *provenance {
+                    uncommitted = true;
+                    continue;
+                }
+                match self.require_commitment(&mandate) {
+                    Ok(()) => return Ok(mandate),
+                    Err(MandateGateError::Rejected(MandateRejection::DecisionNotCommitted)) => {
+                        uncommitted = true;
+                    }
+                    Err(other) => return Err(other),
+                }
             }
+        }
+        if let Some(e) = lifecycle_rejection {
+            return Err(e);
+        }
+        if uncommitted {
+            return Err(rejected(MandateRejection::DecisionNotCommitted));
         }
         Err(rejected(MandateRejection::NoMandate))
     }
 }
 
-impl MandateGate for DefaultMandateGate {
+impl MandateGate for DefaultMandateGate<'_> {
     fn require(&self, req: &MandateRequest) -> Result<MandateGrant, MandateGateError> {
         let mandate = match &req.target {
             MandateTarget::Proposal(proposal) => self.resolve_proposal(proposal, req)?,
@@ -663,6 +779,9 @@ mod tests {
         grants: Vec<AuthorityGrant>,
         fail_get_mandate: bool,
         fail_list_active: bool,
+        /// Simulated index skew: a lookup for this proposal id returns the
+        /// first seeded mandate whatever proposal it names.
+        index_override: Option<String>,
     }
 
     impl FixtureBackend {
@@ -672,11 +791,17 @@ mod tests {
                 grants,
                 fail_get_mandate: false,
                 fail_list_active: false,
+                index_override: None,
             }
         }
 
-        fn gate(self) -> DefaultMandateGate {
-            DefaultMandateGate::new(Arc::new(self))
+        fn with_index_override(mut self, proposal_id: &str) -> Self {
+            self.index_override = Some(proposal_id.to_string());
+            self
+        }
+
+        fn gate(self) -> DefaultMandateGate<'static> {
+            DefaultMandateGate::without_commitment_check(Arc::new(self))
         }
     }
 
@@ -715,6 +840,9 @@ mod tests {
         fn get_mandate_by_proposal(&self, proposal_id: &str) -> Result<Option<Mandate>, String> {
             if self.fail_get_mandate {
                 return Err("transient_backend_error: simulated get_mandate failure".into());
+            }
+            if self.index_override.as_deref() == Some(proposal_id) {
+                return Ok(self.mandates.first().cloned());
             }
             Ok(self
                 .mandates
@@ -869,6 +997,113 @@ mod tests {
         assert_eq!(out.mandate_id, mandate.id);
         assert_eq!(out.decision_hash, prov.decision_hash);
         assert_eq!(out.act, MandateAct::CloseProposal);
+    }
+
+    /// A commitment source with a fixed verdict, for gate-level tests.
+    struct FixedCommitment(crate::decision_commitment::DecisionCommitment);
+    impl DecisionCommitmentSource for FixedCommitment {
+        fn decision_commitment(
+            &self,
+            _: &str,
+        ) -> Result<crate::decision_commitment::DecisionCommitment, String> {
+            Ok(self.0.clone())
+        }
+    }
+
+    #[test]
+    fn proposal_target_requires_the_committed_decision() {
+        use crate::decision_commitment::{CommittedDecision, DecisionCommitment};
+        let dom = domain("coop-a");
+        let actor = did(1);
+        let prov = decision("prop-1", 7);
+        let g = bound_grant(
+            actor.clone(),
+            &dom,
+            MandateAct::CloseProposal,
+            &prov,
+            100,
+            Some(1000),
+        );
+        let mandate =
+            Mandate::new(prov.clone(), [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
+        let backend: Arc<dyn GovernanceReceiptBackend> =
+            Arc::new(FixtureBackend::new(vec![mandate.clone()], vec![g]));
+        let req = proposal_request(actor, dom, "prop-1", 500);
+
+        let committed = FixedCommitment(DecisionCommitment::FinalizedAccepted(CommittedDecision {
+            decision_hash: prov.decision_hash,
+            payload_hash: [9u8; 32],
+        }));
+        let out = DefaultMandateGate::new(backend.clone(), &committed)
+            .require(&req)
+            .expect("committed decision resolves");
+        assert_eq!(out.mandate_id, mandate.id);
+
+        for verdict in [
+            DecisionCommitment::Incomplete,
+            DecisionCommitment::Unknown("no proposal record".into()),
+            DecisionCommitment::FinalizedAccepted(CommittedDecision {
+                decision_hash: [8u8; 32],
+                payload_hash: [9u8; 32],
+            }),
+        ] {
+            let source = FixedCommitment(verdict);
+            let err = DefaultMandateGate::new(backend.clone(), &source)
+                .require(&req)
+                .unwrap_err();
+            assert_eq!(err, rejected(MandateRejection::DecisionNotCommitted));
+        }
+    }
+
+    #[test]
+    fn proposal_target_refuses_skewed_mandate_or_grant_provenance() {
+        use crate::decision_commitment::{CommittedDecision, DecisionCommitment};
+        let dom = domain("coop-a");
+        let actor = did(1);
+        let prov = decision("prop-1", 7);
+        let committed = FixedCommitment(DecisionCommitment::FinalizedAccepted(CommittedDecision {
+            decision_hash: prov.decision_hash,
+            payload_hash: [9u8; 32],
+        }));
+        let req = proposal_request(actor.clone(), dom.clone(), "prop-1", 500);
+
+        // A grant whose provenance names another decision.
+        let mut g = bound_grant(
+            actor.clone(),
+            &dom,
+            MandateAct::CloseProposal,
+            &prov,
+            100,
+            Some(1000),
+        );
+        g.granted_by = Some(decision("prop-2", 8));
+        let mandate =
+            Mandate::new(prov.clone(), [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
+        let backend: Arc<dyn GovernanceReceiptBackend> =
+            Arc::new(FixtureBackend::new(vec![mandate], vec![g]));
+        let err = DefaultMandateGate::new(backend, &committed)
+            .require(&req)
+            .unwrap_err();
+        assert_eq!(err, rejected(MandateRejection::DecisionNotCommitted));
+
+        // The proposal index returning another proposal's mandate (skew).
+        let other = decision("prop-2", 7);
+        let g = bound_grant(
+            actor,
+            &dom,
+            MandateAct::CloseProposal,
+            &other,
+            100,
+            Some(1000),
+        );
+        let mandate = Mandate::new(other, [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
+        let backend = FixtureBackend::new(vec![mandate], vec![g]);
+        let backend: Arc<dyn GovernanceReceiptBackend> =
+            Arc::new(backend.with_index_override("prop-1"));
+        let err = DefaultMandateGate::new(backend, &committed)
+            .require(&req)
+            .unwrap_err();
+        assert_eq!(err, rejected(MandateRejection::DecisionNotCommitted));
     }
 
     #[test]

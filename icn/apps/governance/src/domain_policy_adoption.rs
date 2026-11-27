@@ -36,6 +36,7 @@ use icn_governance::{
 };
 use icn_identity::Did;
 
+use crate::decision_commitment::{DecisionCommitmentSource, ManagerDecisionCommitments};
 use crate::mandate_gate::{
     DefaultMandateGate, MandateAct, MandateGate, MandateGateError, MandateRejection,
     MandateRequest, MandateTarget,
@@ -75,7 +76,8 @@ impl std::error::Error for AdoptDomainPolicyError {}
 /// Resolves whether `actor` holds an active, domain-scoped [`Execution`] grant
 /// that binds the `domain_policy:adopt` act — via the **real** gate resolver
 /// (actor → active grants → `TypedScope.domain` + class + act-token + mandate
-/// lifecycle) — then commits through the pure-core
+/// lifecycle, and the mandate's decision committed per `commitments`) — then
+/// commits through the pure-core
 /// [`InstitutionalDomain::adopt_policy`] as defense-in-depth. Fails closed on
 /// any gate rejection, backend read failure, or structural rejection, leaving
 /// `domain` unchanged.
@@ -87,12 +89,13 @@ impl std::error::Error for AdoptDomainPolicyError {}
 /// [`Execution`]: icn_governance::AuthorityClass::Execution
 pub fn adopt_domain_policy_gated(
     backend: Arc<dyn GovernanceReceiptBackend>,
+    commitments: &dyn DecisionCommitmentSource,
     domain: &mut InstitutionalDomain,
     policy: &DomainPolicy,
     actor: &Did,
     at: Timestamp,
 ) -> Result<DomainPolicyRef, AdoptDomainPolicyError> {
-    let gate = DefaultMandateGate::new(Arc::clone(&backend));
+    let gate = DefaultMandateGate::new(Arc::clone(&backend), commitments);
     let req = MandateRequest {
         actor: actor.clone(),
         domain: domain.domain_id.clone(),
@@ -272,7 +275,11 @@ impl crate::manager::GovernanceManager {
         let backend = self
             .receipt_backend()
             .ok_or(DomainPolicyAdoptionError::MissingReceiptBackend)?;
-        adopt_domain_policy_gated(backend, domain, policy, actor, now)
+        let commitments = ManagerDecisionCommitments {
+            manager: self,
+            receipts: Arc::clone(&backend),
+        };
+        adopt_domain_policy_gated(backend, &commitments, domain, policy, actor, now)
             .map_err(DomainPolicyAdoptionError::Gated)
     }
 
@@ -361,7 +368,11 @@ impl crate::manager::GovernanceManager {
         // write, so an unauthorized caller never creates a domain. Mirrors the
         // adoption seam: actor → active grants → TypedScope.domain + Execution
         // class + `institutional_domain:declare` act token + mandate lifecycle.
-        let gate = DefaultMandateGate::new(backend);
+        let commitments = ManagerDecisionCommitments {
+            manager: self,
+            receipts: Arc::clone(&backend),
+        };
+        let gate = DefaultMandateGate::new(backend, &commitments);
         let req = MandateRequest {
             actor: actor.clone(),
             domain: domain_id.clone(),
@@ -528,19 +539,50 @@ mod tests {
     };
     use icn_kernel_api::{AllocationReceipt, Hash};
 
+    use crate::decision_commitment::{classify, DecisionCommitment, DecisionCommitmentSource};
+    use icn_governance::proof::ProofOutcome;
+    use icn_governance::{Proposal, ProposalId, ProposalPayload, ProposalState, VoteTally};
+
     // ----- fixtures ---------------------------------------------------------
 
     /// Minimal in-memory backend seeded with pre-built mandates and grants.
     /// Implements only the methods the gate + adopter read; the rest are
     /// trivial stubs (mirrors `mandate_gate::tests::FixtureBackend`).
+    ///
+    /// `receipts` are the v1 decision receipts it reports per proposal. `new`
+    /// records one accepted receipt per seeded mandate's decision, as a
+    /// completed close would; `with_receipts` takes them explicitly.
     struct TestBackend {
         mandates: Vec<Mandate>,
         grants: Vec<AuthorityGrant>,
+        receipts: Result<Vec<GovernanceDecisionReceipt>, String>,
     }
 
     impl TestBackend {
         fn new(mandates: Vec<Mandate>, grants: Vec<AuthorityGrant>) -> Arc<Self> {
-            Arc::new(Self { mandates, grants })
+            let mut receipts: Vec<GovernanceDecisionReceipt> = Vec::new();
+            for m in &mandates {
+                let r = receipt_for(&m.decision.proposal_id, m.decision.decision_hash);
+                if !receipts
+                    .iter()
+                    .any(|x| x.proposal_id == r.proposal_id && x.decision_hash == r.decision_hash)
+                {
+                    receipts.push(r);
+                }
+            }
+            Self::with_receipts(mandates, grants, Ok(receipts))
+        }
+
+        fn with_receipts(
+            mandates: Vec<Mandate>,
+            grants: Vec<AuthorityGrant>,
+            receipts: Result<Vec<GovernanceDecisionReceipt>, String>,
+        ) -> Arc<Self> {
+            Arc::new(Self {
+                mandates,
+                grants,
+                receipts,
+            })
         }
     }
 
@@ -553,6 +595,17 @@ mod tests {
             _: &str,
         ) -> Result<Option<GovernanceDecisionReceipt>, String> {
             Ok(None)
+        }
+        fn list_governance_by_proposal(
+            &self,
+            proposal_id: &str,
+        ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+            Ok(self
+                .receipts
+                .clone()?
+                .into_iter()
+                .filter(|r| r.proposal_id == proposal_id)
+                .collect())
         }
         fn put_allocation(&self, _: &AllocationReceipt) -> Result<Hash, String> {
             Ok([0u8; 32])
@@ -629,10 +682,69 @@ mod tests {
         }
     }
 
-    /// A live mandate backing `grant_id` (provenance == `decision()`).
+    /// The accepted proposal `decision()` names, in governance domain `gov-alpha`.
+    fn accepted_proposal() -> Proposal {
+        let mut p = Proposal::new(
+            GovernanceDomainId::new("gov-alpha"),
+            did(9),
+            "adopt policy".into(),
+            "fixture".into(),
+            ProposalPayload::Text {
+                body: "adopt the coop-alpha policy".into(),
+            },
+        );
+        p.id = ProposalId::new("prop-1");
+        p.state = ProposalState::Accepted { closed_at: 50 };
+        p
+    }
+
+    /// The payload hash the mandate seam computes for `accepted_proposal()`.
+    fn committed_payload_hash() -> Hash {
+        crate::grant_minting::hash_proposal_payload(&accepted_proposal().payload)
+            .expect("payload hashes")
+    }
+
+    /// An accepted v1 decision receipt for `proposal_id` in `gov-alpha`.
+    fn receipt_for(proposal_id: &str, decision_hash: Hash) -> GovernanceDecisionReceipt {
+        GovernanceDecisionReceipt {
+            proposal_id: proposal_id.into(),
+            domain_id: "gov-alpha".into(),
+            outcome: ProofOutcome::Accepted,
+            vote_tally: VoteTally::new(3, 0, 0),
+            vote_hash: [0u8; 32],
+            decision_hash,
+        }
+    }
+
+    /// A fixed commitment, for the free-function adoption tests.
+    struct FixedCommitment(DecisionCommitment);
+    impl DecisionCommitmentSource for FixedCommitment {
+        fn decision_commitment(&self, _: &str) -> Result<DecisionCommitment, String> {
+            Ok(self.0.clone())
+        }
+    }
+
+    /// `decision()` as committed: the accepted proposal and its single receipt.
+    fn committed() -> FixedCommitment {
+        FixedCommitment(classify(
+            Some(&accepted_proposal()),
+            None,
+            &[receipt_for("prop-1", decision().decision_hash)],
+        ))
+    }
+
+    /// A live mandate backing `grant_id` (provenance == `decision()`), bound
+    /// to the committed payload.
     fn backing_mandate(grant_id: AuthorityGrantId) -> Mandate {
-        Mandate::new(decision(), [9u8; 32], vec![grant_id], None, None, 0)
-            .expect("grant-bearing mandate is valid")
+        Mandate::new(
+            decision(),
+            committed_payload_hash(),
+            vec![grant_id],
+            None,
+            None,
+            0,
+        )
+        .expect("grant-bearing mandate is valid")
     }
 
     fn coop_alpha() -> InstitutionalDomain {
@@ -652,8 +764,9 @@ mod tests {
         let mut domain = coop_alpha();
         let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
 
-        let adopted = adopt_domain_policy_gated(backend, &mut domain, &policy, &actor, 100)
-            .expect("an active domain-scoped adopt grant authorizes adoption");
+        let adopted =
+            adopt_domain_policy_gated(backend, &committed(), &mut domain, &policy, &actor, 100)
+                .expect("an active domain-scoped adopt grant authorizes adoption");
 
         assert_eq!(adopted, policy.policy_ref());
         assert_eq!(domain.current_policy(), Some(&policy.policy_ref()));
@@ -672,8 +785,9 @@ mod tests {
         let mut domain = coop_alpha();
         let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
 
-        let err = adopt_domain_policy_gated(backend, &mut domain, &policy, &actor, 100)
-            .expect_err("a grant scoped to a different domain must be refused");
+        let err =
+            adopt_domain_policy_gated(backend, &committed(), &mut domain, &policy, &actor, 100)
+                .expect_err("a grant scoped to a different domain must be refused");
         assert!(matches!(
             err,
             AdoptDomainPolicyError::Unauthorized(MandateGateError::Rejected(
@@ -695,8 +809,9 @@ mod tests {
         let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
 
         // A different actor with no grant of their own.
-        let err = adopt_domain_policy_gated(backend, &mut domain, &policy, &did(2), 100)
-            .expect_err("an actor with no authorizing grant must be refused");
+        let err =
+            adopt_domain_policy_gated(backend, &committed(), &mut domain, &policy, &did(2), 100)
+                .expect_err("an actor with no authorizing grant must be refused");
         assert!(matches!(
             err,
             AdoptDomainPolicyError::Unauthorized(MandateGateError::Rejected(
@@ -720,8 +835,9 @@ mod tests {
         let mut domain = coop_alpha();
         let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
 
-        let err = adopt_domain_policy_gated(backend, &mut domain, &policy, &actor, 100)
-            .expect_err("a grant that does not bind the adopt act must be refused");
+        let err =
+            adopt_domain_policy_gated(backend, &committed(), &mut domain, &policy, &actor, 100)
+                .expect_err("a grant that does not bind the adopt act must be refused");
         assert!(matches!(
             err,
             AdoptDomainPolicyError::Unauthorized(MandateGateError::Rejected(
@@ -743,8 +859,9 @@ mod tests {
         let mut domain = coop_alpha();
         let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
 
-        let err = adopt_domain_policy_gated(backend, &mut domain, &policy, &actor, 100)
-            .expect_err("an expired grant must be refused");
+        let err =
+            adopt_domain_policy_gated(backend, &committed(), &mut domain, &policy, &actor, 100)
+                .expect_err("an expired grant must be refused");
         assert!(matches!(
             err,
             AdoptDomainPolicyError::Unauthorized(MandateGateError::Rejected(
@@ -766,8 +883,9 @@ mod tests {
         let mut domain = coop_alpha();
         let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
 
-        let err = adopt_domain_policy_gated(backend, &mut domain, &policy, &actor, 100)
-            .expect_err("a revoked backing mandate must be refused");
+        let err =
+            adopt_domain_policy_gated(backend, &committed(), &mut domain, &policy, &actor, 100)
+                .expect_err("a revoked backing mandate must be refused");
         assert!(matches!(
             err,
             AdoptDomainPolicyError::Unauthorized(MandateGateError::Rejected(
@@ -792,8 +910,15 @@ mod tests {
         let mut domain = coop_alpha();
         let foreign_policy = DomainPolicy::new(domain_id("coop-beta"), b"policy v1");
 
-        let err = adopt_domain_policy_gated(backend, &mut domain, &foreign_policy, &actor, 100)
-            .expect_err("a policy authored for another domain must be refused by the core check");
+        let err = adopt_domain_policy_gated(
+            backend,
+            &committed(),
+            &mut domain,
+            &foreign_policy,
+            &actor,
+            100,
+        )
+        .expect_err("a policy authored for another domain must be refused by the core check");
         assert!(matches!(
             err,
             AdoptDomainPolicyError::Core(InstitutionalDomainError::PolicyForOtherDomain)
@@ -803,8 +928,12 @@ mod tests {
 
     // ----- GovernanceManager seam tests -------------------------------------
 
+    /// A standalone manager holding `accepted_proposal()` in memory, as a
+    /// completed standalone close leaves it.
     fn manager_with(backend: Arc<TestBackend>) -> GovernanceManager {
-        GovernanceManager::new().with_receipt_store(backend)
+        let mgr = GovernanceManager::new().with_receipt_store(backend);
+        mgr.hold_proposal_for_test(accepted_proposal());
+        mgr
     }
 
     #[test]
@@ -948,9 +1077,11 @@ mod tests {
         let domain_store = Arc::new(SledGovernanceStateStore::new(Arc::new(
             icn_store::SledStore::temporary().expect("temp sled"),
         )));
-        GovernanceManager::new()
+        let mgr = GovernanceManager::new()
             .with_receipt_store(backend)
-            .with_domain_store(domain_store)
+            .with_domain_store(domain_store);
+        mgr.hold_proposal_for_test(accepted_proposal());
+        mgr
     }
 
     fn live_adopt_fixture(actor: &Did, dom: &str) -> (Arc<TestBackend>,) {
@@ -1599,5 +1730,337 @@ mod tests {
             .expect("ungated declare persists without any authority resolution");
         assert_eq!(declared.domain_id, domain_id("coop-alpha"));
         assert!(declared.current_policy().is_none());
+    }
+
+    // ----- decision-commitment containment (consumer interfaces) -----------
+    //
+    // A mandate authorizes only when its proposal has committed to exactly the
+    // mandate's decision and payload. These drive the real manager seams the
+    // HTTP adopt/declare routes call.
+
+    fn unauthorized_uncommitted(err: &DomainPolicyAdoptionError) -> bool {
+        matches!(
+            err,
+            DomainPolicyAdoptionError::Gated(AdoptDomainPolicyError::Unauthorized(
+                MandateGateError::Rejected(MandateRejection::DecisionNotCommitted)
+            ))
+        )
+    }
+
+    fn adopt_once(mgr: &GovernanceManager, actor: &Did) -> Result<(), DomainPolicyAdoptionError> {
+        let mut domain = coop_alpha();
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+        let out = mgr.adopt_domain_policy(&mut domain, &policy, actor, 100);
+        if out.is_err() {
+            assert!(
+                domain.current_policy().is_none(),
+                "a refusal leaves the domain unchanged"
+            );
+        }
+        out.map(|_| ())
+    }
+
+    #[test]
+    fn commitment_refuses_mandate_whose_proposal_is_unknown() {
+        // A mandate and its receipt survive, but no proposal record does.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = GovernanceManager::new().with_receipt_store(backend);
+        let err = adopt_once(&mgr, &actor).expect_err("no proposal record: not committed");
+        assert!(unauthorized_uncommitted(&err), "got {err:?}");
+    }
+
+    #[test]
+    fn commitment_refuses_mandate_for_open_or_rejected_proposal() {
+        let actor = did(1);
+        for state in [
+            ProposalState::Open {
+                opened_at: 10,
+                closes_at: 1_000,
+            },
+            ProposalState::Rejected { closed_at: 50 },
+        ] {
+            let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+            let mgr = GovernanceManager::new().with_receipt_store(backend);
+            let mut p = accepted_proposal();
+            p.state = state.clone();
+            mgr.hold_proposal_for_test(p);
+            let err = adopt_once(&mgr, &actor).expect_err("undecided or rejected: not committed");
+            assert!(unauthorized_uncommitted(&err), "{state:?}: got {err:?}");
+        }
+    }
+
+    #[test]
+    fn commitment_refuses_orphan_mandate_with_another_decision_hash() {
+        // The proposal was accepted with decision [8; 32]; the mandate names [7; 32].
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let backend = TestBackend::with_receipts(
+            vec![backing_mandate(gid.clone())],
+            vec![adopt_grant(actor.clone(), "coop-alpha", gid)],
+            Ok(vec![receipt_for("prop-1", [8u8; 32])]),
+        );
+        let err = adopt_once(&manager_with(backend), &actor).expect_err("hash mismatch");
+        assert!(unauthorized_uncommitted(&err), "got {err:?}");
+    }
+
+    #[test]
+    fn commitment_refuses_mandate_bound_to_another_payload() {
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let mandate =
+            Mandate::new(decision(), [9u8; 32], vec![gid.clone()], None, None, 0).unwrap();
+        let backend = TestBackend::new(
+            vec![mandate],
+            vec![adopt_grant(actor.clone(), "coop-alpha", gid)],
+        );
+        let err = adopt_once(&manager_with(backend), &actor).expect_err("payload mismatch");
+        assert!(unauthorized_uncommitted(&err), "got {err:?}");
+    }
+
+    #[test]
+    fn commitment_refuses_contradictory_receipts() {
+        // Two distinct decision receipts for one accepted proposal.
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let backend = TestBackend::with_receipts(
+            vec![backing_mandate(gid.clone())],
+            vec![adopt_grant(actor.clone(), "coop-alpha", gid)],
+            Ok(vec![
+                receipt_for("prop-1", decision().decision_hash),
+                receipt_for("prop-1", [8u8; 32]),
+            ]),
+        );
+        let err = adopt_once(&manager_with(backend), &actor).expect_err("contradictory receipts");
+        assert!(unauthorized_uncommitted(&err), "got {err:?}");
+    }
+
+    #[test]
+    fn commitment_read_failure_is_backend_not_unauthorized() {
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let backend = TestBackend::with_receipts(
+            vec![backing_mandate(gid.clone())],
+            vec![adopt_grant(actor.clone(), "coop-alpha", gid)],
+            Err("receipt index unreadable".into()),
+        );
+        let err = adopt_once(&manager_with(backend), &actor).expect_err("evidence unreadable");
+        assert!(
+            matches!(
+                err,
+                DomainPolicyAdoptionError::Gated(AdoptDomainPolicyError::Unauthorized(
+                    MandateGateError::Backend(_)
+                ))
+            ),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn commitment_orphan_does_not_shadow_committed_authority() {
+        // Two active grants for the same act: one from an orphan decision
+        // (prop-0, no proposal record), one from the committed decision.
+        let actor = did(1);
+        let orphan_gid = AuthorityGrantId::new();
+        let mut orphan_grant = adopt_grant(actor.clone(), "coop-alpha", orphan_gid.clone());
+        let orphan_decision = DecisionProvenance {
+            proposal_id: "prop-0".into(),
+            decision_hash: [5u8; 32],
+        };
+        orphan_grant.granted_by = Some(orphan_decision.clone());
+        let orphan = Mandate::new(
+            orphan_decision,
+            committed_payload_hash(),
+            vec![orphan_gid],
+            None,
+            None,
+            0,
+        )
+        .unwrap();
+        let gid = AuthorityGrantId::new();
+        let backend = TestBackend::new(
+            vec![orphan, backing_mandate(gid.clone())],
+            vec![orphan_grant, adopt_grant(actor.clone(), "coop-alpha", gid)],
+        );
+        adopt_once(&manager_with(backend), &actor).expect("the committed mandate still authorizes");
+    }
+
+    #[test]
+    fn commitment_accepted_intent_authorizes_before_the_terminal_save() {
+        // Stored proposal still Open; a durable accepted close intent carries
+        // the mandate's decision (the window between mandate write and save).
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let store: Arc<dyn crate::state_store::GovernanceStateStore> =
+            Arc::new(SledGovernanceStateStore::new(Arc::new(
+                icn_store::SledStore::temporary().expect("temp sled"),
+            )));
+        let mut open = accepted_proposal();
+        open.state = ProposalState::Open {
+            opened_at: 10,
+            closes_at: 1_000,
+        };
+        store.save_proposal(&open).unwrap();
+        store
+            .save_close_intent(&crate::close_journal::CloseJournalEntry {
+                proposal: accepted_proposal(),
+                proof_bytes: None,
+                receipts: Default::default(),
+                decided_at: 50,
+                governance_decision_hash: Some(hex::encode(decision().decision_hash)),
+                execution_closure: true,
+            })
+            .unwrap();
+        let mgr = GovernanceManager::new()
+            .with_receipt_store(backend)
+            .with_domain_store(store);
+        adopt_once(&mgr, &actor).expect("a durable accepted intent is a commitment");
+    }
+
+    #[test]
+    fn commitment_survives_restart_through_the_durable_proposal_record() {
+        // Persisted adoption over a reopened store: the accepted proposal is
+        // durable, so authority is re-established without in-memory state.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let sled = Arc::new(icn_store::SledStore::temporary().expect("temp sled"));
+        {
+            use crate::state_store::GovernanceStateStore as _;
+            let store = SledGovernanceStateStore::new(sled.clone());
+            store.save_proposal(&accepted_proposal()).unwrap();
+        }
+        let mgr = GovernanceManager::new()
+            .with_receipt_store(backend)
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(sled)));
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+        mgr.adopt_domain_policy_persisted(&domain_id("coop-alpha"), &policy, &actor, 100)
+            .expect("durable accepted proposal + single receipt authorizes after reopen");
+    }
+
+    #[test]
+    fn commitment_refuses_contradictory_close_intent() {
+        // A durable intent says Accepted; the stored terminal state says Rejected.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let store: Arc<dyn crate::state_store::GovernanceStateStore> =
+            Arc::new(SledGovernanceStateStore::new(Arc::new(
+                icn_store::SledStore::temporary().expect("temp sled"),
+            )));
+        let mut rejected = accepted_proposal();
+        rejected.state = ProposalState::Rejected { closed_at: 40 };
+        store.save_proposal(&rejected).unwrap();
+        store
+            .save_close_intent(&crate::close_journal::CloseJournalEntry {
+                proposal: accepted_proposal(),
+                proof_bytes: None,
+                receipts: Default::default(),
+                decided_at: 50,
+                governance_decision_hash: Some(hex::encode(decision().decision_hash)),
+                execution_closure: true,
+            })
+            .unwrap();
+        let mgr = GovernanceManager::new()
+            .with_receipt_store(backend)
+            .with_domain_store(store);
+        let err = adopt_once(&mgr, &actor).expect_err("contradictory evidence");
+        assert!(unauthorized_uncommitted(&err), "got {err:?}");
+    }
+
+    #[test]
+    fn gated_declare_refuses_uncommitted_mandate() {
+        let actor = did(1);
+        let mgr = GovernanceManager::new()
+            .with_receipt_store(live_declare_fixture(&actor, "coop-alpha"))
+            .with_domain_store(Arc::new(SledGovernanceStateStore::new(Arc::new(
+                icn_store::SledStore::temporary().expect("temp sled"),
+            ))));
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &actor,
+                100,
+            )
+            .expect_err("no committed decision behind the declare mandate");
+        assert!(matches!(
+            err,
+            DeclareInstitutionalDomainError::Unauthorized(MandateRejection::DecisionNotCommitted)
+        ));
+        assert!(
+            mgr.domain_state_store()
+                .unwrap()
+                .get_institutional_domain(&domain_id("coop-alpha"))
+                .unwrap()
+                .is_none(),
+            "an unauthorized declare writes nothing"
+        );
+    }
+
+    #[test]
+    fn commitment_refuses_grant_whose_provenance_names_another_proposal() {
+        // The mandate (prop-x) is itself committed, but the grant that leads
+        // to it claims prop-1's decision: inconsistent provenance, not authority.
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let mandate = Mandate::new(
+            DecisionProvenance {
+                proposal_id: "prop-x".into(),
+                decision_hash: decision().decision_hash,
+            },
+            committed_payload_hash(),
+            vec![gid.clone()],
+            None,
+            None,
+            0,
+        )
+        .unwrap();
+        let backend = TestBackend::new(
+            vec![mandate],
+            vec![adopt_grant(actor.clone(), "coop-alpha", gid)],
+        );
+        let mgr = manager_with(backend);
+        let mut prop_x = accepted_proposal();
+        prop_x.id = ProposalId::new("prop-x");
+        mgr.hold_proposal_for_test(prop_x);
+        let err = adopt_once(&mgr, &actor).expect_err("provenance mismatch");
+        assert!(unauthorized_uncommitted(&err), "got {err:?}");
+    }
+
+    #[test]
+    fn a_non_live_candidate_does_not_block_a_later_committed_mandate() {
+        // First candidate: a revoked mandate from another decision whose grant
+        // is still listed active. Second: the live, committed mandate.
+        let actor = did(1);
+        let stale_gid = AuthorityGrantId::new();
+        let stale_decision = DecisionProvenance {
+            proposal_id: "prop-0".into(),
+            decision_hash: [5u8; 32],
+        };
+        let mut stale_grant = adopt_grant(actor.clone(), "coop-alpha", stale_gid.clone());
+        stale_grant.granted_by = Some(stale_decision.clone());
+        let mut stale = Mandate::new(
+            stale_decision,
+            committed_payload_hash(),
+            vec![stale_gid],
+            None,
+            None,
+            0,
+        )
+        .unwrap();
+        stale.status = MandateStatus::Revoked;
+        let gid = AuthorityGrantId::new();
+        let backend = TestBackend::new(
+            vec![stale, backing_mandate(gid.clone())],
+            vec![stale_grant, adopt_grant(actor.clone(), "coop-alpha", gid)],
+        );
+        adopt_once(&manager_with(backend), &actor)
+            .expect("the live committed mandate authorizes despite the earlier revoked candidate");
     }
 }

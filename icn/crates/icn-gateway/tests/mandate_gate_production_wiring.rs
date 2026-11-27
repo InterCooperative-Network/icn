@@ -86,8 +86,18 @@ fn production_gateway_context_validates_when_mandate_gate_wired_from_receipt_sto
     let db = temp_db();
     let receipt_store = Arc::new(ReceiptStore::new(db));
 
+    // As in `server.rs`, the gate verifies decision commitments through the
+    // governance manager (held proposals, state store and receipt store).
+    let manager = Arc::new(
+        icn_governance_actor::GovernanceManager::new().with_receipt_store(receipt_store.clone()),
+    );
     let mandate_gate: Arc<dyn MandateGate + Send + Sync> =
-        Arc::new(DefaultMandateGate::new(receipt_store.clone()));
+        Arc::new(DefaultMandateGate::with_shared_commitments(
+            receipt_store.clone(),
+            Arc::new(
+                icn_governance_actor::decision_commitment::SharedManagerCommitments::new(manager),
+            ),
+        ));
 
     let ctx = production_like_ctx(receipt_store, Some(mandate_gate));
     ctx.validate()
