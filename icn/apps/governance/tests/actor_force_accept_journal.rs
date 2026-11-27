@@ -296,6 +296,8 @@ struct Fixture {
     handle: GovernanceHandle,
     proposal_id: ProposalId,
     domain_id: GovernanceDomainId,
+    /// The domain's sole member.
+    member: icn_identity::Did,
 }
 
 /// The actor and state store after a real restart: every handle on the first
@@ -377,6 +379,7 @@ impl Fixture {
             handle,
             proposal_id,
             domain_id,
+            member: did,
         }
     }
 
@@ -1439,4 +1442,304 @@ async fn non_execution_required_force_accept_recovers_after_a_mid_journal_crash(
     assert_eq!(backend.mandate_writes(), 1);
 
     r.handle.shutdown().await;
+}
+// ---------------------------------------------------------------------------
+// Ordinary close: the execution closure stands behind the close intent
+// ---------------------------------------------------------------------------
+
+impl Fixture {
+    /// Cast the sole member's For vote, so an ordinary close accepts.
+    async fn vote_for(&self) {
+        self.handle
+            .submit(GovernanceCommand::CastVote {
+                proposal_id: self.proposal_id.clone(),
+                voter: self.member.clone(),
+                choice: icn_governance::VoteChoice::For,
+                comment: None,
+            })
+            .await
+            .unwrap();
+    }
+
+    async fn close(&self) -> anyhow::Result<()> {
+        self.handle
+            .submit(GovernanceCommand::CloseProposal {
+                proposal_id: self.proposal_id.clone(),
+                eligible_voters: None,
+                excluded_delegators: None,
+                capability_scope: None,
+            })
+            .await
+    }
+
+    fn authority_counts(&self) -> (usize, usize, usize, usize) {
+        (
+            self.backend.mandates().len(),
+            self.backend.grant_count(),
+            self.backend.effects().len(),
+            self.state().list_close_intents().unwrap().len(),
+        )
+    }
+}
+
+/// `CloseProposal` on a vetoed proposal whose tally accepts is refused by the
+/// state transition. Before the fix the execution-closure preflight ran first,
+/// so the refused close still wrote a mandate, a grant and an effect record.
+#[tokio::test(flavor = "current_thread")]
+async fn refused_close_of_a_vetoed_proposal_writes_no_authority() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    fx.vote_for().await;
+    fx.handle
+        .submit(GovernanceCommand::VetoProposal {
+            proposal_id: fx.proposal_id.clone(),
+            reason: "vetoed before close".to_string(),
+        })
+        .await
+        .unwrap();
+
+    let err = fx.close().await.unwrap_err().to_string();
+    assert!(
+        err.contains("Can only close proposals in Open state"),
+        "{err}"
+    );
+    assert_eq!(
+        fx.authority_counts(),
+        (0, 0, 0, 0),
+        "mandate, grant, effect, intent"
+    );
+    assert!(matches!(fx.stored_state(), ProposalState::Vetoed { .. }));
+
+    fx.handle.shutdown().await;
+}
+
+/// The close intent cannot be written: nothing — no mandate, grant, effect
+/// record or terminal state — is written. Before the fix the preflight minted
+/// before the intent.
+#[tokio::test(flavor = "current_thread")]
+async fn close_intent_write_failure_writes_no_authority() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    fx.vote_for().await;
+
+    fx.fail_store.arm(b"gov:close-intent:");
+    let err = fx.close().await.unwrap_err().to_string();
+    assert!(err.contains("injected write failure"), "{err}");
+    assert_eq!(fx.authority_counts(), (0, 0, 0, 0));
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+
+    fx.handle.shutdown().await;
+}
+
+/// The terminal save fails after the intent: the mandate (if any) is backed by
+/// the durable intent, which carries the closure, and a restart completes the
+/// SAME decision with exactly one mandate bound to the journaled hash.
+#[tokio::test(flavor = "current_thread")]
+async fn failed_close_save_is_completed_on_restart_with_one_mandate() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    let proposal_id = fx.proposal_id.clone();
+    fx.vote_for().await;
+
+    fx.fail_store.arm(b"gov:proposal:");
+    fx.close().await.unwrap_err();
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+    let intent = fx.state().list_close_intents().unwrap().remove(0);
+    assert!(
+        intent.execution_closure,
+        "the close intent carries its closure"
+    );
+    assert!(matches!(
+        intent.proposal.state,
+        ProposalState::Accepted { .. }
+    ));
+    let hash = intent.governance_decision_hash.clone().unwrap();
+    assert_eq!(fx.backend.mandates().len(), 1, "written behind the intent");
+
+    let (r, backend) = fx.restart(tmp.path(), None).await;
+    let stored = r.state.get_proposal(&proposal_id).unwrap().unwrap();
+    assert_eq!(
+        serde_json::to_value(&stored).unwrap(),
+        serde_json::to_value(&intent.proposal).unwrap()
+    );
+    assert_eq!(r.state.list_close_intents().unwrap().len(), 0);
+    assert_eq!(backend.mandates().len(), 1);
+    assert_eq!(backend.mandate_writes(), 1);
+    assert_eq!(
+        hex::encode(backend.mandates()[0].decision.decision_hash),
+        hash
+    );
+    assert_eq!(backend.effect_writes(), 1);
+
+    r.handle.shutdown().await;
+}
+
+/// The effect write fails after the intent is durable: no mandate, the
+/// proposal is still Open, the intent survives; recovery then completes it.
+#[tokio::test(flavor = "current_thread")]
+async fn close_execution_closure_failure_is_completed_by_recovery() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    fx.vote_for().await;
+
+    fx.backend.fail_effect_write.store(true, Ordering::SeqCst);
+    let err = fx.close().await.unwrap_err().to_string();
+    assert!(
+        err.contains("injected institutional-effect write failure"),
+        "{err}"
+    );
+    assert_eq!(fx.authority_counts(), (0, 0, 0, 1));
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+
+    fx.backend.fail_effect_write.store(false, Ordering::SeqCst);
+    fx.handle.recover_incomplete_closes().await;
+    assert!(matches!(fx.stored_state(), ProposalState::Accepted { .. }));
+    assert_eq!(fx.authority_counts(), (1, 1, 1, 0));
+
+    fx.handle.shutdown().await;
+}
+
+/// Committed but unacknowledged (receipt-store flush fails): the caller sees
+/// an error, the intent stays, and a restart replays it without a second
+/// mandate or effect record.
+#[tokio::test(flavor = "current_thread")]
+async fn unacknowledged_close_replays_without_duplicate_authority() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    let proposal_id = fx.proposal_id.clone();
+    fx.vote_for().await;
+
+    fx.backend.fail_flush.store(true, Ordering::SeqCst);
+    // The live close path keeps the intent and reports success for a flush
+    // failure only in its log; either way the intent must remain.
+    let _ = fx.close().await;
+    assert!(matches!(fx.stored_state(), ProposalState::Accepted { .. }));
+    assert_eq!(fx.backend.mandates().len(), 1);
+    assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
+
+    fx.backend.fail_flush.store(false, Ordering::SeqCst);
+    let (r, backend) = fx.restart(tmp.path(), None).await;
+    assert!(matches!(
+        r.state.get_proposal(&proposal_id).unwrap().unwrap().state,
+        ProposalState::Accepted { .. }
+    ));
+    assert_eq!(r.state.list_close_intents().unwrap().len(), 0);
+    assert_eq!(backend.mandates().len(), 1);
+    assert_eq!(backend.mandate_writes(), 1);
+    assert_eq!(backend.effect_writes(), 1);
+
+    r.handle.shutdown().await;
+}
+
+/// Lost unflushed receipt writes across a real reopen of a sled-backed
+/// receipt `Db`: replay re-mints exactly once, bound to the journaled hash.
+#[tokio::test(flavor = "current_thread")]
+async fn close_lost_unflushed_receipt_writes_are_reminted_exactly_once() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state_path = tmp.path().join("state");
+    let receipts_path = tmp.path().join("receipts");
+    let checkpoint_path = tmp.path().join("receipts-fsynced");
+    let fx = Fixture::open(&state_path).await;
+    let proposal_id = fx.proposal_id.clone();
+    fx.vote_for().await;
+
+    let receipts = Arc::new(SledAuthorityBackend::open(&receipts_path));
+    receipts.flush().unwrap();
+    copy_dir(&receipts_path, &checkpoint_path);
+    fx.handle.install_receipt_store(receipts.clone()).await;
+
+    fx.fail_store.arm(b"gov:proposal:");
+    fx.close().await.unwrap_err();
+    let hash = fx.state().list_close_intents().unwrap()[0]
+        .governance_decision_hash
+        .clone()
+        .unwrap();
+    assert_eq!(receipts.mandates().len(), 1);
+
+    fx.release().await;
+    drop(receipts);
+    std::fs::remove_dir_all(&receipts_path).unwrap();
+    copy_dir(&checkpoint_path, &receipts_path);
+    let receipts = Arc::new(SledAuthorityBackend::open(&receipts_path));
+    assert_eq!(receipts.mandates().len(), 0);
+
+    let r = start(&state_path, receipts.clone(), None).await;
+    assert!(matches!(
+        r.state.get_proposal(&proposal_id).unwrap().unwrap().state,
+        ProposalState::Accepted { .. }
+    ));
+    assert_eq!(r.state.list_close_intents().unwrap().len(), 0);
+    let mandates = receipts.mandates();
+    assert_eq!(mandates.len(), 1);
+    assert_eq!(hex::encode(mandates[0].decision.decision_hash), hash);
+    assert_eq!(receipts.effects().len(), 1);
+    r.handle.shutdown().await;
+}
+
+/// The journal alone does not authorize. An intent whose closure hash does not
+/// match the governance receipt it carries fails closed: nothing minted, the
+/// proposal untouched, the intent kept.
+#[tokio::test(flavor = "current_thread")]
+async fn close_intent_with_an_inconsistent_decision_fails_closed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    fx.vote_for().await;
+
+    fx.fail_store.arm(b"gov:proposal:");
+    fx.backend.fail_effect_write.store(true, Ordering::SeqCst);
+    fx.close().await.unwrap_err();
+    fx.fail_store.disarm();
+    fx.backend.fail_effect_write.store(false, Ordering::SeqCst);
+    let mut intent = fx.state().list_close_intents().unwrap().remove(0);
+    assert!(intent.receipts.governance_receipt.is_some());
+    intent.governance_decision_hash = Some(hex::encode([0x33u8; 32]));
+    fx.state().save_close_intent(&intent).unwrap();
+
+    fx.handle.recover_incomplete_closes().await;
+    assert_eq!(fx.backend.mandate_writes(), 0);
+    assert_eq!(fx.backend.effect_writes(), 0);
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+    assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
+
+    fx.handle.shutdown().await;
+}
+
+/// An institutional-effect record already stored for the proposal under
+/// ANOTHER decision hash is not this close's effect. Before the fix the close
+/// treated `AlreadyEmitted` as success and went on to mint a mandate bound to
+/// its own hash beside it. Now the closure is refused: no mandate, the
+/// proposal stays Open and the durable intent is kept for reconciliation.
+#[tokio::test(flavor = "current_thread")]
+async fn close_refuses_an_effect_bound_to_another_decision() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fx = Fixture::open(tmp.path()).await;
+    let payload = fx
+        .state()
+        .get_proposal(&fx.proposal_id)
+        .unwrap()
+        .unwrap()
+        .payload;
+    icn_governance_actor::institutional_effect::emit_accepted_effect(
+        fx.backend.as_ref(),
+        &fx.proposal_id.0,
+        &fx.domain_id.0,
+        Some([0x5au8; 32]),
+        &payload,
+        1,
+    )
+    .unwrap();
+    fx.vote_for().await;
+
+    let err = fx.close().await.unwrap_err().to_string();
+    assert!(
+        err.contains("already bound to a different decision"),
+        "{err}"
+    );
+    assert_eq!(fx.backend.mandate_writes(), 0);
+    assert_eq!(fx.backend.grant_count(), 0);
+    assert_eq!(fx.backend.effects().len(), 1);
+    assert!(matches!(fx.stored_state(), ProposalState::Open { .. }));
+    assert_eq!(fx.state().list_close_intents().unwrap().len(), 1);
+
+    fx.handle.shutdown().await;
 }
