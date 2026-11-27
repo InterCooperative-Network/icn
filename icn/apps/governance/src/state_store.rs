@@ -258,7 +258,7 @@ pub(crate) fn proposal_key_prefix() -> &'static [u8] {
     b"gov:proposal:"
 }
 
-fn vote_key(proposal_id: &ProposalId, voter: &Did) -> Vec<u8> {
+pub(crate) fn vote_key(proposal_id: &ProposalId, voter: &Did) -> Vec<u8> {
     format!("gov:vote:{}:{}", proposal_id.0, voter).into_bytes()
 }
 
@@ -266,7 +266,7 @@ fn vote_key_prefix(proposal_id: &ProposalId) -> Vec<u8> {
     format!("gov:vote:{}:", proposal_id.0).into_bytes()
 }
 
-fn delegation_key(id: &DelegationId) -> Vec<u8> {
+pub(crate) fn delegation_key(id: &DelegationId) -> Vec<u8> {
     format!("gov:delegation:{}", id.0).into_bytes()
 }
 
