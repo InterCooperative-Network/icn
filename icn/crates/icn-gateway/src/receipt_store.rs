@@ -1576,11 +1576,18 @@ impl ReceiptStore {
             return Ok(());
         }
         let own = mandate.id.0.hyphenated().to_string();
-        let legacy: Vec<String> = self
-            .indexed_mandate_ids(proposal_id)?
-            .into_iter()
-            .filter(|id| *id != own)
-            .collect();
+        let indexed = self.indexed_mandate_ids(proposal_id)?;
+        // Count every indexed mandate, including the one being written: a rewrite of one of
+        // several legacy duplicates must not make the others look like a single legacy
+        // mandate and get adopted. Ambiguous history is refused, never resolved.
+        if indexed.len() > 1 {
+            return Err(format!(
+                "{MANDATE_IDENTITY_AMBIGUOUS}: proposal '{proposal_id}' has {} mandates and no \
+                 identity entry; refusing to choose one",
+                indexed.len()
+            ));
+        }
+        let legacy: Vec<String> = indexed.into_iter().filter(|id| *id != own).collect();
         match legacy.as_slice() {
             [] => Ok(()),
             [only] => {
@@ -1640,6 +1647,16 @@ impl ReceiptStore {
         {
             let id_str = std::str::from_utf8(&id)
                 .map_err(|e| format!("mandate identity value not UTF-8: {e}"))?;
+            // An identity entry beside more than one indexed mandate is contradictory history
+            // (the identity cannot vouch for the others): fail closed.
+            let indexed = self.indexed_mandate_ids(proposal_id)?;
+            if indexed.len() > 1 {
+                return Err(format!(
+                    "{MANDATE_IDENTITY_AMBIGUOUS}: proposal '{proposal_id}' has an identity entry \
+                     and {} indexed mandates",
+                    indexed.len()
+                ));
+            }
             return self.load_mandate(id_str)?.map(Some).ok_or_else(|| {
                 format!(
                     "mandate identity skew: proposal '{proposal_id}' names mandate {id_str} \
@@ -6485,6 +6502,33 @@ mod mandate_identity_tests {
                 id.as_bytes(),
             )
             .unwrap();
+    }
+
+    #[test]
+    fn rewriting_one_of_two_consistent_legacy_duplicates_does_not_adopt_the_other() {
+        // S30 review FOLLOW_UP: two legacy mandates bound to the same decision and payload.
+        // A same-id write of one of them must not make the other look like a single legacy
+        // mandate and adopt it: ambiguous history is refused on write and on read.
+        let store = ReceiptStore::new(temp_db());
+        let a = mandate("p-dup", [1u8; 32], [7u8; 32], 10);
+        let b = mandate("p-dup", [1u8; 32], [7u8; 32], 11);
+        put_legacy(&store, &a);
+        put_legacy(&store, &b);
+        let err = store.put_mandate(&a).unwrap_err();
+        assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
+        let err = store.get_mandate_by_proposal("p-dup").unwrap_err();
+        assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
+        assert_eq!(indexed(&store, "p-dup").len(), 2, "nothing removed");
+        let report = store.mandate_identity_report().unwrap();
+        assert_eq!(
+            report
+                .iter()
+                .find(|r| r.proposal_id == "p-dup")
+                .unwrap()
+                .class,
+            MandateIdentityClass::Ambiguous,
+            "no identity entry was written"
+        );
     }
 
     /// Legacy records: a single consistent mandate is adopted (its identity is
