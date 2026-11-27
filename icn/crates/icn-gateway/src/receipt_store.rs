@@ -6529,6 +6529,17 @@ mod mandate_identity_tests {
             MandateIdentityClass::Ambiguous,
             "no identity entry was written"
         );
+        // An identity entry beside several indexed mandates (contradictory history) is not
+        // trusted on read: the read fails closed instead of returning the named mandate.
+        store
+            .db
+            .insert(
+                ReceiptStore::mandate_identity_key("p-dup"),
+                a.id.0.hyphenated().to_string().as_bytes(),
+            )
+            .unwrap();
+        let err = store.get_mandate_by_proposal("p-dup").unwrap_err();
+        assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
     }
 
     /// Legacy records: a single consistent mandate is adopted (its identity is
