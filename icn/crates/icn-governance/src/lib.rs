@@ -163,7 +163,7 @@ pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
     ExecutionClosureClass, FederationProposal, FederationTerms, ForcedOutcome, MembershipAction,
     Proposal, ProposalId, ProposalPayload, ProposalScope, ProposalState, ResourceAccessAction,
-    TreasuryApprovalType, TreasuryProposalOperation, Version,
+    TreasuryApprovalType, TreasuryProposalOperation, Version, MAX_REPRESENTABLE_DEADLINE_SECS,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver, TrustServiceMembershipResolver};
 pub use sdis::{
