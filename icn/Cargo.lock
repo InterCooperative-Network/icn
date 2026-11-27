@@ -4076,6 +4076,7 @@ dependencies = [
  "icn-compute",
  "icn-core",
  "icn-encoding",
+ "icn-gateway",
  "icn-gossip",
  "icn-governance",
  "icn-governance-actor",

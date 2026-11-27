@@ -17,12 +17,13 @@
 //! ## Deferred installation
 //!
 //! Daemon bootstrap constructs [`DeferredDispatchEvidenceSink`] *before*
-//! the gateway creates the backing receipt store. The deferred sink is
-//! plumbed into the kernel via `BootstrapHandles.dispatch_evidence_sink`;
-//! later, the gateway calls [`DeferredDispatchEvidenceSink::install_backend`]
-//! with the concrete `ReceiptStore` once it is open. Any acceptance that
-//! completes before installation logs a debug line and writes no
-//! evidence — honest best-effort behavior during the startup window.
+//! the governance actor exists. The deferred sink is plumbed into the kernel
+//! via `BootstrapHandles.dispatch_evidence_sink`; later, the supervisor's
+//! governance evidence initialization calls
+//! [`DeferredDispatchEvidenceSink::install_backend`] with the shared receipt
+//! store, before close recovery and before any API accepts requests. Any
+//! acceptance that completes before installation logs a debug line and writes
+//! no evidence.
 
 use std::sync::{Arc, OnceLock};
 
@@ -325,16 +326,16 @@ impl DispatchEvidenceSink for GovernanceDispatchEvidenceSink {
 /// Dispatch-evidence sink with deferred backend installation.
 ///
 /// Daemon bootstrap must provide a [`DispatchEvidenceSink`] to the
-/// kernel before the gateway has opened its sled-backed `ReceiptStore`.
+/// kernel before the governance actor exists and its receipt store is installed.
 /// This type fills that window: construct it at bootstrap (empty),
 /// hand `Arc<Self>` to the kernel as the sink, and later call
 /// [`install_backend`] once the real backend is available.
 ///
 /// Writes before installation are silent no-ops with a debug log —
 /// honest best-effort semantics, not a silent data loss hole:
-/// the only realistic window is the narrow slice between supervisor
-/// spawn and gateway startup, during which no proposal acceptance
-/// should be running anyway.
+/// the only realistic window is the slice between actor spawn and the
+/// supervisor's governance evidence initialization, during which the
+/// scheduler is held and no API accepts requests.
 ///
 /// [`install_backend`]: DeferredDispatchEvidenceSink::install_backend
 pub struct DeferredDispatchEvidenceSink {
@@ -355,9 +356,8 @@ impl DeferredDispatchEvidenceSink {
     }
 
     /// Install the concrete receipt backend. Idempotent: a second call
-    /// is ignored (first install wins) and logs a warning. The daemon
-    /// calls this exactly once, immediately after `ReceiptStore`
-    /// initialization.
+    /// is ignored (first install wins) and logs a warning. The supervisor's
+    /// governance evidence initialization calls this exactly once.
     pub fn install_backend(&self, backend: Arc<dyn GovernanceReceiptBackend>) {
         let sink = GovernanceDispatchEvidenceSink::new(backend);
         if self.inner.set(sink).is_err() {

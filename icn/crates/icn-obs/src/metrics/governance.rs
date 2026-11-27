@@ -52,6 +52,20 @@ pub fn init_descriptions() {
         "Number of proposals scanned in last cleanup run"
     );
 
+    // Startup close-journal recovery (supervisor governance evidence init)
+    describe_gauge!(
+        "icn_governance_close_recovery_residual",
+        "Journaled closes the last startup recovery left incomplete (retained for the next replay)"
+    );
+    describe_counter!(
+        "icn_governance_close_recovery_completed_total",
+        "Journaled closes completed by startup recovery"
+    );
+    describe_gauge!(
+        "icn_governance_close_recovery_scan_failed",
+        "1 if the last startup recovery could not scan the close journal (residual unknown), else 0"
+    );
+
     // Domain metrics
     describe_counter!(
         "icn_governance_domains_created_total",
@@ -360,4 +374,21 @@ pub fn scope_overlap_storage_errors_inc() {
 /// Increment deserialization failures counter
 pub fn deserialization_failures_inc() {
     counter!("icn_governance_deserialization_failures_total").increment(1);
+}
+
+// Startup close-journal recovery
+
+/// Set the number of journaled closes the last startup recovery left incomplete
+pub fn close_recovery_residual_set(residual: usize) {
+    gauge!("icn_governance_close_recovery_residual").set(residual as f64);
+}
+
+/// Add journaled closes completed by startup recovery
+pub fn close_recovery_completed_inc(completed: usize) {
+    counter!("icn_governance_close_recovery_completed_total").increment(completed as u64);
+}
+
+/// Record whether the last startup recovery failed to scan the close journal
+pub fn close_recovery_scan_failed_set(failed: bool) {
+    gauge!("icn_governance_close_recovery_scan_failed").set(if failed { 1.0 } else { 0.0 });
 }

@@ -31,14 +31,9 @@ pub struct GatewayHandles {
     /// Governance handle for governance operations
     pub governance: Option<icn_gateway::governance_mgr::GovernanceHandle>,
     /// Concrete actor-backed governance handle (parallel to the trait-object
-    /// `governance` handle above). Needed so the gateway can install its
-    /// receipt_store on the actor via `install_receipt_store`, closing the
-    /// actor-path parity gap for force-close accept and deadline auto-close
-    /// (which would otherwise emit no `InstitutionalEffectRecord`).
-    ///
-    /// The trait-object `governance` alias (`Arc<dyn GovernanceOps>`) does
-    /// not expose the setter because doing so would pull
-    /// `GovernanceReceiptBackend` (app-layer) into the kernel trait.
+    /// `governance` handle above), for the gateway's decision-commitment
+    /// reads. A gateway given this handle refuses to start without
+    /// `shared_store`.
     pub governance_actor_handle: Option<icn_governance_actor::GovernanceHandle>,
     /// Treasury handle for treasury operations
     pub treasury: Option<icn_gateway::TreasuryHandle>,
@@ -71,11 +66,13 @@ pub struct GatewayHandles {
     pub federation_service: Option<Arc<dyn icn_kernel_api::FederationService>>,
     /// Settlement engine for compute audit queries (task_id → settled status).
     pub settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
-    /// Deferred dispatch-evidence sink: the gateway calls
-    /// `install_backend(receipt_store)` on this once it opens its
-    /// `ReceiptStore`, activating durable actor-path dispatch evidence.
-    pub dispatch_evidence_sink_installer:
-        Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
+    /// The daemon's single open of `<data_dir>/gateway_store` (database and
+    /// receipt store). The gateway uses it instead of opening the path.
+    pub shared_store: Option<icn_gateway::shared_store::SharedGatewayStore>,
+    /// Proof that governance evidence initialization completed. Required
+    /// whenever `governance_actor_handle` is set; the gateway refuses to start
+    /// without it.
+    pub governance_evidence: Option<super::init_governance_evidence::GovernanceEvidenceSettled>,
     /// Runtime-owned execution-record store the decision executor writes to.
     /// Shared into the gateway receipt-chain read API so audit reads see real
     /// execution records instead of an empty temp-store fallback (Gap C).
@@ -86,10 +83,6 @@ pub struct GatewayHandles {
     /// authenticated surface is rejected on the other. Its presence is what
     /// lets the gateway assemble the institutional authority profile.
     pub revocation_store: Option<Arc<dyn icn_store::Store>>,
-    /// Execution-record retention cleanup deferred to run after the gateway's
-    /// dispatch-evidence backfill (Issue #1987 follow-up), so pruning cannot
-    /// delete a terminal record whose evidence the backfill still needs to heal.
-    pub post_backfill_cleanup: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -97,8 +90,7 @@ pub struct GatewayHandles {
 /// The gateway runs in a dedicated thread with its own tokio runtime
 /// because actix-web has specific runtime requirements.
 ///
-/// Returns [`GatewayStartup::Ready`] only after the gateway has initialized
-/// (installing the governance evidence sinks and running close recovery) and
+/// Returns [`GatewayStartup::Ready`] only after the gateway has initialized and
 /// bound its socket; [`GatewayStartup::Disabled`] when configured off; and
 /// [`GatewayStartup::Failed`] with the cause otherwise.
 pub async fn spawn_gateway(
@@ -109,6 +101,14 @@ pub async fn spawn_gateway(
     if !config.enabled {
         debug!("Gateway API disabled in configuration");
         return GatewayStartup::Disabled;
+    }
+
+    // Ingress ordering: with a governance actor, the gateway starts only after
+    // governance evidence initialization has completed and settled readiness.
+    if handles.governance_actor_handle.is_some() && handles.governance_evidence.is_none() {
+        warn!("Gateway not started: governance evidence initialization has not settled");
+        icn_obs::metrics::supervisor::error_inc("gateway_governance_evidence_unsettled");
+        return GatewayStartup::Failed(GatewayStartupFailure::GovernanceEvidenceNotSettled);
     }
 
     info!(
@@ -192,10 +192,9 @@ pub async fn spawn_gateway(
     let charter_accepted_hook = handles.charter_accepted_hook;
     let federation_service_handle = handles.federation_service;
     let settlement_engine_handle = handles.settlement_engine;
-    let dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
+    let shared_store = handles.shared_store;
     let execution_query_store = handles.execution_query_store;
     let revocation_store = handles.revocation_store;
-    let post_backfill_cleanup = handles.post_backfill_cleanup;
     let default_trust_score = config.default_trust_score;
     // Dev/demo posture (issue #2075): carried by config (set for the loopback
     // `--insecure-gateway-no-jwt` hatch) instead of an env var, so it does not
@@ -316,8 +315,8 @@ pub async fn spawn_gateway(
                 gateway_server = gateway_server.with_settlement_engine(engine);
             }
 
-            if let Some(installer) = dispatch_evidence_sink_installer {
-                gateway_server = gateway_server.with_dispatch_evidence_sink_installer(installer);
+            if let Some(store) = shared_store {
+                gateway_server = gateway_server.with_shared_store(store);
             }
 
             if let Some(store) = execution_query_store {
@@ -337,10 +336,6 @@ pub async fn spawn_gateway(
                     );
             }
             gateway_server = gateway_server.with_token_lifetime(token_lifetime);
-
-            if let Some(cleanup) = post_backfill_cleanup {
-                gateway_server = gateway_server.with_post_backfill_cleanup(cleanup);
-            }
 
             let result = gateway_server
                 .run_with_startup_signal(startup_tx, activation_rx)
@@ -391,8 +386,7 @@ pub async fn spawn_gateway(
 /// How gateway startup ended, as the supervisor acts on it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GatewayStartup {
-    /// Initialized and bound. Its startup installed the governance evidence
-    /// sinks and ran close recovery before reporting readiness.
+    /// Initialized and bound.
     Ready,
     /// Disabled by configuration: gateway-less operation.
     Disabled,
@@ -407,6 +401,11 @@ pub enum GatewayStartupFailure {
     InvalidConfiguration(String),
     /// Enabled without the required JWT secret.
     MissingCredentials,
+    /// A governance actor is present but governance evidence initialization
+    /// has not settled (no [`GovernanceEvidenceSettled`] was provided).
+    ///
+    /// [`GovernanceEvidenceSettled`]: super::init_governance_evidence::GovernanceEvidenceSettled
+    GovernanceEvidenceNotSettled,
     /// The gateway's async runtime could not be created.
     RuntimeInit(String),
     /// The server exited before readiness (storage initialization, bind, or
@@ -414,72 +413,6 @@ pub enum GatewayStartupFailure {
     ExitedBeforeReadiness(Option<String>),
     /// The server became ready but exited before the supervisor acknowledged it.
     ExitedBeforeActivation,
-}
-
-/// Settle the governance actor's evidence readiness from the gateway outcome.
-///
-/// The gateway is currently the component that installs the governance
-/// receipt store and dispatch-evidence backend and runs close recovery, so:
-/// - `Ready`: recovery has already settled the actor (`Ready`); nothing to do.
-/// - `Disabled`: no evidence path is provisioned; scheduled governance work
-///   proceeds as it always has, without receipt-backed guarantees.
-/// - `Failed`: unless the actor already reached `Ready` (the failure came after
-///   its evidence path was established), hold scheduled work and refuse
-///   terminal transitions rather than complete decisions without evidence.
-///
-/// Returns the governance evidence state in effect, if an actor is present.
-pub fn settle_governance_evidence(
-    startup: &GatewayStartup,
-    governance: Option<&icn_governance_actor::GovernanceHandle>,
-) -> Option<icn_governance_actor::EvidenceReadiness> {
-    use icn_governance_actor::EvidenceReadiness;
-    let handle = governance?;
-    let state = match startup {
-        GatewayStartup::Ready => handle.evidence_readiness(),
-        GatewayStartup::Disabled => {
-            let state = handle.declare_evidence_not_provisioned();
-            info!(
-                ?state,
-                "Gateway disabled: governance runs without receipt-backed evidence"
-            );
-            state
-        }
-        GatewayStartup::Failed(cause) => {
-            let state = handle.mark_evidence_unavailable();
-            if state == EvidenceReadiness::Ready {
-                warn!(
-                    ?cause,
-                    "Gateway failed after governance evidence and recovery were \
-                     established; governance continues"
-                );
-            } else {
-                icn_obs::metrics::supervisor::error_inc("governance_evidence_unavailable");
-                tracing::error!(
-                    ?cause,
-                    ?state,
-                    "Configured gateway failed before governance evidence was \
-                     established: scheduled governance work is held and \
-                     close/veto/force-close are refused until a restart with a \
-                     working evidence path"
-                );
-            }
-            state
-        }
-    };
-    Some(state)
-}
-
-/// Spawn the gateway, then settle governance evidence readiness from how its
-/// startup ended. This is the supervisor's gateway startup step.
-pub async fn start_gateway(
-    config: &GatewayConfig,
-    data_dir: PathBuf,
-    handles: GatewayHandles,
-) -> GatewayStartup {
-    let governance = handles.governance_actor_handle.clone();
-    let startup = spawn_gateway(config, data_dir, handles).await;
-    settle_governance_evidence(&startup, governance.as_ref());
-    startup
 }
 
 #[cfg(test)]

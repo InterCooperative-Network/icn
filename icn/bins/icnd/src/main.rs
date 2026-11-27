@@ -9,6 +9,7 @@
 
 mod community_wiring;
 mod compute_wiring;
+mod governance_store_wiring;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -336,12 +337,25 @@ async fn build_services(
     // Build the deferred dispatch-evidence sink. One Arc is threaded two ways:
     //   - as a trait object into the kernel via `dispatch_evidence_sink` so the
     //     decision executor records per-effect evidence on every accepted proposal.
-    //   - as a concrete installer into the gateway via
-    //     `dispatch_evidence_sink_installer`; the gateway calls `install_backend`
-    //     once its `ReceiptStore` is open, flipping the sink from pre-install
-    //     drop-and-log mode into a durable writer.
+    //   - as a concrete installer via `dispatch_evidence_sink_installer`; the
+    //     supervisor's governance evidence initialization installs the shared
+    //     receipt store as its backend before close recovery.
     let deferred_dispatch_evidence_sink =
         Arc::new(icn_governance_actor::DeferredDispatchEvidenceSink::new());
+
+    // Open `<data_dir>/gateway_store` exactly once and build the one receipt
+    // store over it (its constructor runs the legacy index migration). The
+    // governance view goes to the supervisor's evidence initialization, the
+    // concrete view to the gateway. An open failure (e.g. the store is locked
+    // by another holder) is passed through, not returned: governance is then
+    // held as `Failed` while the rest of the node starts.
+    let governance_store = governance_store_wiring::open_governance_store(&config.data_dir)
+        .inspect_err(|cause| {
+            tracing::error!(
+                error = %cause,
+                "Could not open the governance evidence store; governance will be held"
+            );
+        });
 
     let bootstrap_handles = icn_core::supervisor::BootstrapHandles {
         ledger: ledger_handle,
@@ -366,9 +380,10 @@ async fn build_services(
         // Trait-object view used by the kernel's decision executor.
         dispatch_evidence_sink: Some(deferred_dispatch_evidence_sink.clone()
             as Arc<dyn icn_kernel_api::effects::DispatchEvidenceSink>),
-        // Concrete installer view forwarded to the gateway so it can swap in the
-        // receipt store as the backend once it opens.
+        // Concrete installer view; the supervisor installs the shared receipt
+        // store as its backend during governance evidence initialization.
         dispatch_evidence_sink_installer: Some(deferred_dispatch_evidence_sink),
+        governance_store: Some(governance_store),
     };
 
     Ok((registry, Some(bootstrap_handles)))

@@ -96,11 +96,20 @@ impl RpcConfig {
 /// Spawn the RPC server with all necessary handles
 ///
 /// Returns the compute handle for use by the gateway (if needed)
+///
+/// `governance_evidence` is the proof that governance evidence initialization
+/// (receipt store, dispatch backend, close recovery, backfills) completed and
+/// readiness was settled; the RPC server cannot be started before it exists.
 pub fn spawn_rpc_server(
     config: RpcConfig,
     deps: RpcDeps,
     background_tasks: &mut tokio::task::JoinSet<()>,
+    governance_evidence: &super::init_governance_evidence::GovernanceEvidenceSettled,
 ) -> anyhow::Result<ComputeHandle> {
+    tracing::info!(
+        readiness = ?governance_evidence.readiness(),
+        "RPC ingress starting after governance evidence settlement"
+    );
     // The node's own identity is a construction requirement, not something
     // installed afterwards (#2497).
     //

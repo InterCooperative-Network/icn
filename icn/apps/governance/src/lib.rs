@@ -28,6 +28,7 @@ pub mod actor;
 pub mod close_journal;
 pub mod decision_commitment;
 pub mod dispatch_evidence;
+pub mod dispatch_evidence_backfill;
 pub mod dispatch_evidence_sink;
 pub mod domain_policy_adoption;
 pub mod events;
@@ -50,7 +51,8 @@ pub mod replication_sequence;
 pub mod state_store;
 
 pub use actor::{
-    EvidenceReadiness, GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle,
+    CloseRecoveryReport, CloseRecoveryResidual, EvidenceReadiness, GovernanceActor,
+    GovernanceCommand, GovernanceConfigLite, GovernanceHandle,
 };
 pub use close_journal::{CloseJournalEntry, CloseReceipts, DecisionV3Entry};
 pub use dispatch_evidence::{
