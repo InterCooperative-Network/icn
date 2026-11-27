@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-09-11T08:34:20+00:00",
-  "source_commit": "fbd337ff3dd1cb08f5896af3a21c94dfe0193b2e",
+  "generated": "2026-11-27T05:44:41+00:00",
+  "source_commit": "c207aa69a0c32f38bd509ef0c9face23483529a2",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -1736,6 +1736,7 @@
         "python3 docs/scripts/route_inventory.py --check",
         "cd icn && cargo clippy -p icn-gateway --all-targets -- -D warnings",
         "cd icn && cargo test -p icn-gateway --features sled-storage",
+        "icn-core ratchets cap governance/trust coupling in this crate; a per-package run does not execute them: cd icn && cargo test -p icn-core --lib meaning_firewall",
         "If routes/API shape change, regenerate OpenAPI: cd icn && cargo build -p icnctl && ./target/debug/icnctl api export-openapi -o ../docs/api/openapi.generated.yaml",
         "If the API shape changed, regenerate + check SDK types: cd sdk/typescript && npm ci && npm run generate-types && npm run check-types"
       ],
@@ -1962,7 +1963,8 @@
       "verification_commands": [
         "cd icn && cargo fmt --all --check",
         "cd icn && cargo clippy --workspace --all-targets --all-features -- -D warnings",
-        "cd icn && cargo test"
+        "cd icn && cargo test",
+        "If `cargo test` (workspace) is replaced by per-package runs, still run the workspace-scanning architectural ratchets it would have run: cd icn && cargo test -p icn-core --lib meaning_firewall"
       ],
       "risk_surfaces": [],
       "invariants": [
