@@ -72,8 +72,17 @@
 //! replaying it as a decision without its closure (and, for a force-accept,
 //! as a rejection). Its recovery scan and every close/veto/force-close of
 //! that proposal then fail closed until a binary that understands the
-//! envelope completes the entry. Rolling back past this format while such an
-//! intent is pending is unsupported: roll forward, or let it complete first.
+//! envelope completes the entry. Note that such a binary's
+//! `list_close_intents` fails as a whole on one unparseable entry, so its
+//! startup recovery skips ALL pending intents, not only the enveloped one;
+//! an unrelated proposal's pending close still completes when that proposal
+//! is next closed, vetoed or force-closed.
+//!
+//! Release note / runbook: do not roll back past this format while any
+//! enveloped intent is pending. Since every accepted, execution-required
+//! close (not only a force-accept) now journals its execution closure, that
+//! includes routine closes interrupted before completion. Check that the
+//! close journal is empty (or roll forward) before downgrading.
 
 use serde::{Deserialize, Serialize};
 
