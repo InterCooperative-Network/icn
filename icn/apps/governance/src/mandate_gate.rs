@@ -438,6 +438,11 @@ pub trait MandateGate {
 /// domain targets resolve *actor-first* via
 /// `list_active_authority_grants_by_grantee`, which needs no new index and
 /// inherently enforces the grant-grantee actor binding.
+///
+/// It reads only the receipt backend. It does not consult the stored proposal
+/// state or the close journal, so a mandate resolves as soon as it is written —
+/// for a journaled close that is after the durable close intent and before the
+/// terminal proposal save (see `crate::close_journal`, "Commitment boundary").
 pub struct DefaultMandateGate {
     backend: Arc<dyn GovernanceReceiptBackend>,
 }
