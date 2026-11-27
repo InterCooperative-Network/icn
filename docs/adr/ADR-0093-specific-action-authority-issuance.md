@@ -28,7 +28,7 @@ references:
 Proposed. This ADR is a design for maintainer review. Nothing here is implemented, and
 nothing here changes production issuance until it is accepted.
 
-Revisions 2–4 incorporate an independent architecture review and its delta reviews. The
+Revisions 2–5 incorporate an independent architecture review and its delta reviews (the last delta review: no blockers; revision 5 applies its one-sentence follow-ups). The
 BLOCKERs and FOLLOW_UPs are resolved below; the policy questions are listed under
 *Open maintainer decisions*.
 
@@ -153,7 +153,10 @@ commit-boundary rule, not its replay-by-overwrite mechanics.
 2. **Apply (Db-B, compare-and-put).** Apply the effect only if the domain is in the expected prior state:
    - adoption: `current_policy == expected_prior`;
    - declaration: the domain is absent.
-   The **apply marker** is carried **inside the domain record's own value**: an append-only list of `(mandate id, applied effect)` entries. A single-key compare-and-put therefore covers the effect and its marker together. Later acts append; they never remove or rewrite an entry. No multi-key write is involved, so a partially replayed commit cannot leave a marker without its effect.
+   The **apply marker** is carried **inside the domain record's own value**: an append-only list of `(mandate id, applied effect)` entries. A single-key compare-and-put therefore covers the effect and its marker together. Later acts append; they never rewrite an entry. No multi-key write is involved, so a partially replayed commit cannot leave a marker without its effect.
+   - **Recovery evidence, not history.** Markers exist to recover `InProgress` claims. The durable execution history is the `InstitutionalEffectRecord` in Db-A. An entry may be compacted away once its mandate is terminal there, so the list stays bounded.
+   - **Every writer uses compare-and-put.** Every writer of the institutional-domain key, adoption and declaration included, uses compare-and-put against the exact bytes it read. A plain put would erase markers.
+   - **Older binaries.** An older binary ignores the list on read but erases it on write. §12 therefore requires every claim to be resolved before a downgrade.
 3. **Discharge (Db-A, one transaction).** Move `InProgress → Discharged`, revoke the mandate's grant (`revoked_at`), complete the effect record, and clear the `InProgress` index entry.
 
 **Recovery.** For each `InProgress` mandate, recovery decides by its **apply marker**, never by the domain's current state:
@@ -191,7 +194,9 @@ path. The claim transaction is the fence within one store.
 - **Losing standing.** Live specific-action grants are revoked by a member-removal or freeze decision against the executor, or by an explicit revoke-mandate decision.
 - **Replacement.** Replacing an executor is a new decision, and it also revokes the old mandate. Two live mandates with different content can never both execute.
 - **The claim is the cut-off.** A revocation or replacement that reaches a mandate already `InProgress` does not interrupt it: the claimed execution completes, or recovery resolves it per §5. Only `Pending` mandates are revocable. Revoking a mandate atomically with its claim is refused.
-- **Sealing waits for claims.** Sealing a domain (§11) requires **no** `InProgress` claims for that domain. A seal attempted while a claim exists is refused until the claim resolves. No claim made before a seal can change the domain after it.
+- **Sealing waits for claims.** Sealing a domain (§11) requires **no** `InProgress` claims for that domain. A seal attempted while a claim exists is refused until the claim resolves.
+  - The seal takes the per-domain execution lock and holds it across its claim check and its commit. Claim and apply hold the same lock. The seal row and the claim live in different stores, and the lock is what serializes them; multi-writer is unsupported (§5).
+  - No claim made before a seal can change the domain after it.
 
 ### 7. Idempotent, non-shadowing discharge
 
