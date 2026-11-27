@@ -123,29 +123,7 @@ pub struct MandateIdentityStatus {
     pub class: MandateIdentityClass,
 }
 
-/// Where a proposal's stored mandate stands against the proposal's governance
-/// record ([`ReceiptStore::mandate_authority_inventory`]). Report only.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MandateStanding {
-    /// The proposal is in an accepted terminal state and every mandate is
-    /// bound to the decision hash its record names (the governance receipt,
-    /// or a pending close intent).
-    Consistent,
-    /// The proposal is accepted but no stored decision hash is available to
-    /// compare against (e.g. a forced accept, which stores no v1 receipt).
-    AcceptedUnverified,
-    /// The proposal is accepted but a mandate is bound to another decision.
-    HashMismatch,
-    /// A close of the proposal is durably decided (pending intent) but not
-    /// yet completed; compared against the intent's decision hash.
-    PendingClose,
-    /// The proposal is not in an accepted terminal state (open, vetoed,
-    /// rejected, ...) and has no pending accepted close, yet authority exists
-    /// for it: an orphan, e.g. from a pre-intent preflight of an older binary.
-    Orphan,
-    /// The proposal record is missing from the state store.
-    ProposalMissing,
-}
+pub use icn_governance_actor::mandate_inventory::MandateStanding;
 
 /// One row of [`ReceiptStore::mandate_authority_inventory`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1761,7 +1739,6 @@ impl ReceiptStore {
         &self,
         state: &dyn icn_governance_actor::state_store::GovernanceStateStore,
     ) -> Result<Vec<MandateAuthorityRow>, String> {
-        use icn_governance::{ProposalId, ProposalOutcome, ProposalState};
         let mut rows = Vec::new();
         for identity in self.mandate_identity_report()? {
             let mut hashes = Vec::new();
@@ -1773,46 +1750,13 @@ impl ReceiptStore {
                     }
                 }
             }
-            let pid = ProposalId(identity.proposal_id.clone());
-            let proposal = state
-                .get_proposal(&pid)
-                .map_err(|e| format!("read proposal '{}': {e}", pid.0))?;
-            let intent = state
-                .get_close_intent(&pid)
-                .map_err(|e| format!("read close intent '{}': {e}", pid.0))?;
-            let accepted = |s: &ProposalState| {
-                matches!(
-                    s,
-                    ProposalState::Accepted { .. }
-                        | ProposalState::ForceClosed {
-                            outcome: ProposalOutcome::Accepted,
-                            ..
-                        }
-                )
-            };
-            let receipt_hash = self
-                .get_governance_by_proposal(&pid.0)?
-                .filter(|r| matches!(r.outcome, ProofOutcome::Accepted))
-                .map(|r| hex::encode(r.decision_hash));
-            let matches_all = |h: &str| hashes.iter().all(|x| x == h);
-            let (standing, recorded) = match (&proposal, &intent) {
-                (None, _) => (MandateStanding::ProposalMissing, None),
-                (Some(_), Some(i)) if accepted(&i.proposal.state) => {
-                    let h = i.governance_decision_hash.clone();
-                    match &h {
-                        Some(h) if !matches_all(h) => {
-                            (MandateStanding::HashMismatch, Some(h.clone()))
-                        }
-                        _ => (MandateStanding::PendingClose, h),
-                    }
-                }
-                (Some(p), _) if accepted(&p.state) => match &receipt_hash {
-                    Some(h) if matches_all(h) => (MandateStanding::Consistent, Some(h.clone())),
-                    Some(h) => (MandateStanding::HashMismatch, Some(h.clone())),
-                    None => (MandateStanding::AcceptedUnverified, None),
-                },
-                (Some(_), _) => (MandateStanding::Orphan, receipt_hash),
-            };
+            let (standing, recorded) =
+                icn_governance_actor::mandate_inventory::classify_mandate_standing(
+                    &identity.proposal_id,
+                    &hashes,
+                    state,
+                    self,
+                )?;
             rows.push(MandateAuthorityRow {
                 identity,
                 standing,
@@ -3656,8 +3600,9 @@ mod tests {
     // ========================================================================
 
     use icn_governance::{
-        AuthorityClass, AuthorityGrant, AuthorityGrantId, DecisionProvenance, Grantee,
-        GrantorEntityId, Mandate, TypedScope,
+        sdis::SdisProposal, AuthorityClass, AuthorityGrant, AuthorityGrantId, DecisionProvenance,
+        GovernanceDomainId, Grantee, GrantorEntityId, Mandate, MandateStatus, Proposal,
+        ProposalOutcome, ProposalPayload, ProposalState, TypedScope,
     };
 
     fn make_mandate(proposal_id: &str, decision_hash: Hash, issued_at: u64) -> Mandate {
@@ -6136,581 +6081,596 @@ mod tests {
         let chain = store.list_opaque_for("race_class", "domain-r").unwrap();
         assert_eq!(chain.len(), 1);
     }
-}
 
-/// ADR-0019: exactly one mandate per accepted proposal, enforced by the
-/// receipt store itself (the seam's read-then-write is not enough when two
-/// writers share one store).
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-mod mandate_identity_tests {
-    use super::*;
-    use icn_governance::sdis::SdisProposal;
-    use icn_governance::{DecisionProvenance, GovernanceDomainId, ProposalPayload};
-    use icn_governance_actor::grant_minting::{
-        mint_and_persist_for_accepted, MandateMintOutcome, MANDATE_IDENTITY_CONFLICT,
-    };
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
-
-    const TAKEN: &str = "mandate identity already recorded";
-
-    fn temp_db() -> Db {
-        sled::Config::new().temporary(true).open().unwrap()
-    }
-
-    fn mandate(proposal_id: &str, decision_hash: Hash, payload_hash: Hash, at: u64) -> Mandate {
-        Mandate::new_pending_grants(
-            DecisionProvenance {
-                proposal_id: proposal_id.to_string(),
-                decision_hash,
-            },
-            payload_hash,
-            None,
-            None,
-            at,
-        )
-    }
-
-    /// Mandate ids the by-proposal index lists (independent of the read path
-    /// under test).
-    fn indexed(store: &ReceiptStore, proposal_id: &str) -> Vec<String> {
-        store
-            .db
-            .scan_prefix(ReceiptStore::mandate_by_proposal_scan_prefix(proposal_id))
-            .map(|e| String::from_utf8(e.unwrap().1.to_vec()).unwrap())
-            .collect()
-    }
-
-    fn appoint() -> ProposalPayload {
-        ProposalPayload::Sdis {
-            proposal: SdisProposal::AppointSteward {
-                candidate: Did::from_anchor_id(&[9u8; 32]),
-                sponsors: vec![],
-                region: "nyc".into(),
-                bond_amount: 1_000,
-                term_length: 3_600,
-            },
-        }
-    }
-
-    /// A second mandate id for a proposal that already has one is refused and
-    /// writes nothing — not the mandate, its indexes, nor its grants. Before
-    /// the identity entry both were stored.
-    #[test]
-    fn a_second_mandate_for_one_proposal_is_refused() {
-        let store = ReceiptStore::new(temp_db());
-        let first = mandate("p-two", [1u8; 32], [7u8; 32], 10);
-        let second = mandate("p-two", [1u8; 32], [7u8; 32], 11);
-        store.put_mandate(&first).unwrap();
-        let err = store.put_mandate(&second).unwrap_err();
-        assert!(err.starts_with(TAKEN), "{err}");
-        assert!(err.contains(&first.id.0.hyphenated().to_string()), "{err}");
-        assert_eq!(
-            indexed(&store, "p-two"),
-            vec![first.id.0.hyphenated().to_string()]
-        );
-        assert_eq!(store.get_mandate_by_proposal("p-two").unwrap(), Some(first));
-        assert!(store
-            .db
-            .get(ReceiptStore::mandate_primary_key(&second.id))
-            .unwrap()
-            .is_none());
-    }
-
-    /// The same, for a contradictory decision hash: no overwrite, no second.
-    #[test]
-    fn a_contradictory_mandate_for_one_proposal_is_refused() {
-        let store = ReceiptStore::new(temp_db());
-        let first = mandate("p-contra", [1u8; 32], [7u8; 32], 10);
-        store.put_mandate(&first).unwrap();
-        let contra = mandate("p-contra", [2u8; 32], [7u8; 32], 10);
-        let err = store.put_mandate(&contra).unwrap_err();
-        assert!(err.starts_with(TAKEN), "{err}");
-        assert_eq!(indexed(&store, "p-contra").len(), 1);
-        assert!(store
-            .list_mandates_by_decision(&[2u8; 32])
-            .unwrap()
-            .is_empty());
-        assert_eq!(
-            store.get_mandate_by_proposal("p-contra").unwrap(),
-            Some(first)
-        );
-    }
-
-    /// Eight writers race to record a mandate for one proposal: exactly one
-    /// lands; every other is refused naming the winner.
-    #[test]
-    fn concurrent_writers_record_exactly_one_mandate() {
-        let store = Arc::new(ReceiptStore::new(temp_db()));
-        let barrier = Arc::new(std::sync::Barrier::new(8));
-        let threads: Vec<_> = (0..8)
-            .map(|i| {
-                let store = store.clone();
-                let barrier = barrier.clone();
-                std::thread::spawn(move || {
-                    let m = mandate("p-race", [3u8; 32], [7u8; 32], 100 + i);
-                    barrier.wait();
-                    (m.id.0.hyphenated().to_string(), store.put_mandate(&m))
-                })
-            })
-            .collect();
-        let results: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
-        let winners: Vec<&String> = results
-            .iter()
-            .filter(|(_, r)| r.is_ok())
-            .map(|(id, _)| id)
-            .collect();
-        assert_eq!(winners.len(), 1, "{results:?}");
-        for (_, r) in &results {
-            if let Err(e) = r {
-                assert!(
-                    e.starts_with(TAKEN) && e.contains(winners[0].as_str()),
-                    "{e}"
-                );
-            }
-        }
-        assert_eq!(indexed(&store, "p-race"), vec![winners[0].clone()]);
-    }
-
-    /// Receipt store whose first `stale` by-proposal reads report no mandate:
-    /// models a second writer that read before the first one wrote.
-    struct StaleRead {
-        inner: ReceiptStore,
-        stale: AtomicUsize,
-    }
-
-    impl GovernanceReceiptBackend for StaleRead {
-        fn put_governance(&self, r: &GovernanceDecisionReceipt) -> Result<(), String> {
-            GovernanceReceiptBackend::put_governance(&self.inner, r)
-        }
-        fn get_governance_by_proposal(
-            &self,
-            p: &str,
-        ) -> Result<Option<GovernanceDecisionReceipt>, String> {
-            GovernanceReceiptBackend::get_governance_by_proposal(&self.inner, p)
-        }
-        fn put_allocation(&self, r: &AllocationReceipt) -> Result<Hash, String> {
-            GovernanceReceiptBackend::put_allocation(&self.inner, r)
-        }
-        fn get_governance_by_decision(
-            &self,
-            h: &Hash,
-        ) -> Result<Option<GovernanceDecisionReceipt>, String> {
-            GovernanceReceiptBackend::get_governance_by_decision(&self.inner, h)
-        }
-        fn list_allocations_by_decision(&self, h: &Hash) -> Result<Vec<AllocationReceipt>, String> {
-            GovernanceReceiptBackend::list_allocations_by_decision(&self.inner, h)
-        }
-        fn put_mandate(&self, m: &Mandate) -> Result<(), String> {
-            self.inner.put_mandate(m)
-        }
-        fn get_mandate_by_proposal(&self, p: &str) -> Result<Option<Mandate>, String> {
-            if self
-                .stale
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
-                .is_ok()
-            {
-                return Ok(None);
-            }
-            self.inner.get_mandate_by_proposal(p)
-        }
-        fn put_mandate_with_grants(&self, m: &Mandate, g: &[AuthorityGrant]) -> Result<(), String> {
-            self.inner.put_mandate_with_grants_atomic(m, g)
-        }
-        fn put_authority_grant(&self, g: &AuthorityGrant) -> Result<(), String> {
-            self.inner.put_authority_grant(g)
-        }
-        fn get_authority_grant(
-            &self,
-            id: &AuthorityGrantId,
-        ) -> Result<Option<AuthorityGrant>, String> {
-            self.inner.get_authority_grant(id)
-        }
-    }
-
-    /// Through the acceptance seam: a writer whose idempotency read was stale
-    /// reports the existing mandate (AlreadyMinted) for the same decision and
-    /// writes no second mandate or grant.
-    #[test]
-    fn seam_with_a_stale_read_reports_the_existing_mandate() {
-        let store = StaleRead {
-            inner: ReceiptStore::new(temp_db()),
-            stale: AtomicUsize::new(0),
+    /// ADR-0019: exactly one mandate per accepted proposal, enforced by the
+    /// receipt store itself (the seam's read-then-write is not enough when two
+    /// writers share one store).
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    mod mandate_identity_tests {
+        use super::*;
+        use icn_governance_actor::grant_minting::{
+            mint_and_persist_for_accepted, MandateMintOutcome, MANDATE_IDENTITY_CONFLICT,
         };
-        let dom = GovernanceDomainId("coop:tech".into());
-        let first =
-            mint_and_persist_for_accepted(&store, "p-seam", &dom, [5u8; 32], &appoint(), 1_000)
-                .unwrap();
-        let MandateMintOutcome::Minted { mandate_id, .. } = first else {
-            panic!("{first:?}")
-        };
-        let grants_before = store
-            .inner
-            .list_authority_grants_by_decision(&[5u8; 32])
-            .unwrap();
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
-        store.stale.store(1, Ordering::SeqCst);
-        let again =
-            mint_and_persist_for_accepted(&store, "p-seam", &dom, [5u8; 32], &appoint(), 2_000)
-                .unwrap();
-        assert!(
-            matches!(&again, MandateMintOutcome::AlreadyMinted { mandate_id: id } if *id == mandate_id),
-            "{again:?}"
-        );
-        assert_eq!(indexed(&store.inner, "p-seam").len(), 1);
-        assert_eq!(
+        const TAKEN: &str = "mandate identity already recorded";
+
+        fn temp_db() -> Db {
+            sled::Config::new().temporary(true).open().unwrap()
+        }
+
+        fn mandate(proposal_id: &str, decision_hash: Hash, payload_hash: Hash, at: u64) -> Mandate {
+            Mandate::new_pending_grants(
+                DecisionProvenance {
+                    proposal_id: proposal_id.to_string(),
+                    decision_hash,
+                },
+                payload_hash,
+                None,
+                None,
+                at,
+            )
+        }
+
+        /// Mandate ids the by-proposal index lists (independent of the read path
+        /// under test).
+        fn indexed(store: &ReceiptStore, proposal_id: &str) -> Vec<String> {
             store
+                .db
+                .scan_prefix(ReceiptStore::mandate_by_proposal_scan_prefix(proposal_id))
+                .map(|e| String::from_utf8(e.unwrap().1.to_vec()).unwrap())
+                .collect()
+        }
+
+        fn appoint() -> ProposalPayload {
+            ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: Did::from_anchor_id(&[9u8; 32]),
+                    sponsors: vec![],
+                    region: "nyc".into(),
+                    bond_amount: 1_000,
+                    term_length: 3_600,
+                },
+            }
+        }
+
+        /// A second mandate id for a proposal that already has one is refused and
+        /// writes nothing — not the mandate, its indexes, nor its grants. Before
+        /// the identity entry both were stored.
+        #[test]
+        fn a_second_mandate_for_one_proposal_is_refused() {
+            let store = ReceiptStore::new(temp_db());
+            let first = mandate("p-two", [1u8; 32], [7u8; 32], 10);
+            let second = mandate("p-two", [1u8; 32], [7u8; 32], 11);
+            store.put_mandate(&first).unwrap();
+            let err = store.put_mandate(&second).unwrap_err();
+            assert!(err.starts_with(TAKEN), "{err}");
+            assert!(err.contains(&first.id.0.hyphenated().to_string()), "{err}");
+            assert_eq!(
+                indexed(&store, "p-two"),
+                vec![first.id.0.hyphenated().to_string()]
+            );
+            assert_eq!(store.get_mandate_by_proposal("p-two").unwrap(), Some(first));
+            assert!(store
+                .db
+                .get(ReceiptStore::mandate_primary_key(&second.id))
+                .unwrap()
+                .is_none());
+        }
+
+        /// The same, for a contradictory decision hash: no overwrite, no second.
+        #[test]
+        fn a_contradictory_mandate_for_one_proposal_is_refused() {
+            let store = ReceiptStore::new(temp_db());
+            let first = mandate("p-contra", [1u8; 32], [7u8; 32], 10);
+            store.put_mandate(&first).unwrap();
+            let contra = mandate("p-contra", [2u8; 32], [7u8; 32], 10);
+            let err = store.put_mandate(&contra).unwrap_err();
+            assert!(err.starts_with(TAKEN), "{err}");
+            assert_eq!(indexed(&store, "p-contra").len(), 1);
+            assert!(store
+                .list_mandates_by_decision(&[2u8; 32])
+                .unwrap()
+                .is_empty());
+            assert_eq!(
+                store.get_mandate_by_proposal("p-contra").unwrap(),
+                Some(first)
+            );
+        }
+
+        /// Eight writers race to record a mandate for one proposal: exactly one
+        /// lands; every other is refused naming the winner.
+        #[test]
+        fn concurrent_writers_record_exactly_one_mandate() {
+            let store = Arc::new(ReceiptStore::new(temp_db()));
+            let barrier = Arc::new(std::sync::Barrier::new(8));
+            let threads: Vec<_> = (0..8)
+                .map(|i| {
+                    let store = store.clone();
+                    let barrier = barrier.clone();
+                    std::thread::spawn(move || {
+                        let m = mandate("p-race", [3u8; 32], [7u8; 32], 100 + i);
+                        barrier.wait();
+                        (m.id.0.hyphenated().to_string(), store.put_mandate(&m))
+                    })
+                })
+                .collect();
+            let results: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+            let winners: Vec<&String> = results
+                .iter()
+                .filter(|(_, r)| r.is_ok())
+                .map(|(id, _)| id)
+                .collect();
+            assert_eq!(winners.len(), 1, "{results:?}");
+            for (_, r) in &results {
+                if let Err(e) = r {
+                    assert!(
+                        e.starts_with(TAKEN) && e.contains(winners[0].as_str()),
+                        "{e}"
+                    );
+                }
+            }
+            assert_eq!(indexed(&store, "p-race"), vec![winners[0].clone()]);
+        }
+
+        /// Receipt store whose first `stale` by-proposal reads report no mandate:
+        /// models a second writer that read before the first one wrote.
+        struct StaleRead {
+            inner: ReceiptStore,
+            stale: AtomicUsize,
+        }
+
+        impl GovernanceReceiptBackend for StaleRead {
+            fn put_governance(&self, r: &GovernanceDecisionReceipt) -> Result<(), String> {
+                GovernanceReceiptBackend::put_governance(&self.inner, r)
+            }
+            fn get_governance_by_proposal(
+                &self,
+                p: &str,
+            ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+                GovernanceReceiptBackend::get_governance_by_proposal(&self.inner, p)
+            }
+            fn put_allocation(&self, r: &AllocationReceipt) -> Result<Hash, String> {
+                GovernanceReceiptBackend::put_allocation(&self.inner, r)
+            }
+            fn get_governance_by_decision(
+                &self,
+                h: &Hash,
+            ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+                GovernanceReceiptBackend::get_governance_by_decision(&self.inner, h)
+            }
+            fn list_allocations_by_decision(
+                &self,
+                h: &Hash,
+            ) -> Result<Vec<AllocationReceipt>, String> {
+                GovernanceReceiptBackend::list_allocations_by_decision(&self.inner, h)
+            }
+            fn put_mandate(&self, m: &Mandate) -> Result<(), String> {
+                self.inner.put_mandate(m)
+            }
+            fn get_mandate_by_proposal(&self, p: &str) -> Result<Option<Mandate>, String> {
+                if self
+                    .stale
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+                    .is_ok()
+                {
+                    return Ok(None);
+                }
+                self.inner.get_mandate_by_proposal(p)
+            }
+            fn put_mandate_with_grants(
+                &self,
+                m: &Mandate,
+                g: &[AuthorityGrant],
+            ) -> Result<(), String> {
+                self.inner.put_mandate_with_grants_atomic(m, g)
+            }
+            fn put_authority_grant(&self, g: &AuthorityGrant) -> Result<(), String> {
+                self.inner.put_authority_grant(g)
+            }
+            fn get_authority_grant(
+                &self,
+                id: &AuthorityGrantId,
+            ) -> Result<Option<AuthorityGrant>, String> {
+                self.inner.get_authority_grant(id)
+            }
+        }
+
+        /// Through the acceptance seam: a writer whose idempotency read was stale
+        /// reports the existing mandate (AlreadyMinted) for the same decision and
+        /// writes no second mandate or grant.
+        #[test]
+        fn seam_with_a_stale_read_reports_the_existing_mandate() {
+            let store = StaleRead {
+                inner: ReceiptStore::new(temp_db()),
+                stale: AtomicUsize::new(0),
+            };
+            let dom = GovernanceDomainId("coop:tech".into());
+            let first =
+                mint_and_persist_for_accepted(&store, "p-seam", &dom, [5u8; 32], &appoint(), 1_000)
+                    .unwrap();
+            let MandateMintOutcome::Minted { mandate_id, .. } = first else {
+                panic!("{first:?}")
+            };
+            let grants_before = store
                 .inner
                 .list_authority_grants_by_decision(&[5u8; 32])
-                .unwrap(),
-            grants_before,
-            "no second grant"
-        );
-    }
+                .unwrap();
 
-    /// The same race with a contradictory decision is a conflict, not reuse.
-    #[test]
-    fn seam_with_a_stale_read_and_another_decision_is_a_conflict() {
-        let store = StaleRead {
-            inner: ReceiptStore::new(temp_db()),
-            stale: AtomicUsize::new(0),
-        };
-        let dom = GovernanceDomainId("coop:tech".into());
-        mint_and_persist_for_accepted(&store, "p-seam2", &dom, [5u8; 32], &appoint(), 1_000)
-            .unwrap();
-        store.stale.store(1, Ordering::SeqCst);
-        let err =
-            mint_and_persist_for_accepted(&store, "p-seam2", &dom, [6u8; 32], &appoint(), 2_000)
-                .unwrap_err();
-        assert!(err.starts_with(MANDATE_IDENTITY_CONFLICT), "{err}");
-        assert_eq!(indexed(&store.inner, "p-seam2").len(), 1);
-        assert!(store
-            .inner
-            .list_authority_grants_by_decision(&[6u8; 32])
-            .unwrap()
-            .is_empty());
-    }
-
-    /// The identity survives a real reopen of the sled `Db`.
-    #[test]
-    fn a_reopened_store_still_refuses_a_second_mandate() {
-        let dir = tempfile::tempdir().unwrap();
-        let first = mandate("p-reopen", [1u8; 32], [7u8; 32], 10);
-        {
-            let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
-            store.put_mandate(&first).unwrap();
-            store.db.flush().unwrap();
-        }
-        let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
-        let err = store
-            .put_mandate(&mandate("p-reopen", [1u8; 32], [7u8; 32], 11))
-            .unwrap_err();
-        assert!(err.starts_with(TAKEN), "{err}");
-        assert_eq!(
-            indexed(&store, "p-reopen"),
-            vec![first.id.0.hyphenated().to_string()]
-        );
-        assert_eq!(
-            store.get_mandate_by_proposal("p-reopen").unwrap(),
-            Some(first)
-        );
-    }
-
-    /// The same mandate id must not let a rewrite replace its immutable
-    /// commitments (decision hash, payload hash, grant set). Only the lifecycle
-    /// status may change; the stored record and indexes stay as they were.
-    #[test]
-    fn same_id_rewrite_cannot_replace_commitments() {
-        let store = ReceiptStore::new(temp_db());
-        let first = mandate("p-same-id", [1u8; 32], [7u8; 32], 10);
-        store.put_mandate(&first).unwrap();
-        let stored = |s: &ReceiptStore| {
-            s.db.get(ReceiptStore::mandate_primary_key(&first.id))
-                .unwrap()
-                .unwrap()
-                .to_vec()
-        };
-        let before = stored(&store);
-
-        let mut other_decision = first.clone();
-        other_decision.decision.decision_hash = [2u8; 32];
-        let mut other_payload = first.clone();
-        other_payload.payload_hash = [8u8; 32];
-        let mut other_grants = first.clone();
-        other_grants.grants = vec![AuthorityGrantId::new()];
-        for (what, m) in [
-            ("decision", other_decision),
-            ("payload", other_payload),
-            ("grants", other_grants),
-        ] {
-            let res = store.put_mandate(&m);
+            store.stale.store(1, Ordering::SeqCst);
+            let again =
+                mint_and_persist_for_accepted(&store, "p-seam", &dom, [5u8; 32], &appoint(), 2_000)
+                    .unwrap();
             assert!(
-                res.is_err(),
-                "{what}: a same-id rewrite replaced a commitment"
+                matches!(&again, MandateMintOutcome::AlreadyMinted { mandate_id: id } if *id == mandate_id),
+                "{again:?}"
             );
-            assert_eq!(stored(&store), before, "{what}: stored bytes changed");
+            assert_eq!(indexed(&store.inner, "p-seam").len(), 1);
+            assert_eq!(
+                store
+                    .inner
+                    .list_authority_grants_by_decision(&[5u8; 32])
+                    .unwrap(),
+                grants_before,
+                "no second grant"
+            );
         }
-        assert!(store
-            .list_mandates_by_decision(&[2u8; 32])
-            .unwrap()
-            .is_empty());
-        assert_eq!(
-            store.get_mandate_by_proposal("p-same-id").unwrap(),
-            Some(first.clone())
-        );
 
-        // A lifecycle status change on the same id is still a permitted rewrite.
-        let mut progressed = first.clone();
-        progressed.status = icn_governance::MandateStatus::InProgress;
-        store.put_mandate(&progressed).unwrap();
-        assert_eq!(
-            store
-                .get_mandate_by_proposal("p-same-id")
-                .unwrap()
-                .map(|m| m.status),
-            Some(icn_governance::MandateStatus::InProgress)
-        );
-    }
-
-    /// Write a mandate exactly as a pre-identity binary did: primary + both
-    /// indexes, no identity entry.
-    fn put_legacy(store: &ReceiptStore, m: &Mandate) {
-        let id = m.id.0.hyphenated().to_string();
-        store
-            .db
-            .insert(
-                ReceiptStore::mandate_primary_key(&m.id),
-                serde_json::to_vec(m).unwrap(),
+        /// The same race with a contradictory decision is a conflict, not reuse.
+        #[test]
+        fn seam_with_a_stale_read_and_another_decision_is_a_conflict() {
+            let store = StaleRead {
+                inner: ReceiptStore::new(temp_db()),
+                stale: AtomicUsize::new(0),
+            };
+            let dom = GovernanceDomainId("coop:tech".into());
+            mint_and_persist_for_accepted(&store, "p-seam2", &dom, [5u8; 32], &appoint(), 1_000)
+                .unwrap();
+            store.stale.store(1, Ordering::SeqCst);
+            let err = mint_and_persist_for_accepted(
+                &store,
+                "p-seam2",
+                &dom,
+                [6u8; 32],
+                &appoint(),
+                2_000,
             )
-            .unwrap();
-        store
-            .db
-            .insert(
-                ReceiptStore::mandate_by_proposal_key(&m.decision.proposal_id, m.issued_at, &m.id),
-                id.as_bytes(),
-            )
-            .unwrap();
-        store
-            .db
-            .insert(
-                ReceiptStore::mandate_by_decision_key(
-                    &m.decision.decision_hash,
-                    m.issued_at,
-                    &m.id,
-                ),
-                id.as_bytes(),
-            )
-            .unwrap();
-    }
-
-    #[test]
-    fn rewriting_one_of_two_consistent_legacy_duplicates_does_not_adopt_the_other() {
-        // S30 review FOLLOW_UP: two legacy mandates bound to the same decision and payload.
-        // A same-id write of one of them must not make the other look like a single legacy
-        // mandate and adopt it: ambiguous history is refused on write and on read.
-        let store = ReceiptStore::new(temp_db());
-        let a = mandate("p-dup", [1u8; 32], [7u8; 32], 10);
-        let b = mandate("p-dup", [1u8; 32], [7u8; 32], 11);
-        put_legacy(&store, &a);
-        put_legacy(&store, &b);
-        let err = store.put_mandate(&a).unwrap_err();
-        assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
-        let err = store.get_mandate_by_proposal("p-dup").unwrap_err();
-        assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
-        assert_eq!(indexed(&store, "p-dup").len(), 2, "nothing removed");
-        let report = store.mandate_identity_report().unwrap();
-        assert_eq!(
-            report
-                .iter()
-                .find(|r| r.proposal_id == "p-dup")
-                .unwrap()
-                .class,
-            MandateIdentityClass::Ambiguous,
-            "no identity entry was written"
-        );
-        // An identity entry beside several indexed mandates (contradictory history) is not
-        // trusted on read: the read fails closed instead of returning the named mandate.
-        store
-            .db
-            .insert(
-                ReceiptStore::mandate_identity_key("p-dup"),
-                a.id.0.hyphenated().to_string().as_bytes(),
-            )
-            .unwrap();
-        let err = store.get_mandate_by_proposal("p-dup").unwrap_err();
-        assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
-    }
-
-    /// Legacy records: a single consistent mandate is adopted (its identity is
-    /// recorded, no new mandate written); an inconsistent one is refused and
-    /// not adopted; two are refused by reads and writes alike. The report
-    /// classifies each without writing.
-    #[test]
-    fn legacy_mandates_are_adopted_only_when_single_and_consistent() {
-        let store = ReceiptStore::new(temp_db());
-        let single = mandate("p-legacy-1", [1u8; 32], [7u8; 32], 10);
-        put_legacy(&store, &single);
-        let other = mandate("p-legacy-x", [1u8; 32], [7u8; 32], 10);
-        put_legacy(&store, &other);
-        let a = mandate("p-legacy-2", [1u8; 32], [7u8; 32], 10);
-        let b = mandate("p-legacy-2", [1u8; 32], [7u8; 32], 11);
-        put_legacy(&store, &a);
-        put_legacy(&store, &b);
-
-        let report = store.mandate_identity_report().unwrap();
-        let class = |p: &str| report.iter().find(|r| r.proposal_id == p).unwrap().class;
-        assert_eq!(class("p-legacy-1"), MandateIdentityClass::LegacySingle);
-        assert_eq!(class("p-legacy-2"), MandateIdentityClass::Ambiguous);
-        assert_eq!(
-            store.mandate_identity_report().unwrap(),
-            report,
-            "read-only"
-        );
-
-        // Consistent: adopted.
-        let err = store
-            .put_mandate(&mandate("p-legacy-1", [1u8; 32], [7u8; 32], 20))
             .unwrap_err();
-        assert!(err.starts_with(TAKEN), "{err}");
-        assert_eq!(
-            indexed(&store, "p-legacy-1"),
-            vec![single.id.0.hyphenated().to_string()]
-        );
-        let report = store.mandate_identity_report().unwrap();
-        assert_eq!(
-            report
-                .iter()
-                .find(|r| r.proposal_id == "p-legacy-1")
+            assert!(err.starts_with(MANDATE_IDENTITY_CONFLICT), "{err}");
+            assert_eq!(indexed(&store.inner, "p-seam2").len(), 1);
+            assert!(store
+                .inner
+                .list_authority_grants_by_decision(&[6u8; 32])
                 .unwrap()
-                .class,
-            MandateIdentityClass::Keyed
-        );
+                .is_empty());
+        }
 
-        // Inconsistent: refused, nothing adopted.
-        let err = store
-            .put_mandate(&mandate("p-legacy-x", [9u8; 32], [7u8; 32], 20))
-            .unwrap_err();
-        assert!(err.starts_with(TAKEN), "{err}");
-        assert_eq!(
-            store
-                .mandate_identity_report()
-                .unwrap()
-                .iter()
-                .find(|r| r.proposal_id == "p-legacy-x")
-                .unwrap()
-                .class,
-            MandateIdentityClass::LegacySingle
-        );
-
-        // Two: refused by reads and writes, nothing chosen.
-        let err = store.get_mandate_by_proposal("p-legacy-2").unwrap_err();
-        assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
-        let err = store
-            .put_mandate(&mandate("p-legacy-2", [1u8; 32], [7u8; 32], 20))
-            .unwrap_err();
-        assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
-        assert_eq!(indexed(&store, "p-legacy-2").len(), 2);
-    }
-
-    /// An identity entry whose mandate primary is missing is skew: reads fail
-    /// closed and the report flags it.
-    #[test]
-    fn identity_without_its_mandate_is_skew() {
-        let store = ReceiptStore::new(temp_db());
-        let m = mandate("p-skew", [1u8; 32], [7u8; 32], 10);
-        store.put_mandate(&m).unwrap();
-        store
-            .db
-            .remove(ReceiptStore::mandate_primary_key(&m.id))
-            .unwrap();
-        assert!(store.get_mandate_by_proposal("p-skew").is_err());
-        let report = store.mandate_identity_report().unwrap();
-        assert_eq!(report.len(), 1);
-        assert_eq!(report[0].class, MandateIdentityClass::Skew);
-    }
-    /// Cross-store inventory: an orphan mandate (proposal vetoed), a hash
-    /// mismatch against the stored governance receipt, a consistent accepted
-    /// close, a forced accept with nothing to compare against, and a mandate
-    /// whose proposal is missing — each classified, nothing written.
-    #[test]
-    fn authority_inventory_classifies_orphans_and_mismatches() {
-        use icn_governance::{Proposal, ProposalOutcome, ProposalState};
-        use icn_governance_actor::state_store::{GovernanceStateStore, SledGovernanceStateStore};
-        let store = ReceiptStore::new(temp_db());
-        let state_dir = tempfile::tempdir().unwrap();
-        let state_db: Arc<dyn icn_store::Store> =
-            Arc::new(icn_store::SledStore::open(state_dir.path()).unwrap());
-        let state = SledGovernanceStateStore::new(state_db);
-        let dom = GovernanceDomainId("coop:tech".into());
-        let proposal = |s: ProposalState| {
-            let mut p = Proposal::new(
-                dom.clone(),
-                Did::from_anchor_id(&[1u8; 32]),
-                "t".into(),
-                String::new(),
-                appoint(),
+        /// The identity survives a real reopen of the sled `Db`.
+        #[test]
+        fn a_reopened_store_still_refuses_a_second_mandate() {
+            let dir = tempfile::tempdir().unwrap();
+            let first = mandate("p-reopen", [1u8; 32], [7u8; 32], 10);
+            {
+                let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
+                store.put_mandate(&first).unwrap();
+                store.db.flush().unwrap();
+            }
+            let store = ReceiptStore::new(sled::open(dir.path()).unwrap());
+            let err = store
+                .put_mandate(&mandate("p-reopen", [1u8; 32], [7u8; 32], 11))
+                .unwrap_err();
+            assert!(err.starts_with(TAKEN), "{err}");
+            assert_eq!(
+                indexed(&store, "p-reopen"),
+                vec![first.id.0.hyphenated().to_string()]
             );
-            p.state = s;
-            state.save_proposal(&p).unwrap();
-            p.id.0
-        };
-        let receipt = |pid: &str| {
-            let r = GovernanceDecisionReceipt::new(
-                pid.to_string(),
-                dom.0.clone(),
-                ProofOutcome::Accepted,
-                VoteTally::empty(),
-                &[],
+            assert_eq!(
+                store.get_mandate_by_proposal("p-reopen").unwrap(),
+                Some(first)
             );
-            store.put_governance(&r).unwrap();
-            r.decision_hash
-        };
+        }
 
-        let orphan = proposal(ProposalState::Vetoed {
-            vetoed_at: 1,
-            reason: "v".into(),
-        });
-        store
-            .put_mandate(&mandate(&orphan, [1u8; 32], [7u8; 32], 1))
-            .unwrap();
-        let ok = proposal(ProposalState::Accepted { closed_at: 1 });
-        let h = receipt(&ok);
-        store.put_mandate(&mandate(&ok, h, [7u8; 32], 1)).unwrap();
-        let mm = proposal(ProposalState::Accepted { closed_at: 1 });
-        receipt(&mm);
-        store
-            .put_mandate(&mandate(&mm, [2u8; 32], [7u8; 32], 1))
-            .unwrap();
-        let forced = proposal(ProposalState::ForceClosed {
-            outcome: ProposalOutcome::Accepted,
-            closed_at: 1,
-            reason: "f".into(),
-        });
-        store
-            .put_mandate(&mandate(&forced, [3u8; 32], [7u8; 32], 1))
-            .unwrap();
-        store
-            .put_mandate(&mandate("p-gone", [4u8; 32], [7u8; 32], 1))
-            .unwrap();
+        /// The same mandate id must not let a rewrite replace its immutable
+        /// commitments (decision hash, payload hash, grant set). Only the lifecycle
+        /// status may change; the stored record and indexes stay as they were.
+        #[test]
+        fn same_id_rewrite_cannot_replace_commitments() {
+            let store = ReceiptStore::new(temp_db());
+            let first = mandate("p-same-id", [1u8; 32], [7u8; 32], 10);
+            store.put_mandate(&first).unwrap();
+            let stored = |s: &ReceiptStore| {
+                s.db.get(ReceiptStore::mandate_primary_key(&first.id))
+                    .unwrap()
+                    .unwrap()
+                    .to_vec()
+            };
+            let before = stored(&store);
 
-        let rows = store.mandate_authority_inventory(&state).unwrap();
-        let standing = |p: &str| {
-            rows.iter()
-                .find(|r| r.identity.proposal_id == p)
+            let mut other_decision = first.clone();
+            other_decision.decision.decision_hash = [2u8; 32];
+            let mut other_payload = first.clone();
+            other_payload.payload_hash = [8u8; 32];
+            let mut other_grants = first.clone();
+            other_grants.grants = vec![AuthorityGrantId::new()];
+            for (what, m) in [
+                ("decision", other_decision),
+                ("payload", other_payload),
+                ("grants", other_grants),
+            ] {
+                let res = store.put_mandate(&m);
+                assert!(
+                    res.is_err(),
+                    "{what}: a same-id rewrite replaced a commitment"
+                );
+                assert_eq!(stored(&store), before, "{what}: stored bytes changed");
+            }
+            assert!(store
+                .list_mandates_by_decision(&[2u8; 32])
                 .unwrap()
-                .standing
-        };
-        assert_eq!(standing(&orphan), MandateStanding::Orphan);
-        assert_eq!(standing(&ok), MandateStanding::Consistent);
-        assert_eq!(standing(&mm), MandateStanding::HashMismatch);
-        assert_eq!(standing(&forced), MandateStanding::AcceptedUnverified);
-        assert_eq!(standing("p-gone"), MandateStanding::ProposalMissing);
-        assert_eq!(rows.len(), 5);
-        assert_eq!(
-            store.mandate_authority_inventory(&state).unwrap(),
-            rows,
-            "read-only"
-        );
+                .is_empty());
+            assert_eq!(
+                store.get_mandate_by_proposal("p-same-id").unwrap(),
+                Some(first.clone())
+            );
+
+            // A lifecycle status change on the same id is still a permitted rewrite.
+            let mut progressed = first.clone();
+            progressed.status = MandateStatus::InProgress;
+            store.put_mandate(&progressed).unwrap();
+            assert_eq!(
+                store
+                    .get_mandate_by_proposal("p-same-id")
+                    .unwrap()
+                    .map(|m| m.status),
+                Some(MandateStatus::InProgress)
+            );
+        }
+
+        /// Write a mandate exactly as a pre-identity binary did: primary + both
+        /// indexes, no identity entry.
+        fn put_legacy(store: &ReceiptStore, m: &Mandate) {
+            let id = m.id.0.hyphenated().to_string();
+            store
+                .db
+                .insert(
+                    ReceiptStore::mandate_primary_key(&m.id),
+                    serde_json::to_vec(m).unwrap(),
+                )
+                .unwrap();
+            store
+                .db
+                .insert(
+                    ReceiptStore::mandate_by_proposal_key(
+                        &m.decision.proposal_id,
+                        m.issued_at,
+                        &m.id,
+                    ),
+                    id.as_bytes(),
+                )
+                .unwrap();
+            store
+                .db
+                .insert(
+                    ReceiptStore::mandate_by_decision_key(
+                        &m.decision.decision_hash,
+                        m.issued_at,
+                        &m.id,
+                    ),
+                    id.as_bytes(),
+                )
+                .unwrap();
+        }
+
+        #[test]
+        fn rewriting_one_of_two_consistent_legacy_duplicates_does_not_adopt_the_other() {
+            // S30 review FOLLOW_UP: two legacy mandates bound to the same decision and payload.
+            // A same-id write of one of them must not make the other look like a single legacy
+            // mandate and adopt it: ambiguous history is refused on write and on read.
+            let store = ReceiptStore::new(temp_db());
+            let a = mandate("p-dup", [1u8; 32], [7u8; 32], 10);
+            let b = mandate("p-dup", [1u8; 32], [7u8; 32], 11);
+            put_legacy(&store, &a);
+            put_legacy(&store, &b);
+            let err = store.put_mandate(&a).unwrap_err();
+            assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
+            let err = store.get_mandate_by_proposal("p-dup").unwrap_err();
+            assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
+            assert_eq!(indexed(&store, "p-dup").len(), 2, "nothing removed");
+            let report = store.mandate_identity_report().unwrap();
+            assert_eq!(
+                report
+                    .iter()
+                    .find(|r| r.proposal_id == "p-dup")
+                    .unwrap()
+                    .class,
+                MandateIdentityClass::Ambiguous,
+                "no identity entry was written"
+            );
+            // An identity entry beside several indexed mandates (contradictory history) is not
+            // trusted on read: the read fails closed instead of returning the named mandate.
+            store
+                .db
+                .insert(
+                    ReceiptStore::mandate_identity_key("p-dup"),
+                    a.id.0.hyphenated().to_string().as_bytes(),
+                )
+                .unwrap();
+            let err = store.get_mandate_by_proposal("p-dup").unwrap_err();
+            assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
+        }
+
+        /// Legacy records: a single consistent mandate is adopted (its identity is
+        /// recorded, no new mandate written); an inconsistent one is refused and
+        /// not adopted; two are refused by reads and writes alike. The report
+        /// classifies each without writing.
+        #[test]
+        fn legacy_mandates_are_adopted_only_when_single_and_consistent() {
+            let store = ReceiptStore::new(temp_db());
+            let single = mandate("p-legacy-1", [1u8; 32], [7u8; 32], 10);
+            put_legacy(&store, &single);
+            let other = mandate("p-legacy-x", [1u8; 32], [7u8; 32], 10);
+            put_legacy(&store, &other);
+            let a = mandate("p-legacy-2", [1u8; 32], [7u8; 32], 10);
+            let b = mandate("p-legacy-2", [1u8; 32], [7u8; 32], 11);
+            put_legacy(&store, &a);
+            put_legacy(&store, &b);
+
+            let report = store.mandate_identity_report().unwrap();
+            let class = |p: &str| report.iter().find(|r| r.proposal_id == p).unwrap().class;
+            assert_eq!(class("p-legacy-1"), MandateIdentityClass::LegacySingle);
+            assert_eq!(class("p-legacy-2"), MandateIdentityClass::Ambiguous);
+            assert_eq!(
+                store.mandate_identity_report().unwrap(),
+                report,
+                "read-only"
+            );
+
+            // Consistent: adopted.
+            let err = store
+                .put_mandate(&mandate("p-legacy-1", [1u8; 32], [7u8; 32], 20))
+                .unwrap_err();
+            assert!(err.starts_with(TAKEN), "{err}");
+            assert_eq!(
+                indexed(&store, "p-legacy-1"),
+                vec![single.id.0.hyphenated().to_string()]
+            );
+            let report = store.mandate_identity_report().unwrap();
+            assert_eq!(
+                report
+                    .iter()
+                    .find(|r| r.proposal_id == "p-legacy-1")
+                    .unwrap()
+                    .class,
+                MandateIdentityClass::Keyed
+            );
+
+            // Inconsistent: refused, nothing adopted.
+            let err = store
+                .put_mandate(&mandate("p-legacy-x", [9u8; 32], [7u8; 32], 20))
+                .unwrap_err();
+            assert!(err.starts_with(TAKEN), "{err}");
+            assert_eq!(
+                store
+                    .mandate_identity_report()
+                    .unwrap()
+                    .iter()
+                    .find(|r| r.proposal_id == "p-legacy-x")
+                    .unwrap()
+                    .class,
+                MandateIdentityClass::LegacySingle
+            );
+
+            // Two: refused by reads and writes, nothing chosen.
+            let err = store.get_mandate_by_proposal("p-legacy-2").unwrap_err();
+            assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
+            let err = store
+                .put_mandate(&mandate("p-legacy-2", [1u8; 32], [7u8; 32], 20))
+                .unwrap_err();
+            assert!(err.starts_with(MANDATE_IDENTITY_AMBIGUOUS), "{err}");
+            assert_eq!(indexed(&store, "p-legacy-2").len(), 2);
+        }
+
+        /// An identity entry whose mandate primary is missing is skew: reads fail
+        /// closed and the report flags it.
+        #[test]
+        fn identity_without_its_mandate_is_skew() {
+            let store = ReceiptStore::new(temp_db());
+            let m = mandate("p-skew", [1u8; 32], [7u8; 32], 10);
+            store.put_mandate(&m).unwrap();
+            store
+                .db
+                .remove(ReceiptStore::mandate_primary_key(&m.id))
+                .unwrap();
+            assert!(store.get_mandate_by_proposal("p-skew").is_err());
+            let report = store.mandate_identity_report().unwrap();
+            assert_eq!(report.len(), 1);
+            assert_eq!(report[0].class, MandateIdentityClass::Skew);
+        }
+        /// Cross-store inventory: an orphan mandate (proposal vetoed), a hash
+        /// mismatch against the stored governance receipt, a consistent accepted
+        /// close, a forced accept with nothing to compare against, and a mandate
+        /// whose proposal is missing — each classified, nothing written.
+        #[test]
+        fn authority_inventory_classifies_orphans_and_mismatches() {
+            use icn_governance_actor::state_store::{
+                GovernanceStateStore, SledGovernanceStateStore,
+            };
+            let store = ReceiptStore::new(temp_db());
+            let state_dir = tempfile::tempdir().unwrap();
+            let state_db: Arc<dyn icn_store::Store> =
+                Arc::new(icn_store::SledStore::open(state_dir.path()).unwrap());
+            let state = SledGovernanceStateStore::new(state_db);
+            let dom = GovernanceDomainId("coop:tech".into());
+            let proposal = |s: ProposalState| {
+                let mut p = Proposal::new(
+                    dom.clone(),
+                    Did::from_anchor_id(&[1u8; 32]),
+                    "t".into(),
+                    String::new(),
+                    appoint(),
+                );
+                p.state = s;
+                state.save_proposal(&p).unwrap();
+                p.id.0
+            };
+            let receipt = |pid: &str| {
+                let r = GovernanceDecisionReceipt::new(
+                    pid.to_string(),
+                    dom.0.clone(),
+                    ProofOutcome::Accepted,
+                    VoteTally::empty(),
+                    &[],
+                );
+                store.put_governance(&r).unwrap();
+                r.decision_hash
+            };
+
+            let orphan = proposal(ProposalState::Vetoed {
+                vetoed_at: 1,
+                reason: "v".into(),
+            });
+            store
+                .put_mandate(&mandate(&orphan, [1u8; 32], [7u8; 32], 1))
+                .unwrap();
+            let ok = proposal(ProposalState::Accepted { closed_at: 1 });
+            let h = receipt(&ok);
+            store.put_mandate(&mandate(&ok, h, [7u8; 32], 1)).unwrap();
+            let mm = proposal(ProposalState::Accepted { closed_at: 1 });
+            receipt(&mm);
+            store
+                .put_mandate(&mandate(&mm, [2u8; 32], [7u8; 32], 1))
+                .unwrap();
+            let forced = proposal(ProposalState::ForceClosed {
+                outcome: ProposalOutcome::Accepted,
+                closed_at: 1,
+                reason: "f".into(),
+            });
+            store
+                .put_mandate(&mandate(&forced, [3u8; 32], [7u8; 32], 1))
+                .unwrap();
+            store
+                .put_mandate(&mandate("p-gone", [4u8; 32], [7u8; 32], 1))
+                .unwrap();
+
+            let rows = store.mandate_authority_inventory(&state).unwrap();
+            let standing = |p: &str| {
+                rows.iter()
+                    .find(|r| r.identity.proposal_id == p)
+                    .unwrap()
+                    .standing
+            };
+            assert_eq!(standing(&orphan), MandateStanding::Orphan);
+            assert_eq!(standing(&ok), MandateStanding::Consistent);
+            assert_eq!(standing(&mm), MandateStanding::HashMismatch);
+            assert_eq!(standing(&forced), MandateStanding::AcceptedUnverified);
+            assert_eq!(standing("p-gone"), MandateStanding::ProposalMissing);
+            assert_eq!(rows.len(), 5);
+            assert_eq!(
+                store.mandate_authority_inventory(&state).unwrap(),
+                rows,
+                "read-only"
+            );
+        }
     }
 }
