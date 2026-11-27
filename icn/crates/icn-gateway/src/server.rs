@@ -1319,8 +1319,15 @@ impl GatewayServer {
         let governance_manager: Arc<GovernanceManager> =
             if let Some(handle) = self.governance_handle {
                 info!("Governance manager connected to daemon with persistent action items");
+                let manager = GovernanceManager::with_sled_action_items(handle, sled_db_arc);
+                // Authority checks read the governance actor's own durable
+                // decisions (the receipt store installed on it above).
+                let manager = match self.governance_actor_handle.as_ref() {
+                    Some(actor) => manager.with_decision_commitments(actor.decision_commitments()),
+                    None => manager,
+                };
                 Arc::new(
-                    GovernanceManager::with_sled_action_items(handle, sled_db_arc)
+                    manager
                         .with_receipt_store(receipt_store.clone())
                         .with_structure_store(structure_store)
                         .with_activity_store(activity_store)
@@ -2001,9 +2008,20 @@ impl GatewayServer {
             // populating this field now is necessary so the Production startup
             // guard does not fail closed on the gateway path. Bootstrap/Test
             // contexts may still leave this `None` and receive a warning.
-            mandate_gate: Some(Arc::new(icn_governance_actor::DefaultMandateGate::new(
-                receipt_store.clone(),
-            ))),
+            //
+            // The gate verifies decision commitments: a mandate authorizes only
+            // when its proposal committed to exactly that decision and payload
+            // (`icn_governance_actor::decision_commitment`).
+            mandate_gate: Some(Arc::new(
+                icn_governance_actor::DefaultMandateGate::with_shared_commitments(
+                    receipt_store.clone(),
+                    Arc::new(
+                        icn_governance_actor::decision_commitment::SharedManagerCommitments::new(
+                            governance_manager.clone(),
+                        ),
+                    ),
+                ),
+            )),
             // Deployment posture for the governance HTTP context.
             //
             // Resolved from the `ICN_GOVERNANCE_BUILD_MODE` environment variable

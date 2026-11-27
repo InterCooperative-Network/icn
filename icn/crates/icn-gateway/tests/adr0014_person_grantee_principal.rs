@@ -218,7 +218,8 @@ fn mandate_gate_is_representation_invariant_for_person_actors() {
     let (a, b) = alias_pair();
     seed_gate_chain(store.as_ref(), &a);
 
-    let gate = DefaultMandateGate::new(store.clone());
+    // Actor-lookup invariance only; decision commitments are covered elsewhere.
+    let gate = DefaultMandateGate::without_commitment_check(store.clone());
 
     let under_a = gate.require(&gate_request(&a));
     assert!(
@@ -242,7 +243,8 @@ fn control_mandate_gate_refuses_a_different_principal() {
     seed_gate_chain(store.as_ref(), &a);
     let c = icn_identity::KeyPair::generate().unwrap().did().clone();
 
-    let gate = DefaultMandateGate::new(store.clone());
+    // Actor-lookup invariance only; decision commitments are covered elsewhere.
+    let gate = DefaultMandateGate::without_commitment_check(store.clone());
     match gate.require(&gate_request(&c)) {
         Err(MandateGateError::Rejected(r)) => assert_eq!(r, MandateRejection::NoMandate),
         other => panic!("expected NoMandate for an unrelated principal; got {other:?}"),

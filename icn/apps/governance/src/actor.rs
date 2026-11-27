@@ -335,9 +335,19 @@ pub struct GovernanceHandle {
     /// Stored so `shutdown()` can await task completion deterministically instead
     /// of relying on a fixed sleep. Taken (set to None) on first shutdown call.
     scheduler_task: Arc<std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
+    /// Read-only decision-commitment evidence over this actor's durable state
+    /// and installed receipt store (verdicts only).
+    commitments: crate::decision_commitment::ActorDecisionCommitments,
 }
 
 impl GovernanceHandle {
+    /// The authoritative decision-commitment source for this actor.
+    pub fn decision_commitments(
+        &self,
+    ) -> Arc<dyn crate::decision_commitment::DecisionCommitmentSource> {
+        Arc::new(self.commitments.clone())
+    }
+
     /// Signal the background scheduler task to exit and wait for it to complete.
     ///
     /// Sends the shutdown signal and awaits the task's `JoinHandle`, giving a
@@ -641,6 +651,7 @@ impl GovernanceHandle {
         store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
     ) {
         let mut actor = self.inner.write().await;
+        self.commitments.install_receipts(store.clone());
         actor.receipt_store = Some(store);
     }
 
@@ -1372,6 +1383,8 @@ impl GovernanceActor {
 
         // Wrap raw store in typed state store abstraction
         let store: Arc<dyn GovernanceStateStore> = Arc::new(SledGovernanceStateStore::new(store));
+        let commitments_source =
+            crate::decision_commitment::ActorDecisionCommitments::new(store.clone());
 
         // Subscribe to governance topic
         {
@@ -1492,6 +1505,7 @@ impl GovernanceActor {
             executor: None,
             scheduler_shutdown: Arc::new(std::sync::Mutex::new(Some(shutdown_tx))),
             scheduler_task: scheduler_task_slot.clone(),
+            commitments: commitments_source,
         };
 
         // Spawn background timer task for scheduled governance events

@@ -44,13 +44,15 @@
 //! When [`CloseJournalEntry::execution_closure`] is set, `commit` writes the
 //! institutional-effect record and the ADR-0014 mandate (with its grants and
 //! any SDIS lifecycle revocations) *before* the terminal `save_proposal`.
-//! Those records are usable as soon as they are written: the mandate gate
-//! (`crate::mandate_gate::DefaultMandateGate`) reads only the receipt backend
-//! — the mandate by proposal, its grants, their status and validity — and
-//! consults neither the stored proposal state nor this journal. So, between
-//! the mandate write and the terminal save, the stored proposal can still be
-//! `Open` while its mandate resolves. That window is backed by the durable
-//! intent above, never by a decision that could still be refused.
+//! The mandate gate (`crate::mandate_gate::DefaultMandateGate::new`) resolves
+//! a mandate only when its proposal's committed decision — this durable
+//! accepted intent, or the terminal accepted proposal and its single v1
+//! receipt — carries the mandate's decision and payload hash
+//! (`crate::decision_commitment`). So, between the mandate write and the
+//! terminal save, the mandate resolves on the strength of the durable intent
+//! above, never on a decision that could still be refused; a mandate with no
+//! such commitment (written by an older binary, or contradicted) does not
+//! resolve at all.
 //!
 //! # Incomplete intents are not discarded
 //!
