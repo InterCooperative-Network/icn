@@ -46,6 +46,7 @@ use icn_governance::{
     Grantee, GrantorEntityId, Mandate, MandateId, ProposalPayload, Timestamp, TypedScope,
 };
 
+use crate::decision_commitment::{DecisionCommitment, DecisionCommitmentSource};
 use crate::receipt_backend::GovernanceReceiptBackend;
 
 /// Canonical content hash of a `ProposalPayload`.
@@ -125,15 +126,33 @@ pub const MANDATE_IDENTITY_AMBIGUOUS: &str = "mandate_identity_ambiguous";
 /// Caller contract: only invoke after the proposal has been recorded
 /// as `Accepted` and after the governance decision receipt has been
 /// stored (so `decision_hash` binds into the INV-5 chain).
+///
+/// `commitments` answers what the governance owner committed for an
+/// EARLIER decision. It is consulted only when this acceptance derives
+/// authority from an existing grant (steward reconfirmation and
+/// reinstatement copy class and scope from a prior grant); see
+/// [`verify_template_provenance`]. Revocations never consult it. A path
+/// without authoritative commitment evidence passes
+/// [`crate::decision_commitment::UnavailableCommitments`], which declines
+/// derived authority.
 pub fn mint_and_persist_for_accepted(
     backend: &dyn GovernanceReceiptBackend,
+    commitments: &dyn DecisionCommitmentSource,
     proposal_id: &str,
     domain_id: &GovernanceDomainId,
     decision_hash: icn_kernel_api::Hash,
     payload: &ProposalPayload,
     now: Timestamp,
 ) -> Result<MandateMintOutcome, String> {
-    match mint_once(backend, proposal_id, domain_id, decision_hash, payload, now) {
+    match mint_once(
+        backend,
+        commitments,
+        proposal_id,
+        domain_id,
+        decision_hash,
+        payload,
+        now,
+    ) {
         // Another writer recorded this proposal's mandate between our read and
         // our write (or a single pre-identity mandate was adopted). Nothing of
         // ours was written; report the stored mandate only if it is this
@@ -166,6 +185,7 @@ pub fn mint_and_persist_for_accepted(
 
 fn mint_once(
     backend: &dyn GovernanceReceiptBackend,
+    commitments: &dyn DecisionCommitmentSource,
     proposal_id: &str,
     domain_id: &GovernanceDomainId,
     decision_hash: icn_kernel_api::Hash,
@@ -248,8 +268,14 @@ fn mint_once(
     // decision. So lifecycle errors propagate; no mandate is recorded
     // when any revocation write failed, and the retry re-runs the
     // whole seam.
-    let lifecycle_grants =
-        apply_acceptance_lifecycle(backend, payload, domain_id, &decision_prov, now)?;
+    let lifecycle_grants = apply_acceptance_lifecycle(
+        backend,
+        commitments,
+        payload,
+        domain_id,
+        &decision_prov,
+        now,
+    )?;
 
     // Derive zero or more grants from the payload itself. Empty vec is
     // the truthful default for most payload classes today.
@@ -474,6 +500,7 @@ fn derive_sdis_grants(
 /// without error.
 fn apply_acceptance_lifecycle(
     backend: &dyn GovernanceReceiptBackend,
+    commitments: &dyn DecisionCommitmentSource,
     payload: &ProposalPayload,
     domain_id: &GovernanceDomainId,
     decision: &DecisionProvenance,
@@ -546,7 +573,8 @@ fn apply_acceptance_lifecycle(
         // prior grant is found, we decline (return empty) and log: the
         // seam refuses to fabricate bounds a payload did not carry.
         SdisProposal::ReinstateSteward { steward, .. } => Ok(
-            match mint_reinstatement_grant(backend, steward, domain_id, decision, now)? {
+            match mint_reinstatement_grant(backend, commitments, steward, domain_id, decision, now)?
+            {
                 Some(g) => vec![g],
                 None => Vec::new(),
             },
@@ -594,6 +622,7 @@ fn apply_acceptance_lifecycle(
         } => Ok(
             match mint_reconfirmation_grant(
                 backend,
+                commitments,
                 steward,
                 domain_id,
                 decision,
@@ -667,6 +696,9 @@ fn apply_acceptance_lifecycle(
 /// not match `domain_id` are skipped unconditionally. This preserves
 /// the ADR-0014 invariant that revocation is by-grantor: only the
 /// entity that issued a grant can end it.
+///
+/// Revocation does not consult template provenance or any decision
+/// commitment: ending authority is never gated on proving how it began.
 fn revoke_active_grants_for_person(
     backend: &dyn GovernanceReceiptBackend,
     person: &icn_identity::Did,
@@ -727,6 +759,95 @@ fn revoke_active_grants_for_person(
     Ok(())
 }
 
+/// Why a prior grant was not usable as the template for reconfirmation or
+/// reinstatement. Every refusal declines the derived grant (no grant is
+/// minted; the mandate is still recorded); none is an error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TemplateRefusal {
+    /// The template records no deciding decision (`granted_by` is `None`).
+    NoProvenance,
+    /// No mandate of the template's decision both names that decision and
+    /// lists the template among its grants.
+    NotListedByDecisionMandate,
+    /// The template decision's governance receipt was recorded in another
+    /// domain than the one deciding now.
+    ReceiptInOtherDomain {
+        /// Domain the receipt records.
+        receipt_domain: String,
+    },
+    /// The governance owner's commitment for the template's proposal does
+    /// not authorize the listing mandate.
+    NotCommitted(DecisionCommitment),
+}
+
+impl std::fmt::Display for TemplateRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TemplateRefusal::NoProvenance => f.write_str("template_no_provenance"),
+            TemplateRefusal::NotListedByDecisionMandate => {
+                f.write_str("template_not_listed_by_decision_mandate")
+            }
+            TemplateRefusal::ReceiptInOtherDomain { receipt_domain } => {
+                write!(f, "template_receipt_in_other_domain ({receipt_domain})")
+            }
+            TemplateRefusal::NotCommitted(c) => match c {
+                DecisionCommitment::Contradictory(why) | DecisionCommitment::Unknown(why) => {
+                    write!(f, "template_decision_not_committed: {} ({why})", c.label())
+                }
+                _ => write!(f, "template_decision_not_committed: {}", c.label()),
+            },
+        }
+    }
+}
+
+/// Verify that `template` is a grant of a committed decision of
+/// `domain_id`, before its class and scope are copied into new authority.
+///
+/// Uses the binding the mandate gate uses for live authority: the
+/// template's `granted_by` decision `P`; a mandate `M` stored under
+/// `P.decision_hash` with `M.decision == P` that lists the template; and the
+/// governance owner's commitment for `P.proposal_id` authorizing `M`
+/// (accepted, same decision hash and payload hash). When the backend holds
+/// a governance receipt for `P.decision_hash`, it must record `domain_id`.
+///
+/// Returns `Ok(Err(_))` for every refusal, including a contradictory
+/// commitment: a refusal declines the derived grant and must not wedge the
+/// close that asked. Returns `Err` only when evidence could not be read
+/// (backend or commitment-source failure), so the acceptance aborts before
+/// its mandate write and is retried.
+///
+/// Mandate liveness is deliberately not checked; the decision being
+/// committed is the evidence.
+fn verify_template_provenance(
+    backend: &dyn GovernanceReceiptBackend,
+    commitments: &dyn DecisionCommitmentSource,
+    template: &AuthorityGrant,
+    domain_id: &GovernanceDomainId,
+) -> Result<Result<(), TemplateRefusal>, String> {
+    let Some(prov) = template.granted_by.as_ref() else {
+        return Ok(Err(TemplateRefusal::NoProvenance));
+    };
+    let mandates = backend.list_mandates_by_decision(&prov.decision_hash)?;
+    let Some(mandate) = mandates
+        .iter()
+        .find(|m| m.decision == *prov && m.grants.contains(&template.id))
+    else {
+        return Ok(Err(TemplateRefusal::NotListedByDecisionMandate));
+    };
+    if let Some(receipt) = backend.get_governance_by_decision(&prov.decision_hash)? {
+        if receipt.domain_id != domain_id.0 {
+            return Ok(Err(TemplateRefusal::ReceiptInOtherDomain {
+                receipt_domain: receipt.domain_id,
+            }));
+        }
+    }
+    let commitment = commitments.decision_commitment(&prov.proposal_id)?;
+    if !commitment.authorizes(mandate) {
+        return Ok(Err(TemplateRefusal::NotCommitted(commitment)));
+    }
+    Ok(Ok(()))
+}
+
 /// Mint a fresh reinstatement grant for a steward, cloning
 /// class/scope from the most-recent **revoked** prior grant issued by
 /// **this deciding domain** and setting `grantor` from `domain_id`.
@@ -742,9 +863,13 @@ fn revoke_active_grants_for_person(
 ///   prior Remove→Reinstate cycle" case where a duplicate Reinstate
 ///   would otherwise find the old revoked grant as a template and
 ///   silently mint a second concurrent active grant, or
-/// - cloning the prior term would overflow `now`.
+/// - cloning the prior term would overflow `now`, or
+/// - the most-recent revoked in-domain template is not the grant of a
+///   committed decision ([`verify_template_provenance`]); an older
+///   template is not tried instead.
 ///
-/// Returns `Err(e)` when the backend read fails transiently. The
+/// Returns `Err(e)` when the backend read fails transiently, or when the
+/// commitment source cannot be read. The
 /// caller must propagate so the mandate is NOT recorded — otherwise
 /// the idempotency check at the top of `mint_and_persist_for_accepted`
 /// would short-circuit retries to `AlreadyMinted`, skipping the
@@ -760,6 +885,7 @@ fn revoke_active_grants_for_person(
 /// authority shape.
 fn mint_reinstatement_grant(
     backend: &dyn GovernanceReceiptBackend,
+    commitments: &dyn DecisionCommitmentSource,
     steward: &icn_identity::Did,
     domain_id: &GovernanceDomainId,
     decision: &DecisionProvenance,
@@ -820,6 +946,22 @@ fn mint_reinstatement_grant(
             return Ok(None);
         }
     };
+    // The template's class and scope are copied into new authority, so the
+    // template must be the grant of a committed decision. No fallback: if the
+    // most-recent revoked template is not verified, an older one is not used.
+    // Neither the template's activity nor its mandate's liveness is required:
+    // the template is historical evidence of the scope that was revoked.
+    if let Err(refusal) = verify_template_provenance(backend, commitments, &template, domain_id)? {
+        tracing::warn!(
+            grantee = ?grantee,
+            proposal_id = %decision.proposal_id,
+            deciding_domain = %domain_id.0,
+            template_id = %template.id,
+            reason = %refusal,
+            "ReinstateSteward: template provenance not verified; declining to mint"
+        );
+        return Ok(None);
+    }
 
     let valid_until = match template.valid_until {
         Some(old_until) => {
@@ -875,8 +1017,12 @@ fn mint_reinstatement_grant(
 ///   steward) and the stealth-appointment path (ReconfirmSteward on
 ///   a never-granted DID). The callers for those cases are
 ///   ReinstateSteward and AppointSteward respectively.
+/// - the most-recent active in-domain template is not the grant of a
+///   committed decision ([`verify_template_provenance`]); an older
+///   template is not tried instead.
 ///
-/// Returns `Err(e)` when the backend read fails transiently. The
+/// Returns `Err(e)` when the backend read fails transiently, or when the
+/// commitment source cannot be read. The
 /// caller must propagate so the mandate is NOT recorded — otherwise
 /// the idempotency check at the top of `mint_and_persist_for_accepted`
 /// would short-circuit retries to `AlreadyMinted`, skipping the
@@ -891,6 +1037,7 @@ fn mint_reinstatement_grant(
 /// the `ReconfirmSteward` lifecycle arm for the retry-safety rationale.
 fn mint_reconfirmation_grant(
     backend: &dyn GovernanceReceiptBackend,
+    commitments: &dyn DecisionCommitmentSource,
     steward: &icn_identity::Did,
     domain_id: &GovernanceDomainId,
     decision: &DecisionProvenance,
@@ -935,6 +1082,22 @@ fn mint_reconfirmation_grant(
             return Ok(None);
         }
     };
+    // The template's class and scope are copied into new authority, so the
+    // template must be the grant of a committed decision. No fallback: if the
+    // most-recent active template is not verified, an older one is not used.
+    // The template's own mandate need not still be live; its decision being
+    // committed is the evidence.
+    if let Err(refusal) = verify_template_provenance(backend, commitments, &template, domain_id)? {
+        tracing::warn!(
+            grantee = ?grantee,
+            proposal_id = %decision.proposal_id,
+            deciding_domain = %domain_id.0,
+            template_id = %template.id,
+            reason = %refusal,
+            "ReconfirmSteward: template provenance not verified; declining to mint"
+        );
+        return Ok(None);
+    }
 
     let scope = template.scope.clone();
 
@@ -960,6 +1123,29 @@ mod tests {
 
     fn did(seed: u8) -> Did {
         Did::from_anchor_id(&[seed; 32])
+    }
+
+    /// Commitment stub for flows whose templates come from the seam itself:
+    /// a proposal is `FinalizedAccepted` for exactly the decision and payload
+    /// of the mandate the backend stored for it, otherwise `Unknown`.
+    struct MandateBacked<'a>(&'a dyn GovernanceReceiptBackend);
+
+    impl DecisionCommitmentSource for MandateBacked<'_> {
+        fn decision_commitment(&self, proposal_id: &str) -> Result<DecisionCommitment, String> {
+            Ok(match self.0.get_mandate_by_proposal(proposal_id)? {
+                Some(m) => DecisionCommitment::FinalizedAccepted(
+                    crate::decision_commitment::CommittedDecision {
+                        decision_hash: m.decision.decision_hash,
+                        payload_hash: m.payload_hash,
+                    },
+                ),
+                None => DecisionCommitment::Unknown("no mandate stored".into()),
+            })
+        }
+    }
+
+    fn committed(backend: &dyn GovernanceReceiptBackend) -> MandateBacked<'_> {
+        MandateBacked(backend)
     }
 
     fn domain() -> GovernanceDomainId {
@@ -1184,6 +1370,7 @@ mod tests {
 
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-no-op-grant",
             &domain(),
             [9u8; 32],
@@ -1230,6 +1417,7 @@ mod tests {
 
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-overflow",
             &domain(),
             [3u8; 32],
@@ -1468,6 +1656,7 @@ mod tests {
 
         let result = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-orphan",
             &domain(),
             [9u8; 32],
@@ -1519,6 +1708,7 @@ mod tests {
     /// acceptance-seam lifecycle tests to exercise `apply_acceptance_lifecycle`
     /// without depending on the sled-backed gateway store.
     struct InMemoryGrantBackend {
+        receipts: std::sync::Mutex<Vec<icn_governance::GovernanceDecisionReceipt>>,
         mandates: std::sync::Mutex<Vec<Mandate>>,
         grants: std::sync::Mutex<Vec<AuthorityGrant>>,
         /// One-shot fault-injection switch: when `true`, the next call
@@ -1543,6 +1733,7 @@ mod tests {
     impl InMemoryGrantBackend {
         fn new() -> Self {
             Self {
+                receipts: std::sync::Mutex::new(vec![]),
                 mandates: std::sync::Mutex::new(vec![]),
                 grants: std::sync::Mutex::new(vec![]),
                 fail_next_revoke: std::sync::atomic::AtomicBool::new(false),
@@ -1570,8 +1761,9 @@ mod tests {
     impl GovernanceReceiptBackend for InMemoryGrantBackend {
         fn put_governance(
             &self,
-            _: &icn_governance::GovernanceDecisionReceipt,
+            receipt: &icn_governance::GovernanceDecisionReceipt,
         ) -> Result<(), String> {
+            self.receipts.lock().unwrap().push(receipt.clone());
             Ok(())
         }
         fn get_governance_by_proposal(
@@ -1588,9 +1780,15 @@ mod tests {
         }
         fn get_governance_by_decision(
             &self,
-            _: &icn_kernel_api::Hash,
+            decision_hash: &icn_kernel_api::Hash,
         ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
-            Ok(None)
+            Ok(self
+                .receipts
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|r| &r.decision_hash == decision_hash)
+                .cloned())
         }
         fn list_allocations_by_decision(
             &self,
@@ -1610,6 +1808,19 @@ mod tests {
                 .iter()
                 .find(|m| m.decision.proposal_id == proposal_id)
                 .cloned())
+        }
+        fn list_mandates_by_decision(
+            &self,
+            decision_hash: &icn_kernel_api::Hash,
+        ) -> Result<Vec<Mandate>, String> {
+            Ok(self
+                .mandates
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| &m.decision.decision_hash == decision_hash)
+                .cloned()
+                .collect())
         }
         fn put_authority_grant(&self, grant: &AuthorityGrant) -> Result<(), String> {
             let mut guard = self.grants.lock().unwrap();
@@ -1715,6 +1926,7 @@ mod tests {
         // under the acceptance seam's own rules.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-a",
             &dom,
             [0xa1u8; 32],
@@ -1732,6 +1944,7 @@ mod tests {
         .unwrap();
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-b",
             &dom,
             [0xa2u8; 32],
@@ -1761,6 +1974,7 @@ mod tests {
         // Now accept a RemoveSteward for A only.
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove-a",
             &dom,
             [0xadu8; 32],
@@ -1823,6 +2037,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint",
             &dom,
             [0xc1u8; 32],
@@ -1843,6 +2058,7 @@ mod tests {
         // now=2_500.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove",
             &dom,
             [0xc2u8; 32],
@@ -1863,6 +2079,7 @@ mod tests {
         // (the later retry at 9_999 cannot loosen termination).
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove",
             &dom,
             [0xc2u8; 32],
@@ -1902,6 +2119,7 @@ mod tests {
         // Appoint.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint",
             &dom,
             [0xd1u8; 32],
@@ -1927,6 +2145,7 @@ mod tests {
         // Remove (revoke).
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove",
             &dom,
             [0xd2u8; 32],
@@ -1944,6 +2163,7 @@ mod tests {
         // Reinstate.
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reinstate",
             &dom,
             [0xd3u8; 32],
@@ -2013,6 +2233,7 @@ mod tests {
 
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reinstate-orphan",
             &dom,
             [0xe1u8; 32],
@@ -2052,6 +2273,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-authority",
             &dom,
             [0xf1u8; 32],
@@ -2070,6 +2292,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-revoke-authority",
             &dom,
             [0xf2u8; 32],
@@ -2107,6 +2330,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-authority-late",
             &dom,
             [0xf3u8; 32],
@@ -2126,6 +2350,7 @@ mod tests {
         // Grace-period revocation accepted after the grant was minted.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-revoke-authority-late",
             &dom,
             [0xf4u8; 32],
@@ -2172,6 +2397,7 @@ mod tests {
         // Mint a grant under domain A.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-a",
             &domain_a,
             [0xaau8; 32],
@@ -2190,6 +2416,7 @@ mod tests {
         // Mint a grant under domain B for the same steward.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-b",
             &domain_b,
             [0xbbu8; 32],
@@ -2215,6 +2442,7 @@ mod tests {
         // Domain A accepts RemoveSteward — must NOT touch domain B's grant.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove-a",
             &domain_a,
             [0xccu8; 32],
@@ -2267,6 +2495,7 @@ mod tests {
         // Appoint — steward is active; there are no revoked grants.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint",
             &dom,
             [0x51u8; 32],
@@ -2286,6 +2515,7 @@ mod tests {
         // Reinstate while still active — must decline.
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reinstate-active",
             &dom,
             [0x52u8; 32],
@@ -2333,6 +2563,7 @@ mod tests {
         // Appoint + revoke under domain B only.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-b",
             &domain_b,
             [0x60u8; 32],
@@ -2350,6 +2581,7 @@ mod tests {
         .unwrap();
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove-b",
             &domain_b,
             [0x61u8; 32],
@@ -2367,6 +2599,7 @@ mod tests {
         // Domain A tries to reinstate — no in-domain template exists.
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reinstate-a",
             &domain_a,
             [0x62u8; 32],
@@ -2419,6 +2652,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-probation",
             &dom,
             [0x70u8; 32],
@@ -2437,6 +2671,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-probation",
             &dom,
             [0x71u8; 32],
@@ -2480,6 +2715,7 @@ mod tests {
         // Appoint.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-cycle",
             &dom,
             [0x80u8; 32],
@@ -2499,6 +2735,7 @@ mod tests {
         // Remove → first grant is revoked.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove-cycle",
             &dom,
             [0x81u8; 32],
@@ -2516,6 +2753,7 @@ mod tests {
         // First Reinstate → mints a fresh active grant (valid cycle).
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reinstate-1",
             &dom,
             [0x82u8; 32],
@@ -2544,6 +2782,7 @@ mod tests {
         // in-domain grant already exists — must decline to mint.
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reinstate-2",
             &dom,
             [0x83u8; 32],
@@ -2595,6 +2834,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-fail",
             &dom,
             [0x90u8; 32],
@@ -2615,6 +2855,7 @@ mod tests {
         backend.arm_next_revoke_failure();
         let err = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove-fail",
             &dom,
             [0x91u8; 32],
@@ -2657,6 +2898,7 @@ mod tests {
         // mandate records.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove-fail",
             &dom,
             [0x91u8; 32],
@@ -2707,6 +2949,7 @@ mod tests {
         // Appoint and revoke to produce a revoked in-domain template.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-reinstate-read-fail",
             &dom,
             [0x93u8; 32],
@@ -2724,6 +2967,7 @@ mod tests {
         .unwrap();
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove-reinstate-read-fail",
             &dom,
             [0x94u8; 32],
@@ -2743,6 +2987,7 @@ mod tests {
         backend.arm_next_list_all_failure();
         let err = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reinstate-read-fail",
             &dom,
             [0x95u8; 32],
@@ -2772,6 +3017,7 @@ mod tests {
         // Retry — flag is cleared, reinstatement mints fresh grant.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reinstate-read-fail",
             &dom,
             [0x95u8; 32],
@@ -2820,6 +3066,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-reconfirm-read-fail",
             &dom,
             [0x96u8; 32],
@@ -2839,6 +3086,7 @@ mod tests {
         backend.arm_next_list_active_failure();
         let err = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reconfirm-read-fail",
             &dom,
             [0x97u8; 32],
@@ -2868,6 +3116,7 @@ mod tests {
         // Retry — flag is cleared, reconfirmation mints fresh grant.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reconfirm-read-fail",
             &dom,
             [0x97u8; 32],
@@ -2920,6 +3169,7 @@ mod tests {
 
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reconfirm-ghost",
             &dom,
             [0xA0u8; 32],
@@ -2966,6 +3216,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-for-revoke",
             &dom,
             [0xA1u8; 32],
@@ -2984,6 +3235,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-remove-before-reconfirm",
             &dom,
             [0xA2u8; 32],
@@ -3002,6 +3254,7 @@ mod tests {
         // decline rather than silently re-activate.
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reconfirm-revoked",
             &dom,
             [0xA3u8; 32],
@@ -3048,6 +3301,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-92",
             &dom,
             [0xA4u8; 32],
@@ -3067,6 +3321,7 @@ mod tests {
         // new_term_end equal to now: must decline.
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reconfirm-now-eq-term",
             &dom,
             [0xA5u8; 32],
@@ -3090,6 +3345,7 @@ mod tests {
         // new_term_end strictly before now: must decline.
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reconfirm-term-in-past",
             &dom,
             [0xA6u8; 32],
@@ -3133,6 +3389,7 @@ mod tests {
 
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-93",
             &dom,
             [0xA7u8; 32],
@@ -3151,6 +3408,7 @@ mod tests {
 
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reconfirm-happy",
             &dom,
             [0xA8u8; 32],
@@ -3221,6 +3479,7 @@ mod tests {
         // Domain B appoints the steward.
         mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-appoint-b-94",
             &domain_b,
             [0xA9u8; 32],
@@ -3241,6 +3500,7 @@ mod tests {
         // no grant to refresh).
         let outcome = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "prop-reconfirm-cross-domain",
             &domain_a,
             [0xAAu8; 32],
@@ -3291,12 +3551,21 @@ mod tests {
     fn existing_mandate_for_a_different_decision_is_refused_not_reused() {
         let backend = InMemoryGrantBackend::new();
         let dom = domain();
-        mint_and_persist_for_accepted(&backend, "p-id", &dom, [0x01u8; 32], &appoint(20), 1_000)
-            .unwrap();
+        mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "p-id",
+            &dom,
+            [0x01u8; 32],
+            &appoint(20),
+            1_000,
+        )
+        .unwrap();
         let before = backend.mandates.lock().unwrap().clone();
 
         let err = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "p-id",
             &dom,
             [0x02u8; 32],
@@ -3310,6 +3579,7 @@ mod tests {
         // The same decision is still idempotent.
         let again = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "p-id",
             &dom,
             [0x01u8; 32],
@@ -3325,12 +3595,21 @@ mod tests {
     fn existing_mandate_for_a_different_payload_is_refused_not_reused() {
         let backend = InMemoryGrantBackend::new();
         let dom = domain();
-        mint_and_persist_for_accepted(&backend, "p-id", &dom, [0x01u8; 32], &appoint(20), 1_000)
-            .unwrap();
+        mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "p-id",
+            &dom,
+            [0x01u8; 32],
+            &appoint(20),
+            1_000,
+        )
+        .unwrap();
         let before = backend.mandates.lock().unwrap().clone();
 
         let err = mint_and_persist_for_accepted(
             &backend,
+            &committed(&backend),
             "p-id",
             &dom,
             [0x01u8; 32],
@@ -3340,5 +3619,718 @@ mod tests {
         .unwrap_err();
         assert!(err.starts_with(MANDATE_IDENTITY_CONFLICT), "{err}");
         assert_eq!(*backend.mandates.lock().unwrap(), before, "nothing written");
+    }
+
+    // ========================================================================
+    // Template provenance (reconfirmation / reinstatement)
+    // ========================================================================
+
+    /// A grant written straight into the store: in-domain grantor, a
+    /// `granted_by` naming `prov`, and a scope wider than any appointment
+    /// would mint. Nothing about it is backed by a committed mandate.
+    fn planted_grant(
+        steward: &Did,
+        dom: &GovernanceDomainId,
+        prov: DecisionProvenance,
+        valid_from: Timestamp,
+        revoked_at: Option<Timestamp>,
+    ) -> AuthorityGrant {
+        AuthorityGrant {
+            id: AuthorityGrantId::new(),
+            class: AuthorityClass::Execution,
+            grantor: GrantorEntityId(dom.0.clone()),
+            grantee: Grantee::Person(steward.clone()),
+            scope: TypedScope {
+                domain: Some(dom.clone()),
+                proposal_class: vec!["Sdis".into(), "Treasury".into()],
+                ..TypedScope::default()
+            },
+            granted_by: Some(prov),
+            valid_from,
+            valid_until: Some(valid_from + 100_000),
+            revoked_at,
+        }
+    }
+
+    fn reconfirm(steward: &Did) -> ProposalPayload {
+        ProposalPayload::Sdis {
+            proposal: SdisProposal::ReconfirmSteward {
+                steward: steward.clone(),
+                new_term_end: 90_000,
+                performance_notes: None,
+            },
+        }
+    }
+
+    fn reinstate(steward: &Did) -> ProposalPayload {
+        ProposalPayload::Sdis {
+            proposal: SdisProposal::ReinstateSteward {
+                steward: steward.clone(),
+                reason: "appeal upheld".into(),
+            },
+        }
+    }
+
+    fn grants_persisted(outcome: &MandateMintOutcome) -> usize {
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => *grants_persisted,
+            other => panic!("expected Minted; got {other:?}"),
+        }
+    }
+
+    fn grants_of(backend: &InMemoryGrantBackend, steward: &Did) -> Vec<AuthorityGrant> {
+        backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward.clone()))
+            .unwrap()
+    }
+
+    #[test]
+    fn reconfirm_refuses_orphan_active_template_with_no_mandate() {
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(120);
+        let orphan = planted_grant(
+            &steward,
+            &dom,
+            DecisionProvenance {
+                proposal_id: "prop-never-decided".into(),
+                decision_hash: [0xE1u8; 32],
+            },
+            1_000,
+            None,
+        );
+        backend.put_authority_grant(&orphan).unwrap();
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "prop-reconfirm-orphan",
+            &dom,
+            [0xE2u8; 32],
+            &reconfirm(&steward),
+            5_000,
+        )
+        .unwrap();
+        assert_eq!(
+            grants_persisted(&outcome),
+            0,
+            "an orphan template must not be carried forward"
+        );
+        assert_eq!(grants_of(&backend, &steward), vec![orphan]);
+    }
+
+    #[test]
+    fn reinstate_refuses_orphan_revoked_template() {
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(121);
+        let orphan = planted_grant(
+            &steward,
+            &dom,
+            DecisionProvenance {
+                proposal_id: "prop-never-decided".into(),
+                decision_hash: [0xE3u8; 32],
+            },
+            1_000,
+            Some(2_000),
+        );
+        backend.put_authority_grant(&orphan).unwrap();
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "prop-reinstate-orphan",
+            &dom,
+            [0xE4u8; 32],
+            &reinstate(&steward),
+            5_000,
+        )
+        .unwrap();
+        assert_eq!(
+            grants_persisted(&outcome),
+            0,
+            "an orphan revoked template must not be reinstated"
+        );
+        assert_eq!(grants_of(&backend, &steward), vec![orphan]);
+    }
+
+    #[test]
+    fn reconfirm_refuses_template_forging_provenance_of_a_committed_decision() {
+        // A real appointment of another steward is committed (mandate +
+        // grant). A planted grant names that same decision in `granted_by`,
+        // but the decision's mandate does not list it.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(123);
+        mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "prop-appoint-122",
+            &dom,
+            [0xE5u8; 32],
+            &appoint(122),
+            1_000,
+        )
+        .unwrap();
+        let real = backend
+            .get_mandate_by_proposal("prop-appoint-122")
+            .unwrap()
+            .unwrap();
+        let forged = planted_grant(&steward, &dom, real.decision.clone(), 1_500, None);
+        backend.put_authority_grant(&forged).unwrap();
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "prop-reconfirm-forged",
+            &dom,
+            [0xE6u8; 32],
+            &reconfirm(&steward),
+            5_000,
+        )
+        .unwrap();
+        assert_eq!(
+            grants_persisted(&outcome),
+            0,
+            "a grant the decision's mandate does not list is not that decision's grant"
+        );
+        assert_eq!(grants_of(&backend, &steward), vec![forged]);
+    }
+
+    /// Commitment stub with one verdict per proposal id; any other id is
+    /// `Unknown`.
+    struct Verdicts(Vec<(String, DecisionCommitment)>);
+
+    impl DecisionCommitmentSource for Verdicts {
+        fn decision_commitment(&self, proposal_id: &str) -> Result<DecisionCommitment, String> {
+            Ok(self
+                .0
+                .iter()
+                .find(|(p, _)| p == proposal_id)
+                .map(|(_, c)| c.clone())
+                .unwrap_or_else(|| DecisionCommitment::Unknown("unlisted".into())))
+        }
+    }
+
+    /// Commitment source that must never be consulted.
+    struct MustNotConsult;
+
+    impl DecisionCommitmentSource for MustNotConsult {
+        fn decision_commitment(&self, proposal_id: &str) -> Result<DecisionCommitment, String> {
+            panic!("revocation consulted the commitment source for '{proposal_id}'");
+        }
+    }
+
+    /// Commitment source that fails once, then answers like [`MandateBacked`].
+    struct FailsOnce<'a> {
+        inner: MandateBacked<'a>,
+        failed: std::sync::atomic::AtomicBool,
+    }
+
+    impl DecisionCommitmentSource for FailsOnce<'_> {
+        fn decision_commitment(&self, proposal_id: &str) -> Result<DecisionCommitment, String> {
+            if !self.failed.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                return Err("transient: commitment evidence unreadable".into());
+            }
+            self.inner.decision_commitment(proposal_id)
+        }
+    }
+
+    fn committed_decision(m: &Mandate) -> crate::decision_commitment::CommittedDecision {
+        crate::decision_commitment::CommittedDecision {
+            decision_hash: m.decision.decision_hash,
+            payload_hash: m.payload_hash,
+        }
+    }
+
+    /// Appoint `steward` through the seam (mandate + grant) and return the
+    /// appointment's stored mandate.
+    fn appoint_through_seam(
+        backend: &InMemoryGrantBackend,
+        pid: &str,
+        steward: u8,
+        hash: u8,
+        now: Timestamp,
+    ) -> Mandate {
+        mint_and_persist_for_accepted(
+            backend,
+            &MustNotConsult,
+            pid,
+            &domain(),
+            [hash; 32],
+            &appoint(steward),
+            now,
+        )
+        .unwrap();
+        backend.get_mandate_by_proposal(pid).unwrap().unwrap()
+    }
+
+    fn remove(steward: &Did) -> ProposalPayload {
+        ProposalPayload::Sdis {
+            proposal: SdisProposal::RemoveSteward {
+                steward: steward.clone(),
+                reason: "breach".into(),
+                return_bond: false,
+            },
+        }
+    }
+
+    /// Every verdict other than an accepted commitment of exactly the
+    /// template's decision and payload declines reconfirmation benignly:
+    /// the close succeeds, records its mandate, and mints nothing.
+    #[test]
+    fn reconfirm_declines_unless_the_template_decision_is_committed() {
+        let other = |d: u8, p: u8| crate::decision_commitment::CommittedDecision {
+            decision_hash: [d; 32],
+            payload_hash: [p; 32],
+        };
+        type VerdictFor<'a> = Box<dyn Fn(&Mandate) -> DecisionCommitment + 'a>;
+        let cases: Vec<(&str, VerdictFor<'_>)> = vec![
+            ("incomplete", Box::new(|_| DecisionCommitment::Incomplete)),
+            ("rejected", Box::new(|_| DecisionCommitment::Rejected)),
+            (
+                "unknown",
+                Box::new(|_| DecisionCommitment::Unknown("x".into())),
+            ),
+            (
+                "contradictory",
+                Box::new(|_| DecisionCommitment::Contradictory("x".into())),
+            ),
+            (
+                "accepted, other payload",
+                Box::new(|m: &Mandate| {
+                    DecisionCommitment::FinalizedAccepted(other(m.decision.decision_hash[0], 0xEE))
+                }),
+            ),
+            (
+                "accepted, other decision",
+                Box::new(|m: &Mandate| {
+                    DecisionCommitment::AcceptedIntent(
+                        crate::decision_commitment::CommittedDecision {
+                            decision_hash: [0xEE; 32],
+                            payload_hash: m.payload_hash,
+                        },
+                    )
+                }),
+            ),
+        ];
+        for (label, verdict) in cases {
+            let backend = InMemoryGrantBackend::new();
+            let steward = did(130);
+            let appointed = appoint_through_seam(&backend, "prop-appoint-130", 130, 0x31, 1_000);
+            let source = Verdicts(vec![("prop-appoint-130".into(), verdict(&appointed))]);
+            let outcome = mint_and_persist_for_accepted(
+                &backend,
+                &source,
+                "prop-reconfirm-130",
+                &domain(),
+                [0x32; 32],
+                &reconfirm(&steward),
+                2_000,
+            )
+            .unwrap_or_else(|e| panic!("{label}: a refusal must not be an error: {e}"));
+            assert_eq!(grants_persisted(&outcome), 0, "{label}");
+            assert_eq!(grants_of(&backend, &steward).len(), 1, "{label}");
+            assert!(
+                backend
+                    .get_mandate_by_proposal("prop-reconfirm-130")
+                    .unwrap()
+                    .is_some(),
+                "{label}: the reconfirmation's own mandate is still recorded"
+            );
+        }
+    }
+
+    #[test]
+    fn reinstate_declines_unless_the_template_decision_is_committed() {
+        for (label, verdict) in [
+            ("unknown", DecisionCommitment::Unknown("x".into())),
+            (
+                "contradictory",
+                DecisionCommitment::Contradictory("x".into()),
+            ),
+            ("rejected", DecisionCommitment::Rejected),
+        ] {
+            let backend = InMemoryGrantBackend::new();
+            let steward = did(131);
+            appoint_through_seam(&backend, "prop-appoint-131", 131, 0x33, 1_000);
+            mint_and_persist_for_accepted(
+                &backend,
+                &MustNotConsult,
+                "prop-remove-131",
+                &domain(),
+                [0x34; 32],
+                &remove(&steward),
+                2_000,
+            )
+            .unwrap();
+            let source = Verdicts(vec![("prop-appoint-131".into(), verdict)]);
+            let outcome = mint_and_persist_for_accepted(
+                &backend,
+                &source,
+                "prop-reinstate-131",
+                &domain(),
+                [0x35; 32],
+                &reinstate(&steward),
+                3_000,
+            )
+            .unwrap_or_else(|e| panic!("{label}: a refusal must not be an error: {e}"));
+            assert_eq!(grants_persisted(&outcome), 0, "{label}");
+            assert_eq!(grants_of(&backend, &steward).len(), 1, "{label}");
+        }
+    }
+
+    /// A mandate stored under the template's decision hash and listing the
+    /// template, but naming another proposal, is not the template's decision.
+    #[test]
+    fn reconfirm_declines_when_the_listing_mandate_names_another_proposal() {
+        let backend = InMemoryGrantBackend::new();
+        let steward = did(132);
+        let prov = DecisionProvenance {
+            proposal_id: "prop-claimed".into(),
+            decision_hash: [0x36; 32],
+        };
+        let template = planted_grant(&steward, &domain(), prov.clone(), 1_000, None);
+        backend.put_authority_grant(&template).unwrap();
+        let elsewhere = Mandate::new(
+            DecisionProvenance {
+                proposal_id: "prop-elsewhere".into(),
+                decision_hash: prov.decision_hash,
+            },
+            [0x37; 32],
+            vec![template.id.clone()],
+            None,
+            None,
+            1_000,
+        )
+        .unwrap();
+        backend.put_mandate(&elsewhere).unwrap();
+        // The claimed proposal's commitment matches the foreign mandate's
+        // decision hash and payload hash exactly.
+        let source = Verdicts(vec![(
+            "prop-claimed".into(),
+            DecisionCommitment::FinalizedAccepted(committed_decision(&elsewhere)),
+        )]);
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &source,
+            "prop-reconfirm-132",
+            &domain(),
+            [0x38; 32],
+            &reconfirm(&steward),
+            2_000,
+        )
+        .unwrap();
+        assert_eq!(grants_persisted(&outcome), 0);
+        assert_eq!(grants_of(&backend, &steward), vec![template]);
+    }
+
+    /// No fallback: the most-recent active template is unverified, so the
+    /// reconfirmation declines even though an older verified one exists.
+    #[test]
+    fn reconfirm_does_not_fall_back_to_an_older_verified_template() {
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(133);
+        appoint_through_seam(&backend, "prop-appoint-133", 133, 0x39, 1_000);
+        let newer = planted_grant(
+            &steward,
+            &dom,
+            DecisionProvenance {
+                proposal_id: "prop-never-decided".into(),
+                decision_hash: [0x3A; 32],
+            },
+            1_500,
+            None,
+        );
+        backend.put_authority_grant(&newer).unwrap();
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "prop-reconfirm-133",
+            &dom,
+            [0x3B; 32],
+            &reconfirm(&steward),
+            2_000,
+        )
+        .unwrap();
+        assert_eq!(grants_persisted(&outcome), 0);
+        assert_eq!(grants_of(&backend, &steward).len(), 2);
+    }
+
+    #[test]
+    fn reinstate_does_not_fall_back_to_an_older_verified_template() {
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(134);
+        appoint_through_seam(&backend, "prop-appoint-134", 134, 0x3C, 1_000);
+        mint_and_persist_for_accepted(
+            &backend,
+            &MustNotConsult,
+            "prop-remove-134",
+            &dom,
+            [0x3D; 32],
+            &remove(&steward),
+            2_000,
+        )
+        .unwrap();
+        let newer = planted_grant(
+            &steward,
+            &dom,
+            DecisionProvenance {
+                proposal_id: "prop-never-decided".into(),
+                decision_hash: [0x3E; 32],
+            },
+            1_500,
+            Some(2_500),
+        );
+        backend.put_authority_grant(&newer).unwrap();
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "prop-reinstate-134",
+            &dom,
+            [0x3F; 32],
+            &reinstate(&steward),
+            3_000,
+        )
+        .unwrap();
+        assert_eq!(grants_persisted(&outcome), 0);
+        assert_eq!(grants_of(&backend, &steward).len(), 2);
+    }
+
+    /// A commitment source that cannot be read is an error, not a verdict:
+    /// the acceptance aborts before its mandate write, and the retry mints.
+    #[test]
+    fn unreadable_commitment_aborts_acceptance_and_retry_succeeds() {
+        let backend = InMemoryGrantBackend::new();
+        let steward = did(135);
+        appoint_through_seam(&backend, "prop-appoint-135", 135, 0x40, 1_000);
+        let source = FailsOnce {
+            inner: committed(&backend),
+            failed: std::sync::atomic::AtomicBool::new(false),
+        };
+        let err = mint_and_persist_for_accepted(
+            &backend,
+            &source,
+            "prop-reconfirm-135",
+            &domain(),
+            [0x41; 32],
+            &reconfirm(&steward),
+            2_000,
+        )
+        .unwrap_err();
+        assert!(err.contains("commitment evidence unreadable"), "{err}");
+        assert!(backend
+            .get_mandate_by_proposal("prop-reconfirm-135")
+            .unwrap()
+            .is_none());
+        assert_eq!(grants_of(&backend, &steward).len(), 1);
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &source,
+            "prop-reconfirm-135",
+            &domain(),
+            [0x41; 32],
+            &reconfirm(&steward),
+            2_000,
+        )
+        .unwrap();
+        assert_eq!(grants_persisted(&outcome), 1);
+    }
+
+    /// Control: a template whose decision is only durably intended (close
+    /// intent, not yet terminal) is a committed decision.
+    #[test]
+    fn reconfirm_accepts_a_template_with_an_accepted_intent() {
+        let backend = InMemoryGrantBackend::new();
+        let steward = did(136);
+        let appointed = appoint_through_seam(&backend, "prop-appoint-136", 136, 0x42, 1_000);
+        let source = Verdicts(vec![(
+            "prop-appoint-136".into(),
+            DecisionCommitment::AcceptedIntent(committed_decision(&appointed)),
+        )]);
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &source,
+            "prop-reconfirm-136",
+            &domain(),
+            [0x43; 32],
+            &reconfirm(&steward),
+            2_000,
+        )
+        .unwrap();
+        assert_eq!(grants_persisted(&outcome), 1);
+    }
+
+    /// Control: the template's mandate need not still be live. An expired
+    /// appointment mandate is still evidence its decision was committed.
+    #[test]
+    fn templates_with_non_live_mandates_are_still_evidence() {
+        let expire = |backend: &InMemoryGrantBackend, pid: &str| {
+            let mut ms = backend.mandates.lock().unwrap();
+            let m = ms
+                .iter_mut()
+                .find(|m| m.decision.proposal_id == pid)
+                .unwrap();
+            m.deadline = Some(1_100);
+            m.status = icn_governance::MandateStatus::Expired;
+        };
+        // Reconfirmation of an active grant whose mandate has expired.
+        let backend = InMemoryGrantBackend::new();
+        let steward = did(137);
+        appoint_through_seam(&backend, "prop-appoint-137", 137, 0x44, 1_000);
+        expire(&backend, "prop-appoint-137");
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "prop-reconfirm-137",
+            &domain(),
+            [0x45; 32],
+            &reconfirm(&steward),
+            2_000,
+        )
+        .unwrap();
+        assert_eq!(grants_persisted(&outcome), 1, "reconfirm");
+
+        // Reinstatement of a revoked grant whose mandate has expired.
+        let backend = InMemoryGrantBackend::new();
+        let steward = did(138);
+        appoint_through_seam(&backend, "prop-appoint-138", 138, 0x46, 1_000);
+        mint_and_persist_for_accepted(
+            &backend,
+            &MustNotConsult,
+            "prop-remove-138",
+            &domain(),
+            [0x47; 32],
+            &remove(&steward),
+            2_000,
+        )
+        .unwrap();
+        expire(&backend, "prop-appoint-138");
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            &committed(&backend),
+            "prop-reinstate-138",
+            &domain(),
+            [0x48; 32],
+            &reinstate(&steward),
+            9_000,
+        )
+        .unwrap();
+        assert_eq!(grants_persisted(&outcome), 1, "reinstate");
+        let all = grants_of(&backend, &steward);
+        let fresh = all.iter().find(|g| g.valid_from == 9_000).unwrap();
+        assert!(fresh.is_active_at(9_000));
+        assert_eq!(fresh.scope, all[0].scope);
+    }
+
+    /// The template decision's governance receipt, when held, must record
+    /// the deciding domain.
+    #[test]
+    fn reconfirm_declines_when_the_template_receipt_records_another_domain() {
+        for (receipt_domain, expected) in [("coop:elsewhere", 0usize), ("coop:tech", 1usize)] {
+            let backend = InMemoryGrantBackend::new();
+            let steward = did(139);
+            let appointed = appoint_through_seam(&backend, "prop-appoint-139", 139, 0x49, 1_000);
+            backend
+                .put_governance(&icn_governance::GovernanceDecisionReceipt {
+                    proposal_id: "prop-appoint-139".into(),
+                    domain_id: receipt_domain.into(),
+                    outcome: icn_governance::proof::ProofOutcome::Accepted,
+                    vote_tally: icn_governance::VoteTally::new(1, 0, 0),
+                    vote_hash: [0u8; 32],
+                    decision_hash: appointed.decision.decision_hash,
+                })
+                .unwrap();
+            let outcome = mint_and_persist_for_accepted(
+                &backend,
+                &committed(&backend),
+                "prop-reconfirm-139",
+                &domain(),
+                [0x4A; 32],
+                &reconfirm(&steward),
+                2_000,
+            )
+            .unwrap();
+            assert_eq!(grants_persisted(&outcome), expected, "{receipt_domain}");
+        }
+    }
+
+    /// Revocation never consults provenance: an orphan grant (no mandate,
+    /// no committed decision) is still revoked by every revoking payload.
+    #[test]
+    fn revocation_reaches_orphan_grants_without_consulting_commitments() {
+        let revoking = |s: &Did| -> Vec<(&'static str, ProposalPayload)> {
+            vec![
+                ("remove", remove(s)),
+                (
+                    "suspend",
+                    ProposalPayload::Sdis {
+                        proposal: SdisProposal::SuspendSteward {
+                            steward: s.clone(),
+                            reason: "r".into(),
+                            duration: 10,
+                        },
+                    },
+                ),
+                (
+                    "sanction-removal",
+                    ProposalPayload::Sdis {
+                        proposal: SdisProposal::SanctionSteward {
+                            steward: s.clone(),
+                            penalty: icn_governance::sdis::StewardPenalty::Removal {
+                                return_bond: false,
+                            },
+                            reason: "r".into(),
+                            evidence: vec![],
+                        },
+                    },
+                ),
+                (
+                    "revoke-authority",
+                    ProposalPayload::Sdis {
+                        proposal: SdisProposal::RevokeAuthority {
+                            authority_did: s.clone(),
+                            reason: "r".into(),
+                            effective_at: None,
+                        },
+                    },
+                ),
+            ]
+        };
+        for (label, payload) in revoking(&did(140)) {
+            let backend = InMemoryGrantBackend::new();
+            let steward = did(140);
+            let orphan = planted_grant(
+                &steward,
+                &domain(),
+                DecisionProvenance {
+                    proposal_id: "prop-never-decided".into(),
+                    decision_hash: [0x4B; 32],
+                },
+                1_000,
+                None,
+            );
+            backend.put_authority_grant(&orphan).unwrap();
+            mint_and_persist_for_accepted(
+                &backend,
+                &MustNotConsult,
+                "prop-revoke-140",
+                &domain(),
+                [0x4C; 32],
+                &payload,
+                5_000,
+            )
+            .unwrap_or_else(|e| panic!("{label}: {e}"));
+            let after = grants_of(&backend, &steward);
+            assert_eq!(after.len(), 1, "{label}");
+            assert_eq!(after[0].revoked_at, Some(5_000), "{label}");
+        }
     }
 }

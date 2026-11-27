@@ -338,6 +338,12 @@ fn assignee_projection_read_guard() -> std::sync::RwLockReadGuard<'static, ()> {
 /// The `did:icn:` scheme, as it appears at a projection key's anchor.
 const DID_SCHEME: &str = "did:icn:";
 
+/// Reason the standalone close path declines authority derived from an
+/// earlier decision's grant (steward reconfirmation and reinstatement): it
+/// has no decision-commitment source it can read while closing.
+pub(crate) const STANDALONE_TEMPLATE_PROVENANCE_UNAVAILABLE: &str =
+    "standalone close path has no decision-commitment source; derived authority declined";
+
 /// Why an assignee-projection row is one this store could not have written.
 ///
 /// Reason classes only. No DID spelling, domain id, item id, action-item title,
@@ -4556,8 +4562,19 @@ impl GovernanceManager {
                 // **behavior-neutral**: no executor gating, no
                 // dispatcher wiring changes.
                 if matches!(outcome, ProofOutcome::Accepted) {
+                    // This path holds `proposals.write()` and has not yet
+                    // recorded the new decision, so it cannot read decision
+                    // commitments here (the manager's source re-takes that
+                    // lock). Authority derived from an earlier decision's
+                    // grant (steward reconfirmation / reinstatement) is
+                    // therefore declined on this path, never minted
+                    // unverified. Revocations are unaffected.
+                    let commitments = crate::decision_commitment::UnavailableCommitments(
+                        STANDALONE_TEMPLATE_PROVENANCE_UNAVAILABLE,
+                    );
                     match crate::grant_minting::mint_and_persist_for_accepted(
                         store.as_ref(),
+                        &commitments,
                         &proposal_id.0,
                         &proposal.domain_id,
                         receipt.decision_hash,
@@ -9644,6 +9661,46 @@ mod tests {
             items.sort_by_key(|g| g.valid_from);
             Ok(items)
         }
+        fn list_authority_grants_by_grantee(
+            &self,
+            grantee: &icn_governance::Grantee,
+        ) -> Result<Vec<icn_governance::AuthorityGrant>, String> {
+            let mut items: Vec<icn_governance::AuthorityGrant> = self
+                .authority_grants
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|g| &g.grantee == grantee)
+                .cloned()
+                .collect();
+            items.sort_by_key(|g| g.valid_from);
+            Ok(items)
+        }
+        fn list_active_authority_grants_by_grantee(
+            &self,
+            grantee: &icn_governance::Grantee,
+            now: u64,
+        ) -> Result<Vec<icn_governance::AuthorityGrant>, String> {
+            Ok(self
+                .list_authority_grants_by_grantee(grantee)?
+                .into_iter()
+                .filter(|g| g.is_active_at(now))
+                .collect())
+        }
+        fn revoke_authority_grant(
+            &self,
+            grant_id: &icn_governance::AuthorityGrantId,
+            revoked_at: u64,
+        ) -> Result<(), String> {
+            let mut grants = self.authority_grants.lock().unwrap();
+            let Some(g) = grants.iter_mut().find(|g| &g.id == grant_id) else {
+                return Err(format!("grant_not_found: {grant_id}"));
+            };
+            if g.revoked_at.is_none_or(|existing| revoked_at < existing) {
+                g.revoked_at = Some(revoked_at);
+            }
+            Ok(())
+        }
     }
 
     /// Build a minimal manager with a single domain and single member.
@@ -13306,6 +13363,145 @@ mod tests {
         );
         assert_eq!(mandate.grants, vec![grant.id.clone()]);
         assert_eq!(mandate.decision.decision_hash, gov_receipt.decision_hash);
+    }
+
+    /// Create, open, vote For and close a proposal through the standalone
+    /// manager; return its id.
+    async fn standalone_decide(
+        mgr: &GovernanceManager,
+        domain_id: &GovernanceDomainId,
+        member_did: &Did,
+        payload: ProposalPayload,
+    ) -> ProposalId {
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Steward".to_string(),
+                "Steward lifecycle".to_string(),
+                payload,
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(20),
+            mgr.close_proposal(proposal_id.clone()),
+        )
+        .await
+        .expect("standalone close must not block on the proposal lock")
+        .unwrap();
+        proposal_id
+    }
+
+    /// The standalone close path has no decision-commitment source it can
+    /// read while closing, so steward reconfirmation and reinstatement
+    /// decline (no derived grant) without blocking; appointment and removal
+    /// are unaffected.
+    #[tokio::test]
+    async fn standalone_close_declines_derived_steward_authority() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+        let steward = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let grantee = icn_governance::Grantee::Person(steward.clone());
+        let sdis = |proposal| ProposalPayload::Sdis { proposal };
+
+        standalone_decide(
+            &mgr,
+            &domain_id,
+            &member_did,
+            sdis(icn_governance::sdis::SdisProposal::AppointSteward {
+                candidate: steward.clone(),
+                sponsors: vec![member_did.clone()],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: 365 * 24 * 60 * 60,
+            }),
+        )
+        .await;
+        assert_eq!(
+            backend
+                .list_authority_grants_by_grantee(&grantee)
+                .unwrap()
+                .len(),
+            1,
+            "appointment mints"
+        );
+
+        let reconfirm = standalone_decide(
+            &mgr,
+            &domain_id,
+            &member_did,
+            sdis(icn_governance::sdis::SdisProposal::ReconfirmSteward {
+                steward: steward.clone(),
+                new_term_end: icn_time::current_timestamp_secs() + 3_600 * 24 * 400,
+                performance_notes: None,
+            }),
+        )
+        .await;
+        let m = backend
+            .get_mandate_by_proposal(&reconfirm.0)
+            .unwrap()
+            .unwrap();
+        assert!(m.has_no_grants(), "reconfirmation declined: {m:?}");
+        assert_eq!(
+            backend
+                .list_authority_grants_by_grantee(&grantee)
+                .unwrap()
+                .len(),
+            1
+        );
+
+        standalone_decide(
+            &mgr,
+            &domain_id,
+            &member_did,
+            sdis(icn_governance::sdis::SdisProposal::RemoveSteward {
+                steward: steward.clone(),
+                reason: "r".into(),
+                return_bond: false,
+            }),
+        )
+        .await;
+        let after_remove = backend.list_authority_grants_by_grantee(&grantee).unwrap();
+        assert!(
+            after_remove[0].revoked_at.is_some(),
+            "removal still revokes"
+        );
+
+        let reinstate = standalone_decide(
+            &mgr,
+            &domain_id,
+            &member_did,
+            sdis(icn_governance::sdis::SdisProposal::ReinstateSteward {
+                steward: steward.clone(),
+                reason: "r".into(),
+            }),
+        )
+        .await;
+        let m = backend
+            .get_mandate_by_proposal(&reinstate.0)
+            .unwrap()
+            .unwrap();
+        assert!(m.has_no_grants(), "reinstatement declined: {m:?}");
+        assert_eq!(
+            backend
+                .list_authority_grants_by_grantee(&grantee)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     /// Accepted proposals whose payload class does not truthfully imply

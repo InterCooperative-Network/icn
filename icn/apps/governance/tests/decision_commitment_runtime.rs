@@ -189,6 +189,39 @@ impl GovernanceReceiptBackend for RecordingReceipts {
     ) -> Result<Option<icn_governance::AuthorityGrant>, String> {
         Ok(self.grants.lock().unwrap().get(id).cloned())
     }
+    fn list_authority_grants_by_grantee(
+        &self,
+        grantee: &icn_governance::Grantee,
+    ) -> Result<Vec<icn_governance::AuthorityGrant>, String> {
+        Ok(self.grants_of(grantee))
+    }
+    fn list_active_authority_grants_by_grantee(
+        &self,
+        grantee: &icn_governance::Grantee,
+        now: u64,
+    ) -> Result<Vec<icn_governance::AuthorityGrant>, String> {
+        Ok(self
+            .grants_of(grantee)
+            .into_iter()
+            .filter(|g| g.is_active_at(now))
+            .collect())
+    }
+}
+
+impl RecordingReceipts {
+    /// Every grant held for `grantee`, oldest-first by `valid_from`.
+    fn grants_of(&self, grantee: &icn_governance::Grantee) -> Vec<icn_governance::AuthorityGrant> {
+        let mut out: Vec<_> = self
+            .grants
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|g| &g.grantee == grantee)
+            .cloned()
+            .collect();
+        out.sort_by_key(|g| g.valid_from);
+        out
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +263,28 @@ async fn spawn(
 
 /// Domain with `member` as its sole voter; an open steward-appointment proposal.
 async fn open_proposal(handle: &GovernanceHandle, member: &Did, candidate: &Did) -> ProposalId {
+    open_payload(
+        handle,
+        member,
+        ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: candidate.clone(),
+                sponsors: vec![member.clone()],
+                region: "region-runtime".into(),
+                bond_amount: 1_000,
+                term_length: 3600 * 24 * 30,
+            },
+        },
+    )
+    .await
+}
+
+/// Domain with `member` as its sole voter; an open proposal carrying `payload`.
+async fn open_payload(
+    handle: &GovernanceHandle,
+    member: &Did,
+    payload: ProposalPayload,
+) -> ProposalId {
     let ops: &dyn GovernanceOps = handle;
     if ops
         .create_domain(
@@ -247,17 +302,9 @@ async fn open_proposal(handle: &GovernanceHandle, member: &Did, candidate: &Did)
     let id = ops
         .create_proposal(
             GovernanceDomainId(DOMAIN.into()),
-            "Appoint steward".into(),
+            "Steward proposal".into(),
             "d".into(),
-            ProposalPayload::Sdis {
-                proposal: SdisProposal::AppointSteward {
-                    candidate: candidate.clone(),
-                    sponsors: vec![member.clone()],
-                    region: "region-runtime".into(),
-                    bond_amount: 1_000,
-                    term_length: 3600 * 24 * 30,
-                },
-            },
+            payload,
             ProposalScope::Local,
         )
         .await
@@ -465,5 +512,129 @@ async fn an_actor_backed_manager_answers_only_from_the_wired_actor_source() {
         .unwrap();
     assert!(is_finalized(&c), "{c:?}");
     assert!(c.authorizes(&receipts.mandate_for(&id.0).unwrap()));
+    handle.shutdown().await;
+}
+
+// ---------------------------------------------------------------------------
+// Derived authority: reconfirmation / reinstatement templates
+// ---------------------------------------------------------------------------
+
+/// A grant written straight into the receipt store: in-domain grantor and a
+/// `granted_by` naming a decision this runtime never made.
+fn planted_grant(steward: &Did, revoked_at: Option<u64>) -> icn_governance::AuthorityGrant {
+    let now = icn_time::current_timestamp_secs();
+    icn_governance::AuthorityGrant {
+        id: icn_governance::AuthorityGrantId::new(),
+        class: icn_governance::AuthorityClass::Execution,
+        grantor: icn_governance::GrantorEntityId(DOMAIN.into()),
+        grantee: icn_governance::Grantee::Person(steward.clone()),
+        scope: icn_governance::TypedScope {
+            domain: Some(GovernanceDomainId(DOMAIN.into())),
+            proposal_class: vec!["Sdis".into(), "Treasury".into()],
+            ..icn_governance::TypedScope::default()
+        },
+        granted_by: Some(icn_governance::DecisionProvenance {
+            proposal_id: "prop-never-decided".into(),
+            decision_hash: [0xD7; 32],
+        }),
+        valid_from: now.saturating_sub(100),
+        valid_until: Some(now + 1_000_000),
+        revoked_at,
+    }
+}
+
+fn reconfirm(steward: &Did) -> ProposalPayload {
+    ProposalPayload::Sdis {
+        proposal: SdisProposal::ReconfirmSteward {
+            steward: steward.clone(),
+            new_term_end: icn_time::current_timestamp_secs() + 3600 * 24 * 90,
+            performance_notes: None,
+        },
+    }
+}
+
+fn steward_grants(
+    receipts: &RecordingReceipts,
+    steward: &Did,
+) -> Vec<icn_governance::AuthorityGrant> {
+    receipts.grants_of(&icn_governance::Grantee::Person(steward.clone()))
+}
+
+#[tokio::test]
+async fn daemon_reconfirm_does_not_carry_forward_an_orphan_active_template() {
+    let tmp = tempfile::tempdir().unwrap();
+    let receipts = Arc::new(RecordingReceipts::default());
+    let (member, steward) = (new_did(), new_did());
+    let handle = spawn(tmp.path(), Some(receipts.clone())).await;
+    let orphan = planted_grant(&steward, None);
+    receipts.put_authority_grant(&orphan).unwrap();
+
+    let id = open_payload(&handle, &member, reconfirm(&steward)).await;
+    vote_and_close(&handle, &id, &member, VoteChoice::For).await;
+    let state = handle.get_proposal(&id).await.unwrap().unwrap().state;
+    assert!(matches!(state, ProposalState::Accepted { .. }), "{state:?}");
+
+    let mandate = receipts
+        .mandate_for(&id.0)
+        .expect("the close records a mandate");
+    assert!(mandate.grants.is_empty(), "no derived grant: {mandate:?}");
+    assert_eq!(steward_grants(&receipts, &steward), vec![orphan]);
+    handle.shutdown().await;
+}
+
+#[tokio::test]
+async fn daemon_reinstate_does_not_carry_forward_an_orphan_revoked_template() {
+    let tmp = tempfile::tempdir().unwrap();
+    let receipts = Arc::new(RecordingReceipts::default());
+    let (member, steward) = (new_did(), new_did());
+    let handle = spawn(tmp.path(), Some(receipts.clone())).await;
+    let revoked_at = icn_time::current_timestamp_secs().saturating_sub(10);
+    let orphan = planted_grant(&steward, Some(revoked_at));
+    receipts.put_authority_grant(&orphan).unwrap();
+
+    let payload = ProposalPayload::Sdis {
+        proposal: SdisProposal::ReinstateSteward {
+            steward: steward.clone(),
+            reason: "appeal upheld".into(),
+        },
+    };
+    let id = open_payload(&handle, &member, payload).await;
+    vote_and_close(&handle, &id, &member, VoteChoice::For).await;
+    let state = handle.get_proposal(&id).await.unwrap().unwrap().state;
+    assert!(matches!(state, ProposalState::Accepted { .. }), "{state:?}");
+
+    let mandate = receipts
+        .mandate_for(&id.0)
+        .expect("the close records a mandate");
+    assert!(mandate.grants.is_empty(), "no derived grant: {mandate:?}");
+    assert_eq!(steward_grants(&receipts, &steward), vec![orphan]);
+    handle.shutdown().await;
+}
+
+/// Control: a template the runtime itself committed (a real appointment) is
+/// carried forward by a real reconfirmation close.
+#[tokio::test]
+async fn daemon_reconfirm_carries_forward_a_committed_appointment() {
+    let tmp = tempfile::tempdir().unwrap();
+    let receipts = Arc::new(RecordingReceipts::default());
+    let (member, steward) = (new_did(), new_did());
+    let handle = spawn(tmp.path(), Some(receipts.clone())).await;
+    let appoint = open_proposal(&handle, &member, &steward).await;
+    vote_and_close(&handle, &appoint, &member, VoteChoice::For).await;
+    let appointed = steward_grants(&receipts, &steward);
+    assert_eq!(appointed.len(), 1, "the appointment minted one grant");
+
+    let id = open_payload(&handle, &member, reconfirm(&steward)).await;
+    vote_and_close(&handle, &id, &member, VoteChoice::For).await;
+    let mandate = receipts
+        .mandate_for(&id.0)
+        .expect("the close records a mandate");
+    assert_eq!(mandate.grants.len(), 1, "{mandate:?}");
+    let all = steward_grants(&receipts, &steward);
+    assert_eq!(all.len(), 2, "{all:?}");
+    let fresh = all.iter().find(|g| g.id == mandate.grants[0]).unwrap();
+    assert_eq!(fresh.class, appointed[0].class);
+    assert_eq!(fresh.scope, appointed[0].scope);
+    assert_eq!(fresh.granted_by, Some(mandate.decision.clone()));
     handle.shutdown().await;
 }

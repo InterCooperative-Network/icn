@@ -91,6 +91,7 @@ use serde::{Deserialize, Serialize};
 use icn_governance::{GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Proposal};
 use icn_kernel_api::AllocationReceipt;
 
+use crate::decision_commitment::DecisionCommitmentSource;
 use crate::receipt_backend::GovernanceReceiptBackend;
 use crate::state_store::GovernanceStateStore;
 
@@ -432,7 +433,7 @@ impl CloseJournalEntry {
                     self.proposal.id.0
                 )
             })?;
-            self.apply_execution_closure(backend)?;
+            self.apply_execution_closure(backend, state)?;
         }
         if let Some(proof) = &self.proof_bytes {
             state.save_proof_bytes(&self.proposal.id, proof)?;
@@ -447,10 +448,16 @@ impl CloseJournalEntry {
     /// Uses `decided_at` as the write time so a replay reproduces the same
     /// records rather than restamping them with the restart time. Fails closed
     /// unless the entry records an accepted outcome with a well-formed decision
-    /// hash — a mandate must never be minted for anything else.
+    /// hash — a mandate must never be minted for anything else — and unless the
+    /// durable state (this entry's close intent, or the terminal proposal and
+    /// its receipt) commits exactly this decision and payload.
+    ///
+    /// Template provenance for derived authority (reconfirmation and
+    /// reinstatement) is read from the same state store and receipt backend.
     fn apply_execution_closure(
         &self,
         backend: &dyn GovernanceReceiptBackend,
+        state: &dyn GovernanceStateStore,
     ) -> anyhow::Result<()> {
         let proposal_id = &self.proposal.id.0;
         if !is_accepted(&self.proposal.state) {
@@ -486,6 +493,37 @@ impl CloseJournalEntry {
                 );
             }
         }
+        // The decision itself must be committed by the governance owner, not
+        // merely carried by this entry: the stored close intent (or the
+        // terminal proposal and its receipt) must name this decision hash and
+        // this payload. Checked before any closure write.
+        let commitments = crate::decision_commitment::BorrowedStoreCommitments {
+            state,
+            receipts: backend,
+        };
+        let payload_hash = crate::grant_minting::hash_proposal_payload(&self.proposal.payload)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "execution closure for proposal '{proposal_id}' failed: payload hash: {e}"
+                )
+            })?;
+        let commitment = commitments
+            .decision_commitment(proposal_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "execution closure for proposal '{proposal_id}' failed: decision commitment unreadable: {e}"
+                )
+            })?;
+        match &commitment {
+            crate::decision_commitment::DecisionCommitment::AcceptedIntent(c)
+            | crate::decision_commitment::DecisionCommitment::FinalizedAccepted(c)
+                if c.decision_hash == decision_hash && c.payload_hash == payload_hash => {}
+            other => anyhow::bail!(
+                "execution closure for proposal '{proposal_id}' refused: the stored decision \
+                 commitment ({}) is not this accepted decision",
+                other.label()
+            ),
+        }
         let effect = crate::institutional_effect::emit_accepted_effect(
             backend,
             proposal_id,
@@ -508,6 +546,7 @@ impl CloseJournalEntry {
             })?;
         match crate::grant_minting::mint_and_persist_for_accepted(
             backend,
+            &commitments,
             proposal_id,
             &self.proposal.domain_id,
             decision_hash,
@@ -523,5 +562,139 @@ impl CloseJournalEntry {
                 anyhow::bail!("execution closure for proposal '{proposal_id}' failed: mandate: {e}")
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+    use std::sync::{Arc, Mutex};
+
+    use icn_governance::{GovernanceDomainId, Mandate, ProposalId, ProposalPayload, ProposalState};
+    use icn_identity::Did;
+    use icn_store::SledStore;
+
+    use crate::state_store::SledGovernanceStateStore;
+
+    /// Receipt backend holding governance receipts and mandates only.
+    #[derive(Default)]
+    struct Receipts {
+        governance: Mutex<Vec<GovernanceDecisionReceipt>>,
+        mandates: Mutex<Vec<Mandate>>,
+    }
+
+    impl GovernanceReceiptBackend for Receipts {
+        fn put_governance(&self, r: &GovernanceDecisionReceipt) -> Result<(), String> {
+            self.governance.lock().unwrap().push(r.clone());
+            Ok(())
+        }
+        fn get_governance_by_proposal(
+            &self,
+            pid: &str,
+        ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+            Ok(self.list_governance_by_proposal(pid)?.into_iter().next())
+        }
+        fn list_governance_by_proposal(
+            &self,
+            pid: &str,
+        ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+            Ok(self
+                .governance
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|r| r.proposal_id == pid)
+                .cloned()
+                .collect())
+        }
+        fn put_allocation(&self, _: &AllocationReceipt) -> Result<icn_kernel_api::Hash, String> {
+            Ok([0u8; 32])
+        }
+        fn get_governance_by_decision(
+            &self,
+            h: &icn_kernel_api::Hash,
+        ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+            Ok(self
+                .governance
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|r| &r.decision_hash == h)
+                .cloned())
+        }
+        fn list_allocations_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Vec<AllocationReceipt>, String> {
+            Ok(vec![])
+        }
+        fn put_mandate(&self, m: &Mandate) -> Result<(), String> {
+            self.mandates.lock().unwrap().push(m.clone());
+            Ok(())
+        }
+        fn get_mandate_by_proposal(&self, pid: &str) -> Result<Option<Mandate>, String> {
+            Ok(self
+                .mandates
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|m| m.decision.proposal_id == pid)
+                .cloned())
+        }
+    }
+
+    fn entry(hash: [u8; 32]) -> CloseJournalEntry {
+        let mut p = Proposal::new(
+            GovernanceDomainId::new("gov-cj"),
+            Did::from_anchor_id(&[1u8; 32]),
+            "t".into(),
+            "d".into(),
+            ProposalPayload::Text { body: "b".into() },
+        );
+        p.id = ProposalId::new("prop-cj");
+        p.state = ProposalState::Accepted { closed_at: 50 };
+        CloseJournalEntry {
+            proposal: p,
+            proof_bytes: None,
+            receipts: CloseReceipts::default(),
+            decided_at: 50,
+            governance_decision_hash: Some(hex::encode(hash)),
+            execution_closure: true,
+        }
+    }
+
+    fn state() -> SledGovernanceStateStore {
+        SledGovernanceStateStore::new(Arc::new(SledStore::temporary().unwrap()))
+    }
+
+    /// The execution closure mints only for the decision the durable state
+    /// commits: this entry's own stored intent. Without it (or with a stored
+    /// intent naming another decision) nothing is minted.
+    #[test]
+    fn execution_closure_requires_the_stored_commitment_of_this_decision() {
+        let h = [0x11u8; 32];
+
+        // No intent and no proposal row: Unknown.
+        let (s, r) = (state(), Receipts::default());
+        let err = entry(h).commit(Some(&r), &s).unwrap_err().to_string();
+        assert!(err.contains("not this accepted decision"), "{err}");
+        assert!(r.get_mandate_by_proposal("prop-cj").unwrap().is_none());
+
+        // A stored intent for another decision.
+        let (s, r) = (state(), Receipts::default());
+        s.save_close_intent(&entry([0x22u8; 32])).unwrap();
+        let err = entry(h).commit(Some(&r), &s).unwrap_err().to_string();
+        assert!(err.contains("not this accepted decision"), "{err}");
+        assert!(r.get_mandate_by_proposal("prop-cj").unwrap().is_none());
+
+        // Control: its own intent is stored first, as the actor does.
+        let (s, r) = (state(), Receipts::default());
+        let e = entry(h);
+        s.save_close_intent(&e).unwrap();
+        e.commit(Some(&r), &s).unwrap();
+        let m = r.get_mandate_by_proposal("prop-cj").unwrap().unwrap();
+        assert_eq!(m.decision.decision_hash, h);
     }
 }

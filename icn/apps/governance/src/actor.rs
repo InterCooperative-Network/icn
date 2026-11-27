@@ -2013,8 +2013,17 @@ impl GovernanceActor {
                     }
                 }
                 if let Some(decision_hash) = decision_hash {
+                    // Only non-execution-required (Text) payloads reach here;
+                    // they derive no authority from prior grants. The actor's
+                    // own stores still back the source, so the seam has the
+                    // same evidence it has inside the close journal.
+                    let commitments = crate::decision_commitment::BorrowedStoreCommitments {
+                        state: self.store.as_ref(),
+                        receipts: store.as_ref(),
+                    };
                     match crate::grant_minting::mint_and_persist_for_accepted(
                         store.as_ref(),
+                        &commitments,
                         &proposal.id.0,
                         &proposal.domain_id,
                         decision_hash,

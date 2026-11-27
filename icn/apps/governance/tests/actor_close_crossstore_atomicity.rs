@@ -214,6 +214,19 @@ impl GovernanceReceiptBackend for RecordingReceiptBackend {
             .find(|r| r.proposal_id == proposal_id)
             .cloned())
     }
+    fn list_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .governance
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|r| r.proposal_id == proposal_id)
+            .cloned()
+            .collect())
+    }
     fn put_allocation(
         &self,
         receipt: &icn_kernel_api::AllocationReceipt,

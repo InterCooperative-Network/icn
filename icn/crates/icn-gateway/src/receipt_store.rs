@@ -5212,6 +5212,9 @@ mod tests {
 
         let outcome_foo_bar = mint_and_persist_for_accepted(
             &store,
+            &icn_governance_actor::decision_commitment::UnavailableCommitments(
+                "test: no template provenance consulted",
+            ),
             "foo:bar",
             &domain,
             [0xbbu8; 32],
@@ -5219,9 +5222,18 @@ mod tests {
             1_000,
         )
         .unwrap();
-        let outcome_foo =
-            mint_and_persist_for_accepted(&store, "foo", &domain, [0xaau8; 32], &payload, 1_000)
-                .unwrap();
+        let outcome_foo = mint_and_persist_for_accepted(
+            &store,
+            &icn_governance_actor::decision_commitment::UnavailableCommitments(
+                "test: no template provenance consulted",
+            ),
+            "foo",
+            &domain,
+            [0xaau8; 32],
+            &payload,
+            1_000,
+        )
+        .unwrap();
 
         match outcome_foo_bar {
             MandateMintOutcome::Minted { .. } => {}
@@ -5271,6 +5283,9 @@ mod tests {
 
         let outcome = mint_and_persist_for_accepted(
             &store,
+            &icn_governance_actor::decision_commitment::UnavailableCommitments(
+                "test: no template provenance consulted",
+            ),
             "prop-seam-real",
             &domain,
             decision_hash,
@@ -5322,6 +5337,9 @@ mod tests {
         // Seam idempotency: re-invoking must not duplicate mandate or grant
         let outcome2 = mint_and_persist_for_accepted(
             &store,
+            &icn_governance_actor::decision_commitment::UnavailableCommitments(
+                "test: no template provenance consulted",
+            ),
             "prop-seam-real",
             &domain,
             decision_hash,
@@ -6571,9 +6589,18 @@ mod tests {
                 stale: AtomicUsize::new(0),
             };
             let dom = GovernanceDomainId("coop:tech".into());
-            let first =
-                mint_and_persist_for_accepted(&store, "p-seam", &dom, [5u8; 32], &appoint(), 1_000)
-                    .unwrap();
+            let first = mint_and_persist_for_accepted(
+                &store,
+                &icn_governance_actor::decision_commitment::UnavailableCommitments(
+                    "test: no template provenance consulted",
+                ),
+                "p-seam",
+                &dom,
+                [5u8; 32],
+                &appoint(),
+                1_000,
+            )
+            .unwrap();
             let MandateMintOutcome::Minted { mandate_id, .. } = first else {
                 panic!("{first:?}")
             };
@@ -6583,9 +6610,18 @@ mod tests {
                 .unwrap();
 
             store.stale.store(1, Ordering::SeqCst);
-            let again =
-                mint_and_persist_for_accepted(&store, "p-seam", &dom, [5u8; 32], &appoint(), 2_000)
-                    .unwrap();
+            let again = mint_and_persist_for_accepted(
+                &store,
+                &icn_governance_actor::decision_commitment::UnavailableCommitments(
+                    "test: no template provenance consulted",
+                ),
+                "p-seam",
+                &dom,
+                [5u8; 32],
+                &appoint(),
+                2_000,
+            )
+            .unwrap();
             assert!(
                 matches!(&again, MandateMintOutcome::AlreadyMinted { mandate_id: id } if *id == mandate_id),
                 "{again:?}"
@@ -6609,11 +6645,24 @@ mod tests {
                 stale: AtomicUsize::new(0),
             };
             let dom = GovernanceDomainId("coop:tech".into());
-            mint_and_persist_for_accepted(&store, "p-seam2", &dom, [5u8; 32], &appoint(), 1_000)
-                .unwrap();
+            mint_and_persist_for_accepted(
+                &store,
+                &icn_governance_actor::decision_commitment::UnavailableCommitments(
+                    "test: no template provenance consulted",
+                ),
+                "p-seam2",
+                &dom,
+                [5u8; 32],
+                &appoint(),
+                1_000,
+            )
+            .unwrap();
             store.stale.store(1, Ordering::SeqCst);
             let err = mint_and_persist_for_accepted(
                 &store,
+                &icn_governance_actor::decision_commitment::UnavailableCommitments(
+                    "test: no template provenance consulted",
+                ),
                 "p-seam2",
                 &dom,
                 [6u8; 32],

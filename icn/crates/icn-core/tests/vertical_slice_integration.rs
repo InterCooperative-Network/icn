@@ -103,6 +103,16 @@ impl GovernanceReceiptBackend for TestReceiptBackend {
             .cloned())
     }
 
+    fn list_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .get_governance_by_proposal(proposal_id)?
+            .into_iter()
+            .collect())
+    }
+
     fn put_allocation(&self, receipt: &AllocationReceipt) -> Result<Hash, String> {
         self.allocations_by_decision
             .lock()
