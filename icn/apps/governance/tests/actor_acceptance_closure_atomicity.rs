@@ -85,6 +85,13 @@ impl GovernanceReceiptBackend for CountingReceiptBackend {
     ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
         Ok(None)
     }
+    // Stores no governance receipts, so it holds none for any proposal.
+    fn list_governance_by_proposal(
+        &self,
+        _: &str,
+    ) -> Result<Vec<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(vec![])
+    }
     fn put_allocation(
         &self,
         _: &icn_kernel_api::AllocationReceipt,

@@ -83,6 +83,9 @@ fn alias_spelled_revocation_reaches_the_grant() {
 
     let outcome = mint_and_persist_for_accepted(
         store.as_ref(),
+        &icn_governance_actor::decision_commitment::UnavailableCommitments(
+            "test: no template provenance consulted",
+        ),
         "p-revoke",
         &domain(),
         [0xe2u8; 32],
@@ -118,6 +121,9 @@ fn control_same_spelled_revocation_reaches_the_grant() {
 
     mint_and_persist_for_accepted(
         store.as_ref(),
+        &icn_governance_actor::decision_commitment::UnavailableCommitments(
+            "test: no template provenance consulted",
+        ),
         "p-revoke-same",
         &domain(),
         [0xe4u8; 32],
@@ -152,6 +158,9 @@ fn control_revocation_does_not_reach_another_principal() {
 
     mint_and_persist_for_accepted(
         store.as_ref(),
+        &icn_governance_actor::decision_commitment::UnavailableCommitments(
+            "test: no template provenance consulted",
+        ),
         "p-revoke-other",
         &domain(),
         [0xe6u8; 32],

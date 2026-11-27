@@ -268,6 +268,36 @@ pub(crate) fn commitment_from_stores(
     Ok(classify(stored.as_ref(), intent.as_ref(), &receipts))
 }
 
+/// Commitment source over a state store and receipt backend the caller already
+/// borrows (the close journal and the actor's close path hold both). Same
+/// evidence and verdicts as [`StoredDecisionCommitments`].
+pub(crate) struct BorrowedStoreCommitments<'a> {
+    pub(crate) state: &'a dyn GovernanceStateStore,
+    pub(crate) receipts: &'a dyn GovernanceReceiptBackend,
+}
+
+impl DecisionCommitmentSource for BorrowedStoreCommitments<'_> {
+    fn decision_commitment(&self, proposal_id: &str) -> Result<DecisionCommitment, String> {
+        commitment_from_stores(proposal_id, None, Some(self.state), self.receipts)
+    }
+}
+
+/// Commitment source for a path that has no authoritative commitment evidence.
+///
+/// Every lookup is [`DecisionCommitment::Unknown`] carrying the given reason,
+/// so nothing that requires a committed decision is authorized through it. The
+/// standalone manager's close path uses it: that path cannot read its own
+/// commitments while it holds the proposal lock, so authority derived from an
+/// earlier decision (steward reconfirmation and reinstatement) is declined
+/// there rather than minted unverified.
+pub struct UnavailableCommitments(pub &'static str);
+
+impl DecisionCommitmentSource for UnavailableCommitments {
+    fn decision_commitment(&self, _proposal_id: &str) -> Result<DecisionCommitment, String> {
+        Ok(DecisionCommitment::Unknown(self.0.to_string()))
+    }
+}
+
 impl DecisionCommitmentSource for StoredDecisionCommitments {
     fn decision_commitment(&self, proposal_id: &str) -> Result<DecisionCommitment, String> {
         commitment_from_stores(

@@ -104,6 +104,19 @@ impl GovernanceReceiptBackend for MandateTrackingBackend {
             .find(|r| r.proposal_id == proposal_id)
             .cloned())
     }
+    fn list_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .receipts
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r.proposal_id == proposal_id)
+            .cloned()
+            .collect())
+    }
     fn put_allocation(
         &self,
         _: &icn_kernel_api::AllocationReceipt,
@@ -516,6 +529,9 @@ async fn actor_close_proposal_mandate_mint_is_idempotent() {
         .decision_hash;
     let outcome = mint_and_persist_for_accepted(
         backend.as_ref() as &dyn GovernanceReceiptBackend,
+        &icn_governance_actor::decision_commitment::UnavailableCommitments(
+            "test: no template provenance consulted",
+        ),
         &proposal_id.0,
         &domain_id,
         decision_hash,

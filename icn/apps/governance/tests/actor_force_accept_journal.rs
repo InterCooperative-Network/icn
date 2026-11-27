@@ -160,6 +160,13 @@ impl GovernanceReceiptBackend for AuthorityBackend {
     ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
         Ok(None)
     }
+    // Stores no governance receipts, so it holds none for any proposal.
+    fn list_governance_by_proposal(
+        &self,
+        _: &str,
+    ) -> Result<Vec<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(vec![])
+    }
     fn put_allocation(
         &self,
         _: &icn_kernel_api::AllocationReceipt,
@@ -985,6 +992,9 @@ async fn force_accept_refuses_a_mandate_bound_to_another_decision() {
     let other = [0x5au8; 32];
     icn_governance_actor::grant_minting::mint_and_persist_for_accepted(
         fx.backend.as_ref(),
+        &icn_governance_actor::decision_commitment::UnavailableCommitments(
+            "test: no template provenance consulted",
+        ),
         &fx.proposal_id.0,
         &fx.domain_id,
         other,
@@ -1181,6 +1191,13 @@ impl GovernanceReceiptBackend for SledAuthorityBackend {
         _: &str,
     ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
         Ok(None)
+    }
+    // Stores no governance receipts, so it holds none for any proposal.
+    fn list_governance_by_proposal(
+        &self,
+        _: &str,
+    ) -> Result<Vec<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(vec![])
     }
     fn put_allocation(
         &self,
