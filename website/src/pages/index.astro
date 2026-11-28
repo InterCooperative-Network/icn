@@ -36,19 +36,13 @@
 import Layout from '../layouts/Layout.astro';
 import FragmentationFigure from '../components/FragmentationFigure.astro';
 import PublicLoop from '../components/PublicLoop.astro';
-import MaturityBadge from '../components/MaturityBadge.astro';
 import EvidenceBadge from '../components/EvidenceBadge.astro';
 import Icon from '../components/Icon.astro';
-import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectState';
+import { WALKTHROUGH_STEPS } from '../data/walkthrough';
 
-// The homepage states the shape of the maturity picture, never a per-subsystem
-// claim — those belong on /whats-real-now, where each one carries its evidence
-// class and its recorded gaps. Deriving even this summary from the generated
-// data means the homepage cannot drift into a rosier account than the
-// maturity page gives.
-const strongest = subsystemsInBand('strong');
-const weakest = subsystemsInBand('notyet');
-
+// The homepage deliberately carries no subsystem counts or maturity figures.
+// /whats-real-now owns the verified maturity account (PUBLIC_SITE_IA.md §3);
+// a second summary here would be a competing one that could drift from it.
 const PARTICIPATION = [
   {
     icon: 'execution' as const,
@@ -101,23 +95,29 @@ const PARTICIPATION = [
         </h1>
 
         <p class="lede hero-lede">
-          The InterCooperative Network is shared digital infrastructure for
-          cooperatives, communities, and federations. It connects the rules an
+          The network is the people, cooperatives, communities, and federations
+          who choose to coordinate. The InterCooperative Network software is the
+          shared infrastructure beneath them. It connects the rules an
           institution sets, the decisions it makes under them, the actions that
           follow, and the durable proof of why — instead of scattering those
           across six products owned by somebody else.
         </p>
 
         <div class="hero-actions">
+          <!-- "See ICN work" implied a system in live operation. The
+               destination is explicitly labelled "illustrative direction" —
+               fixture data, no live institution. A concrete noun the reader
+               already owns ("one decision") is both more accurate and a
+               better first word than the project's name. -->
           <a href="/see-it-work" class="btn btn-primary">
-            See ICN work
+            Follow one decision
             <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
           </a>
           <a href="/what-is-icn" class="btn btn-secondary">Start reading</a>
         </div>
 
         <p class="hero-qualifier">
-          Under active construction, and honest about it —
+          A fictional walkthrough, not a live system. Under active construction, and honest about it —
           <a href="/whats-real-now">what's real now</a> states what each part of
           the system can and cannot do today.
         </p>
@@ -227,6 +227,14 @@ const PARTICIPATION = [
           without depending on a vendor to still exist, still export, and still
           be telling the truth.
         </p>
+        <p>
+          The direction, which is a design goal and not a shipped capability,
+          is that institutions which keep their own records this way can also
+          coordinate with one another on terms each of them has agreed to,
+          without any one of them, or any vendor, becoming the owner of the
+          relationship. Federation between institutions is not running today.
+          <a href="/whats-real-now">What's real now</a> says what exists.
+        </p>
       </div>
     </div>
   </section>
@@ -276,13 +284,14 @@ const PARTICIPATION = [
           </a>
         </div>
 
+        <!-- Rendered from data/walkthrough.ts, not retyped. The previous hand-
+             copied list had already drifted from the source it mirrors (step 06
+             differed in its apostrophe), which is how a copy announces that it
+             will eventually differ in substance too. -->
         <ol class="see-preview" aria-label="The six steps of the walkthrough">
-          <li><span class="see-preview-n">01</span> Someone is recognized by their cooperative</li>
-          <li><span class="see-preview-n">02</span> Something comes up that needs a decision</li>
-          <li><span class="see-preview-n">03</span> The rules say who may decide it, and why</li>
-          <li><span class="see-preview-n">04</span> Before anything happens, you can see what would happen</li>
-          <li><span class="see-preview-n">05</span> What happened leaves a record that can be checked</li>
-          <li><span class="see-preview-n">06</span> The record joins the institution's memory</li>
+          {WALKTHROUGH_STEPS.map((step) => (
+            <li><span class="see-preview-n">{step.n}</span> {step.title}</li>
+          ))}
         </ol>
       </div>
     </div>
@@ -295,44 +304,23 @@ const PARTICIPATION = [
         <span class="eyebrow">Current state</span>
         <h2>What is actually built, and how we know.</h2>
         <p class="sublede">
-          ICN's subsystems are at very different stages, and the project
+          ICN is under active development. Its subsystems are at very different stages, and the project
           publishes that unevenness rather than averaging it into a
           reassuring summary. Two labels travel with every claim: how far along
           it is, and what kind of evidence sits behind it.
         </p>
       </header>
 
-      <div class="state-summary">
-        <div class="state-figure">
-          <span class="state-figure-value">{strongest.length} of {projectState.subsystems.length}</span>
-          <span class="state-figure-label">
-            subsystems in the <MaturityBadge band="strong" /> band
-          </span>
-          <p>
-            {strongest.map((s) => s.name).join(', ')}.
-          </p>
-        </div>
-
-        <div class="state-figure">
-          <span class="state-figure-value">{weakest.length}</span>
-          <span class="state-figure-label">
-            still <MaturityBadge band="notyet" />
-          </span>
-          <p>
-            {weakest.length > 0
-              ? `${weakest.map((s) => s.name).join(', ')} — scaffolding exists, the capability does not.`
-              : 'No subsystem is currently in this band.'}
-          </p>
-        </div>
-
-        <div class="state-figure">
-          <span class="state-figure-value state-figure-date">{projectState.newestVerified}</span>
-          <span class="state-figure-label">last verified against source</span>
-          <p>
-            Generated from the repository's own state file on every build, so
-            this page cannot quietly fall behind the code.
-          </p>
-        </div>
+      <div class="state-pointer">
+        <p>
+          The dated, per-subsystem account lives on one page. It says when each
+          part was last checked against its source, separates that from the
+          changes merged since, and lists what each part is still missing. A
+          change landing in the repository is not a re-assessment.
+        </p>
+        <p>
+          <a href="/whats-real-now" class="link-arrow">What's real now, with dates and recorded gaps</a>
+        </p>
       </div>
 
       <div class="callout callout-caution state-callout">
@@ -343,9 +331,6 @@ const PARTICIPATION = [
           against prepared data — several are. Evidence labels like
           <EvidenceBadge evidence="fixture-backed" label="Fixture-backed" /> exist
           precisely so that distinction survives contact with a homepage.
-        </p>
-        <p>
-          <a href="/whats-real-now" class="link-arrow">The full per-subsystem account, with recorded gaps</a>
         </p>
       </div>
     </div>
@@ -633,46 +618,12 @@ const PARTICIPATION = [
 
   /* ─── 7 · State ────────────────────────────────────────────────────────── */
 
-  .state-summary {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--space-xl);
+  .state-pointer {
+    max-width: var(--measure-wide);
   }
 
-  .state-figure {
-    min-width: 0;
-    padding-top: var(--space-lg);
-    border-top: 2px solid var(--border-default);
-  }
-
-  .state-figure-value {
-    display: block;
-    font-family: var(--font-heading);
-    font-size: var(--text-3xl);
-    font-weight: 700;
-    color: var(--text-heading);
-    line-height: 1.1;
-  }
-
-  .state-figure-date {
-    font-family: var(--font-mono);
-    font-size: var(--text-2xl);
-  }
-
-  .state-figure-label {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4em;
-    align-items: baseline;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    margin: var(--space-xs) 0 var(--space-sm);
-  }
-
-  .state-figure p {
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-    line-height: 1.65;
+  .state-pointer p {
+    margin-bottom: var(--space-md);
   }
 
   .state-callout {
@@ -754,10 +705,6 @@ const PARTICIPATION = [
     .story-cols {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--space-4xl);
-    }
-    .state-summary {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: var(--space-2xl);
     }
     .deeper-grid,
     .part-grid {
