@@ -12,7 +12,7 @@ This document analyzes gaps between the ICN Federation Interoperability Contract
 
 ## 1. Critical Gaps (Security/Correctness Issues)
 
-These gaps represent security vulnerabilities or correctness issues that MUST be addressed before federation interoperability can be considered production-ready.
+These gaps represent security vulnerabilities or correctness issues that MUST be addressed before federation interoperability could be relied on outside a rehearsal.
 
 ### 1.1 HashMap Usage in Signed/Hashed Structures
 

@@ -182,6 +182,7 @@ This implementation supports:
 
 ## Sign-off
 
-**Status: PRODUCTION READY** ✅
+**Status (2025-12-18):** the vulnerabilities listed above were fixed and tested.
+This is not a readiness sign-off.
 
-All critical security vulnerabilities have been addressed with comprehensive fixes, extensive testing, and thorough documentation. The system is ready for production deployment with appropriate monitoring.
+All critical security vulnerabilities known at the time were addressed with fixes, extensive testing, and documentation. Closing them removed the specific defects named here; it did not by itself make the system production-grade.

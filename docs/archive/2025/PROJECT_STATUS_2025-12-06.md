@@ -1,5 +1,7 @@
 ⚠️ **ARCHIVED** - This document is from 2025 and has been archived.
 
+<!-- claim-class: historical-proof ref=2dabeba9bae0c3cd152c434d12f44f6b136756e1 date=2025-12-06 evidence=https://github.com/InterCooperative-Network/icn/commit/2dabeba9bae0c3cd152c434d12f44f6b136756e1 -->
+
 For current information, see:
 - [STATE.md](../STATE.md) - Current project state
 - [TODO.md](../TODO.md) - Current tasks

@@ -41,7 +41,7 @@
 |-----------|--------|-------------|
 | NY Cooperative Summit workshop | Oct 2026 | Live demo + hands-on session |
 | Federation pilot (3-5 coops) | Q4 2026 | Multiple organizations federated on ICN |
-| Phase 2 completion (~90%) | Dec 2026 | Production-ready for small-scale deployment |
+| Phase 2 completion (~90%) | Dec 2026 | Targeting production-readiness for small-scale deployment |
 
 ## Long-Term Vision (2027+)
 
