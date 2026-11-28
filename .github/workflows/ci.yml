@@ -45,7 +45,7 @@ jobs:
       has_rust: ${{ steps.filter.outputs.has_rust }}
       member_shell_relevant: ${{ steps.filter.outputs.member_shell_relevant }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -103,7 +103,7 @@ jobs:
     needs: [changes]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Check for placeholder secrets in deployable manifests
         run: |
@@ -144,7 +144,7 @@ jobs:
     name: Format Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Pin to the project toolchain so rustfmt rules stay stable.
       # Using @stable here causes drift every 6-week Rust release cycle.
@@ -163,7 +163,7 @@ jobs:
     needs: [changes]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Check kernel/app separation
         run: |
@@ -193,7 +193,7 @@ jobs:
     needs: [changes]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install build tools
         uses: ./.github/actions/install-build-tools
@@ -283,7 +283,7 @@ jobs:
     needs: [changes]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@1.95.0
 
@@ -318,7 +318,7 @@ jobs:
     needs: [changes]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Run compliance linter
         run: |
@@ -348,7 +348,7 @@ jobs:
     needs: [changes]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Self-test the readiness linter
         run: python3 .github/scripts/test_readiness_overclaim_linter.py
@@ -381,7 +381,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Skip only when docs_only AND no Rust files changed (dual-signal guard).
       # Requiring both prevents silent skips when paths-filter misclassifies a push.
@@ -425,7 +425,7 @@ jobs:
     # CPUAccounting= removed) and fails. Narrowing that assertion is a separate change.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Docs-only fast path
         if: needs.changes.outputs.docs_only == 'true' && needs.changes.outputs.has_rust != 'true'
@@ -518,7 +518,7 @@ jobs:
     if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
@@ -569,7 +569,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
@@ -611,7 +611,7 @@ jobs:
     if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install build tools
         uses: ./.github/actions/install-build-tools
@@ -674,7 +674,7 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Docs-only fast path
         if: needs.changes.outputs.docs_only == 'true' && needs.changes.outputs.has_rust != 'true'
@@ -723,7 +723,7 @@ jobs:
       run:
         working-directory: ./sdk/typescript
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Docs-only fast path — job must always run (not be skipped) so it
       # satisfies branch protection required checks on docs-only PRs.
@@ -804,7 +804,7 @@ jobs:
       run:
         working-directory: ./web/pilot-ui
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
@@ -830,7 +830,7 @@ jobs:
       run:
         working-directory: ./web/pilot-ui
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Docs-only fast path — job must always run so it satisfies branch protection required checks
       - name: Docs-only fast path
@@ -881,7 +881,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # No-op fast path — the job itself always runs (so it can satisfy branch
       # protection if/when it joins the required set) but only skips substance
@@ -954,7 +954,7 @@ jobs:
     timeout-minutes: 15
     needs: [changes, test]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
