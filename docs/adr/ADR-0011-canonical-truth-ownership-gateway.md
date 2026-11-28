@@ -1,10 +1,11 @@
 ---
 id: "0011"
 title: "Canonical Truth Ownership — Gateway vs Supervisor"
-status: "accepted"
+status: "amended"
 date: "2026-03-31"
 context: "federation-clearing-position-api / PR #1477"
 deciders: ["Matt Faherty"]
+amended_by: ["ADR-0094"]
 tags: ["gateway", "architecture", "federation", "clearing", "truth-ownership"]
 ---
 
@@ -30,6 +31,8 @@ After fixing the specific bug (PR #1477), an architectural audit was conducted t
 patterns existed elsewhere in the gateway.
 
 ## Decision
+
+> **Amendment (2026-11-28, ADR-0094):** For the governance domain only, the gateway-local `GovernanceManager` fallback is no longer an acceptable path for authoritative governance, and governance evidence initialization (receipt store, dispatch-evidence backend, close recovery and backfills) is owned by the supervisor rather than the gateway. The Governance row of the domain map below is amended accordingly. See ADR-0094.
 
 ### The Invariant
 
