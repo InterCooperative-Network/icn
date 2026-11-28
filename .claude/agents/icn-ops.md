@@ -107,8 +107,11 @@ kubectl exec -n icn-alpha deployment/icn-node -- icnctl net peers
 **Check disk (recurring issue — Rust build artifacts fill icn-dev):**
 ```bash
 df -h / /var/lib/rancher
-du -sh ~/projects/icn/target  # usually the culprit
-cargo clean  # if > 20GB
+# Build output is spread across every agent worktree, not one tree, so a single
+# `cargo clean` does not bound it. icn-disk-guard classifies each worktree and
+# reclaims only Cargo output from merged, inactive, clean ones.
+icn-disk-guard            # audit only; never deletes
+icn-disk-guard --auto     # reclaim what it classifies as safe
 ```
 
 **Restart a stuck pod:**
@@ -118,7 +121,7 @@ kubectl rollout restart deployment/<name> -n <namespace>
 
 **Check ops/mcp state:**
 ```bash
-cd ~/projects/icn/ops/mcp && git status
+cd "$(git rev-parse --show-toplevel)/ops/mcp" && git status
 ```
 
 ## Release Readiness Checklist
@@ -139,7 +142,7 @@ Before tagging a release:
 
 ## Known Recurring Issues
 
-1. **icn-dev disk fill** — Rust build artifacts grow unboundedly. Run `cargo clean` in `~/projects/icn/` when disk > 70%. Add to pre-session checklist.
+1. **icn-dev disk fill** — every agent worktree builds into its own `icn/target`, so build output grows with the number of worktrees, not with one tree. Run `icn-disk-guard` to audit and `icn-disk-guard --auto` to reclaim; it only removes Cargo output from worktrees it classifies merged-and-inactive and never touches source. A merged worktree still held by a live process reports as `MERGED-BUT-PROCESS-PINNED` — that is agent-lifecycle debt, not something the guard resolves.
 2. **P2P 0.0.0.0 advertisement** — Nodes advertise loopback. Fixed by IPv6 Happy Eyeballs (Mar 21). Verify fix is live before any federation demo.
 3. **ops/mcp dirty state** — 4 modified + 10 untracked files pending commit since Mar 13. Run `git status && git add -A && git commit` on icn-dev.
 4. **ExecutionReceiptGate key** — Signing key not configured in K3s secrets. Required for Flow 1B.
@@ -148,14 +151,15 @@ Before tagging a release:
 
 ## ops/mcp Quick Reference
 
-The `@icn/ops-mcp` v0.1.0 server runs on icn-dev at `~/projects/icn/ops/mcp/`.
+The `@icn/ops-mcp` server lives at `ops/mcp/` inside the checkout. Resolve it as
+`"$(git rev-parse --show-toplevel)/ops/mcp"` — never a memorized machine path.
 
 **Tool sets:** sessions, tasks, repos, health, decisions, comms, events, watchers
 
 **Start/stop:**
 ```bash
 # On icn-dev
-cd ~/projects/icn/ops/mcp && node dist/index.js
+cd "$(git rev-parse --show-toplevel)/ops/mcp" && node dist/index.js
 ```
 
 **Schema:** v2 — events, mailbox, watchers_process tables (SQLite)
