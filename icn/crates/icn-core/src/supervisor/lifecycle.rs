@@ -494,6 +494,10 @@ async fn spawn_actors_with_identity(
     // Execution-record retention cleanup, run by evidence initialization only
     // after its dispatch-evidence backfill succeeds.
     let post_backfill_cleanup: Option<Box<dyn FnOnce() + Send>>;
+    // In-flight decision recovery runs after evidence initialization (M-C1
+    // S2a), with the same dispatch-evidence sink as the live effect path.
+    let in_flight_executor: Arc<super::decision_executor::DecisionExecutor>;
+    let in_flight_sink = dispatch_evidence_sink.clone();
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -1027,34 +1031,17 @@ async fn spawn_actors_with_identity(
                 .with_escrow_store(escrow_store),
         );
 
-        // Recover in-flight decisions from prior crash
-        // This must run BEFORE the event subscription is established
-        // so we don't race with new incoming decisions.
-        match decision_executor.recover_in_flight().await {
-            Ok(report) => {
-                if report.total() > 0 {
-                    info!(
-                        confirmed = report.recovered_confirmed,
-                        not_executed = report.recovered_not_executed,
-                        failed = report.recovered_failed,
-                        skipped = report.skipped_no_effects + report.skipped_max_retries,
-                        "Startup recovery: processed {} in-flight decisions",
-                        report.total()
-                    );
-                } else {
-                    debug!("Startup recovery: no in-flight decisions found");
-                }
-            }
-            Err(e) => {
-                warn!(
-                    error = %e,
-                    "Startup recovery failed (non-fatal, new decisions will still process)"
-                );
-            }
-        }
+        // In-flight decisions from a prior crash are recovered after
+        // governance evidence initialization (below). A stored veto or
+        // force-close drives the actor's terminal transitions and needs the
+        // receipt store installed. The executor's per-decision claim keeps a
+        // recovered decision from dispatching twice alongside an acceptance
+        // re-emitted by close recovery through this subscription.
+        in_flight_executor = decision_executor.clone();
 
-        // Best-effort startup retention cleanup (non-fatal). Must run after
-        // recovery so pending/in-flight records are not pruned, and (Issue
+        // Best-effort startup retention cleanup (non-fatal). It prunes only
+        // terminal records, so in-flight records survive it whichever runs
+        // first. It runs (Issue
         // #1987 follow-up) after the dispatch-evidence backfill so pruning
         // cannot delete a terminal record whose evidence was lost in the crash
         // window before it can be healed. Governance evidence initialization
@@ -1095,10 +1082,10 @@ async fn spawn_actors_with_identity(
 
     info!("✓ Governance event handlers registered");
 
-    // Governance evidence initialization (M-C1 S1). After the actor, the
-    // decision executor's in-flight recovery and the effect subscription (so
-    // recovered acceptances reach the executor); before the RPC server and
-    // the gateway accept requests. Readiness is settled from this outcome.
+    // Governance evidence initialization (M-C1 S1). After the actor and the
+    // effect subscription (so recovered acceptances reach the executor);
+    // before in-flight decision recovery (S2a), the RPC server and the
+    // gateway. Readiness is settled from this outcome.
     let (governance_evidence, governance_settled) =
         super::init_governance_evidence::establish_governance_evidence(
             super::init_governance_evidence::GovernanceEvidenceInputs {
@@ -1116,6 +1103,41 @@ async fn spawn_actors_with_identity(
         }
         super::init_governance_evidence::GovernanceEvidenceInit::Failed(cause) => {
             error!(?cause, readiness = ?governance_settled.readiness(), "Governance evidence not established");
+        }
+    }
+
+    // In-flight decision recovery (M-C1 S2a): after evidence initialization,
+    // so a recovered veto/force-close runs with the receipt store installed,
+    // and before the RPC server and the gateway accept requests. When
+    // evidence did not settle Ready, veto/force-close records are deferred
+    // untouched to a later boot.
+    match in_flight_executor
+        .recover_in_flight_with(super::decision_executor::RecoveryOptions {
+            defer_actor_control: governance_settled.defers_actor_control_recovery(),
+            sink: in_flight_sink,
+        })
+        .await
+    {
+        Ok(report) => {
+            if report.total() > 0 {
+                info!(
+                    confirmed = report.recovered_confirmed,
+                    not_executed = report.recovered_not_executed,
+                    failed = report.recovered_failed,
+                    skipped = report.skipped_no_effects + report.skipped_max_retries,
+                    deferred_actor_control = report.deferred_actor_control,
+                    "Startup recovery: processed {} in-flight decisions",
+                    report.total()
+                );
+            } else {
+                debug!("Startup recovery: no in-flight decisions found");
+            }
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                "Startup recovery failed (non-fatal, new decisions will still process)"
+            );
         }
     }
 
@@ -2512,20 +2534,32 @@ mod governance_evidence_ordering_tests {
     fn evidence_init_runs_after_the_effect_subscription_and_before_rpc_and_gateway() {
         let src = production_source();
         let identity_fn = position(src, "async fn spawn_actors_with_identity(");
-        let recover_in_flight = position(src, "decision_executor.recover_in_flight().await");
         let subscription = position(src, "event_bus.subscribe(effect_subscription).await");
         let evidence = position(src, "establish_governance_evidence(");
+        let recover_in_flight = position(src, ".recover_in_flight_with(");
         let rpc = position(src, "init_rpc::spawn_rpc_server(");
-        assert!(identity_fn < recover_in_flight);
-        assert!(recover_in_flight < subscription);
+        assert!(identity_fn < subscription);
         assert!(
             subscription < evidence,
             "recovered acceptances must reach the effect subscription"
         );
         assert!(
-            evidence < rpc,
+            evidence < recover_in_flight,
+            "M-C1 S2a: a recovered veto/force-close needs established evidence"
+        );
+        assert!(
+            recover_in_flight < rpc,
             "recovery must complete before RPC accepts requests"
         );
+        assert!(
+            !src.contains(".recover_in_flight()"),
+            "production recovery must pass explicit options"
+        );
+        // The options are the evidence-derived deferral and the live sink.
+        let call = &src[recover_in_flight..rpc];
+        assert!(call
+            .contains("defer_actor_control: governance_settled.defers_actor_control_recovery()"));
+        assert!(call.contains("sink: in_flight_sink"));
 
         // The gateway is spawned by `run_supervisor` only after
         // `spawn_actors_with_identity(...)` (which contains evidence init) returns.

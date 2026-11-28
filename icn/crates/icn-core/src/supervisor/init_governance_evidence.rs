@@ -4,9 +4,9 @@
 //! institutional evidence path that terminal governance transitions write to,
 //! and settles the governance actor's evidence readiness from the outcome.
 //! It runs after the governance actor is spawned, after the decision executor
-//! has recovered in-flight decisions, and after the governance effect
-//! subscription is registered (so recovered acceptances reach the executor),
-//! and before the RPC server or the gateway accepts requests.
+//! has registered the governance effect subscription (so recovered acceptances
+//! reach the executor), and before in-flight decision recovery, the RPC server,
+//! or the gateway accepts requests.
 //!
 //! The daemon opens `<data_dir>/gateway_store` once and builds the receipt
 //! store over it (whose constructor runs the legacy by-proposal index
@@ -310,6 +310,13 @@ impl GovernanceEvidenceSettled {
     pub fn readiness(&self) -> EvidenceReadiness {
         self.readiness
     }
+
+    /// Whether in-flight decision recovery must defer records that drive the
+    /// actor's terminal transitions (veto / force-close): true unless
+    /// evidence is `Ready`.
+    pub fn defers_actor_control_recovery(&self) -> bool {
+        self.readiness != EvidenceReadiness::Ready
+    }
 }
 
 impl PartialEq<EvidenceReadiness> for GovernanceEvidenceSettled {
@@ -343,5 +350,30 @@ pub fn split_governance_store(
         None => (None, None),
         Some(Err(cause)) => (Some(Err(cause)), None),
         Some(Ok(injection)) => (Some(Ok(injection.evidence)), Some(injection.gateway)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// M-C1 S2a: only Ready admits in-flight recovery of veto/force-close
+    /// decisions. The settled production path returns Ready or Failed, and
+    /// other readiness values remain fail-closed.
+    #[test]
+    fn actor_control_recovery_is_deferred_unless_evidence_admits_it() {
+        for (readiness, defers) in [
+            (EvidenceReadiness::Pending, true),
+            (EvidenceReadiness::Ready, false),
+            (EvidenceReadiness::NotProvisioned, true),
+            (EvidenceReadiness::Failed, true),
+        ] {
+            let settled = GovernanceEvidenceSettled { readiness };
+            assert_eq!(
+                settled.defers_actor_control_recovery(),
+                defers,
+                "{readiness:?}"
+            );
+        }
     }
 }

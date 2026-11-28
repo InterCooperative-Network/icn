@@ -44,13 +44,14 @@
 //! - **NoOp-only** batches must **not** reach `Confirmed` via aggregation (they are all
 //!   `not_executed`).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
 use tokio::sync::Semaphore;
 use tracing::{debug, error, info, warn};
 
-use icn_kernel_api::effects::{DispatchEvidenceSink, EffectResult, KernelEffect};
+use icn_kernel_api::effects::{ControlEffect, DispatchEvidenceSink, EffectResult, KernelEffect};
 use icn_kernel_api::escrow::{EscrowStatus, EscrowStore};
 use icn_kernel_api::execution::{
     ExecutionRecord, ExecutionStatus, ExecutionStore, ExecutionTruthSummary,
@@ -75,6 +76,8 @@ pub struct DecisionExecutor {
     escrow_store: Option<Arc<dyn EscrowStore>>,
     /// Bounded semaphore for backpressure on concurrent executions.
     concurrency_limit: Arc<Semaphore>,
+    /// Per-decision in-process exclusion (M-C1 S2a); see [`Self::claim`].
+    claims: Arc<std::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
 }
 
 impl DecisionExecutor {
@@ -85,6 +88,7 @@ impl DecisionExecutor {
             store,
             escrow_store: None,
             concurrency_limit: Arc::new(Semaphore::new(MAX_CONCURRENT_EXECUTIONS)),
+            claims: Arc::default(),
         }
     }
 
@@ -92,6 +96,38 @@ impl DecisionExecutor {
     pub fn with_escrow_store(mut self, escrow_store: Arc<dyn EscrowStore>) -> Self {
         self.escrow_store = Some(escrow_store);
         self
+    }
+
+    /// Serialize executions of one decision within this process.
+    ///
+    /// The durable record cannot do this alone: a non-terminal `Executing`
+    /// record is deliberately re-dispatched (crash recovery), so two
+    /// in-process callers for one decision — the live effect callback and
+    /// in-flight recovery — would both dispatch. The claim is keyed on the
+    /// decision receipt id, which the live callback and a recovered record
+    /// share (legacy receipt-keyed rows included). Distinct decisions that
+    /// share a receipt id only serialize; nothing is skipped.
+    async fn claim(&self, decision_receipt_id: &str) -> ExecutionClaim {
+        let lock = {
+            let mut claims = self.claims.lock().unwrap_or_else(|e| e.into_inner());
+            claims
+                .entry(decision_receipt_id.to_string())
+                .or_default()
+                .clone()
+        };
+        let guard = lock.clone().lock_owned().await;
+        ExecutionClaim {
+            claims: self.claims.clone(),
+            key: decision_receipt_id.to_string(),
+            lock,
+            guard: Some(guard),
+        }
+    }
+
+    /// Number of decisions currently holding or awaiting an execution claim.
+    #[cfg(test)]
+    fn claims_in_progress(&self) -> usize {
+        self.claims.lock().unwrap_or_else(|e| e.into_inner()).len()
     }
 
     /// Get a reference to the execution store.
@@ -107,6 +143,20 @@ impl DecisionExecutor {
     ///
     /// Call this once at startup, after constructing the executor.
     pub async fn recover_in_flight(&self) -> Result<RecoveryReport> {
+        self.recover_in_flight_with(RecoveryOptions::default())
+            .await
+    }
+
+    /// [`Self::recover_in_flight`] with explicit startup options.
+    ///
+    /// The supervisor runs this after governance evidence initialization
+    /// (M-C1 S2a). Recovered executions write dispatch evidence through
+    /// `options.sink`, because that boot's #1987 backfill has already run.
+    /// With `options.defer_actor_control`, a record whose effects drive the
+    /// governance actor's terminal transitions (veto / force-close) is left
+    /// exactly as stored — not dispatched, no retry consumed — for a later
+    /// boot whose evidence admits it.
+    pub async fn recover_in_flight_with(&self, options: RecoveryOptions) -> Result<RecoveryReport> {
         // Log the store's status distribution before recovery begins
         match self.store.count_by_status() {
             Ok(counts) => {
@@ -160,6 +210,18 @@ impl DecisionExecutor {
                     continue;
                 }
 
+                if options.defer_actor_control && carries_actor_control(&record.effects) {
+                    warn!(
+                        decision_hash = %record.decision_hash,
+                        status = ?record.status,
+                        retries = record.retries,
+                        "Deferring recovery of a veto/force-close decision: governance evidence \
+                         does not admit terminal transitions"
+                    );
+                    report.deferred_actor_control += 1;
+                    continue;
+                }
+
                 if record.status == ExecutionStatus::Failed && record.retries >= MAX_RETRIES {
                     // Exhausted retries — mark permanently failed
                     let mut rec = record;
@@ -196,12 +258,25 @@ impl DecisionExecutor {
             let receipt_id = record.decision_receipt_id.clone();
             let proposal_id = record.proposal_id.clone();
             let effects = record.effects.clone();
+            let effects_for_sink = options.sink.as_ref().map(|_| effects.clone());
 
             match self
                 .execute(effects, &receipt_id, &decision_hash, &proposal_id)
                 .await
             {
-                Ok(_results) => {
+                Ok(results) => {
+                    if let (Some(sink), Some(effects_for_sink)) =
+                        (options.sink.as_ref(), effects_for_sink)
+                    {
+                        if !results.is_empty() {
+                            sink.record_effects(
+                                &receipt_id,
+                                &effects_for_sink,
+                                &results,
+                                unix_now_secs(),
+                            );
+                        }
+                    }
                     if let Some(rec) = self.store.get(&decision_hash)? {
                         match rec.status {
                             ExecutionStatus::Confirmed => {
@@ -391,6 +466,10 @@ impl DecisionExecutor {
         decision_hash: &str,
         proposal_id: &str,
     ) -> Result<Vec<EffectResult>> {
+        // M-C1 S2a: one in-process execution per decision at a time, held across
+        // key selection, the idempotency read, dispatch and the record write.
+        let _claim = self.claim(decision_receipt_id).await;
+
         // Backward-compatibility across the #2094->#2096 upgrade window. Before
         // federation effects carried an extractable `decision_hash`, a
         // federation-only decision produced no hash, so the callback keyed its
@@ -696,6 +775,56 @@ impl DecisionExecutor {
     }
 }
 
+/// Holds one decision's execution claim; releases it, and drops the map
+/// entry when no other caller holds or awaits it, on drop.
+struct ExecutionClaim {
+    claims: Arc<std::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
+    key: String,
+    lock: Arc<tokio::sync::Mutex<()>>,
+    guard: Option<tokio::sync::OwnedMutexGuard<()>>,
+}
+
+impl Drop for ExecutionClaim {
+    fn drop(&mut self) {
+        self.guard.take();
+        let mut claims = self.claims.lock().unwrap_or_else(|e| e.into_inner());
+        // The map and this claim hold the only references: no other caller
+        // holds or awaits the lock, and none can obtain it without the map.
+        if Arc::strong_count(&self.lock) == 2 {
+            claims.remove(&self.key);
+        }
+    }
+}
+
+/// Whether a stored batch drives the governance actor's terminal
+/// transitions (veto / force-close), which need established evidence.
+fn carries_actor_control(effects: &[KernelEffect]) -> bool {
+    effects.iter().any(|e| {
+        matches!(
+            e,
+            KernelEffect::Control(
+                ControlEffect::VetoProposal { .. } | ControlEffect::ForceCloseProposal { .. }
+            )
+        )
+    })
+}
+
+fn unix_now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Options for [`DecisionExecutor::recover_in_flight_with`].
+#[derive(Default)]
+pub struct RecoveryOptions {
+    /// Leave records carrying actor-bound control effects untouched.
+    pub defer_actor_control: bool,
+    /// Dispatch-evidence sink for recovered executions.
+    pub sink: Option<Arc<dyn DispatchEvidenceSink>>,
+}
+
 /// Report from startup recovery scan.
 #[derive(Debug, Default)]
 pub struct RecoveryReport {
@@ -709,6 +838,9 @@ pub struct RecoveryReport {
     pub skipped_no_effects: usize,
     /// Decisions skipped because they exhausted retry limits.
     pub skipped_max_retries: usize,
+    /// Records left untouched because they carry actor-bound control effects
+    /// and governance evidence did not admit them.
+    pub deferred_actor_control: usize,
 }
 
 impl RecoveryReport {
@@ -719,6 +851,7 @@ impl RecoveryReport {
             + self.recovered_failed
             + self.skipped_no_effects
             + self.skipped_max_retries
+            + self.deferred_actor_control
     }
 }
 
@@ -1784,5 +1917,293 @@ mod tests {
         assert_eq!(record.status, ExecutionStatus::Failed);
         assert_eq!(record.retries, 1);
         assert!(!record.is_terminal());
+    }
+
+    // ---- M-C1 S2a: in-flight recovery ordering (exclusion, sink, deferral) ----
+
+    use icn_kernel_api::effects::ControlEffect;
+    use icn_kernel_api::services::{
+        ControlService, ForceCloseProposalRequest, ForceCloseProposalResult, VetoProposalRequest,
+        VetoProposalResult,
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// Counts control calls; each call reports entry, then blocks until released.
+    struct GatedControlService {
+        calls: AtomicUsize,
+        entered: tokio::sync::mpsc::UnboundedSender<usize>,
+        released: std::sync::Mutex<bool>,
+        release_cv: std::sync::Condvar,
+    }
+
+    impl GatedControlService {
+        fn new(open: bool) -> (Arc<Self>, tokio::sync::mpsc::UnboundedReceiver<usize>) {
+            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+            let svc = Arc::new(Self {
+                calls: AtomicUsize::new(0),
+                entered: tx,
+                released: std::sync::Mutex::new(open),
+                release_cv: std::sync::Condvar::new(),
+            });
+            (svc, rx)
+        }
+
+        fn release(&self) {
+            *self.released.lock().unwrap_or_else(|e| e.into_inner()) = true;
+            self.release_cv.notify_all();
+        }
+
+        fn enter(&self) {
+            let n = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+            let _ = self.entered.send(n);
+            let guard = self.released.lock().unwrap_or_else(|e| e.into_inner());
+            // Bounded: a broken test must not hang the suite.
+            let _ = self.release_cv.wait_timeout_while(
+                guard,
+                std::time::Duration::from_secs(10),
+                |open| !*open,
+            );
+        }
+    }
+
+    impl ControlService for GatedControlService {
+        fn veto_proposal(&self, _r: VetoProposalRequest) -> Result<VetoProposalResult> {
+            self.enter();
+            Ok(VetoProposalResult {
+                success: true,
+                message: "vetoed".into(),
+                state_change_hash: Some("h".into()),
+                vetoed_at: 0,
+            })
+        }
+        fn force_close_proposal(
+            &self,
+            _r: ForceCloseProposalRequest,
+        ) -> Result<ForceCloseProposalResult> {
+            self.enter();
+            Ok(ForceCloseProposalResult {
+                success: true,
+                message: "closed".into(),
+                state_change_hash: Some("h".into()),
+                final_outcome: "rejected".into(),
+                closed_at: 0,
+            })
+        }
+        fn can_veto(&self, _t: &str, _d: &str) -> bool {
+            true
+        }
+        fn can_force_close(&self, _t: &str, _d: &str) -> bool {
+            true
+        }
+    }
+
+    #[derive(Default)]
+    struct RecordingSink {
+        calls: std::sync::Mutex<Vec<(String, usize)>>,
+    }
+
+    impl DispatchEvidenceSink for RecordingSink {
+        fn record_effects(
+            &self,
+            decision_receipt_id: &str,
+            _effects: &[KernelEffect],
+            results: &[EffectResult],
+            _recorded_at: u64,
+        ) {
+            self.calls
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push((decision_receipt_id.to_string(), results.len()));
+        }
+    }
+
+    fn make_control_executor(
+        svc: Arc<GatedControlService>,
+    ) -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>) {
+        use icn_kernel_api::protocol_params::StubParamStore;
+        let kernel_executor = Arc::new(
+            super::super::governance_executor::KernelGovernanceExecutor::new(Arc::new(
+                StubParamStore,
+            ))
+            .with_control_service(svc),
+        );
+        let dispatcher = Arc::new(EffectDispatcher::new(kernel_executor));
+        let exec_store = Arc::new(MemoryExecutionStore::new());
+        let decision_executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
+        (decision_executor, exec_store)
+    }
+
+    fn veto(target: &str) -> Vec<KernelEffect> {
+        vec![KernelEffect::Control(ControlEffect::VetoProposal {
+            target_proposal_id: target.into(),
+            veto_reason: "s2a".into(),
+        })]
+    }
+
+    fn seed(store: &MemoryExecutionStore, hash: &str, effects: Vec<KernelEffect>, failed: bool) {
+        let mut rec =
+            ExecutionRecord::new_pending(hash, format!("p-{hash}"), format!("r-{hash}"), effects);
+        rec.mark_executing();
+        if failed {
+            rec.mark_failed("prior attempt");
+        }
+        store.put(&rec).unwrap();
+    }
+
+    /// T1: a live execution and a recovery of the SAME decision must not both
+    /// dispatch. Without per-decision exclusion the second caller sees the
+    /// non-terminal `Executing` record and dispatches again.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_execution_of_one_decision_dispatches_once() {
+        let (svc, mut entered) = GatedControlService::new(false);
+        let (executor, store) = make_control_executor(svc.clone());
+
+        let first = {
+            let ex = executor.clone();
+            tokio::spawn(async move { ex.execute(veto("p-1"), "receipt-1", "hash-1", "p-1").await })
+        };
+        let n = tokio::time::timeout(std::time::Duration::from_secs(5), entered.recv())
+            .await
+            .expect("first dispatch must start");
+        assert_eq!(n, Some(1));
+
+        let second = {
+            let ex = executor.clone();
+            tokio::spawn(async move { ex.execute(veto("p-1"), "receipt-1", "hash-1", "p-1").await })
+        };
+        // Non-vacuity bound: an unguarded second caller reaches dispatch within
+        // milliseconds; 2 s of silence means it is excluded.
+        let again = tokio::time::timeout(std::time::Duration::from_secs(2), entered.recv()).await;
+        assert!(
+            again.is_err(),
+            "second dispatch of the same decision while the first was in flight: {again:?}"
+        );
+
+        svc.release();
+        first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
+        assert_eq!(
+            svc.calls.load(Ordering::SeqCst),
+            1,
+            "veto dispatched exactly once"
+        );
+        assert_eq!(
+            store.get("hash-1").unwrap().unwrap().status,
+            ExecutionStatus::Confirmed
+        );
+        assert_eq!(executor.claims_in_progress(), 0, "claims are released");
+    }
+
+    /// T2: a recovered execution writes dispatch evidence through the sink,
+    /// because it now runs after the boot's #1987 backfill.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn recovered_execution_records_dispatch_evidence() {
+        let (svc, _entered) = GatedControlService::new(true);
+        let (executor, store) = make_control_executor(svc.clone());
+        seed(&store, "hash-s", veto("p-s"), false);
+        let sink = Arc::new(RecordingSink::default());
+
+        let report = executor
+            .recover_in_flight_with(RecoveryOptions {
+                defer_actor_control: false,
+                sink: Some(sink.clone()),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(report.recovered_confirmed, 1);
+        assert_eq!(svc.calls.load(Ordering::SeqCst), 1);
+        let calls = sink.calls.lock().unwrap().clone();
+        assert_eq!(calls, vec![("r-hash-s".to_string(), 1)]);
+    }
+
+    /// T3: when evidence does not admit terminal transitions, records carrying
+    /// veto/force-close are left exactly as they were (no dispatch, no retry
+    /// consumed); other records still recover.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn deferred_recovery_leaves_actor_control_records_untouched() {
+        let (svc, _entered) = GatedControlService::new(true);
+        let (executor, store) = make_control_executor(svc.clone());
+        seed(&store, "hash-v", veto("p-v"), true);
+        seed(
+            &store,
+            "hash-f",
+            vec![KernelEffect::Control(ControlEffect::ForceCloseProposal {
+                target_proposal_id: "p-f".into(),
+                close_reason: "s2a".into(),
+            })],
+            false,
+        );
+        seed(
+            &store,
+            "hash-n",
+            vec![KernelEffect::NoOp {
+                reason: "plain".into(),
+            }],
+            false,
+        );
+        let before_v = store.get("hash-v").unwrap().unwrap();
+        let before_f = store.get("hash-f").unwrap().unwrap();
+
+        let report = executor
+            .recover_in_flight_with(RecoveryOptions {
+                defer_actor_control: true,
+                sink: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(svc.calls.load(Ordering::SeqCst), 0, "no control dispatch");
+        assert_eq!(report.deferred_actor_control, 2);
+        let after_v = store.get("hash-v").unwrap().unwrap();
+        let after_f = store.get("hash-f").unwrap().unwrap();
+        assert_eq!(
+            (after_v.status, after_v.retries),
+            (before_v.status, before_v.retries)
+        );
+        assert_eq!(
+            (after_f.status, after_f.retries),
+            (before_f.status, before_f.retries)
+        );
+        assert!(
+            store.get("hash-n").unwrap().unwrap().is_terminal(),
+            "non-control recovered"
+        );
+        assert_eq!(report.recovered_not_executed, 1);
+
+        // Control: the same records DO dispatch once deferral is lifted.
+        let report = executor
+            .recover_in_flight_with(RecoveryOptions::default())
+            .await
+            .unwrap();
+        assert_eq!(report.deferred_actor_control, 0);
+        assert_eq!(svc.calls.load(Ordering::SeqCst), 2);
+    }
+
+    /// Even an exhausted retry budget must not turn a control record into a
+    /// permanent failure while governance evidence is unavailable.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn deferred_exhausted_control_record_preserves_status_and_retries() {
+        let (svc, _entered) = GatedControlService::new(true);
+        let (executor, store) = make_control_executor(svc.clone());
+        seed(&store, "hash-exhausted", veto("p-exhausted"), true);
+        let mut before = store.get("hash-exhausted").unwrap().unwrap();
+        before.retries = MAX_RETRIES;
+        store.put(&before).unwrap();
+
+        let report = executor
+            .recover_in_flight_with(RecoveryOptions {
+                defer_actor_control: true,
+                sink: None,
+            })
+            .await
+            .unwrap();
+
+        let after = store.get("hash-exhausted").unwrap().unwrap();
+        assert_eq!(report.deferred_actor_control, 1);
+        assert_eq!(report.skipped_max_retries, 0);
+        assert_eq!(after.status, before.status);
+        assert_eq!(after.retries, before.retries);
+        assert_eq!(svc.calls.load(Ordering::SeqCst), 0);
     }
 }
