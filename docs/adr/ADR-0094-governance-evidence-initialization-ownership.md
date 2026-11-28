@@ -1,14 +1,14 @@
 ---
 id: "0094"
 title: "Governance evidence initialization is owned by the supervisor, not the gateway"
-status: "proposed"
+status: "accepted"
 date: "2026-11-28"
-deciders: []
+deciders: ["Matt Faherty"]
 tags: ["governance", "evidence", "supervisor", "gateway", "durability", "topology"]
 supersedes: []
 superseded_by: []
 amends: ["ADR-0011"]
-implementation_status: "proposed"
+implementation_status: "not yet implemented (stage S1 in PR #2980, unmerged)"
 references:
   - "ADR-0011 (amended: §Fallback / Standalone Mode for governance; Audit Results Domain Map, Governance row)"
   - "ADR-0014 (mandates and authority grants written through the receipt backend)"
@@ -21,7 +21,7 @@ references:
 
 ## Status
 
-`proposed`. This ADR has not been accepted. Its first-stage implementation (S1, PR #2980) must not land until it is.
+`accepted` (2026-11-28). Implementation is staged; stage S1 is PR #2980.
 
 ## Context
 
