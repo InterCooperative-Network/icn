@@ -1070,6 +1070,34 @@ pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
                                 writes the survivor back and orphans the losers. No domain rule \
                                 authorizes that merge (#2676).",
         },
+        DeferredNamespace {
+            name: "governance/replication_sequence",
+            // `gov:repl:seq:v1:` ‖ u32_be len ‖ author spelling ‖ u32_be len ‖ domain id
+            // (apps/governance/src/replication_sequence.rs `sequence_key`). Written on the
+            // first signed governance emission of every (author, domain) pair, so a node that
+            // has closed one proposal holds at least one row.
+            prefix: b"gov:repl:seq:v1:",
+            gate: "#2627 registry: governance replication-sequence disposition (owner decision)",
+            inventory_rows: &[24],
+            posture: DeferredCollisionPosture::ReportOnly,
+            posture_rationale: "Startup only — not a statement that alias handling is safe, \
+                                and a deviation from ReportOnly's contract the owner must accept: \
+                                the counter refuses nothing at the point of use. At startup \
+                                nothing scans or merges the keyspace (one watermark per raw key, \
+                                read lazily, only that key written back), so no row is collapsed \
+                                or orphaned. The value is a high-water mark keyed by the signed \
+                                author's spelling, and Did equality is already key equality, so \
+                                an alias-spelled principal gets its own watermark and REISSUES \
+                                sequence numbers already signed for that principal — reachable \
+                                in-process today, not only at migration. The consequence is \
+                                latent while no receiver reads seq (op_id hashes the signed \
+                                body). The fix belongs in the counter (key on identifier bytes); \
+                                any migration must merge MaxMonotonic. Reporting is incomplete: \
+                                scanned as WholeKey, the u32 author length lands in the shape so \
+                                aliases of different length are not grouped, and a domain id \
+                                that spells did:icn: adds a false principal or an unreadable \
+                                row.",
+        },
     ]
 }
 
@@ -2480,6 +2508,78 @@ mod tests {
         assert_eq!(scanned, 1, "only the registered row was scanned");
     }
 
+    /// Characterization, not endorsement: the deferral scans this keyspace as `WholeKey`, so the
+    /// u32 length field in front of the author is carried into the canonical shape verbatim.
+    /// Two spellings of one author with different lengths therefore land in different shapes
+    /// and are NOT grouped as a collision. A covered disposition needs a length-framed region.
+    #[test]
+    fn governance_replication_sequence_aliases_of_different_length_are_not_grouped_yet() {
+        let (b58, b16) = two_spellings(0x25);
+        assert_ne!(
+            b58.len(),
+            b16.len(),
+            "precondition: the spellings differ in length"
+        );
+        let row = |author: &str| {
+            let mut key = b"gov:repl:seq:v1:".to_vec();
+            key.extend_from_slice(&(author.len() as u32).to_be_bytes());
+            key.extend_from_slice(author.as_bytes());
+            key.extend_from_slice(&4u32.to_be_bytes());
+            key.extend_from_slice(b"coop");
+            key
+        };
+        let (s1, s2) = (40u64.to_be_bytes(), 3u64.to_be_bytes());
+        let store = store_with_raw(&[(row(&b58), &s1), (row(&b16), &s2)]);
+        let reports = scan_deferred(&store, &n2a_deferred_namespaces()).unwrap();
+        let r = reports
+            .iter()
+            .find(|r| r.name == "governance/replication_sequence")
+            .unwrap();
+        assert_eq!(r.report.rows_with_readable_did, 2, "both rows are read");
+        assert!(
+            r.report.collision_groups.is_empty(),
+            "if this fails the scan now groups length-varying aliases: update the rationale"
+        );
+    }
+
+    /// A node that has closed one proposal holds a replication-sequence row naming its own DID.
+    /// That row is deferred, not uncovered, and does not block the startup gate.
+    #[test]
+    fn governance_replication_sequence_row_is_deferred_and_does_not_block() {
+        let (one, _) = two_spellings(0x24);
+        let mut key = b"gov:repl:seq:v1:".to_vec();
+        key.extend_from_slice(&(one.len() as u32).to_be_bytes());
+        key.extend_from_slice(one.as_bytes());
+        let domain = b"coop-board";
+        key.extend_from_slice(&(domain.len() as u32).to_be_bytes());
+        key.extend_from_slice(domain);
+        let seq = 11u64.to_be_bytes();
+        let store = store_with_raw(&[(key, &seq)]);
+
+        let deferrals = n2a_deferred_namespaces();
+        let a = audit(&store, &[], &deferrals);
+        assert_eq!(a.deferred_did_rows(), 1, "the author row is deferred");
+        assert_eq!(a.uncovered_did_rows(), 0, "and not uncovered");
+        assert!(
+            a.is_clear(),
+            "a node that closed a proposal must still start"
+        );
+        let d = deferrals
+            .iter()
+            .find(|d| d.name == "governance/replication_sequence")
+            .expect("registered");
+        assert_eq!(d.posture, DeferredCollisionPosture::ReportOnly);
+        let reports = scan_deferred(&store, &deferrals).unwrap();
+        let r = reports
+            .iter()
+            .find(|r| r.name == "governance/replication_sequence")
+            .unwrap();
+        assert_eq!(
+            r.report.rows_with_readable_did, 1,
+            "the author row is read, not skipped"
+        );
+        assert!(!r.blocks());
+    }
     #[test]
     fn every_principal_row_lands_in_exactly_one_of_three_states() {
         // covered | deferred | uncovered — and nothing may fall through.
