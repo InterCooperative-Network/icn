@@ -21,6 +21,13 @@ async fn test_budget_enforcement() {
     // Setup identities
     let alice = IdentityBundle::generate().unwrap();
     let bob = IdentityBundle::generate().unwrap();
+    // The second successful payment goes to a different payee. Budgets are enforced on the
+    // payer only, so this does not change what the test checks. It keeps the two successful
+    // settlements from being content-identical: `create_settlement` sets no nonce, so two
+    // identical settlements built in one millisecond share a journal entry id, and the ledger
+    // refuses the second as already journaled (icn#2871). That legacy limitation is unresolved
+    // (icn#2871 part 2, ADR-0091 on icn#2878); this fixture does not claim otherwise.
+    let carol = IdentityBundle::generate().unwrap();
     let coop_id = "test-coop".to_string();
     let currency = "USD".to_string();
 
@@ -74,9 +81,16 @@ async fn test_budget_enforcement() {
     let updated_budget_2 = budget_store.get("budget-1").unwrap().unwrap();
     assert_eq!(updated_budget_2.spent, 50);
 
-    // 4. Make Payment (50) -> Success (Total 100 == 100)
+    // 4. Make Payment (50) to a second payee -> Success (Total 100 == 100)
     let res_success = ledger_mgr
-        .create_settlement(&coop_id, alice.did(), bob.did(), 50, currency.clone(), None)
+        .create_settlement(
+            &coop_id,
+            alice.did(),
+            carol.did(),
+            50,
+            currency.clone(),
+            None,
+        )
         .await;
     assert!(res_success.is_ok());
 
