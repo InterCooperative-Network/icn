@@ -59,6 +59,7 @@ pub mod message;
 pub mod power_diff;
 pub mod profile;
 pub mod proof;
+pub mod proof_bundle;
 #[allow(missing_docs)]
 pub mod proposal;
 #[allow(missing_docs)]

@@ -275,7 +275,20 @@ fn delegation_key_prefix() -> &'static [u8] {
 }
 
 fn proof_key(proposal_id: &ProposalId) -> Vec<u8> {
-    format!("governance:proof:{}", proposal_id.0).into_bytes()
+    icn_governance::proof_bundle::stored_proof_key(&proposal_id.0)
+}
+
+/// The exact stored `GovernanceProofV2` bytes for `proposal_id`, as the close path persisted them.
+///
+/// Read-only and byte-exact: the bytes are not decoded or re-serialized, so an exporter can carry
+/// them to an offline verifier unchanged (icn#2465). `store` is the governance store
+/// (`{data_dir}/store/governance`). `None` means no proof was persisted for this proposal — e.g. a
+/// force-close, or a close on a node without a signing key.
+pub fn read_stored_proof_bytes(
+    store: &dyn icn_store::Store,
+    proposal_id: &ProposalId,
+) -> Result<Option<Vec<u8>>> {
+    store.get(&proof_key(proposal_id))
 }
 
 fn close_intent_key(id: &ProposalId) -> Vec<u8> {

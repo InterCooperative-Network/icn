@@ -2,6 +2,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 mod device_authority;
+mod gov_proof;
 mod institution_bootstrap;
 mod institution_runtime_root;
 
@@ -1307,6 +1308,10 @@ enum GovCommands {
     /// Vote on proposals
     #[command(subcommand)]
     Vote(VoteCommands),
+
+    /// Portable decision proofs: export offline, verify offline against a pinned signer
+    #[command(subcommand)]
+    Proof(gov_proof::ProofCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -3600,6 +3605,9 @@ async fn main() -> Result<()> {
             handle_federation_command(fed_cmd, &data_dir, &args.endpoint).await?
         }
 
+        // Before the general arm: proof export/verify are offline and must never create the
+        // authenticated RPC client that `handle_gov_command` opens first.
+        Commands::Gov(GovCommands::Proof(proof_cmd)) => gov_proof::run(proof_cmd, &data_dir)?,
         Commands::Gov(gov_cmd) => handle_gov_command(gov_cmd, &data_dir, &args.endpoint).await?,
 
         Commands::Institution(institution_cmd) => {
@@ -10630,6 +10638,9 @@ async fn handle_gov_command(cmd: GovCommands, data_dir: &Path, endpoint: &str) -
             }
         }
 
+        GovCommands::Proof(_) => bail!(
+            "gov proof commands run offline and are dispatched before any RPC client is created"
+        ),
         GovCommands::Vote(vote_cmd) => match vote_cmd {
             VoteCommands::Cast {
                 proposal_id,
