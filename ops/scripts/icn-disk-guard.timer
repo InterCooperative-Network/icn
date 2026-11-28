@@ -1,0 +1,16 @@
+[Unit]
+Description=ICN disk-guard audit every 4 hours
+Documentation=file:///home/ubuntu/icn-dev/scripts/icn-disk-guard
+
+[Timer]
+# Boot-persistent by construction: OnBootSec fires after every boot with no login required.
+OnBootSec=15min
+# Relative cadence rather than OnCalendar, so runs never synchronise to a wall-clock instant
+# across hosts and never stack up after downtime.
+OnUnitActiveSec=4h
+RandomizedDelaySec=20min
+AccuracySec=5min
+Unit=icn-disk-guard.service
+
+[Install]
+WantedBy=timers.target
