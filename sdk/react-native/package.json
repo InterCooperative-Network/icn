@@ -39,7 +39,7 @@
     "@icn/client": "^0.1.0",
     "@noble/ed25519": "^3.0.0",
     "@noble/hashes": "^2.0.1",
-    "@noble/post-quantum": "^0.6.0"
+    "@noble/post-quantum": "^0.7.1"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.5",
