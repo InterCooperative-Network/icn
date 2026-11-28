@@ -13,6 +13,8 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
 icn-encoding = { path = "../icn-encoding" }
 icn-kernel-api = { path = "../icn-kernel-api" }
+# authz_threshold: the governance AdoptedRule for the experimental effect_v0 spine.
+icn-authz = { path = "../icn-authz" }
 icn-entity = { path = "../icn-entity" }
 icn-federation = { path = "../icn-federation" }
 icn-identity = { path = "../icn-identity" }
