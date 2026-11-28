@@ -1,21 +1,21 @@
-//! Supervisor gateway startup and governance evidence readiness.
+//! Supervisor gateway startup and governance evidence readiness (M-C1 S1).
 //!
-//! The gateway is the component that installs the governance receipt store and
-//! dispatch-evidence backend and runs close recovery. How its startup ends
-//! decides what governance may do:
+//! On a node with an identity the supervisor — not the gateway — installs the
+//! governance receipt store and dispatch-evidence backend and runs close
+//! recovery (`establish_governance_evidence`), over the store the daemon opened
+//! once, before the gateway starts. Readiness is keyed to that outcome:
 //!
-//! * ready: recovery settled governance; scheduled closes write evidence;
-//! * disabled by configuration: no evidence path is provisioned; scheduled
-//!   closes proceed as before, with no receipt-backed guarantee;
-//! * a configured gateway that fails before its evidence path is established:
-//!   scheduled work is held (overdue proposals preserved) and terminal
-//!   transitions are refused, while unrelated activity continues;
-//! * a failure after evidence and recovery were established: governance stays
-//!   ready.
+//! * established: governance is Ready and scheduled closes write evidence,
+//!   whatever then happens to the gateway (disabled, misconfigured, failed);
+//! * the store cannot be opened, or none was injected: scheduled work is held
+//!   (overdue proposals preserved) and terminal transitions are refused,
+//!   while unrelated activity continues;
+//! * the gateway never settles governance, and a gateway given the actor
+//!   without the shared store refuses to start.
 //!
-//! These drive the supervisor's real startup step (`start_gateway`) wherever a
-//! configuration can produce the case, and its settlement seam
-//! (`settle_governance_evidence`) for states between sink installation steps.
+//! Before S1 these cases were keyed to the gateway's own startup outcome
+//! (disabled gateway = NotProvisioned; failed gateway = held). Each test below
+//! states the new expectation it replaces.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::sync::Arc;
@@ -23,9 +23,13 @@ use std::time::Duration;
 
 use icn_core::config::GatewayConfig;
 use icn_core::supervisor::init_gateway::{
-    settle_governance_evidence, start_gateway, GatewayHandles, GatewayStartup,
-    GatewayStartupFailure,
+    spawn_gateway, GatewayHandles, GatewayStartup, GatewayStartupFailure,
 };
+use icn_core::supervisor::init_governance_evidence::{
+    establish_governance_evidence, EvidenceInitFailure, GovernanceEvidenceInit,
+    GovernanceEvidenceInputs, GovernanceEvidenceSettled, GovernanceEvidenceStore,
+};
+use icn_gateway::shared_store::SharedGatewayStore;
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_governance::{
     GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, MembershipConfig,
@@ -158,14 +162,55 @@ async fn wait_closed(h: &GovernanceHandle, id: &ProposalId) -> ProposalState {
     }
 }
 
-fn handles_with(h: &GovernanceHandle) -> GatewayHandles {
+fn handles_with(
+    h: &GovernanceHandle,
+    shared: Option<SharedGatewayStore>,
+    settled: GovernanceEvidenceSettled,
+) -> GatewayHandles {
     GatewayHandles {
         governance_actor_handle: Some(h.clone()),
-        // As the daemon wires it: with a broadcaster the gateway is built over
-        // its data directory (without one it would use temporary storage).
         event_broadcaster: Some(Arc::new(icn_gateway::EventBroadcaster::new())),
+        shared_store: shared,
+        governance_evidence: Some(settled),
         ..GatewayHandles::default()
     }
+}
+
+/// The daemon's single open of `<data>/gateway_store` and the supervisor's
+/// evidence initialization over it, as on an identity node.
+async fn establish(
+    fx: &Fixture,
+    data: &std::path::Path,
+) -> (
+    GovernanceEvidenceInit,
+    GovernanceEvidenceSettled,
+    Option<SharedGatewayStore>,
+) {
+    let (store, shared) = match SharedGatewayStore::open(data) {
+        Ok(shared) => {
+            let receipts = shared.receipt_store().clone();
+            let backfill = receipts.clone();
+            (
+                Ok(GovernanceEvidenceStore {
+                    receipt_backend: receipts,
+                    backfill_by_grantee_index: Arc::new(move || {
+                        backfill.backfill_grant_by_grantee_index()
+                    }),
+                }),
+                Some(shared),
+            )
+        }
+        Err(e) => (Err(e), None),
+    };
+    let (init, readiness) = establish_governance_evidence(GovernanceEvidenceInputs {
+        governance: fx.handle.clone(),
+        store: Some(store),
+        dispatch_evidence_sink: None,
+        execution_store: None,
+        post_backfill_cleanup: None,
+    })
+    .await;
+    (init, readiness, shared)
 }
 
 fn enabled_config() -> GatewayConfig {
@@ -210,53 +255,79 @@ async fn assert_held_and_fail_closed(fx: &Fixture) {
         .expect("unrelated governance activity continues");
 }
 
+/// Was: a disabled gateway declared NotProvisioned. Now: on an identity node
+/// evidence is established by the supervisor, so with the gateway disabled
+/// governance is Ready and the overdue close completes with evidence.
 #[tokio::test]
-async fn a_disabled_gateway_declares_no_evidence_path_and_scheduled_closes_proceed() {
+async fn a_disabled_gateway_leaves_established_governance_ready_and_closes_proceed() {
     let fx = fixture().await;
     let data = tempfile::tempdir().unwrap();
-    let startup = start_gateway(
+    let (init, readiness, shared) = establish(&fx, data.path()).await;
+    assert!(matches!(init, GovernanceEvidenceInit::Established(_)));
+    assert_eq!(readiness, EvidenceReadiness::Ready);
+    let startup = spawn_gateway(
         &GatewayConfig::default(),
         data.path().to_path_buf(),
-        handles_with(&fx.handle),
+        handles_with(&fx.handle, shared.clone(), readiness),
     )
     .await;
     assert_eq!(startup, GatewayStartup::Disabled);
+    assert_eq!(fx.handle.evidence_readiness(), EvidenceReadiness::Ready);
+    let s = wait_closed(&fx.handle, &fx.overdue).await;
+    assert!(matches!(s, ProposalState::Accepted { .. }), "{s:?}");
+    assert!(shared
+        .unwrap()
+        .receipt_store()
+        .get_mandate_by_proposal(&fx.overdue.0)
+        .unwrap()
+        .is_some());
+    fx.handle.shutdown().await;
+}
+
+/// Was: missing gateway credentials held governance. Now: the gateway failure
+/// is reported as before but does not reach governance, which stays Ready.
+#[tokio::test]
+async fn missing_gateway_credentials_are_a_gateway_failure_only() {
+    let fx = fixture().await;
+    let data = tempfile::tempdir().unwrap();
+    let (_init, settled, shared) = establish(&fx, data.path()).await;
+    let config = GatewayConfig {
+        jwt_secret: String::new(),
+        ..enabled_config()
+    };
+    let startup = spawn_gateway(
+        &config,
+        data.path().to_path_buf(),
+        handles_with(&fx.handle, shared, settled),
+    )
+    .await;
     assert_eq!(
-        fx.handle.evidence_readiness(),
-        EvidenceReadiness::NotProvisioned
+        startup,
+        GatewayStartup::Failed(GatewayStartupFailure::MissingCredentials)
     );
+    assert_eq!(fx.handle.evidence_readiness(), EvidenceReadiness::Ready);
     let s = wait_closed(&fx.handle, &fx.overdue).await;
     assert!(matches!(s, ProposalState::Accepted { .. }), "{s:?}");
     fx.handle.shutdown().await;
 }
 
+/// Was: an invalid gateway bind address held governance. Now: a gateway
+/// configuration failure only; governance stays Ready.
 #[tokio::test]
-async fn missing_credentials_are_a_failure_not_a_disabled_gateway() {
+async fn an_invalid_bind_address_is_a_gateway_configuration_failure_only() {
     let fx = fixture().await;
     let data = tempfile::tempdir().unwrap();
-    let config = GatewayConfig {
-        jwt_secret: String::new(),
-        ..enabled_config()
-    };
-    let startup = start_gateway(&config, data.path().to_path_buf(), handles_with(&fx.handle)).await;
-    assert_eq!(
-        startup,
-        GatewayStartup::Failed(GatewayStartupFailure::MissingCredentials)
-    );
-    assert_eq!(fx.handle.evidence_readiness(), EvidenceReadiness::Failed);
-    assert_held_and_fail_closed(&fx).await;
-    fx.handle.shutdown().await;
-}
-
-#[tokio::test]
-async fn an_invalid_bind_address_is_a_configuration_failure() {
-    let fx = fixture().await;
-    let data = tempfile::tempdir().unwrap();
+    let (_init, settled, shared) = establish(&fx, data.path()).await;
     let config = GatewayConfig {
         bind_addr: "not-an-address".to_string(),
         ..enabled_config()
     };
-    let startup = start_gateway(&config, data.path().to_path_buf(), handles_with(&fx.handle)).await;
+    let startup = spawn_gateway(
+        &config,
+        data.path().to_path_buf(),
+        handles_with(&fx.handle, shared, settled),
+    )
+    .await;
     assert!(
         matches!(
             startup,
@@ -264,20 +335,38 @@ async fn an_invalid_bind_address_is_a_configuration_failure() {
         ),
         "{startup:?}"
     );
-    assert_eq!(fx.handle.evidence_readiness(), EvidenceReadiness::Failed);
-    assert_held_and_fail_closed(&fx).await;
+    assert_eq!(fx.handle.evidence_readiness(), EvidenceReadiness::Ready);
+    let s = wait_closed(&fx.handle, &fx.overdue).await;
+    assert!(matches!(s, ProposalState::Accepted { .. }), "{s:?}");
     fx.handle.shutdown().await;
 }
 
+/// Was: the gateway failing to open its store held governance. Now: the
+/// daemon cannot open the governance store (the data directory is a regular
+/// file), so evidence init fails with StoreOpen and governance is held and
+/// fails closed; the gateway, given the actor but no store, refuses to start.
 #[tokio::test]
-async fn a_storage_failure_before_the_receipt_store_holds_governance() {
-    // The gateway thread starts, then cannot open its store: its data
-    // directory is a regular file.
+async fn an_unopenable_governance_store_holds_governance() {
     let fx = fixture().await;
     let data = tempfile::tempdir().unwrap();
     let not_a_dir = data.path().join("file");
     std::fs::write(&not_a_dir, b"x").unwrap();
-    let startup = start_gateway(&enabled_config(), not_a_dir, handles_with(&fx.handle)).await;
+    let (init, readiness, shared) = establish(&fx, &not_a_dir).await;
+    assert!(
+        matches!(
+            init,
+            GovernanceEvidenceInit::Failed(EvidenceInitFailure::StoreOpen(_))
+        ),
+        "{init:?}"
+    );
+    assert!(shared.is_none());
+    assert_eq!(readiness, EvidenceReadiness::Failed);
+    let startup = spawn_gateway(
+        &enabled_config(),
+        not_a_dir,
+        handles_with(&fx.handle, None, readiness),
+    )
+    .await;
     assert!(
         matches!(
             startup,
@@ -290,14 +379,17 @@ async fn a_storage_failure_before_the_receipt_store_holds_governance() {
     fx.handle.shutdown().await;
 }
 
+/// Unchanged expectation, new owner: evidence init then a healthy gateway;
+/// governance Ready and the overdue close completes.
 #[tokio::test]
-async fn a_healthy_gateway_recovers_and_overdue_closes_then_complete() {
+async fn a_healthy_gateway_after_evidence_init_and_overdue_closes_complete() {
     let fx = fixture().await;
     let data = tempfile::tempdir().unwrap();
-    let startup = start_gateway(
+    let (_init, settled, shared) = establish(&fx, data.path()).await;
+    let startup = spawn_gateway(
         &enabled_config(),
         data.path().to_path_buf(),
-        handles_with(&fx.handle),
+        handles_with(&fx.handle, shared, settled),
     )
     .await;
     assert_eq!(startup, GatewayStartup::Ready);
@@ -307,72 +399,88 @@ async fn a_healthy_gateway_recovers_and_overdue_closes_then_complete() {
     fx.handle.shutdown().await;
 }
 
-fn real_receipt_store() -> (
-    tempfile::TempDir,
-    Arc<icn_gateway::receipt_store::ReceiptStore>,
-) {
-    let dir = tempfile::tempdir().unwrap();
-    let db = sled::open(dir.path()).unwrap();
-    (
-        dir,
-        Arc::new(icn_gateway::receipt_store::ReceiptStore::new(db)),
-    )
-}
-
+/// Was: a failure between the gateway's receipt-store install and its
+/// recovery held governance. That intermediate state no longer exists in
+/// production (installs and recovery are one supervisor step). The remaining
+/// "actor present, evidence never established" case — no store injected —
+/// holds governance.
 #[tokio::test]
-async fn a_failure_between_receipt_store_and_recovery_holds_governance() {
-    // The receipt store is installed but recovery never ran (the dispatch
-    // backend or recovery step did not complete).
+async fn no_injected_store_holds_governance() {
     let fx = fixture().await;
-    let (_dir, receipts) = real_receipt_store();
-    fx.handle.install_receipt_store(receipts).await;
-    let state = settle_governance_evidence(
-        &GatewayStartup::Failed(GatewayStartupFailure::ExitedBeforeReadiness(None)),
-        Some(&fx.handle),
+    let (init, readiness) = establish_governance_evidence(GovernanceEvidenceInputs {
+        governance: fx.handle.clone(),
+        store: None,
+        dispatch_evidence_sink: None,
+        execution_store: None,
+        post_backfill_cleanup: None,
+    })
+    .await;
+    assert!(
+        matches!(
+            init,
+            GovernanceEvidenceInit::Failed(EvidenceInitFailure::NotInjected)
+        ),
+        "{init:?}"
     );
-    assert_eq!(state, Some(EvidenceReadiness::Failed));
+    assert_eq!(readiness, EvidenceReadiness::Failed);
     assert_held_and_fail_closed(&fx).await;
     fx.handle.shutdown().await;
 }
 
+/// Was: a gateway failure after its own evidence install and recovery kept
+/// governance Ready. Now: any gateway failure after evidence init keeps
+/// governance Ready, and the close writes its mandate to the shared store.
 #[tokio::test]
-async fn a_failure_after_evidence_and_recovery_keeps_governance_closing_with_evidence() {
+async fn a_gateway_failure_after_evidence_init_keeps_governance_closing_with_evidence() {
     let fx = fixture().await;
-    let (_dir, receipts) = real_receipt_store();
-    fx.handle.install_receipt_store(receipts.clone()).await;
-    fx.handle.recover_incomplete_closes().await;
-    let state = settle_governance_evidence(
-        &GatewayStartup::Failed(GatewayStartupFailure::ExitedBeforeActivation),
-        Some(&fx.handle),
-    );
-    assert_eq!(state, Some(EvidenceReadiness::Ready));
+    let data = tempfile::tempdir().unwrap();
+    let (_init, settled, shared) = establish(&fx, data.path()).await;
+    let shared = shared.unwrap();
+    let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let config = GatewayConfig {
+        bind_addr: occupied.local_addr().unwrap().to_string(),
+        ..enabled_config()
+    };
+    let startup = spawn_gateway(
+        &config,
+        data.path().to_path_buf(),
+        handles_with(&fx.handle, Some(shared.clone()), settled),
+    )
+    .await;
+    assert!(matches!(startup, GatewayStartup::Failed(_)), "{startup:?}");
+    assert_eq!(fx.handle.evidence_readiness(), EvidenceReadiness::Ready);
     let s = wait_closed(&fx.handle, &fx.overdue).await;
     assert!(matches!(s, ProposalState::Accepted { .. }), "{s:?}");
     assert!(
-        receipts
+        shared
+            .receipt_store()
             .get_mandate_by_proposal(&fx.overdue.0)
             .unwrap()
             .is_some(),
-        "the accepted close writes its mandate to the real receipt store"
+        "the accepted close writes its mandate to the shared receipt store"
     );
     fx.handle.shutdown().await;
 }
 
+/// Was: without an actor, gateway startup settled nothing. Settlement now
+/// takes an actor by type, so only the gateway half remains: with no actor
+/// and no injected store (the identity-less path, unchanged by S1) the
+/// gateway needs no shared store.
 #[tokio::test]
-async fn without_a_governance_actor_startup_settles_nothing() {
-    assert_eq!(
-        settle_governance_evidence(
-            &GatewayStartup::Failed(GatewayStartupFailure::MissingCredentials),
-            None
-        ),
-        None
-    );
+async fn without_a_governance_actor_the_gateway_needs_no_injected_store() {
     let data = tempfile::tempdir().unwrap();
-    let startup = start_gateway(
+    let startup = spawn_gateway(
         &GatewayConfig::default(),
         data.path().to_path_buf(),
         GatewayHandles::default(),
     )
     .await;
     assert_eq!(startup, GatewayStartup::Disabled);
+    let startup = spawn_gateway(
+        &enabled_config(),
+        data.path().to_path_buf(),
+        GatewayHandles::default(),
+    )
+    .await;
+    assert_eq!(startup, GatewayStartup::Ready);
 }

@@ -25,6 +25,7 @@ pub mod init_federation;
 pub mod init_gateway;
 pub mod init_gossip;
 pub mod init_governance;
+pub mod init_governance_evidence;
 pub mod init_naming;
 pub mod init_network;
 pub mod init_notifications;

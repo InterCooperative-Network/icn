@@ -22,10 +22,10 @@ use super::actors::{
 
 /// Best-effort startup retention cleanup of old terminal execution records.
 ///
-/// Extracted so it can run either inline (no gateway) or be deferred to run
-/// *after* the gateway's dispatch-evidence backfill (Issue #1987 follow-up):
-/// pruning before the backfill could delete a terminal record whose
-/// `EffectDispatchEvidence` was lost in the crash window before it can be healed.
+/// Runs inside governance evidence initialization, only after its #1987
+/// dispatch-evidence backfill succeeded: pruning before the backfill could
+/// delete a terminal record whose `EffectDispatchEvidence` was lost in the
+/// crash window before it can be healed.
 fn run_execution_record_cleanup(executor: &super::decision_executor::DecisionExecutor) {
     match executor.cleanup_old_records() {
         Ok(report) => {
@@ -150,10 +150,11 @@ pub async fn run_supervisor(
         spawn_without_identity(&config, &shutdown_tx, &mut background_tasks).await
     };
 
-    // Spawn Gateway API server if enabled, then settle governance evidence
-    // readiness from how its startup ended (see `settle_governance_evidence`).
+    // Spawn Gateway API server if enabled. Governance evidence readiness was
+    // already settled by `init_governance_evidence` (identity path); the
+    // gateway's outcome does not affect it.
     // commons is taken from gateway_handles (populated above, shared with kernel executor)
-    super::init_gateway::start_gateway(
+    super::init_gateway::spawn_gateway(
         &config.gateway,
         config.data_dir.clone(),
         super::init_gateway::GatewayHandles {
@@ -177,10 +178,10 @@ pub async fn run_supervisor(
             charter_accepted_hook: gateway_handles.charter_accepted_hook,
             federation_service: gateway_handles.federation_service,
             settlement_engine: gateway_handles.settlement_engine,
-            dispatch_evidence_sink_installer: gateway_handles.dispatch_evidence_sink_installer,
+            shared_store: gateway_handles.shared_store,
+            governance_evidence: gateway_handles.governance_evidence,
             execution_query_store: gateway_handles.execution_query_store,
             revocation_store: gateway_handles.revocation_store,
-            post_backfill_cleanup: gateway_handles.post_backfill_cleanup,
         },
     )
     .await;
@@ -482,9 +483,17 @@ async fn spawn_actors_with_identity(
     let compute_commons_settlement_callback = handles.commons_settlement_callback;
     let compute_settlement_query_engine = handles.settlement_query_engine;
     let dispatch_evidence_sink = handles.dispatch_evidence_sink;
-    // Carry the concrete installer through to the gateway so it can bind
-    // the receipt store into the deferred sink once the store is open.
-    gateway_handles.dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
+    // Consumed by governance evidence initialization (below), which installs
+    // the shared receipt store as the deferred sink's backend.
+    let dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
+    // The daemon's single open of `<data_dir>/gateway_store`: the governance
+    // view goes to evidence initialization, the concrete view to the gateway.
+    let (governance_evidence_store, shared_gateway_store) =
+        super::init_governance_evidence::split_governance_store(handles.governance_store);
+    gateway_handles.shared_store = shared_gateway_store;
+    // Execution-record retention cleanup, run by evidence initialization only
+    // after its dispatch-evidence backfill succeeds.
+    let post_backfill_cleanup: Option<Box<dyn FnOnce() + Send>>;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -1045,22 +1054,15 @@ async fn spawn_actors_with_identity(
         }
 
         // Best-effort startup retention cleanup (non-fatal). Must run after
-        // recovery so pending/in-flight records are not pruned.
-        //
-        // Issue #1987 follow-up: when a gateway will start, it runs the
-        // dispatch-evidence backfill at its own (later) startup. Defer cleanup
-        // until after that backfill so pruning cannot delete a terminal record
-        // whose evidence was lost in the crash window before it can be healed.
-        // When no gateway will start, run cleanup inline now.
-        let gateway_will_start = config.gateway.enabled && !config.gateway.jwt_secret.is_empty();
-        if gateway_will_start {
-            let cleanup_executor = decision_executor.clone();
-            gateway_handles.post_backfill_cleanup = Some(Arc::new(move || {
-                run_execution_record_cleanup(&cleanup_executor)
-            }));
-        } else {
-            run_execution_record_cleanup(&decision_executor);
-        }
+        // recovery so pending/in-flight records are not pruned, and (Issue
+        // #1987 follow-up) after the dispatch-evidence backfill so pruning
+        // cannot delete a terminal record whose evidence was lost in the crash
+        // window before it can be healed. Governance evidence initialization
+        // runs it after a successful backfill, and skips it otherwise.
+        let cleanup_executor = decision_executor.clone();
+        post_backfill_cleanup = Some(Box::new(move || {
+            run_execution_record_cleanup(&cleanup_executor)
+        }));
 
         // Create callback that routes effects through DecisionExecutor.
         // When a dispatch-evidence sink is wired, route through it so that
@@ -1092,6 +1094,30 @@ async fn spawn_actors_with_identity(
     });
 
     info!("✓ Governance event handlers registered");
+
+    // Governance evidence initialization (M-C1 S1). After the actor, the
+    // decision executor's in-flight recovery and the effect subscription (so
+    // recovered acceptances reach the executor); before the RPC server and
+    // the gateway accept requests. Readiness is settled from this outcome.
+    let (governance_evidence, governance_settled) =
+        super::init_governance_evidence::establish_governance_evidence(
+            super::init_governance_evidence::GovernanceEvidenceInputs {
+                governance: governance_handle.clone(),
+                store: governance_evidence_store,
+                dispatch_evidence_sink: dispatch_evidence_sink_installer,
+                execution_store: gateway_handles.execution_query_store.clone(),
+                post_backfill_cleanup,
+            },
+        )
+        .await;
+    match &governance_evidence {
+        super::init_governance_evidence::GovernanceEvidenceInit::Established(_) => {
+            info!(readiness = ?governance_settled.readiness(), "✓ Governance evidence established");
+        }
+        super::init_governance_evidence::GovernanceEvidenceInit::Failed(cause) => {
+            error!(?cause, readiness = ?governance_settled.readiness(), "Governance evidence not established");
+        }
+    }
 
     // Initialize contract registry
     let contract_registry_services =
@@ -1169,10 +1195,12 @@ async fn spawn_actors_with_identity(
             policy_oracle: Some(oracle_for_components.clone()),
         },
         background_tasks,
+        &governance_settled,
     )?;
     gateway_handles.compute = Some(rpc_compute_handle);
     gateway_handles.settlement_engine = Some(compute_services.settlement_engine.clone());
     gateway_handles.revocation_store = Some(revocation_store);
+    gateway_handles.governance_evidence = Some(governance_settled);
 
     // Extract LedgerService for background tasks (resource enforcer)
     let ledger_service_for_bg: Option<Arc<dyn icn_kernel_api::services::LedgerService>> =
@@ -2454,5 +2482,63 @@ mod core_oracle_registration_tests {
             .expect("test keypair")
             .did()
             .clone()
+    }
+}
+
+/// M-C1 S1 (i): governance evidence initialization — including close recovery —
+/// completes before any API accepts requests. The lifecycle awaits it in
+/// sequence, so its position among the awaited startup steps is the guarantee.
+#[cfg(test)]
+mod governance_evidence_ordering_tests {
+    /// Production source of this file, up to its first test module.
+    fn production_source() -> &'static str {
+        let src = include_str!("lifecycle.rs");
+        let end = src.find("#[cfg(test)]").unwrap_or(src.len());
+        &src[..end]
+    }
+
+    fn position(src: &str, needle: &str) -> usize {
+        let first = src.find(needle);
+        let last = src.rfind(needle);
+        assert!(first.is_some(), "`{needle}` not found in lifecycle.rs");
+        assert_eq!(
+            first, last,
+            "`{needle}` must occur exactly once in lifecycle.rs"
+        );
+        first.unwrap_or_default()
+    }
+
+    #[test]
+    fn evidence_init_runs_after_the_effect_subscription_and_before_rpc_and_gateway() {
+        let src = production_source();
+        let identity_fn = position(src, "async fn spawn_actors_with_identity(");
+        let recover_in_flight = position(src, "decision_executor.recover_in_flight().await");
+        let subscription = position(src, "event_bus.subscribe(effect_subscription).await");
+        let evidence = position(src, "establish_governance_evidence(");
+        let rpc = position(src, "init_rpc::spawn_rpc_server(");
+        assert!(identity_fn < recover_in_flight);
+        assert!(recover_in_flight < subscription);
+        assert!(
+            subscription < evidence,
+            "recovered acceptances must reach the effect subscription"
+        );
+        assert!(
+            evidence < rpc,
+            "recovery must complete before RPC accepts requests"
+        );
+
+        // The gateway is spawned by `run_supervisor` only after
+        // `spawn_actors_with_identity(...)` (which contains evidence init) returns.
+        let identity_call = position(src, "{\n        spawn_actors_with_identity(\n");
+        let gateway = position(src, "init_gateway::spawn_gateway(");
+        assert!(identity_call < gateway);
+        let identity_await = src[identity_call..]
+            .find(".await?")
+            .map(|i| identity_call + i)
+            .unwrap_or(usize::MAX);
+        assert!(
+            identity_await < gateway,
+            "identity actors are awaited before the gateway"
+        );
     }
 }

@@ -29,8 +29,8 @@ pub struct GatewayActorHandles {
     pub ledger_service: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
     pub governance: Option<icn_gateway::governance_mgr::GovernanceHandle>,
     /// Concrete actor-backed governance handle. Parallel to `governance`
-    /// (which is the trait-object alias). Needed for installing the
-    /// gateway's receipt_store on the actor's inner state.
+    /// (which is the trait-object alias). The gateway reads decision
+    /// commitments through it; its presence requires `shared_store`.
     pub governance_actor_handle: Option<icn_governance_actor::GovernanceHandle>,
     pub treasury: Option<icn_gateway::TreasuryHandle>,
     pub ledger: Option<icn_gateway::LedgerHandle>,
@@ -57,13 +57,13 @@ pub struct GatewayActorHandles {
     pub federation_service: Option<Arc<dyn icn_kernel_api::services::FederationService>>,
     /// Settlement engine for compute audit queries (task_id → settled status).
     pub settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
-    /// Deferred dispatch-evidence sink installer. The daemon constructs one
-    /// `Arc<DeferredDispatchEvidenceSink>` at bootstrap; a clone is handed
-    /// to the kernel via `BootstrapHandles.dispatch_evidence_sink`, and
-    /// this field carries the *same* Arc through to the gateway so it can
-    /// install the receipt store as the concrete backend once it is open.
-    pub dispatch_evidence_sink_installer:
-        Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
+    /// The daemon's single open of `<data_dir>/gateway_store`, forwarded to
+    /// the gateway. Governance evidence initialization over the same store is
+    /// the supervisor's (see `init_governance_evidence`).
+    pub shared_store: Option<icn_gateway::shared_store::SharedGatewayStore>,
+    /// Proof that governance evidence initialization completed, forwarded so
+    /// the gateway starts only after it (see `GovernanceEvidenceSettled`).
+    pub governance_evidence: Option<super::init_governance_evidence::GovernanceEvidenceSettled>,
     /// Runtime-owned execution-record store — the same sled store the decision
     /// executor writes execution records to. Shared into the gateway
     /// receipt-chain read API so `/v1/receipts/chain/{decision_hash}` reads real
@@ -74,13 +74,6 @@ pub struct GatewayActorHandles {
     /// so a revoked credential is rejected on both authenticated surfaces
     /// (issue #2437).
     pub revocation_store: Option<Arc<dyn icn_store::Store>>,
-    /// Best-effort execution-record retention cleanup, deferred to run *after*
-    /// the gateway's dispatch-evidence backfill (Issue #1987 follow-up). Pruning
-    /// terminal execution records before the backfill could delete a record
-    /// whose `EffectDispatchEvidence` was lost in the crash window before it can
-    /// be healed. Set only when a gateway will actually start; otherwise the
-    /// supervisor runs cleanup inline and leaves this `None`.
-    pub post_backfill_cleanup: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 /// Core actor handles returned from initialization
@@ -221,15 +214,19 @@ pub struct BootstrapHandles {
     /// Kernel-neutral trait — the app-side implementer persists evidence.
     pub dispatch_evidence_sink: Option<Arc<dyn icn_kernel_api::effects::DispatchEvidenceSink>>,
     /// Concrete installer companion to `dispatch_evidence_sink`. Carries the
-    /// same underlying `Arc<DeferredDispatchEvidenceSink>` so the supervisor
-    /// can forward it to the gateway; the gateway calls `install_backend`
-    /// once the receipt store is open, flipping the deferred sink from
-    /// forwarder-to-nowhere into a live writer.
+    /// same underlying `Arc<DeferredDispatchEvidenceSink>`; the supervisor's
+    /// governance evidence initialization installs the receipt store as its
+    /// backend before close recovery runs.
     ///
     /// Optional — leaving this `None` keeps the deferred sink in its
-    /// pre-install "log and drop" state, which is the correct behavior for
-    /// configurations where no gateway / no receipt store exists (e.g.
-    /// standalone supervisor-only tests).
+    /// pre-install "log and drop" state.
     pub dispatch_evidence_sink_installer:
         Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
+    /// The daemon's single open of `<data_dir>/gateway_store`: `None` when
+    /// the daemon injected none, `Err` with the cause when opening it failed.
+    /// An open failure is carried here rather than aborting the daemon, so
+    /// governance evidence initialization reports `Failed` and governance is
+    /// held while the rest of the node runs.
+    pub governance_store:
+        Option<Result<super::init_governance_evidence::GovernanceStoreInjection, String>>,
 }

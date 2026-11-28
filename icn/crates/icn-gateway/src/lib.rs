@@ -34,6 +34,7 @@ pub mod compute_events;
 pub mod compute_mgr;
 pub mod coop;
 pub mod coop_entity_resolver;
+#[cfg(test)]
 mod dispatch_evidence_backfill;
 pub mod email_client;
 pub mod entity_audit;
@@ -68,6 +69,7 @@ pub mod server;
 pub mod service_discovery_mgr;
 pub mod session;
 pub mod session_authority;
+pub mod shared_store;
 pub mod steward_mgr;
 pub mod token_authority;
 pub mod treasury_mgr;

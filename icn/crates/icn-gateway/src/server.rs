@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use tracing_actix_web::TracingLogger;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -114,10 +114,9 @@ pub struct GatewayServer {
     /// Optional handle to daemon's GovernanceActor (for actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional concrete actor handle, parallel to `governance_handle`.
-    /// Used solely to install `receipt_store` onto the actor at startup so
-    /// actor-path `CloseProposal::Accept` and `ForceCloseProposal::Accept`
-    /// emit `InstitutionalEffectRecord` durably (closes parity gap with
-    /// the gateway-path close).
+    /// Used for the governance manager's decision-commitment source. Its
+    /// presence also requires an injected [`Self::shared_store`]: the
+    /// supervisor, not the gateway, installs the receipt store on the actor.
     governance_actor_handle: Option<icn_governance_actor::GovernanceHandle>,
     /// Optional handle to daemon's ContractRegistryActor (for contract management)
     contract_registry_handle: Option<icn_ccl::ContractRegistryHandle>,
@@ -158,25 +157,16 @@ pub struct GatewayServer {
     commons_handle: Option<icn_commons::CommonsHandle>,
     /// Settlement engine for compute audit queries (task_id → settled status).
     settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
-    /// Deferred dispatch-evidence sink: the daemon constructs this before
-    /// the gateway opens the receipt store and passes it through here so
-    /// the gateway can install the backend as soon as `ReceiptStore` is
-    /// ready. With this installer wired, actor/internal proposal
-    /// acceptances produce the same durable per-effect
-    /// `EffectDispatchEvidence` as the gateway-close HTTP path.
-    dispatch_evidence_sink_installer:
-        Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
+    /// The daemon's single open of `<data_dir>/gateway_store` (database and
+    /// receipt store). Required whenever a governance actor handle is set:
+    /// the supervisor owns governance evidence initialization over this same
+    /// store, so the gateway must not open a second one.
+    shared_store: Option<crate::shared_store::SharedGatewayStore>,
     /// Runtime-owned execution-record store shared from the daemon supervisor.
     /// When present, the receipt-chain audit read endpoints use it instead of
     /// re-opening the (exclusively `sled`-locked) execution path — which would
     /// otherwise fall back to an empty temporary store (Gap C).
     execution_query_store: Option<Arc<dyn icn_store::Store>>,
-    /// Best-effort execution-record retention cleanup, supplied by the daemon
-    /// supervisor and invoked once, right AFTER the startup dispatch-evidence
-    /// backfill (Issue #1987 follow-up). Deferring cleanup until after the
-    /// backfill ensures pruning cannot delete a terminal execution record whose
-    /// evidence was lost in the crash window before the backfill heals it.
-    post_backfill_cleanup: Option<Arc<dyn Fn() + Send + Sync>>,
     /// Dev/demo posture: force-enable self-asserted `/auth/verify` coop issuance
     /// without relying on the `ICN_DEV_MODE` env var (issue #2075). This is the
     /// race-free channel for `icnd --insecure-gateway-no-jwt` (a loopback-only
@@ -403,9 +393,8 @@ impl GatewayServer {
             charter_accepted_hook: None,
             commons_handle: None,
             settlement_engine: None,
-            dispatch_evidence_sink_installer: None,
+            shared_store: None,
             execution_query_store: None,
-            post_backfill_cleanup: None,
             dev_self_serve_auth: false,
         }
     }
@@ -458,9 +447,8 @@ impl GatewayServer {
             charter_accepted_hook: None,
             commons_handle: None,
             settlement_engine: None,
-            dispatch_evidence_sink_installer: None,
+            shared_store: None,
             execution_query_store: None,
-            post_backfill_cleanup: None,
             dev_self_serve_auth: false,
         }
     }
@@ -514,9 +502,8 @@ impl GatewayServer {
             charter_accepted_hook: None,
             commons_handle: None,
             settlement_engine: None,
-            dispatch_evidence_sink_installer: None,
+            shared_store: None,
             execution_query_store: None,
-            post_backfill_cleanup: None,
             dev_self_serve_auth: false,
         }
     }
@@ -674,10 +661,10 @@ impl GatewayServer {
     /// Set the concrete actor-backed governance handle.
     ///
     /// This is parallel to `with_governance_handle`, which accepts the
-    /// trait-object alias (`Arc<dyn GovernanceOps>`). The concrete handle is
-    /// required so the gateway can install its `receipt_store` on the actor
-    /// via `install_receipt_store` — without it, actor-path force-close
-    /// accept and deadline auto-close do not emit `InstitutionalEffectRecord`.
+    /// trait-object alias (`Arc<dyn GovernanceOps>`). The gateway reads the
+    /// actor's decision commitments through it. A gateway given this handle
+    /// must also be given [`Self::with_shared_store`]; otherwise it refuses to
+    /// start rather than open a second, divergent store.
     pub fn with_governance_actor_handle(
         mut self,
         handle: icn_governance_actor::GovernanceHandle,
@@ -805,20 +792,15 @@ impl GatewayServer {
         self
     }
 
-    /// Install the deferred dispatch-evidence sink installer.
+    /// Use the daemon's single open of `<data_dir>/gateway_store`.
     ///
-    /// The daemon constructs `DeferredDispatchEvidenceSink` at bootstrap,
-    /// passes a clone into the kernel as `BootstrapHandles.dispatch_evidence_sink`,
-    /// and passes this clone here so the gateway — once it opens its
-    /// `ReceiptStore` — can install the backend into the deferred sink.
-    /// Without this wiring, actor-path acceptances that complete while
-    /// the daemon is running log per-effect results but never persist
-    /// `EffectDispatchEvidence` (the parity gap this closes).
-    pub fn with_dispatch_evidence_sink_installer(
-        mut self,
-        installer: Arc<icn_governance_actor::DeferredDispatchEvidenceSink>,
-    ) -> Self {
-        self.dispatch_evidence_sink_installer = Some(installer);
+    /// The gateway builds its sled-backed stores over this database and uses
+    /// this receipt store, instead of opening the path itself. Governance
+    /// evidence initialization (receipt-store install, dispatch backend,
+    /// close recovery, backfills) is the supervisor's and has already run
+    /// over the same store; the gateway does none of it.
+    pub fn with_shared_store(mut self, store: crate::shared_store::SharedGatewayStore) -> Self {
+        self.shared_store = Some(store);
         self
     }
 
@@ -861,16 +843,6 @@ impl GatewayServer {
 
     pub fn with_execution_query_store(mut self, store: Arc<dyn icn_store::Store>) -> Self {
         self.execution_query_store = Some(store);
-        self
-    }
-
-    /// Install a best-effort execution-record retention cleanup to run once,
-    /// right after the startup dispatch-evidence backfill (Issue #1987
-    /// follow-up). The daemon supervisor defers cleanup to here so pruning
-    /// cannot delete a terminal execution record whose evidence the backfill
-    /// still needs to heal.
-    pub fn with_post_backfill_cleanup(mut self, cleanup: Arc<dyn Fn() + Send + Sync>) -> Self {
-        self.post_backfill_cleanup = Some(cleanup);
         self
     }
 
@@ -1075,158 +1047,81 @@ impl GatewayServer {
                 None
             };
 
-        // Initialize Sled DB early for managers that need persistent storage
-        // (governance action items, listings, budgets, etc.)
-        // Note: sled::Db is internally Arc-wrapped, so db.clone() is cheap
-        let db = if let Some(ref data_dir) = self.data_dir {
-            let db_path = data_dir.join("gateway_store");
-            match sled::open(&db_path) {
-                Ok(db) => {
-                    info!("Opened gateway storage at {:?}", db_path);
-                    db
-                }
-                Err(e) => {
-                    return Err(crate::error::GatewayError::InternalError(format!(
-                        "Failed to open gateway storage: {e}"
-                    )));
-                }
+        // Sled DB for managers that need persistent storage (governance action
+        // items, listings, budgets, etc.) and the receipt store over it.
+        // Note: sled::Db is internally Arc-wrapped, so db.clone() is cheap.
+        //
+        // With a governance actor (a node with an identity) the daemon opened
+        // `<data_dir>/gateway_store` once and injected it; the supervisor has
+        // already run governance evidence initialization over it (receipt
+        // store on the actor, dispatch-evidence backend, close recovery,
+        // backfills). The gateway does none of that and must not open a second
+        // store: an actor without an injected store is a wiring error, and
+        // the gateway refuses to start rather than serve governance over an
+        // implicit temporary database.
+        let (db, receipt_store) = match (self.shared_store, &self.governance_actor_handle) {
+            (Some(shared), _) => {
+                info!("Using the daemon's shared gateway storage");
+                (shared.db().clone(), shared.receipt_store().clone())
             }
-        } else {
-            info!("Using temporary in-memory storage for gateway");
-            match sled::Config::new().temporary(true).open() {
-                Ok(db) => db,
-                Err(e) => {
-                    return Err(crate::error::GatewayError::InternalError(format!(
-                        "Failed to open temporary storage: {e}"
-                    )));
+            (None, Some(_)) => {
+                return Err(crate::error::GatewayError::InternalError(
+                    "a governance actor was provided without the daemon's shared gateway store; \
+                     refusing to start (the gateway does not open governance evidence storage itself)"
+                        .to_string(),
+                ));
+            }
+            (None, None) => {
+                let db = if let Some(ref data_dir) = self.data_dir {
+                    let db_path = data_dir.join(crate::shared_store::GATEWAY_STORE_DIR);
+                    match sled::open(&db_path) {
+                        Ok(db) => {
+                            info!("Opened gateway storage at {:?}", db_path);
+                            db
+                        }
+                        Err(e) => {
+                            return Err(crate::error::GatewayError::InternalError(format!(
+                                "Failed to open gateway storage: {e}"
+                            )));
+                        }
+                    }
+                } else {
+                    info!("Using temporary in-memory storage for gateway");
+                    match sled::Config::new().temporary(true).open() {
+                        Ok(db) => db,
+                        Err(e) => {
+                            return Err(crate::error::GatewayError::InternalError(format!(
+                                "Failed to open temporary storage: {e}"
+                            )));
+                        }
+                    }
+                };
+                let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
+                info!("Receipt store initialized");
+                // One-shot startup backfill for the ADR-0014 by-grantee index
+                // (idempotent, non-destructive). With no governance actor no
+                // acceptance lifecycle reads it here, but listing readers do.
+                match receipt_store.backfill_grant_by_grantee_index() {
+                    Ok(0) => {
+                        info!("ADR-0014 by-grantee index backfill: no legacy grants found");
+                    }
+                    Ok(written) => {
+                        info!(
+                            written,
+                            "ADR-0014 by-grantee index backfill: recovered legacy grants"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            error = %e,
+                            "ADR-0014 by-grantee index backfill failed at startup; \
+                             legacy grants may be invisible to by-grantee readers until next successful run"
+                        );
+                    }
                 }
+                (db, receipt_store)
             }
         };
-
-        // Create receipt store early so governance manager can reference it
-        let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
-        info!("Receipt store initialized");
-
-        // One-shot startup backfill for the ADR-0014 by-grantee index.
-        // Databases written between PR #1575 (grant primary + by-decision
-        // index) and PR #1579 (by-grantee index + acceptance-seam
-        // revocations) hold primary grant records without a by-grantee
-        // entry. Without this, `list_*_by_grantee` readers miss those
-        // legacy grants and an accepted RemoveSteward/SuspendSteward/
-        // RevokeAuthority lifecycle silently leaves them active after
-        // acceptance. The backfill is idempotent (deterministic keys,
-        // no-op when the index is already complete) and non-destructive
-        // (never mutates primary records), so running on every startup
-        // is safe; steady-state cost is a single prefix scan with no
-        // writes.
-        match receipt_store.backfill_grant_by_grantee_index() {
-            Ok(0) => {
-                info!("ADR-0014 by-grantee index backfill: no legacy grants found");
-            }
-            Ok(written) => {
-                info!(
-                    written,
-                    "ADR-0014 by-grantee index backfill: recovered legacy grants"
-                );
-            }
-            Err(e) => {
-                // Non-fatal: startup continues. Revocation lookups for
-                // legacy grants may miss until the next successful
-                // backfill run, but the gateway itself is operational.
-                // Surfacing the error loudly so operators can investigate
-                // (and optionally re-run a manual backfill).
-                tracing::error!(
-                    error = %e,
-                    "ADR-0014 by-grantee index backfill failed at startup; \
-                     legacy grants may be invisible to by-grantee readers until next successful run"
-                );
-            }
-        }
-
-        // Install receipt_store on the actor so actor-path `CloseProposal::Accept`
-        // and `ForceCloseProposal::Accept` emit `InstitutionalEffectRecord`
-        // durably. Without this, the HTTP-close path was the sole writer and
-        // force-close / deadline auto-close produced no institutional artifact.
-        if let Some(ref actor_handle) = self.governance_actor_handle {
-            actor_handle
-                .install_receipt_store(receipt_store.clone())
-                .await;
-            info!("Receipt store installed on governance actor (actor-path parity)");
-        }
-
-        // Install the same receipt store into the deferred dispatch-evidence
-        // sink handed to us by the daemon. From this point onward, actor/
-        // internal acceptance paths flowing through the decision-executor
-        // callback produce durable per-effect `EffectDispatchEvidence` —
-        // the same artifact the gateway-close HTTP hook writes, just via
-        // the kernel seam. Without this call the deferred sink stays a
-        // no-op forwarder and the actor-path evidence gap remains open.
-        if let Some(ref installer) = self.dispatch_evidence_sink_installer {
-            installer.install_backend(receipt_store.clone());
-            info!("Dispatch-evidence sink backend installed (actor-path evidence parity active)");
-        }
-
-        // Replay any incomplete write-ahead governance close-journal entries NOW
-        // that every durable downstream sink a recovered close can feed — the
-        // receipt store (installed above) AND the deferred dispatch-evidence sink
-        // (installed just above) — is ready. This MUST run after the dispatch-sink
-        // install: a recovered `ProposalAccepted` can drive executable effects,
-        // and the deferred sink drops `EffectDispatchEvidence` batches until its
-        // backend is installed, so replaying earlier could permanently lose that
-        // evidence. Recovery is decoupled from `install_receipt_store` for exactly
-        // this reason.
-        if let Some(ref actor_handle) = self.governance_actor_handle {
-            actor_handle.recover_incomplete_closes().await;
-            info!("Replayed incomplete governance close-journal entries (post-sink recovery)");
-        }
-
-        // Issue #1987: backfill any EffectDispatchEvidence dropped in the async
-        // execution window. Runs AFTER the dispatch-evidence sink backend is
-        // installed (above) and the close-journal replay, using the same
-        // execution-record store the decision executor writes to. The sink's
-        // backfill path is idempotent (read-back dedup), so a clean restart
-        // re-scans and writes nothing, and replay never duplicates evidence.
-        if let (Some(execution_store), Some(sink)) = (
-            self.execution_query_store.as_ref(),
-            self.dispatch_evidence_sink_installer.as_ref(),
-        ) {
-            match crate::dispatch_evidence_backfill::backfill_pending_dispatch_evidence(
-                execution_store,
-                sink,
-            ) {
-                Ok(report) if report.redriven > 0 => {
-                    info!(
-                        scanned = report.scanned,
-                        redriven = report.redriven,
-                        skipped = report.skipped,
-                        unparsable = report.unparsable,
-                        "Backfilled dispatch evidence for recovered execution records (post-sink recovery)"
-                    );
-                }
-                Ok(report) => {
-                    debug!(
-                        scanned = report.scanned,
-                        "Dispatch-evidence backfill: no terminal records required healing"
-                    );
-                }
-                Err(e) => {
-                    warn!(
-                        error = %e,
-                        "Dispatch-evidence backfill scan failed (non-fatal; evidence may remain incomplete until next startup)"
-                    );
-                }
-            }
-        }
-
-        // Issue #1987 follow-up: run the deferred execution-record retention
-        // cleanup ONLY now — after the dispatch-evidence backfill above — so
-        // pruning cannot delete a terminal record whose evidence was lost in the
-        // crash window before the backfill had a chance to heal it. The daemon
-        // supervisor hands us this cleanup instead of running it at its own
-        // (pre-gateway) startup precisely for this ordering.
-        if let Some(cleanup) = self.post_backfill_cleanup.as_ref() {
-            cleanup();
-        }
 
         // Execution record query store (read-only API surface).
         // Gap C: prefer the runtime-owned execution store shared from the daemon
@@ -1321,7 +1216,8 @@ impl GatewayServer {
                 info!("Governance manager connected to daemon with persistent action items");
                 let manager = GovernanceManager::with_sled_action_items(handle, sled_db_arc);
                 // Authority checks read the governance actor's own durable
-                // decisions (the receipt store installed on it above).
+                // decisions (the shared receipt store the supervisor installed
+                // on it).
                 let manager = match self.governance_actor_handle.as_ref() {
                     Some(actor) => manager.with_decision_commitments(actor.decision_commitments()),
                     None => manager,

@@ -39,6 +39,9 @@ icn-ccl.workspace = true
 icn-store.workspace = true
 icn-rpc.workspace = true
 icn-obs.workspace = true
+# Builds the shared `<data_dir>/gateway_store` receipt store once at the
+# composition root (M-C1 S1); bins are unrestricted in the crate taxonomy.
+icn-gateway.workspace = true
 icn-community = { path = "../../crates/icn-community" }
 hex = "0.4"
 serde_json.workspace = true

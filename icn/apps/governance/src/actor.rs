@@ -371,6 +371,30 @@ pub struct GovernanceHandle {
     evidence: Arc<std::sync::atomic::AtomicU8>,
 }
 
+/// What one startup replay of the governance close journal did.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CloseRecoveryReport {
+    /// Journal entries found and attempted.
+    pub scanned: usize,
+    /// Entries driven to completion and cleared.
+    pub completed: usize,
+    /// Entries that did not complete; each stays in the journal for the next
+    /// startup's replay.
+    pub residual: Vec<CloseRecoveryResidual>,
+    /// The journal could not be scanned; nothing was replayed and the number
+    /// of incomplete closes is unknown.
+    pub scan_error: Option<String>,
+}
+
+/// A journaled close that recovery left incomplete.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CloseRecoveryResidual {
+    /// The proposal whose close remains journaled.
+    pub proposal_id: String,
+    /// Why it did not complete.
+    pub cause: String,
+}
+
 /// Whether the institutional evidence path a terminal transition writes to —
 /// the receipt store and dispatch-evidence sink, with incomplete closes
 /// replayed — is in place.
@@ -384,9 +408,12 @@ pub enum EvidenceReadiness {
     Pending = 0,
     /// Sinks installed and startup close recovery has run.
     Ready = 1,
-    /// The deployment runs no evidence path (gateway disabled by
-    /// configuration). Governance proceeds as before; no receipt-backed
-    /// guarantee is claimed.
+    /// No evidence path is provisioned and none will be attempted. Not a
+    /// normal state for a node with an identity — the supervisor always
+    /// attempts evidence initialization there, settling `Ready` or `Failed`.
+    /// Kept as a defensive state for an embedding that runs the actor without
+    /// ever attempting it. Governance proceeds; no receipt-backed guarantee
+    /// is claimed.
     NotProvisioned = 2,
     /// The evidence path was configured but failed to initialize. Scheduled
     /// work is held and terminal transitions are refused, so no decision
@@ -728,8 +755,8 @@ impl GovernanceHandle {
     /// The builder-style `with_receipt_store` consumes `self`, which is
     /// incompatible with production wiring where the concrete
     /// `GovernanceHandle` has already been cloned into `Arc<dyn GovernanceOps>`
-    /// before the receipt_store is created (receipt_store's backing DB is only
-    /// opened when the gateway server starts, after the actor is spawned).
+    /// before the receipt store is installed (the supervisor's governance
+    /// evidence initialization installs it after the actor is spawned).
     ///
     /// This setter mutates the shared actor state via the same
     /// `Arc<RwLock<GovernanceActor>>`, so every clone of the handle sees the
@@ -764,18 +791,25 @@ impl GovernanceHandle {
     /// would be permanently dropped if its sink were not yet installed (the
     /// deferred sink drops batches until its backend is wired). This is
     /// deliberately DECOUPLED from `install_receipt_store` so the dispatch sink
-    /// can be installed in between — see the gateway `server.rs` wiring.
+    /// can be installed in between — see the supervisor's governance evidence
+    /// initialization (`icn-core` `init_governance_evidence`).
     ///
     /// A no-op when there is nothing to recover.
     ///
     /// Also releases the scheduler: no scheduled event (including closes
     /// rehydrated at spawn) is dispatched until this has run.
-    pub async fn recover_incomplete_closes(&self) {
-        self.inner.read().await.recover_incomplete_closes().await;
+    ///
+    /// Returns what the replay did. Readiness becomes `Ready` whatever the
+    /// report says: entries that did not complete (and a journal that could
+    /// not be scanned) stay durable for the next startup and are surfaced by
+    /// the caller rather than holding governance.
+    pub async fn recover_incomplete_closes(&self) -> CloseRecoveryReport {
+        let report = self.inner.read().await.recover_incomplete_closes().await;
         self.evidence.store(
             EvidenceReadiness::Ready as u8,
             std::sync::atomic::Ordering::Release,
         );
+        report
     }
 
     /// Current institutional evidence readiness.
@@ -783,8 +817,9 @@ impl GovernanceHandle {
         EvidenceReadiness::load(&self.evidence)
     }
 
-    /// The deployment runs no evidence path (gateway disabled by
-    /// configuration): scheduled work proceeds without it, as it always has.
+    /// No evidence path is provisioned and none will be attempted (defensive;
+    /// not used for a node with an identity, whose supervisor always attempts
+    /// evidence initialization): scheduled work proceeds without it.
     /// Never overrides an already-settled state. Returns the state in effect.
     pub fn declare_evidence_not_provisioned(&self) -> EvidenceReadiness {
         EvidenceReadiness::settle(&self.evidence, EvidenceReadiness::NotProvisioned)
@@ -1937,27 +1972,38 @@ impl GovernanceActor {
     /// already durable in the receipt store are matched by the now-committed
     /// terminal proposal state. Recovery never deletes an append-only receipt;
     /// it only completes the close that was already decided.
-    async fn recover_incomplete_closes(&self) {
+    async fn recover_incomplete_closes(&self) -> CloseRecoveryReport {
+        let mut report = CloseRecoveryReport::default();
         let intents = match self.store.list_close_intents() {
             Ok(intents) => intents,
             Err(e) => {
                 warn!("Could not scan governance close-journal for recovery: {e}");
-                return;
+                report.scan_error = Some(e.to_string());
+                return report;
             }
         };
         if intents.is_empty() {
-            return;
+            return report;
         }
         info!(
             count = intents.len(),
             "Replaying incomplete governance close(s) from the write-ahead journal"
         );
         for entry in intents {
-            // Best-effort on startup: failures are logged inside and the entry is
-            // left for the next startup's replay, so the result is intentionally
-            // ignored here (unlike the close handler's retry path, which surfaces it).
-            let _ = self.complete_journaled_close(entry).await;
+            report.scanned += 1;
+            let proposal_id = entry.proposal.id.0.clone();
+            // Best-effort on startup: an entry that does not complete is left
+            // for the next startup's replay and reported as residual, so the
+            // caller can surface it (unlike the close handler's retry path,
+            // which returns the error to its requester).
+            match self.complete_journaled_close(entry).await {
+                Ok(()) => report.completed += 1,
+                Err(cause) => report
+                    .residual
+                    .push(CloseRecoveryResidual { proposal_id, cause }),
+            }
         }
+        report
     }
 
     /// Drive a single write-ahead close-journal entry to completion: re-commit
