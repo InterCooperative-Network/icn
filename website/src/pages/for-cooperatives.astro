@@ -1,13 +1,36 @@
 ---
+// for-cooperatives.astro
+//
+// PRIMARY JOB (PUBLIC_SITE_IA §3): what ICN would mean for an institution like
+// yours, and how you could realistically approach it. Explicitly NOT its job:
+// general explanation — link back rather than repeat.
+//
+// This page previously opened with three sections re-arguing the institutional
+// diagnosis that /why-icn owns (one of them sharing a verbatim sentence with
+// it) and the bridge-institutions framing that /cooperative-economy owns. Those
+// are now a handoff. What replaced them is the question the page was actually
+// missing: the adoption path.
+
 import Layout from '../layouts/Layout.astro';
 import ScopeModel from '../components/ScopeModel.astro';
 import ProvenanceTrail from '../components/ProvenanceTrail.astro';
+import AdoptionPath from '../components/AdoptionPath.astro';
+import MaturityBadge from '../components/MaturityBadge.astro';
 import ReadingLadder from '../components/ReadingLadder.astro';
+import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectState';
+
+// Derived, never asserted. A hand-typed count here would be a second project
+// tracker, which is exactly what /roadmap was before it was folded away.
+const strongCount = subsystemsInBand('strong').length;
 ---
 
-<Layout title="For Cooperatives" activeNav="for-cooperatives" description="What ICN is trying to do for cooperatives, communities, and federations — and what it is not yet ready to do.">
+<Layout
+  title="For cooperatives"
+  activeNav="for-cooperatives"
+  description="What adopting ICN would mean for an institution like yours, what it can and cannot carry today, and how a cooperative could move one bounded function at a time instead of migrating everything at once."
+>
 
-  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+  <section class="section section-page-top">
     <div class="container narrow">
       <div class="page-hero">
         <span class="badge badge-amber">For Cooperatives</span>
@@ -41,61 +64,32 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 
   <section class="section-alt section-pre-ladder">
     <div class="container narrow prose">
-      <h2>Bridges, and what the bridge does not cover</h2>
+      <!-- ─── Diagnosis handoff ────────────────────────────────────────────
+           Three sections used to live here — "Bridges, and what the bridge
+           does not cover", "The institutional problem you actually face", and
+           "Why generic software is not enough". All three re-argued a case
+           /why-icn already makes better, one of them with a verbatim-identical
+           sentence ("Integrating them only spreads the gap more evenly"), and
+           the bridge-institutions argument is /cooperative-economy's whole
+           premise. PUBLIC_SITE_IA §3 names this page's duplication as
+           outstanding and its contract as "Adoption and evaluation for an
+           institution — general explanation is NOT its job; link back rather
+           than repeat." This is the link back. -->
+      <h2>You already run all of this somewhere</h2>
       <p>
-        Cooperatives already have institutions that help them survive the existing economy.
-        Credit unions hold deposits and clear obligations across regulated rails. Fiscal sponsors
-        let new cooperative work receive grants through an established legal entity. Community
-        development financial institutions (CDFIs) and cooperative lenders move capital toward
-        cooperative formation, conversion, and operating capacity. Accountants, bookkeepers, and
-        legal / co-op developers translate cooperative practice into the books, filings, and
-        contracts the wider economy expects. Together with technical assistance organizations,
-        these are the bridge institutions the cooperative economy depends on.
+        Membership in a CRM or a spreadsheet. Minutes in a shared drive, separate
+        from the decisions they record. Votes in one tool, the result pasted into
+        another. Books that have no idea what was decided. Work that happens
+        because a particular person remembered.
       </p>
       <p>
-        Bridges are necessary. They are not sufficient. A bridge handles the crossing into someone
-        else's system; it does not provide the machinery a cooperative needs <em>on its own side
-        of the bridge</em> — the digital substrate for membership, decisions, action, obligations,
-        receipts, and federation between cooperatives. ICN is being built to be that machinery.
-        The framing is laid out in
-        <a href="/cooperative-economy">The cooperative economy needs its own machinery</a>.
-      </p>
-
-      <h2>The institutional problem you actually face</h2>
-      <p>
-        Most cooperatives operate across a stack of tools that were built for firms, platforms,
-        or administrative convenience, and then stretched to cover democratic life.
-        Membership sits in a CRM or spreadsheet. Governance happens in meetings whose minutes
-        live somewhere separate from the decisions they produced.
-        Rules live in documents that are read inconsistently and interpreted differently depending on who is in the room.
-        Accounting lives in a system that has no idea what was decided.
-        Execution depends on whoever remembered what they were supposed to do.
-      </p>
-      <p>
-        Concretely, that often means Google Workspace or Microsoft 365 for documents and internal records,
-        Loomio for voting, QuickBooks for accounting, Slack or Teams for day-to-day coordination,
-        and some combination of CRM, Airtable, or spreadsheets for membership and standing.
-      </p>
-      <p>
-        Each of these tools, in isolation, can be made to work. Together, they produce drift.
-        Decisions do not reliably become action. Rules do not reliably bind practice.
-        Accountability decays into trust in the specific people holding the pieces together in their heads.
-        And when those people leave, burn out, or disagree about what happened,
-        the institution can lose what it knew.
-      </p>
-
-      <h2>Why generic software is not enough</h2>
-      <p>
-        The underlying problem is that none of those tools model the institution itself.
-        They do not know what a member is in the sense that matters to a cooperative.
-        They do not know what a rule is in the sense that should bind practice.
-        They do not know what it means for a decision to authorize an action.
-        Integrating them only spreads the gap more evenly.
-      </p>
-      <p>
-        This also means ICN should not be understood as a one-for-one clone of Google, Microsoft, Slack, QuickBooks, or Loomio.
-        The aim is deeper than substitution at the app layer. It is to give the cooperative its own institutional substrate,
-        so those functions no longer depend on a bundle of external systems held together by staff discipline.
+        We are not going to re-argue that here — <a href="/why-icn">Why ICN</a>
+        makes the case that this is structural rather than a tooling problem, and
+        <a href="/cooperative-economy">The cooperative economy</a> covers where
+        credit unions, CDFIs, and fiscal sponsors fit. This page assumes you are
+        past that argument and asks the two questions that follow it:
+        <strong>what would this actually mean for an institution like ours</strong>,
+        and <strong>how would we realistically get there from where we are?</strong>
       </p>
 
       <h2>What changes when the institutional loop is closed</h2>
@@ -110,7 +104,13 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         <li>Obligations between members or between cooperatives are carried as <strong>institutional facts</strong> — with treasury, budgets and approvals, patronage settlement, and mutual-credit positions — not entries in a private spreadsheet.</li>
         <li>The chain from <em>what we decided</em> to <em>what actually happened</em> stays intact, so the institution can answer its own members honestly about its own actions.</li>
         <li>Federation with other cooperatives is a first-class mechanism — <strong>formal agreements, attestations, and cross-institutional clearing</strong> — not something two organizations have to hold together by email and trust in specific staff.</li>
-        <li>Shared infrastructure — compute, storage, coordinated work — can be held as a <strong>commons</strong> with governance, placement, clearing, and dispute resolution built into the same loop, not bolted on after the fact.</li>
+        <!-- A seventh bullet claimed shared compute/storage "can be held as a
+             commons with governance, placement, clearing, and dispute
+             resolution". docs/status.toml has compute at foundation-only and
+             storage at simplified. In an un-banded list of things a cooperative
+             "gets", that reads as available capability. Cut rather than
+             caveated — the list is about evaluation, and a capability this far
+             from usable does not belong in an evaluation checklist. -->
       </ul>
       <p>
         None of this replaces the work of running a cooperative.
@@ -119,99 +119,123 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 
       <ScopeModel title="The contexts your members would actually act inside" showTruthLabelChip />
 
-      <h2>What is real today</h2>
+      <h2>What you would be adopting today</h2>
       <p>
-        Some of this is already working. The strongest parts of ICN today are
-        <strong>provenance and institutional memory</strong> — the chain that carries an outcome
-        back through the rule that shaped it, the decision that authorized it, and the members who held standing.
-        Cryptographic identity and membership primitives are in place. The architectural discipline
-        that keeps enforcement and institutional meaning cleanly separated is real and enforced in the codebase.
+        The strongest thing ICN has is the chain below: an outcome that can be
+        walked back through the rule that shaped it, the decision that authorized
+        it, and the standing that made acting legitimate.
       </p>
 
       <div class="trail-wrap">
         <ProvenanceTrail title="The chain a decision walks" showTruthLabelChip />
       </div>
 
+      <!-- This used to be four paragraphs of hand-written per-subsystem maturity
+           prose. /whats-real-now generates the same account from docs/status.toml
+           and states outright that where the two disagree it wins and the other
+           page is a defect. A second hand-maintained copy is how /roadmap drifted
+           a month behind canonical state before it was folded in. The summary
+           below is derived; the judgement after it is this page's own, and is
+           about evaluation rather than about subsystems. -->
       <p>
-        <strong>Execution coverage</strong> — how broadly an accepted decision translates into operational effect —
-        is where active development is concentrated. The mechanism exists; the range of decisions
-        it handles is expanding.
+        Of {projectState.subsystems.length} subsystems tracked against source,
+        {strongCount} are in the <MaturityBadge band="strong" /> band
+        (verified {projectState.newestVerified}). That is a real foundation, and
+        it is also not the thing you would be living in.
       </p>
       <p>
-        <strong>Federation</strong> (treaties, attestations, cross-institutional clearing) and
-        <strong>commons/compute</strong> (shared infrastructure with placement, clearing, and dispute resolution)
-        have serious implementation behind them.
-        <strong>Economic semantics</strong> — treasury, budgets, patronage settlement, usage-rights accounting —
-        are real, with cross-scope integration still being completed.
+        <strong>The gap you would feel first is the member-facing surface.</strong>
+        The capabilities underneath are genuinely built; the unified interface an
+        ordinary member would open is the part of the system furthest from what it
+        needs to be. An institution adopting ICN this month would be adopting
+        strong substrate and an unfinished front door — and would need people
+        willing to work in that gap.
       </p>
       <p>
-        The <strong>member-facing experience</strong> is the part of the system still furthest from what
-        it will eventually be. The capabilities underneath are real; the unified interface for ordinary
-        members is still being built. If you tried to adopt ICN this month, that gap is what you would feel most.
-      </p>
-      <p>
-        The full account, with bounded maturity language for every subsystem, is at <a href="/whats-real-now">What's Real Now</a>.
+        The full per-subsystem account, with the project's own record of what is
+        missing in each, is at <a href="/whats-real-now">What's real now</a>. If
+        anything on this page reads as more finished than it does there, that page
+        is right and this one is a defect worth reporting.
       </p>
 
-      <h2 id="how-cooperative-infrastructure-works">How cooperative infrastructure works</h2>
+      <h2 id="adoption">How you would actually get there</h2>
       <p>
-        ICN is cooperative infrastructure. The relationship to it is the one cooperatives already understand —
-        co-operated, co-shaped, collectively held. The code, contracts, and shared institutional patterns
-        are open. Cooperatives run the infrastructure themselves, or share that operation with peers.
-        Improvements made by one institution are inheritable by others. The substrate gets stronger as
-        more cooperative institutions use it and shape it.
+        The most common and most reasonable objection to everything above is that
+        you already depend on all of it. Membership is in the CRM, the books are in
+        QuickBooks, and the cooperative cannot stop operating for a quarter while
+        someone rebuilds its nervous system.
       </p>
       <p>
-        Two honest maturity statements sit alongside that frame:
+        It should not have to. The design intent is that ICN can be adopted one
+        bounded function at a time, with the incumbent system still running
+        underneath, and with every stage reversible.
       </p>
+
+      <div class="trail-wrap">
+        <AdoptionPath showTruthLabelChip />
+      </div>
+
+      <p>
+        Two things worth being explicit about. First, this is a
+        <strong>sequence, not a product</strong> — there is no migration tool, and
+        the honest reading of the figure above is that the middle of the path is
+        the least built part of ICN. Second, the unit of adoption is
+        <strong>one function</strong>, not one organization. A cooperative that
+        moves only its safety-spending decisions onto ICN and leaves everything
+        else where it is has adopted ICN correctly.
+      </p>
+
+      <!-- The prose that opened this section restated the "co-operated,
+           collectively held" framing already made by the second card at the top
+           of this page. What was load-bearing were the two caveats, so only
+           those remain. -->
+      <h2 id="how-cooperative-infrastructure-works">Two things to be clear about</h2>
       <ul>
-        <li><strong>Federation is real but not finished.</strong> Inter-cooperative coordination — treaties, attestations, cross-institutional clearing — is built into the substrate as a first-class mechanism. Not everything a federation would want to do across its members is implemented yet.</li>
-        <li><strong>ICN is the layer underneath your governance, not a replacement for it.</strong> The work of deliberation, interpretation, and political judgment remains the cooperative's. ICN gives that work a durable substrate to act through.</li>
+        <li><strong>You would be running it, or sharing that with peers.</strong> ICN is not hosted for you. There is no vendor on the other end of it, which is the point and also the cost.</li>
+        <li><strong>ICN sits underneath your governance, not in place of it.</strong> Deliberation, interpretation, and political judgment stay with the members. The substrate carries what they decided, not the deciding.</li>
       </ul>
 
-      <h2>How to engage</h2>
+      <!-- One section, not two. "How to engage" and "How to engage right now"
+           were adjacent headings answering the same question — the first in
+           abstract prose, the second as steps. The steps survived; the prose
+           became the one-line framing on each. -->
+      <h2>What to actually do next</h2>
       <p>
-        Engagement looks like participation. There are a few honest entry points,
-        depending on the capacity and interest your cooperative has right now.
-      </p>
-      <p>
-        The first is <strong>observation</strong>: following the work, understanding the direction,
-        being in a position to evaluate it as the surfaces mature. This is the right relationship for most cooperatives right now.
-      </p>
-      <p>
-        The second is <strong>collaboration</strong>: working with the project in depth,
-        with real engineering involvement, as a cooperative or federation willing to be part of how the infrastructure gets shaped.
-        This is the right relationship for institutions with the capacity and the interest —
-        co-building the substrate the cooperative economy needs.
-      </p>
-      <p>
-        The third is <strong>contribution of expertise</strong>: bringing the institutional knowledge
-        of how real cooperatives actually run into the design of the system.
-        ICN needs to be informed by the institutions it is meant to serve.
-      </p>
-
-      <h2>How to engage right now</h2>
-      <p>
-        The practical next step depends on what kind of relationship you want with the project.
-        These are the current real paths:
+        Most cooperatives should be observing, not adopting. That is a real
+        relationship and the honest one for the current state of the system.
       </p>
       <ol>
-        <li><strong>Evaluate first.</strong> Read <a href="/whats-real-now">What's Real Now</a> and confirm that the current maturity is compatible with what you need.</li>
-        <li><strong>Bring a concrete institutional case.</strong> Open a <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">GitHub Discussion</a> that describes the governance, accounting, coordination, or federation problem your current stack does not carry well. Institutions engaging in depth are helping shape the infrastructure directly.</li>
-        <li><strong>If you only want to support the work,</strong> use the GitHub Sponsors rail on <a href="/get-involved#support">Get Involved</a>.</li>
+        <li>
+          <strong>Evaluate first.</strong> Read <a href="/whats-real-now">What's real now</a>
+          and decide whether the current maturity is compatible with what your
+          institution actually needs. This is the step most cooperatives should
+          stop at for now.
+        </li>
+        <li>
+          <strong>Name the function you would move first.</strong> Stage 01 of the
+          path above needs no involvement from us. Working out where your
+          membership, rules, decisions, money, and work really live — and who can
+          change each one — is useful to a cooperative whether or not it ever
+          adopts ICN.
+        </li>
+        <li>
+          <strong>Bring a concrete institutional case.</strong> Open a
+          <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">GitHub Discussion</a>
+          describing the governance, accounting, coordination, or federation
+          problem your current stack does not carry well. Institutional knowledge
+          of how cooperatives actually run is the input the project is shortest on.
+        </li>
+        <li>
+          <strong>If you only want to support the work,</strong> the GitHub Sponsors
+          rail is on <a href="/get-involved#support">Get involved</a>.
+        </li>
       </ol>
 
-      <h2>This is about enhancing human institutions, not automating them away</h2>
-      <p>
-        The work of running a cooperative — deliberation, interpretation, care, negotiation, political judgment,
-        the mediation of disagreement, the responsibility for what the institution does in the world —
-        is human work. It is hard, and the hardness is not a defect.
-      </p>
-      <p>
-        What ICN is trying to change is the <em>fragility of the glue</em> that holds institutional coherence together.
-        Better memory. Better continuity. Better accountability. Better legibility. Better collective capacity across organizations.
-        So that the attention of members and staff can go to the work that actually requires human judgment.
-      </p>
+      <!-- A closing section titled "This is about enhancing human institutions,
+           not automating them away" stood here. It made the same point as the
+           second caveat above, which is two paragraphs earlier on this page, and
+           /how-it-works owns the long version of the argument. Saying it three
+           times does not make it three times truer. -->
     </div>
   </section>
 
@@ -219,8 +243,9 @@ import ReadingLadder from '../components/ReadingLadder.astro';
     <div class="container narrow">
       <ReadingLadder current="for-cooperatives">
         <Fragment slot="extras">
-          <a href="/get-involved" class="btn btn-ghost">Get Involved</a>
-          <a href="/community" class="btn btn-ghost">Community</a>
+          <!-- "Community" pointed at /community, a redirect to /get-involved
+               that sat next to a /get-involved button. -->
+          <a href="/get-involved" class="btn btn-ghost">Get involved</a>
           <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="btn btn-ghost">GitHub ↗</a>
         </Fragment>
       </ReadingLadder>
@@ -236,6 +261,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
     font-size: var(--text-xl);
   }
 
+.section-page-top { padding-top: calc(64px + var(--space-3xl)); }
 .narrow { max-width: 760px; }
 .page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
 .page-hero .badge { align-self: flex-start; }
