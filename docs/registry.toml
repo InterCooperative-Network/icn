@@ -3214,6 +3214,22 @@ domain_tags = ["project-index", "navigation", "documentation-control"]
 recommended_action = "keep"
 last_reviewed = "2026-04-29"
 
+[docs."docs/reference/project-index/membership-authority-flow-map.md"]
+category = "reference"
+status = "living"
+title = "Membership Authority Flow Map"
+description = "Navigation map of where membership is stored (domain voter list, CoopStore, commons standing, entity, federation), where each membership/authorization decision is taken, and the known gaps between them. Links to owners; decides nothing."
+last_updated = "2026-11-23"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "membership", "governance", "authorization"]
+recommended_action = "keep"
+last_reviewed = "2026-11-23"
+
 [docs."docs/reference/project-index/runtime-surface-map.md"]
 category = "reference"
 status = "living"

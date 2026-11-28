@@ -277,6 +277,7 @@ Show-ready orientation layer — routes outside readers, contributors, and agent
 - [rust-workspace-map.md](reference/project-index/rust-workspace-map.md) - The `icn/` Rust workspace grouped by rough layer
 - [docs-control-map.md](reference/project-index/docs-control-map.md) - INDEX, registry, validator, truth classes, how to add a doc
 - [runtime-surface-map.md](reference/project-index/runtime-surface-map.md) - Real runtime surfaces (member standing, action cards, completion-receipt retrieval)
+- [membership-authority-flow-map.md](reference/project-index/membership-authority-flow-map.md) - Where membership is stored, where each authorization decision reads it, and the gaps between stores
 - [ci-ops-deploy-map.md](reference/project-index/ci-ops-deploy-map.md) - Workflows, deploy paths, K3s smoke runbooks
 - [show-readiness-map.md](reference/project-index/show-readiness-map.md) - What can be shown now, what should not be shown as finished, red lines
 - [proof-level-taxonomy-capability-matrix.md](reference/project-index/proof-level-taxonomy-capability-matrix.md) - Proof-level taxonomy (L0-L8) and a capability matrix for the organizer-rehearsal path
