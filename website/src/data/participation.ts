@@ -55,16 +55,16 @@ export const PARTICIPATION_ROUTES: ParticipationRoute[] = [
   },
   {
     id: "first-issue",
-    audience: "Technical contributors, first time",
-    title: "Pick a scoped first issue",
-    body: "A small, deliberately curated set of issues that are genuinely self-contained — they have a clear boundary, a stated expectation, and do not require holding the whole architecture in your head. The label is not applied to make the project look welcoming; if an issue turns out to be larger than advertised, say so on the issue.",
-    nextAction: "Browse the open good-first-issue label",
-    href: "https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue",
+    audience: "New contributors (with or without coding experience)",
+    title: "Try a first contribution",
+    body: "Start with a newcomer walkthrough of the contributor guide, or choose one of the linked mobile UX and small Python testing tasks. Each has a bounded scope, expected result, and a place to report what happened. You do not need to understand the whole system.",
+    nextAction: "Explore the three starter tasks",
+    href: "https://github.com/InterCooperative-Network/icn/issues/2826",
     external: true,
     maintainedBy:
-      "Curated by hand on the repository. Issues are removed from the label when they stop being newcomer-sized.",
+      "Tracked as live GitHub issues (#2826, #2827, #2828), with concrete acceptance checks. The maintainer reviews the queue and closes or redirects tasks as they complete.",
     ifUnavailable:
-      "If the list is empty, that is accurate rather than broken — ask in Discussions what would be useful right now.",
+      "Check issues #2827 and #2828 directly or ask in Discord for a current scoped task. Do not assume a historical good-first-issue label is still curated.",
   },
   {
     id: "organizers",
