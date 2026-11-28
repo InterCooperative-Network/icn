@@ -302,6 +302,11 @@ struct Fixture {
     sentinel_did: Did,
     sentinel_addr: SocketAddr,
     _guards: (Guard, Guard),
+    /// Holds the sentinel's actor alive. A `NetworkActor` exits when its last handle is
+    /// dropped, closing its connections; the responder then (correctly) stops listing it as a
+    /// peer. Without this, the sentinel died as soon as the fixture returned and these tests
+    /// were asserting on the disclosure of a dead connection that lingered in the session map.
+    _sentinel: NetworkHandle,
 }
 
 async fn responder_holding_a_sentinel_peer(peer_exchange_enabled: bool) -> Result<Fixture> {
@@ -313,7 +318,7 @@ async fn responder_holding_a_sentinel_peer(peer_exchange_enabled: bool) -> Resul
     let (responder_handle, responder_addr, responder_guard) =
         spawn_node(responder, peer_exchange_enabled).await?;
     // The sentinel's own posture is irrelevant: it is dialled, and never asked anything.
-    let (_sentinel_handle, sentinel_addr, sentinel_guard) = spawn_node(sentinel, false).await?;
+    let (sentinel_handle, sentinel_addr, sentinel_guard) = spawn_node(sentinel, false).await?;
 
     responder_handle
         .dial(sentinel_addr, sentinel_did.clone())
@@ -331,6 +336,7 @@ async fn responder_holding_a_sentinel_peer(peer_exchange_enabled: bool) -> Resul
         sentinel_did,
         sentinel_addr,
         _guards: (responder_guard, sentinel_guard),
+        _sentinel: sentinel_handle,
     })
 }
 

@@ -979,6 +979,36 @@ pub(crate) async fn install_incoming_connection(
     }
 }
 
+/// Forget `connection`: drop every key that still maps to it, and nothing else.
+///
+/// Called when the handler that serviced `connection` exits — the connection has failed, been
+/// closed, or timed out (QUIC idle timeout surfaces as `ConnectionError::TimedOut`), and nothing
+/// will read from it again. Left in place, its entry is a phantom peer: periodic traffic keeps
+/// being sent into it, and anything that asks "do we hold a session with this peer?" is told yes.
+///
+/// Matching is by connection identity (`stable_id`), never by key, so an old connection's
+/// cleanup cannot remove a *newer* connection to the same peer that has already replaced it —
+/// the replacement has a different identity. It also removes any provisional alias the
+/// connection was installed under before Hello authenticated it (#2530). Done under one write
+/// guard, so no reader sees a half-evicted map.
+///
+/// Returns the keys removed (empty when a replacement had already displaced this connection).
+pub(crate) async fn evict_connection(
+    connections: &Arc<RwLock<HashMap<String, quinn::Connection>>>,
+    connection: &quinn::Connection,
+) -> Vec<String> {
+    let closing_id = connection.stable_id();
+    let mut removed = Vec::new();
+    connections.write().await.retain(|key, existing| {
+        let is_this_connection = existing.stable_id() == closing_id;
+        if is_this_connection {
+            removed.push(key.clone());
+        }
+        !is_this_connection
+    });
+    removed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1458,5 +1488,119 @@ mod tests {
 
         other.stop().await.unwrap();
         manager.stop().await.unwrap();
+    }
+
+    fn held_ids(map: &HashMap<String, quinn::Connection>, key: &str) -> Option<usize> {
+        map.get(key).map(|c| c.stable_id())
+    }
+
+    /// An ended connection is forgotten under every key it was held by, and nothing else is.
+    #[tokio::test]
+    async fn test_evict_connection_removes_every_key_for_that_connection_only() {
+        setup();
+        let (mut survivor, survivor_addr) = start_manager().await;
+        let (mut peer, _) = start_manager().await;
+        let (mut other, _) = start_manager().await;
+
+        let ending = connect(&survivor, &peer, survivor_addr).await;
+        let unrelated = connect(&survivor, &other, survivor_addr).await;
+        let map = survivor.connections_arc();
+        {
+            let mut guard = map.write().await;
+            guard.insert("did:icn:zEnding".to_string(), ending.clone());
+            guard.insert("did:icn:zEndingAlias".to_string(), ending.clone());
+            guard.insert("did:icn:zUnrelated".to_string(), unrelated.clone());
+        }
+
+        let mut removed = evict_connection(&map, &ending).await;
+        removed.sort();
+        assert_eq!(removed, vec!["did:icn:zEnding", "did:icn:zEndingAlias"]);
+        let guard = map.read().await;
+        assert!(guard.get("did:icn:zEnding").is_none());
+        assert_eq!(
+            held_ids(&guard, "did:icn:zUnrelated"),
+            Some(unrelated.stable_id()),
+            "another connection's entry must survive"
+        );
+        drop(guard);
+
+        peer.stop().await.unwrap();
+        other.stop().await.unwrap();
+        survivor.stop().await.unwrap();
+    }
+
+    /// The replacement race: the peer reconnected and its new connection was installed before
+    /// the old connection's handler got round to cleaning up. The late cleanup must not remove
+    /// the replacement — it is a different connection, even though it has the same key.
+    #[tokio::test]
+    async fn test_late_cleanup_of_a_replaced_connection_leaves_the_replacement() {
+        setup();
+        let (mut survivor, survivor_addr) = start_manager().await;
+        let peer_did = "did:icn:zReconnectingPeer".to_string();
+
+        let (mut peer_v1, _) = start_manager().await;
+        let old = connect(&survivor, &peer_v1, survivor_addr).await;
+        survivor
+            .store_incoming_connection(peer_did.clone(), old.clone())
+            .await;
+        peer_v1.stop().await.unwrap();
+        tokio::time::timeout(tokio::time::Duration::from_secs(5), old.closed())
+            .await
+            .expect("the old connection should observe closure");
+
+        let (mut peer_v2, _) = start_manager().await;
+        let replacement = connect(&survivor, &peer_v2, survivor_addr).await;
+        let replacement_id = replacement.stable_id();
+        survivor
+            .store_incoming_connection(peer_did.clone(), replacement)
+            .await;
+
+        let removed = evict_connection(&survivor.connections_arc(), &old).await;
+        assert!(
+            removed.is_empty(),
+            "nothing maps to the old connection any more"
+        );
+        assert_eq!(
+            held_ids(&*survivor.connections_arc().read().await, &peer_did),
+            Some(replacement_id),
+            "the old connection's cleanup must not delete its replacement"
+        );
+        assert!(can_reach(&survivor, &peer_did).await);
+
+        peer_v2.stop().await.unwrap();
+        survivor.stop().await.unwrap();
+    }
+
+    /// Without eviction, an ended connection stays in the map as a peer nobody can reach.
+    #[tokio::test]
+    async fn test_an_ended_connection_is_gone_after_eviction() {
+        setup();
+        let (mut survivor, survivor_addr) = start_manager().await;
+        let peer_did = "did:icn:zDepartingPeer".to_string();
+        let (mut peer, _) = start_manager().await;
+        let conn = connect(&survivor, &peer, survivor_addr).await;
+        survivor
+            .store_incoming_connection(peer_did.clone(), conn.clone())
+            .await;
+        peer.stop().await.unwrap();
+        tokio::time::timeout(tokio::time::Duration::from_secs(5), conn.closed())
+            .await
+            .expect("closure observed");
+        assert!(
+            survivor
+                .connections_arc()
+                .read()
+                .await
+                .contains_key(&peer_did),
+            "precondition: nothing removes an ended connection on its own"
+        );
+
+        evict_connection(&survivor.connections_arc(), &conn).await;
+        assert!(!survivor
+            .connections_arc()
+            .read()
+            .await
+            .contains_key(&peer_did));
+        survivor.stop().await.unwrap();
     }
 }

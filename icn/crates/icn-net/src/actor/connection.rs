@@ -463,6 +463,9 @@ impl NetworkActor {
             }),
         );
 
+        // Set when a Hello is rejected; returned after cleanup so the caller sees the same error.
+        let mut hello_failure: Option<anyhow::Error> = None;
+
         loop {
             // A connection stops being anonymous exactly once and never goes back, so this only
             // ever clears the deadline — and it is read here, in the same sequential task that
@@ -778,18 +781,25 @@ impl NetworkActor {
                                     ml_kem_public,
                                     pq_binding_proof,
                                 } => {
-                                    ctx.handle_hello(
-                                        &connection,
-                                        &message.from,
-                                        binding_info,
-                                        version_info,
-                                        topology_info,
-                                        x25519_public,
-                                        ml_dsa_public.clone(),
-                                        ml_kem_public.clone(),
-                                        pq_binding_proof.clone(),
-                                    )
-                                    .await?;
+                                    // Not `?`: a rejected Hello ends this connection, and the
+                                    // connection must still be forgotten on the way out.
+                                    if let Err(e) = ctx
+                                        .handle_hello(
+                                            &connection,
+                                            &message.from,
+                                            binding_info,
+                                            version_info,
+                                            topology_info,
+                                            x25519_public,
+                                            ml_dsa_public.clone(),
+                                            ml_kem_public.clone(),
+                                            pq_binding_proof.clone(),
+                                        )
+                                        .await
+                                    {
+                                        hello_failure = Some(e);
+                                        break;
+                                    }
                                 }
                                 MessagePayload::Handshake {
                                     region,
@@ -914,6 +924,24 @@ impl NetworkActor {
             }
         }
 
-        Ok(())
+        // Every exit from the loop means nobody will service this connection again — it closed,
+        // timed out, or failed its Hello — so it must stop being a session. Left in place, a
+        // timed-out connection stayed in the map indefinitely: the peer was still reported as
+        // connected and was never redialled. Eviction is by connection identity: if a newer
+        // connection to the same peer has already replaced this one, it is left untouched.
+        let connections = session_manager.read().await.connections_arc();
+        let evicted = crate::session::evict_connection(&connections, &connection).await;
+        if !evicted.is_empty() {
+            info!(
+                evicted_keys = ?evicted,
+                close_reason = ?connection.close_reason(),
+                "Connection ended; removed it from the session map"
+            );
+        }
+
+        match hello_failure {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 }

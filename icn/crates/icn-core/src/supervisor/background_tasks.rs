@@ -762,6 +762,65 @@ impl Default for BootstrapHealthConfig {
     }
 }
 
+/// What a bootstrap peer's configured endpoint looks like right now.
+///
+/// Three outcomes are kept apart because they call for different responses. Only `Healthy`
+/// means the operator's relationship holds. `IdentityMismatch` is an authenticated, live
+/// session at the configured address with a *different* DID than configured: transport works,
+/// but the configured peer is not the one there, so it is never reported healthy — and
+/// redialling cannot change who answers at that address, so it is not redialled while the other
+/// node holds it. `Unreachable` is the only case a redial can fix.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BootstrapPeerHealth {
+    /// The configured DID is authenticated on a live session.
+    Healthy,
+    /// A live session reaches the configured address, but authenticated as `authenticated`.
+    IdentityMismatch { authenticated: Did },
+    /// No live session reaches the configured peer or its address.
+    Unreachable,
+}
+
+/// `addr` with an IPv4-mapped IP (`::ffff:a.b.c.d`) rewritten to plain IPv4.
+///
+/// A dual-stack socket — the default, `listen_addr` is `[::]:7777` — reports IPv4 peers in mapped
+/// form, while an operator configures `a.b.c.d`. Same rule as `SourceKey::from_addr` in
+/// `icn-net`: only `::ffff:0:0/96` is unmapped, never deprecated IPv4-compatible addresses (that
+/// would also turn `::1` into `0.0.0.1`).
+fn unmapped(addr: std::net::SocketAddr) -> std::net::SocketAddr {
+    match addr.ip() {
+        std::net::IpAddr::V6(ip) => match ip.to_ipv4_mapped() {
+            Some(v4) => std::net::SocketAddr::new(std::net::IpAddr::V4(v4), addr.port()),
+            None => addr,
+        },
+        std::net::IpAddr::V4(_) => addr,
+    }
+}
+
+/// Classify one configured bootstrap peer.
+///
+/// `expected_is_live` is whether the configured DID holds a live, authenticated session;
+/// `live_endpoints` are every live, authenticated session's `(DID, remote address)`. Pure, so
+/// the policy is testable without a network.
+pub fn classify_bootstrap_peer(
+    expected: &Did,
+    address: std::net::SocketAddr,
+    expected_is_live: bool,
+    live_endpoints: &[(Did, std::net::SocketAddr)],
+) -> BootstrapPeerHealth {
+    if expected_is_live {
+        return BootstrapPeerHealth::Healthy;
+    }
+    match live_endpoints
+        .iter()
+        .find(|(did, addr)| unmapped(*addr) == unmapped(address) && did != expected)
+    {
+        Some((other, _)) => BootstrapPeerHealth::IdentityMismatch {
+            authenticated: other.clone(),
+        },
+        None => BootstrapPeerHealth::Unreachable,
+    }
+}
+
 /// Status of bootstrap peer connectivity
 #[derive(Debug, Clone)]
 pub struct BootstrapPeerStatus {
@@ -769,10 +828,22 @@ pub struct BootstrapPeerStatus {
     pub did: Did,
     /// Peer address
     pub address: std::net::SocketAddr,
-    /// Currently connected
-    pub connected: bool,
-    /// Consecutive connection failures
+    /// Last observed health; `None` before the first check.
+    pub health: Option<BootstrapPeerHealth>,
+    /// Consecutive failed reconnection attempts
     pub failure_count: u32,
+    /// Checks to skip before the next reconnection attempt (exponential backoff)
+    pub backoff_ticks_remaining: u32,
+}
+
+/// How many checks to skip after `failures` consecutive failed reconnections: 1, 3, 7, 15, then
+/// 31 at most — attempts spaced 2, 4, 8, 16 and finally 32 check intervals apart.
+///
+/// Each attempt to an unreachable peer occupies the network actor for up to its dial timeout
+/// (the actor awaits dials inline), so retrying a peer that stays down on every check would keep
+/// the actor busy indefinitely.
+pub fn reconnect_backoff_ticks(failures: u32) -> u32 {
+    (1u32 << failures.min(5)) - 1
 }
 
 /// Spawn the bootstrap health checking background task
@@ -783,7 +854,9 @@ pub struct BootstrapPeerStatus {
 ///
 /// Key behaviors:
 /// - Checks bootstrap peer connectivity every `check_interval`
-/// - Attempts reconnection for disconnected bootstrap peers
+/// - Classifies each peer as healthy, identity-mismatched, or unreachable
+///   ([`classify_bootstrap_peer`]); only healthy peers count as connected
+/// - Redials only unreachable peers, through `dial_expecting`, with exponential backoff
 /// - Records successful connections to peer cache for faster rejoining
 /// - Emits metrics for bootstrap connectivity monitoring
 ///
@@ -798,9 +871,28 @@ pub fn spawn_bootstrap_health_task(
     bootstrap_peers: Vec<(Did, std::net::SocketAddr)>,
     network_handle: NetworkHandle,
     peer_cache: Option<PeerCacheCallback>,
-    mut shutdown_rx: BroadcastReceiver<()>,
+    shutdown_rx: BroadcastReceiver<()>,
 ) -> JoinHandle<()> {
-    tokio::spawn(async move {
+    tokio::spawn(run_bootstrap_health_task(
+        config,
+        bootstrap_peers,
+        network_handle,
+        peer_cache,
+        shutdown_rx,
+    ))
+}
+
+/// The bootstrap health task itself, for callers that own its lifetime — the daemon runs it in
+/// the supervisor's `JoinSet`, so shutdown joins or aborts it with its sibling tasks.
+/// [`spawn_bootstrap_health_task`] documents the behaviour.
+pub async fn run_bootstrap_health_task(
+    config: BootstrapHealthConfig,
+    bootstrap_peers: Vec<(Did, std::net::SocketAddr)>,
+    network_handle: NetworkHandle,
+    peer_cache: Option<PeerCacheCallback>,
+    mut shutdown_rx: BroadcastReceiver<()>,
+) {
+    {
         if bootstrap_peers.is_empty() {
             info!("No bootstrap peers configured, health task exiting");
             return;
@@ -812,120 +904,165 @@ pub fn spawn_bootstrap_health_task(
             "Bootstrap health task started"
         );
 
-        // Track status for each bootstrap peer
         let mut peer_status: Vec<BootstrapPeerStatus> = bootstrap_peers
             .iter()
             .map(|(did, addr)| BootstrapPeerStatus {
                 did: did.clone(),
                 address: *addr,
-                connected: true, // Assume initially connected (we dial at startup)
+                health: None,
                 failure_count: 0,
+                backoff_ticks_remaining: 0,
             })
             .collect();
 
         let mut interval = tokio::time::interval(config.check_interval);
+        // A reconnection attempt can hold this loop for the reconnect timeout. `Delay` keeps the
+        // spacing after such a stall; the default `Burst` would fire the missed checks back to
+        // back and consume the backoff in a moment.
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        interval.tick().await; // Skip first immediate tick (we just dialed at startup)
 
-        // Skip first tick - startup connection happens elsewhere
-        interval.tick().await;
-
-        loop {
+        'checks: loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    let mut connected_count = 0;
-                    let mut disconnected_count = 0;
+                    let mut connected_count = 0u64;
+                    let mut disconnected_count = 0u64;
+                    let live_endpoints = network_handle.connected_peer_endpoints().await;
 
                     for status in &mut peer_status {
-                        // Check if peer is currently connected
-                        let is_connected = network_handle
+                        let expected_is_live = network_handle
                             .is_peer_connected(&status.did)
                             .await
                             .unwrap_or(false);
+                        let health = classify_bootstrap_peer(
+                            &status.did,
+                            status.address,
+                            expected_is_live,
+                            &live_endpoints,
+                        );
 
-                        if is_connected {
-                            // Peer is connected
-                            connected_count += 1;
-                            status.connected = true;
-                            status.failure_count = 0;
-
-                            // Record success to peer cache if available
-                            if let Some(ref cache_fn) = peer_cache {
-                                cache_fn(&status.did, status.address);
+                        match &health {
+                            BootstrapPeerHealth::Healthy => {
+                                connected_count += 1;
+                                status.failure_count = 0;
+                                status.backoff_ticks_remaining = 0;
+                                if let Some(ref cache_fn) = peer_cache {
+                                    cache_fn(&status.did, status.address);
+                                }
                             }
-                        } else {
-                            // Peer is disconnected - attempt reconnection
-                            disconnected_count += 1;
-                            status.connected = false;
-
-                            debug!(
-                                peer = %status.did,
-                                address = %status.address,
-                                failures = status.failure_count,
-                                "Bootstrap peer disconnected, attempting reconnection"
-                            );
-
-                            // Attempt reconnection with timeout
-                            match tokio::time::timeout(
-                                config.reconnect_timeout,
-                                network_handle.dial(status.address, status.did.clone()),
-                            )
-                            .await
-                            {
-                                Ok(Ok(_)) => {
-                                    info!(
-                                        peer = %status.did,
-                                        "Reconnected to bootstrap peer"
+                            BootstrapPeerHealth::IdentityMismatch { authenticated } => {
+                                disconnected_count += 1;
+                                // Once per episode: the state, not each check, is the news.
+                                if status.health.as_ref() != Some(&health) {
+                                    warn!(
+                                        expected_did = %status.did,
+                                        authenticated_did = %authenticated,
+                                        address = %status.address,
+                                        "Bootstrap peer identity mismatch: a different DID holds \
+                                         the configured endpoint. Not counted as connected, and \
+                                         not redialled while it holds the endpoint"
                                     );
-                                    status.connected = true;
-                                    status.failure_count = 0;
-                                    connected_count += 1;
-                                    disconnected_count -= 1;
-
-                                    // Record success to peer cache
-                                    if let Some(ref cache_fn) = peer_cache {
-                                        cache_fn(&status.did, status.address);
+                                }
+                            }
+                            BootstrapPeerHealth::Unreachable => {
+                                disconnected_count += 1;
+                                if status.backoff_ticks_remaining > 0 {
+                                    status.backoff_ticks_remaining -= 1;
+                                } else {
+                                    debug!(
+                                        peer = %status.did,
+                                        address = %status.address,
+                                        failures = status.failure_count,
+                                        "Bootstrap peer disconnected, attempting reconnection"
+                                    );
+                                    // `dial_expecting`, as at startup: this DID came from
+                                    // operator configuration, so a different node answering
+                                    // after an outage surfaces as a divergence (#2533) and is
+                                    // classified as a mismatch on the next check.
+                                    // Raced against shutdown: an attempt can take the whole
+                                    // reconnect timeout, and the supervisor waits for this task
+                                    // before aborting what is left. Shutdown must not wait for a
+                                    // dial to a peer that is not there.
+                                    let attempt = tokio::select! {
+                                        attempt = tokio::time::timeout(
+                                            config.reconnect_timeout,
+                                            network_handle.dial_expecting(
+                                                status.address,
+                                                status.did.clone(),
+                                            ),
+                                        ) => attempt,
+                                        _ = shutdown_rx.recv() => {
+                                            info!(
+                                                "Bootstrap health task shutting down \
+                                                 (reconnection attempt abandoned)"
+                                            );
+                                            break 'checks;
+                                        }
+                                    };
+                                    match attempt {
+                                        Ok(Ok(_)) => {
+                                            // Transport came up; whether the configured peer is
+                                            // there is decided by the next check. Count the
+                                            // attempt until then: an address that answers but
+                                            // never becomes healthy (failed Hello, refusal, a
+                                            // node that drops us) must back off like one that
+                                            // does not answer. At least one check of grace, so a
+                                            // Hello in flight does not cost a second connection.
+                                            status.failure_count += 1;
+                                            status.backoff_ticks_remaining =
+                                                reconnect_backoff_ticks(status.failure_count)
+                                                    .max(1);
+                                            info!(
+                                                peer = %status.did,
+                                                "Reached bootstrap peer; identity is confirmed \
+                                                 by the next check"
+                                            );
+                                            icn_obs::metrics::nat::dial_success_inc(
+                                                "bootstrap_reconnect",
+                                            );
+                                        }
+                                        Ok(Err(e)) => {
+                                            status.failure_count += 1;
+                                            status.backoff_ticks_remaining =
+                                                reconnect_backoff_ticks(status.failure_count);
+                                            warn!(
+                                                peer = %status.did,
+                                                error = %e,
+                                                failures = status.failure_count,
+                                                "Failed to reconnect to bootstrap peer"
+                                            );
+                                            icn_obs::metrics::nat::dial_failure_inc();
+                                        }
+                                        Err(_) => {
+                                            status.failure_count += 1;
+                                            status.backoff_ticks_remaining =
+                                                reconnect_backoff_ticks(status.failure_count);
+                                            warn!(
+                                                peer = %status.did,
+                                                timeout_ms = config.reconnect_timeout.as_millis(),
+                                                failures = status.failure_count,
+                                                "Bootstrap reconnection timed out"
+                                            );
+                                            icn_obs::metrics::nat::dial_failure_inc();
+                                        }
                                     }
-
-                                    icn_obs::metrics::nat::dial_success_inc("bootstrap_reconnect");
+                                    if status.failure_count >= config.max_failures {
+                                        warn!(
+                                            peer = %status.did,
+                                            failures = status.failure_count,
+                                            "Bootstrap peer not healthy after {} consecutive reconnection attempts",
+                                            config.max_failures
+                                        );
+                                    }
                                 }
-                                Ok(Err(e)) => {
-                                    status.failure_count += 1;
-                                    warn!(
-                                        peer = %status.did,
-                                        error = %e,
-                                        failures = status.failure_count,
-                                        "Failed to reconnect to bootstrap peer"
-                                    );
-                                    icn_obs::metrics::nat::dial_failure_inc();
-                                }
-                                Err(_) => {
-                                    status.failure_count += 1;
-                                    warn!(
-                                        peer = %status.did,
-                                        timeout_ms = config.reconnect_timeout.as_millis(),
-                                        failures = status.failure_count,
-                                        "Bootstrap reconnection timed out"
-                                    );
-                                    icn_obs::metrics::nat::dial_failure_inc();
-                                }
-                            }
-
-                            // Alert if max failures exceeded
-                            if status.failure_count >= config.max_failures {
-                                warn!(
-                                    peer = %status.did,
-                                    failures = status.failure_count,
-                                    "Bootstrap peer unreachable after {} consecutive failures",
-                                    config.max_failures
-                                );
                             }
                         }
+                        status.health = Some(health);
                     }
 
-                    // Update metrics
                     icn_obs::metrics::scalability::bootstrap_peers_connected_set(connected_count);
                     icn_obs::metrics::scalability::bootstrap_peers_disconnected_set(disconnected_count);
 
-                    // Log summary if any disconnected
                     if disconnected_count > 0 {
                         debug!(
                             connected = connected_count,
@@ -941,7 +1078,7 @@ pub fn spawn_bootstrap_health_task(
                 }
             }
         }
-    })
+    }
 }
 
 #[cfg(test)]
@@ -980,6 +1117,69 @@ mod tests {
         assert_eq!(config.retention_days, 365);
         assert_eq!(config.max_records_per_entity, 10000);
         assert_eq!(config.batch_size, 1000);
+    }
+
+    fn did(seed: u8) -> Did {
+        icn_identity::IdentityBundle::generate()
+            .map(|b| b.did().clone())
+            .unwrap_or_else(|_| panic!("identity {seed}"))
+    }
+
+    #[test]
+    fn only_the_expected_did_makes_a_bootstrap_peer_healthy() {
+        let expected = did(1);
+        let other = did(2);
+        let addr: std::net::SocketAddr = "192.0.2.11:7777".parse().unwrap();
+
+        assert_eq!(
+            classify_bootstrap_peer(&expected, addr, true, &[(expected.clone(), addr)]),
+            BootstrapPeerHealth::Healthy
+        );
+        // A different authenticated DID at the configured address is not the configured peer.
+        assert_eq!(
+            classify_bootstrap_peer(&expected, addr, false, &[(other.clone(), addr)]),
+            BootstrapPeerHealth::IdentityMismatch {
+                authenticated: other.clone()
+            }
+        );
+        // A session to some other address says nothing about this endpoint.
+        let elsewhere: std::net::SocketAddr = "192.0.2.12:7777".parse().unwrap();
+        assert_eq!(
+            classify_bootstrap_peer(&expected, addr, false, &[(other, elsewhere)]),
+            BootstrapPeerHealth::Unreachable
+        );
+        assert_eq!(
+            classify_bootstrap_peer(&expected, addr, false, &[]),
+            BootstrapPeerHealth::Unreachable
+        );
+    }
+
+    #[test]
+    fn a_dual_stack_report_of_the_configured_ipv4_endpoint_is_the_same_endpoint() {
+        let expected = did(1);
+        let other = did(2);
+        let configured: std::net::SocketAddr = "192.0.2.11:7777".parse().unwrap();
+        let mapped: std::net::SocketAddr = "[::ffff:192.0.2.11]:7777".parse().unwrap();
+        assert_eq!(
+            classify_bootstrap_peer(&expected, configured, false, &[(other.clone(), mapped)]),
+            BootstrapPeerHealth::IdentityMismatch {
+                authenticated: other.clone()
+            }
+        );
+        // IPv6 loopback must not be merged into an IPv4 address.
+        let v6_loopback: std::net::SocketAddr = "[::1]:7777".parse().unwrap();
+        let v4_odd: std::net::SocketAddr = "0.0.0.1:7777".parse().unwrap();
+        assert_eq!(
+            classify_bootstrap_peer(&expected, v4_odd, false, &[(other, v6_loopback)]),
+            BootstrapPeerHealth::Unreachable
+        );
+    }
+
+    #[test]
+    fn reconnection_backoff_grows_and_is_capped() {
+        let spacing: Vec<u32> = (1..=7).map(reconnect_backoff_ticks).collect();
+        assert_eq!(spacing, vec![1, 3, 7, 15, 31, 31, 31]);
+        assert_eq!(reconnect_backoff_ticks(u32::MAX), 31);
     }
 
     #[test]

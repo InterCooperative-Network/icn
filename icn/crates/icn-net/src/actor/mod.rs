@@ -566,12 +566,22 @@ impl NetworkHandle {
     ///
     /// Returns true if the peer has completed the Hello handshake and has
     /// an active connection entry.
+    ///
+    /// "Active" is read from the session map — the only state that holds the connection itself —
+    /// and means the connection has not closed. It is deliberately *not* read from
+    /// `peer_connections`: those rows outlive their connection by design (they are restored from
+    /// snapshots before any Hello, and a connection ending does not remove them — only an
+    /// explicit `disconnect_peer` does), so their presence says
+    /// a peer was once seen, not that it is reachable now. Reading them made a peer whose
+    /// connection had timed out look connected forever, so it was never redialled.
     pub async fn is_peer_connected(&self, did: &Did) -> Result<bool> {
-        if let Some(ref connections) = self.peer_connections {
-            Ok(connections.read().await.contains_key(did))
-        } else {
-            Ok(false)
-        }
+        // Take the map handle and release the session-manager guard before awaiting the map:
+        // holding that guard across an await can deadlock `SessionManager::stop`.
+        let connections = self.session_manager.read().await.connections_arc();
+        let connections = connections.read().await;
+        Ok(connections
+            .get(did.as_str())
+            .is_some_and(|connection| connection.close_reason().is_none()))
     }
 
     /// Disconnect a peer by closing their QUIC connection
