@@ -8,13 +8,13 @@ tags: ["governance", "evidence", "supervisor", "gateway", "durability", "topolog
 supersedes: []
 superseded_by: []
 amends: ["ADR-0011"]
-implementation_status: "not yet implemented (stage S1 in PR #2980, unmerged)"
+implementation_status: "partially implemented (S1 merged via PR #2980 as db075e081; S2, S3 and S4 not yet implemented)"
 references:
   - "ADR-0011 (amended: §Fallback / Standalone Mode for governance; Audit Results Domain Map, Governance row)"
   - "ADR-0014 (mandates and authority grants written through the receipt backend)"
   - "ADR-0019 (one mandate per proposal)"
   - "ADR-0018 (ADR lifecycle vocabulary)"
-  - "PR #2980 (stage S1 implementation; must not merge before this ADR is accepted)"
+  - "PR #2980 (stage S1 implementation; merged after acceptance as db075e081)"
 ---
 
 # ADR-0094: Governance evidence initialization is owned by the supervisor, not the gateway
